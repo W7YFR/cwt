@@ -144,6 +144,29 @@ def test_sibling_text_autodiscovered(capsys, tmp_path):
     assert d["comparison"]["accuracy"] == 1.0
 
 
+def test_expected_accepts_literal_text(capsys, tmp_path):
+    import json as _json
+
+    from cw_decoder import cli
+    wav = tmp_path / "msg.wav"
+    _write_wav(wav, text="CQ DE AB1CD")
+    # -e value is not a file -> treated as the literal intended message.
+    assert cli.main([str(wav), "-e", "CQ DE AB1CD", "--json"]) == 0
+    d = _json.loads(capsys.readouterr().out)
+    assert d["comparison"]["expected_source"] == "(inline text)"
+    assert d["comparison"]["accuracy"] == 1.0
+
+
+def test_expected_missing_txt_file_errors(capsys, tmp_path):
+    from cw_decoder import cli
+    wav = tmp_path / "msg.wav"
+    _write_wav(wav)
+    # A .txt value that doesn't exist is a typo, not literal text -> error.
+    rc = cli.main([str(wav), "-e", str(tmp_path / "typo.txt")])
+    assert rc == 1
+    assert "not found" in capsys.readouterr().err
+
+
 def test_explicit_expected_overrides_sibling(capsys, tmp_path):
     import json as _json
 

@@ -59,7 +59,7 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `-w, --target-wpm N` | Your target **character** speed. Turns on the practice report. |
 | `-f, --target-farnsworth N` | Your target **overall** (Farnsworth) speed. Defaults to `--target-wpm`. Only meaningful with `-w`. |
 | `-T, --tolerance PCT` | Grading tolerance in percent (default 30). Smaller = stricter. |
-| `-e, --expected FILE` | Text file with the intended message; scores decode accuracy against it. |
+| `-e, --expected TEXT\|FILE` | The intended message — literal text (`-e "CQ DE AB1CD"`) or a path to a text file. Scores decode accuracy against it. |
 | `-q, --quiet` | Print only the decoded text (suppresses all reports). |
 | `--json` | Emit a single structured JSON object to stdout (text + speeds + grading + accuracy) and nothing else. |
 | `--listen` | Trainer mode: capture live from an audio input device instead of a file. |
@@ -138,12 +138,18 @@ that's the point, it shows where you drifted. Drop `-w/-f` for a clean read.
 
 ## Compare against the intended text
 
-Put the message you meant to send in a text file and pass it with `-e`:
+Pass the message you meant to send with `-e` — either directly as text or as a
+path to a text file:
 
 ```sh
-echo "ROB DE W7YFR ROB DE W7YFR 73 <BK>" > message.txt
-cw-decode -e message.txt recording.wav
+cw-decode -e "CQ CQ DE AB1CD K" recording.wav     # literal text
+cw-decode -e message.txt recording.wav            # or a file
 ```
+
+If the value names an existing file it's read; otherwise it's used as the text
+(the report's `source:` line shows `(inline text)` in that case). As a typo
+guard, a value ending in `.txt` that *doesn't* exist is treated as a mistyped
+filename and errors out rather than being graded as literal text.
 
 **Sibling auto-discovery:** if you don't pass `-e`, it automatically looks for a
 text file with the same base name as the audio in the same directory and uses it
@@ -192,8 +198,9 @@ input (your rig's sidetone into an interface, a keyer's audio, or a mic) and the
 decodes and grades it — the same reports as above, live. (macOS only for now.)
 
 ```sh
-cw-decode --list-devices                       # see input devices
-cw-decode --listen -D 1 -w 20 -e message.txt   # key against a 20 wpm target
+cw-decode --list-devices                           # see input devices
+cw-decode --listen -D 1 -w 20 -e "CQ DE AB1CD K"   # key against a 20 wpm target
+cw-decode --listen -D 1 -w 20 -e message.txt       # target from a file instead
 ```
 
 When you supply the target text (via `-e` or a sibling `.txt`), it prints the

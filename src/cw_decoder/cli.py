@@ -196,9 +196,10 @@ def main(argv=None) -> int:
     p.add_argument("-T", "--tolerance", type=float, default=30.0,
                    help="grading tolerance in percent for the practice report "
                         "(default 30). Smaller = stricter.")
-    p.add_argument("-e", "--expected", metavar="TEXTFILE", default=None,
-                   help="file containing the intended message; the decode is "
-                        "compared against it and scored for accuracy.")
+    p.add_argument("-e", "--expected", metavar="TEXT|FILE", default=None,
+                   help="the intended message, as literal text or a path to a "
+                        "text file (an existing file is read; otherwise the "
+                        "value is the message). The decode is scored against it.")
     p.add_argument("-q", "--quiet", action="store_true",
                    help="print only the decoded text (no report).")
     p.add_argument("--json", action="store_true",
@@ -258,17 +259,29 @@ def main(argv=None) -> int:
             print(f"  [{idx}] {name}")
         return 0
 
-    # Load the intended text, if explicitly given.
+    # Resolve the intended text, if explicitly given: a path to an existing file
+    # is read; otherwise the value is used as the literal message text.
     expected = None
     expected_source = None
     if args.expected is not None:
-        try:
-            with open(args.expected, encoding="utf-8") as fh:
-                expected = fh.read()
-            expected_source = args.expected
-        except OSError as e:
-            print(f"error: cannot read --expected file: {e}", file=sys.stderr)
+        if os.path.isfile(args.expected):
+            try:
+                with open(args.expected, encoding="utf-8") as fh:
+                    expected = fh.read()
+                expected_source = args.expected
+            except OSError as e:
+                print(f"error: cannot read --expected file: {e}", file=sys.stderr)
+                return 1
+        elif args.expected.lower().endswith(".txt"):
+            # Looks like a filename but doesn't exist — almost certainly a typo,
+            # not an intended literal message. Fail loudly rather than silently
+            # grading against the path string.
+            print(f"error: --expected file not found: {args.expected}",
+                  file=sys.stderr)
             return 1
+        else:
+            expected = args.expected
+            expected_source = "(inline text)"
 
     # --- live capture (trainer) ------------------------------------------ #
     if args.listen:
