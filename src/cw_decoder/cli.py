@@ -214,10 +214,49 @@ def main(argv=None) -> int:
                    help="overall Farnsworth speed for --demo.")
     p.add_argument("--demo-noise", type=float, default=0.0,
                    help="additive noise level for --demo (e.g. 0.2).")
+
+    live = p.add_argument_group("live capture (trainer)")
+    live.add_argument("--listen", action="store_true",
+                      help="capture from an audio input device instead of a "
+                           "file: key your message, then it decodes and grades.")
+    live.add_argument("--list-devices", action="store_true",
+                      help="list available audio input devices and exit.")
+    live.add_argument("-D", "--device", type=int, default=None,
+                      help="audio input device index for --listen "
+                           "(see --list-devices).")
+    live.add_argument("--duration", type=float, default=30.0,
+                      help="maximum capture length in seconds; recording also "
+                           "stops early when you press Enter (default 30). This "
+                           "cap prevents a runaway recording filling the disk.")
+    live.add_argument("--save", metavar="WAVFILE", default=None,
+                      help="keep the captured audio at this path (default: "
+                           "discard after decoding).")
     args = p.parse_args(argv)
 
     verbose = not args.quiet
     tol = max(args.tolerance, 0.0) / 100.0
+
+    def emit(res, comparison, source):
+        if args.json:
+            print(json.dumps(_build_report(res, comparison, source), indent=2))
+        else:
+            _print_result(res, verbose, comparison, source)
+
+    # --- list audio devices and exit ------------------------------------- #
+    if args.list_devices:
+        from . import capture
+        try:
+            devices = capture.list_audio_devices()
+        except RuntimeError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        if not devices:
+            print("no audio input devices found.", file=sys.stderr)
+            return 1
+        print("audio input devices:")
+        for idx, name in devices:
+            print(f"  [{idx}] {name}")
+        return 0
 
     # Load the intended text, if explicitly given.
     expected = None
@@ -230,6 +269,70 @@ def main(argv=None) -> int:
         except OSError as e:
             print(f"error: cannot read --expected file: {e}", file=sys.stderr)
             return 1
+
+    # --- live capture (trainer) ------------------------------------------ #
+    if args.listen:
+        from . import capture
+
+        device = args.device
+        try:
+            if device is None:
+                devices = capture.list_audio_devices()
+                if not devices:
+                    print("no audio input devices found.", file=sys.stderr)
+                    return 1
+                print("audio input devices:", file=sys.stderr)
+                for idx, name in devices:
+                    print(f"  [{idx}] {name}", file=sys.stderr)
+                if not sys.stdin.isatty():
+                    print("error: specify a device with -D/--device.",
+                          file=sys.stderr)
+                    return 1
+                print("select device index: ", end="", file=sys.stderr, flush=True)
+                device = int(input().strip())
+
+            if args.save:
+                out_path, keep = args.save, True
+            else:
+                fd, out_path = tempfile.mkstemp(suffix=".wav")
+                os.close(fd)
+                keep = False
+
+            if expected:
+                print("#", file=sys.stderr)
+                print("# send this:", file=sys.stderr)
+                print(f"#   {' '.join(expected.split())}", file=sys.stderr)
+                print("#", file=sys.stderr)
+            else:
+                print("# (no target text given — pass -e FILE to be graded)",
+                      file=sys.stderr)
+
+            print(f"# recording from device {device} — key your message, then "
+                  f"press Enter to stop (auto-stops after {args.duration:g}s).",
+                  file=sys.stderr)
+
+            try:
+                capture.record(device, out_path, rate=args.rate,
+                               max_seconds=args.duration)
+                res = core.decode_file(out_path, tone=args.tone,
+                                       target_rate=args.rate,
+                                       bandwidth=args.bandwidth,
+                                       target_wpm=args.target_wpm,
+                                       target_farnsworth=args.target_farnsworth,
+                                       tolerance=tol)
+            finally:
+                if not keep and os.path.exists(out_path):
+                    os.unlink(out_path)
+        except (RuntimeError, ValueError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+
+        if args.save and verbose:
+            print(f"# saved recording to {args.save}", file=sys.stderr)
+        comparison = (core.compare_text(expected, res.text)
+                      if expected else None)
+        emit(res, comparison, expected_source)
+        return 0
 
     if args.demo is not None:
         from . import synth

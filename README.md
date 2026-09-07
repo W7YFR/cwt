@@ -62,6 +62,11 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `-e, --expected FILE` | Text file with the intended message; scores decode accuracy against it. |
 | `-q, --quiet` | Print only the decoded text (suppresses all reports). |
 | `--json` | Emit a single structured JSON object to stdout (text + speeds + grading + accuracy) and nothing else. |
+| `--listen` | Trainer mode: capture live from an audio input device instead of a file. |
+| `--list-devices` | List available audio input devices and exit. |
+| `-D, --device N` | Audio input device index for `--listen` (see `--list-devices`). |
+| `--duration SEC` | Max live-capture length; also stops early on Enter (default 30, prevents runaway recordings). |
+| `--save WAVFILE` | Keep the captured audio (default: discarded after decoding). |
 | `--demo [TEXT]` | Decode a synthesized signal instead of a file (self-test); pairs with `--demo-wpm`, `--demo-farnsworth`, `--demo-noise`. |
 
 ---
@@ -179,6 +184,48 @@ cw-decode -w 25 -f 12 -T 20 -e message.txt recording.wav
 (`-q` suppresses the reports, including accuracy — omit it to see them.)
 
 ---
+
+## Trainer: key live and get graded
+
+Instead of recording a file first, `--listen` captures straight from an audio
+input (your rig's sidetone into an interface, a keyer's audio, or a mic) and then
+decodes and grades it — the same reports as above, live. (macOS only for now.)
+
+```sh
+cw-decode --list-devices                       # see input devices
+cw-decode --listen -D 1 -w 20 -e message.txt   # key against a 20 wpm target
+```
+
+When you supply the target text (via `-e` or a sibling `.txt`), it prints the
+message to send before recording, so you know what to key:
+
+```
+# send this:
+#   CQ CQ DE AB1CD K
+#
+# recording from device 1 — key your message, then press Enter to stop.
+```
+
+Pick the input with `-D` (index from `--list-devices`); omit it and you'll get a
+prompt. Recording stops when you **press Enter**, or automatically after the
+`--duration` cap (default **30 s**)
+`--save practice.wav` to keep the take.
+
+A typical practice loop — put the target in a text file once, then repeat:
+
+```sh
+echo "CQ CQ DE AB1CD K" > message.txt
+cw-decode --listen -D 1 -w 20 -e message.txt   # key it, read the grade, repeat
+```
+
+You get the spacing breakdown and the accuracy diff each time, so you can watch
+your word timing tighten up. Notes:
+
+- First use may trigger a macOS microphone-permission prompt for your terminal.
+- The capture goes through the same pipeline as a file, so tone auto-detect,
+  `-t`, and `-b` all work the same.
+- `--save` pairs well with the fixture workflow: a good take can be dropped into
+  `tests/data/` as a regression fixture.
 
 ## JSON output
 

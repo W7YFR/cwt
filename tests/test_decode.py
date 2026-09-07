@@ -111,6 +111,20 @@ def test_json_output(capsys, tmp_path):
     assert d["analysis"]["elements"]
 
 
+def test_capture_device_parser():
+    from cw_decoder import capture
+    # Sample of ffmpeg's avfoundation device listing (goes to stderr).
+    sample = (
+        "[AVFoundation indev @ 0x7f] AVFoundation video devices:\n"
+        "[AVFoundation indev @ 0x7f] [0] FaceTime HD Camera\n"
+        "[AVFoundation indev @ 0x7f] AVFoundation audio devices:\n"
+        "[AVFoundation indev @ 0x7f] [0] MacBook Pro Microphone\n"
+        "[AVFoundation indev @ 0x7f] [1] USB Audio CODEC\n"
+    )
+    devices = capture._parse_devices(sample)
+    assert devices == [(0, "MacBook Pro Microphone"), (1, "USB Audio CODEC")]
+
+
 def _write_wav(path, text="CQ DE AB1CD", wpm=20):
     synth.write_wav(str(path), synth.generate(text, wpm=wpm, tone=600, rate=8000),
                     8000)
