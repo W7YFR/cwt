@@ -111,6 +111,51 @@ def test_json_output(capsys, tmp_path):
     assert d["analysis"]["elements"]
 
 
+def _write_wav(path, text="CQ DE AB1CD", wpm=20):
+    synth.write_wav(str(path), synth.generate(text, wpm=wpm, tone=600, rate=8000),
+                    8000)
+
+
+def test_sibling_text_autodiscovered(capsys, tmp_path):
+    import json as _json
+
+    from cw_decoder import cli
+    wav = tmp_path / "msg.wav"
+    _write_wav(wav)
+    (tmp_path / "msg.txt").write_text("CQ DE AB1CD")
+    assert cli.main([str(wav), "--json"]) == 0
+    d = _json.loads(capsys.readouterr().out)
+    assert d["comparison"] is not None
+    assert d["comparison"]["expected_source"].endswith("msg.txt")
+    assert d["comparison"]["accuracy"] == 1.0
+
+
+def test_explicit_expected_overrides_sibling(capsys, tmp_path):
+    import json as _json
+
+    from cw_decoder import cli
+    wav = tmp_path / "msg.wav"
+    _write_wav(wav)
+    (tmp_path / "msg.txt").write_text("TOTALLY WRONG")       # sibling
+    other = tmp_path / "right.txt"
+    other.write_text("CQ DE AB1CD")
+    assert cli.main([str(wav), "-e", str(other), "--json"]) == 0
+    d = _json.loads(capsys.readouterr().out)
+    assert d["comparison"]["expected_source"].endswith("right.txt")
+    assert d["comparison"]["accuracy"] == 1.0
+
+
+def test_no_sibling_no_comparison(capsys, tmp_path):
+    import json as _json
+
+    from cw_decoder import cli
+    wav = tmp_path / "msg.wav"
+    _write_wav(wav)                                          # no .txt beside it
+    assert cli.main([str(wav), "--json"]) == 0
+    d = _json.loads(capsys.readouterr().out)
+    assert d["comparison"] is None
+
+
 def test_compare_exact():
     c = core.compare_text("ROB DE W7YFR", "ROB DE W7YFR")
     assert c.accuracy == 1.0

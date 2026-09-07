@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import tempfile
 
@@ -11,7 +12,8 @@ from . import core
 
 
 def _build_report(res: core.Result,
-                  comparison: "core.Comparison | None") -> dict:
+                  comparison: "core.Comparison | None",
+                  comparison_source: "str | None" = None) -> dict:
     """Assemble a JSON-serializable report from a decode result."""
     t = res.timing
     report = {
@@ -64,6 +66,7 @@ def _build_report(res: core.Result,
     if comparison is not None:
         c = comparison
         report["comparison"] = {
+            "expected_source": comparison_source,
             "accuracy": round(c.accuracy, 4),
             "n_expected": c.n_expected,
             "substitutions": c.substitutions,
@@ -120,10 +123,12 @@ def _print_analysis(a: core.Analysis) -> None:
     print("# ---", file=e)
 
 
-def _print_comparison(c: core.Comparison) -> None:
+def _print_comparison(c: core.Comparison, source: "str | None" = None) -> None:
     e = sys.stdout
     errors = c.substitutions + c.insertions + c.deletions
     print("# ===== accuracy vs intended text =====", file=e)
+    if source:
+        print(f"#   source   : {source}", file=e)
     print(f"#   accuracy : {c.accuracy*100:.1f}%  "
           f"({errors} error(s) in {c.n_expected} symbols: "
           f"{c.substitutions} sub, {c.insertions} extra, {c.deletions} missed)",
@@ -148,7 +153,8 @@ def _wrap(s: str, width: int):
 
 
 def _print_result(res: core.Result, verbose: bool,
-                  comparison: "core.Comparison | None" = None) -> None:
+                  comparison: "core.Comparison | None" = None,
+                  comparison_source: "str | None" = None) -> None:
     t = res.timing
     if verbose:
         print(f"# tone           : {res.tone_hz:.1f} Hz")
@@ -163,7 +169,7 @@ def _print_result(res: core.Result, verbose: bool,
         else:
             _print_analysis(res.analysis)
         if comparison is not None:
-            _print_comparison(comparison)
+            _print_comparison(comparison, comparison_source)
     print(res.text)
 
 
@@ -213,12 +219,14 @@ def main(argv=None) -> int:
     verbose = not args.quiet
     tol = max(args.tolerance, 0.0) / 100.0
 
-    # Load the intended text, if given.
+    # Load the intended text, if explicitly given.
     expected = None
+    expected_source = None
     if args.expected is not None:
         try:
             with open(args.expected, encoding="utf-8") as fh:
                 expected = fh.read()
+            expected_source = args.expected
         except OSError as e:
             print(f"error: cannot read --expected file: {e}", file=sys.stderr)
             return 1
@@ -238,18 +246,34 @@ def main(argv=None) -> int:
                                    target_farnsworth=args.target_farnsworth,
                                    tolerance=tol)
         # For a demo, compare against the demo text unless a file was supplied.
-        cmp_target = expected if expected is not None else args.demo
+        if expected is not None:
+            cmp_target, cmp_source = expected, expected_source
+        else:
+            cmp_target, cmp_source = args.demo, "--demo text"
         comparison = core.compare_text(cmp_target, res.text)
         if args.json:
-            print(json.dumps(_build_report(res, comparison), indent=2))
+            print(json.dumps(_build_report(res, comparison, cmp_source), indent=2))
             return 0
         if verbose:
             print(f"# demo input     : {args.demo!r}")
-        _print_result(res, verbose, comparison)
+        _print_result(res, verbose, comparison, cmp_source)
         return 0
 
     if not args.input:
         p.error("an input file is required (or use --demo)")
+
+    # If no --expected was given, fall back to a sibling text file with the same
+    # base name as the audio (e.g. qso.wav -> qso.txt).
+    if expected is None:
+        sibling = os.path.splitext(args.input)[0] + ".txt"
+        if os.path.isfile(sibling):
+            try:
+                with open(sibling, encoding="utf-8") as fh:
+                    expected = fh.read()
+                expected_source = sibling
+            except OSError as e:
+                print(f"error: cannot read {sibling}: {e}", file=sys.stderr)
+                return 1
 
     try:
         res = core.decode_file(args.input, tone=args.tone,
@@ -263,9 +287,10 @@ def main(argv=None) -> int:
 
     comparison = core.compare_text(expected, res.text) if expected else None
     if args.json:
-        print(json.dumps(_build_report(res, comparison), indent=2))
+        print(json.dumps(_build_report(res, comparison, expected_source),
+                         indent=2))
         return 0
-    _print_result(res, verbose, comparison)
+    _print_result(res, verbose, comparison, expected_source)
     return 0
 
 

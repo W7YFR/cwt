@@ -140,6 +140,17 @@ echo "ROB DE W7YFR ROB DE W7YFR 73 <BK>" > message.txt
 cw-decode -e message.txt recording.wav
 ```
 
+**Sibling auto-discovery:** if you don't pass `-e`, it automatically looks for a
+text file with the same base name as the audio in the same directory and uses it
+if present. So if you keep `qso.wav` and `qso.txt` together, this just works:
+
+```sh
+cw-decode qso.wav          # uses qso.txt if it exists
+```
+
+An explicit `-e FILE` always wins over the sibling. The report's `source:` line
+shows which text it compared against.
+
 ```
 # ===== accuracy vs intended text =====
 #   accuracy : 96.7%  (8 error(s) in 91 symbols: 0 sub, 5 extra, 3 missed)
