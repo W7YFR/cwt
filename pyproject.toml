@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cw-decoder"
+version = "0.1.0"
+description = "Decode Morse code (CW) from an audio recording into text, with automatic speed detection."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+cw-decode = "cw_decoder.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
