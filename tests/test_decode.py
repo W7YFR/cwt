@@ -164,6 +164,25 @@ def test_sibling_text_autodiscovered(capsys, tmp_path):
     assert d["comparison"]["accuracy"] == 1.0
 
 
+def test_color_modes(capsys, tmp_path):
+    from cw_decoder import cli
+    wav = tmp_path / "m.wav"
+    _write_wav(wav, text="CQ DE AB1CD")
+    ESC = "\033["
+    # 'never' -> no ANSI
+    cli.main([str(wav), "-w", "20", "--color", "never"])
+    assert ESC not in capsys.readouterr().out
+    # 'always' -> ANSI present
+    cli.main([str(wav), "-w", "20", "--color", "always"])
+    assert ESC in capsys.readouterr().out
+    # JSON never carries color, even with --color always
+    cli.main([str(wav), "-w", "20", "--color", "always", "--json"])
+    out = capsys.readouterr().out
+    assert ESC not in out
+    import json as _json
+    _json.loads(out)  # and it's still valid JSON
+
+
 def test_expected_accepts_literal_text(capsys, tmp_path):
     import json as _json
 

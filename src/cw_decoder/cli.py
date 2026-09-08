@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -77,21 +78,60 @@ def _build_report(res: core.Result,
     return report
 
 
-def _mark(ok: bool) -> str:
-    return "OK" if ok else "**"
+_ANSI = {"green": "\033[32m", "yellow": "\033[33m", "red": "\033[31m",
+         "bold": "\033[1m", "reset": "\033[0m"}
 
 
-def _print_analysis(a: core.Analysis) -> None:
+class _Palette:
+    """Wraps text in ANSI colors, or passes it through when disabled."""
+
+    def __init__(self, enabled: bool):
+        self.enabled = enabled
+
+    def __call__(self, text, color):
+        if not self.enabled or not color:
+            return text
+        return f"{_ANSI[color]}{text}{_ANSI['reset']}"
+
+
+def _color_enabled(mode: str) -> bool:
+    if mode == "never":
+        return False
+    if mode == "always":
+        return True
+    # auto: colorize only on a real terminal, and respect NO_COLOR.
+    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
+def _grade(dev_ratio: float, tol: float):
+    """Map a deviation ratio to a (marker, color): green OK / yellow ~ / red **."""
+    if dev_ratio <= tol:
+        return "OK", "green"
+    if dev_ratio <= 2 * tol:
+        return "~", "yellow"
+    return "**", "red"
+
+
+def _colorize_diff(line: str, pal: "_Palette") -> str:
+    """Paint the bracketed error annotations ([..]) red; leave correct text."""
+    if not pal.enabled:
+        return line
+    return re.sub(r"\[[^\]]*\]", lambda m: pal(m.group(0), "red"), line)
+
+
+def _print_analysis(a: core.Analysis, pal: "_Palette") -> None:
     ref, m = a.ref, a.measured
     e = sys.stdout
 
     def wpm_line(label, actual, target):
         diff = actual - target
         sign = "+" if diff >= 0 else ""
+        base = max(1.0, 0.08 * target)
+        marker, color = _grade(abs(diff), base)
         print(f"#   {label:16s}: {actual:5.1f} wpm  (target {target:.1f}, "
-              f"{sign}{diff:.1f})  {_mark(abs(diff) <= max(1.0, 0.08*target))}", file=e)
+              f"{sign}{diff:.1f})  {pal(marker, color)}", file=e)
 
-    print("# ===== practice report =====", file=e)
+    print(pal("# ===== practice report =====", "bold"), file=e)
     wpm_line("character speed", m.char_wpm, ref.char_wpm)
     wpm_line("overall speed", m.farnsworth_wpm, ref.farnsworth_wpm)
     print(f"#   target unit     : {ref.unit_sec*1000:.1f} ms/dit", file=e)
@@ -101,12 +141,17 @@ def _print_analysis(a: core.Analysis) -> None:
     labels = {"dit": "dit", "dah": "dah", "element-gap": "intra-char gap",
               "char-gap": "character gap", "word-gap": "word gap"}
     for s in a.stats:
-        ok = abs(s.mean_units - s.target_units) <= a.tolerance * s.target_units
-        print(f"#     {labels[s.name]:15s}: {s.mean_units:4.2f}u avg  "
+        dev = abs(s.mean_units - s.target_units) / s.target_units \
+            if s.target_units else 0.0
+        marker, color = _grade(dev, a.tolerance)
+        avg = pal(f"{s.mean_units:4.2f}u", color)
+        print(f"#     {labels[s.name]:15s}: {avg} avg  "
               f"(target {s.target_units:.2f})  jitter ±{s.std_units:.2f}u  "
-              f"n={s.n:<3d} {_mark(ok)}", file=e)
+              f"n={s.n:<3d} {pal(marker, color)}", file=e)
     print("#", file=e)
-    print(f"#   consistency     : {a.within_tol_frac*100:.0f}% of elements "
+    frac = a.within_tol_frac
+    fcolor = "green" if frac >= 0.9 else "yellow" if frac >= 0.75 else "red"
+    print(f"#   consistency     : {pal(f'{frac*100:.0f}%', fcolor)} of elements "
           "within tolerance", file=e)
     if a.n_pauses:
         print(f"#   ({a.n_pauses} long inter-transmission pause(s) ignored)",
@@ -116,26 +161,30 @@ def _print_analysis(a: core.Analysis) -> None:
         for d in a.deviations:
             ctx = f' after "{d.context}"' if d.context else ""
             print(f"#     t={d.time_sec:6.2f}s  {d.kind:12s} "
-                  f"{d.value_units:5.2f}u (target {d.target_units:.2f}){ctx}",
-                  file=e)
+                  f"{pal(f'{d.value_units:5.2f}u', 'red')} "
+                  f"(target {d.target_units:.2f}){ctx}", file=e)
     else:
-        print("#   no significant spacing deviations. clean sending!", file=e)
+        print(pal("#   no significant spacing deviations. clean sending!",
+                  "green"), file=e)
     print("# ---", file=e)
 
 
-def _print_comparison(c: core.Comparison, source: "str | None" = None) -> None:
+def _print_comparison(c: core.Comparison, source: "str | None",
+                      pal: "_Palette") -> None:
     e = sys.stdout
     errors = c.substitutions + c.insertions + c.deletions
-    print("# ===== accuracy vs intended text =====", file=e)
+    print(pal("# ===== accuracy vs intended text =====", "bold"), file=e)
     if source:
         print(f"#   source   : {source}", file=e)
-    print(f"#   accuracy : {c.accuracy*100:.1f}%  "
+    acc = c.accuracy
+    acolor = "green" if acc >= 0.95 else "yellow" if acc >= 0.85 else "red"
+    print(f"#   accuracy : {pal(f'{acc*100:.1f}%', acolor)}  "
           f"({errors} error(s) in {c.n_expected} symbols: "
           f"{c.substitutions} sub, {c.insertions} extra, {c.deletions} missed)",
           file=e)
     print("#   diff ([exp→got] substitution, [+extra], [-missed]):", file=e)
     for line in _wrap(c.diff, 72):
-        print(f"#     {line}", file=e)
+        print(f"#     {_colorize_diff(line, pal)}", file=e)
     print("# ---", file=e)
 
 
@@ -189,7 +238,9 @@ def _send_header(expected) -> None:
 
 def _print_result(res: core.Result, verbose: bool,
                   comparison: "core.Comparison | None" = None,
-                  comparison_source: "str | None" = None) -> None:
+                  comparison_source: "str | None" = None,
+                  pal: "_Palette | None" = None) -> None:
+    pal = pal or _Palette(False)
     t = res.timing
     if verbose:
         print(f"# tone           : {res.tone_hz:.1f} Hz")
@@ -202,9 +253,9 @@ def _print_result(res: core.Result, verbose: bool,
                 print(f"# {note}")
             print("# ---")
         else:
-            _print_analysis(res.analysis)
+            _print_analysis(res.analysis, pal)
         if comparison is not None:
-            _print_comparison(comparison, comparison_source)
+            _print_comparison(comparison, comparison_source, pal)
     print(res.text)
 
 
@@ -241,6 +292,9 @@ def main(argv=None) -> int:
                    help="emit a structured JSON report to stdout (and nothing "
                         "else). Includes the decoded text, speeds, grading, and "
                         "accuracy.")
+    p.add_argument("--color", choices=["auto", "always", "never"], default="auto",
+                   help="colorize the report: auto (only on a terminal; also "
+                        "honors NO_COLOR), always, or never.")
     p.add_argument("--demo", metavar="TEXT", nargs="?", const="CQ CQ DE W1AW K",
                    help="decode a synthesized signal of TEXT instead of a file "
                         "(round-trip self-test).")
@@ -278,11 +332,13 @@ def main(argv=None) -> int:
     if args.preview and not args.live:
         p.error("--preview only applies with --live")
 
+    pal = _Palette(_color_enabled(args.color))
+
     def emit(res, comparison, source):
         if args.json:
             print(json.dumps(_build_report(res, comparison, source), indent=2))
         else:
-            _print_result(res, verbose, comparison, source)
+            _print_result(res, verbose, comparison, source, pal)
 
     # --- list audio devices and exit ------------------------------------- #
     if args.list_devices:
@@ -419,7 +475,7 @@ def main(argv=None) -> int:
             return 0
         if verbose:
             print(f"# demo input     : {args.demo!r}")
-        _print_result(res, verbose, comparison, cmp_source)
+        _print_result(res, verbose, comparison, cmp_source, pal)
         return 0
 
     if not args.input:
@@ -449,11 +505,7 @@ def main(argv=None) -> int:
         return 1
 
     comparison = core.compare_text(expected, res.text) if expected else None
-    if args.json:
-        print(json.dumps(_build_report(res, comparison, expected_source),
-                         indent=2))
-        return 0
-    _print_result(res, verbose, comparison, expected_source)
+    emit(res, comparison, expected_source)
     return 0
 
 

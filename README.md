@@ -62,6 +62,7 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `-e, --expected TEXT\|FILE` | The intended message — literal text (`-e "CQ DE AB1CD"`) or a path to a text file. Scores decode accuracy against it. |
 | `-q, --quiet` | Print only the decoded text (suppresses all reports). |
 | `--json` | Emit a single structured JSON object to stdout (text + speeds + grading + accuracy) and nothing else. |
+| `--color auto\|always\|never` | Colorize the report — green/yellow/red for good/marginal/bad (default `auto`: only on a terminal, honors `NO_COLOR`). Never applied to `--json`. |
 | `--live` | Trainer mode: capture from an audio input device (live keying) instead of a file, then decode and grade. |
 | `--preview` | With `--live`, also print the decode in **real time** as you key (requires `-w`). |
 | `--list-devices` | List available audio input devices and exit. |
@@ -125,7 +126,9 @@ How to read it:
   correct stretched targets).
 - **jitter** (`±`) is the standard deviation — how *consistent* you were. Low
   jitter with an off average means a consistent bias; high jitter means uneven.
-- **`OK` / `**`** flags whether each average is within `--tolerance`.
+- **`OK` / `~` / `**`** flag each average as good / marginal / off (within
+  tolerance / within 2×tolerance / beyond). On a terminal these are colored
+  green / yellow / red so you can scan the report at a glance.
 - **largest deviations** are timestamped and labeled with the text they follow,
   so you can find the exact spot in your recording.
 - **Long pauses** between transmissions are detected and excluded so they don't
