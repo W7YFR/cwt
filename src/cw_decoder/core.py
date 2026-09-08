@@ -267,6 +267,8 @@ def otsu_threshold(env: np.ndarray) -> float:
     denom = w * (total - w)
     denom[denom == 0] = np.nan
     between = (mu_t * w - mu) ** 2 / denom
+    if np.all(np.isnan(between)):     # constant/silent input -> no split
+        return float(np.median(x))
     k = np.nanargmax(between)
     return float(centers[k])
 
@@ -668,6 +670,26 @@ def analyze(segs, ref: Timing, measured: Timing, tolerance: float = 0.30) -> Ana
 # --------------------------------------------------------------------------- #
 # Orchestration
 # --------------------------------------------------------------------------- #
+def quick_decode(sig: np.ndarray, rate: int, tone: float,
+                 timing: Timing, bandwidth: float = 200.0) -> str:
+    """Decode `sig` to text using a *fixed* known tone and timing.
+
+    Lightweight path for live/streaming use: no tone detection or speed
+    estimation, just envelope -> threshold -> segments -> decode against the
+    given (target) timing. Returns "" for too-short/silent input.
+    """
+    if sig.size < int(0.1 * rate) or float(np.max(np.abs(sig))) < 1e-6:
+        return ""
+    env = envelope(sig, rate, tone, bw=bandwidth)
+    thr = keying_threshold(env)
+    segs = run_lengths(env > thr, rate)
+    marks = [d for s, d in segs if s == 1]
+    if not marks:
+        return ""
+    segs = debounce(segs, min_dur=0.35 * float(np.percentile(marks, 20)))
+    return decode_segments(segs, timing)
+
+
 @dataclass
 class Result:
     text: str

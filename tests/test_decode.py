@@ -111,6 +111,26 @@ def test_json_output(capsys, tmp_path):
     assert d["analysis"]["elements"]
 
 
+def test_quick_decode_fixed_timing():
+    """The live/streaming decode path decodes correctly against fixed timing."""
+    timing = core.target_timing(20)
+    sig = synth.generate("CQ DE AB1CD K", wpm=20, tone=600, rate=8000)
+    assert "CQ DE AB1CD K" in core.quick_decode(sig, 8000, 600.0, timing)
+    # Too-short / silent input yields no text (no crash).
+    assert core.quick_decode(sig[:50], 8000, 600.0, timing) == ""
+    assert core.quick_decode(sig * 0, 8000, 600.0, timing) == ""
+
+
+def test_quick_decode_partial_prefix():
+    """A prefix of the audio decodes to a prefix of the message (streaming)."""
+    timing = core.target_timing(20)
+    sig = synth.generate("PARIS PARIS", wpm=20, tone=600, rate=8000)
+    full = core.quick_decode(sig, 8000, 600.0, timing).strip()
+    part = core.quick_decode(sig[: int(sig.size * 0.4)], 8000, 600.0, timing).strip()
+    assert full == "PARIS PARIS"
+    assert part and full.startswith(part[:3])
+
+
 def test_capture_device_parser():
     from cw_decoder import capture
     # Sample of ffmpeg's avfoundation device listing (goes to stderr).

@@ -152,6 +152,41 @@ def _wrap(s: str, width: int):
     return out or [""]
 
 
+def _resolve_device(device, capture):
+    """Return an audio input device index, listing/prompting if not given.
+
+    Returns None (after printing an error) if no device can be determined.
+    """
+    if device is not None:
+        return device
+    devices = capture.list_audio_devices()
+    if not devices:
+        print("no audio input devices found.", file=sys.stderr)
+        return None
+    print("audio input devices:", file=sys.stderr)
+    for idx, name in devices:
+        print(f"  [{idx}] {name}", file=sys.stderr)
+    if not sys.stdin.isatty():
+        print("error: specify a device with -D/--device.", file=sys.stderr)
+        return None
+    print("select device index: ", end="", file=sys.stderr, flush=True)
+    try:
+        return int(input().strip())
+    except (ValueError, EOFError):
+        print("error: invalid device index.", file=sys.stderr)
+        return None
+
+
+def _send_header(expected) -> None:
+    if expected:
+        print("#\n# send this:", file=sys.stderr)
+        print(f"#   {' '.join(expected.split())}", file=sys.stderr)
+        print("#", file=sys.stderr)
+    else:
+        print("# no target message — send anything (add -e to score against one)",
+              file=sys.stderr)
+
+
 def _print_result(res: core.Result, verbose: bool,
                   comparison: "core.Comparison | None" = None,
                   comparison_source: "str | None" = None) -> None:
@@ -217,13 +252,16 @@ def main(argv=None) -> int:
                    help="additive noise level for --demo (e.g. 0.2).")
 
     live = p.add_argument_group("live capture (trainer)")
-    live.add_argument("--listen", action="store_true",
-                      help="capture from an audio input device instead of a "
-                           "file: key your message, then it decodes and grades.")
+    live.add_argument("--live", action="store_true",
+                      help="capture from an audio input device (live keying) "
+                           "instead of decoding a file, then decode and grade.")
+    live.add_argument("--preview", action="store_true",
+                      help="with --live, also print the decode in real time as "
+                           "you key (requires -w for timing).")
     live.add_argument("--list-devices", action="store_true",
                       help="list available audio input devices and exit.")
     live.add_argument("-D", "--device", type=int, default=None,
-                      help="audio input device index for --listen "
+                      help="audio input device index for --live "
                            "(see --list-devices).")
     live.add_argument("--duration", type=float, default=30.0,
                       help="maximum capture length in seconds; recording also "
@@ -236,6 +274,9 @@ def main(argv=None) -> int:
 
     verbose = not args.quiet
     tol = max(args.tolerance, 0.0) / 100.0
+
+    if args.preview and not args.live:
+        p.error("--preview only applies with --live")
 
     def emit(res, comparison, source):
         if args.json:
@@ -284,61 +325,67 @@ def main(argv=None) -> int:
             expected_source = "(inline text)"
 
     # --- live capture (trainer) ------------------------------------------ #
-    if args.listen:
+    if args.live:
         from . import capture
 
-        device = args.device
-        try:
-            if device is None:
-                devices = capture.list_audio_devices()
-                if not devices:
-                    print("no audio input devices found.", file=sys.stderr)
-                    return 1
-                print("audio input devices:", file=sys.stderr)
-                for idx, name in devices:
-                    print(f"  [{idx}] {name}", file=sys.stderr)
-                if not sys.stdin.isatty():
-                    print("error: specify a device with -D/--device.",
-                          file=sys.stderr)
-                    return 1
-                print("select device index: ", end="", file=sys.stderr, flush=True)
-                device = int(input().strip())
-
-            if args.save:
-                out_path, keep = args.save, True
-            else:
-                fd, out_path = tempfile.mkstemp(suffix=".wav")
-                os.close(fd)
-                keep = False
-
-            if expected:
-                print("#", file=sys.stderr)
-                print("# send this:", file=sys.stderr)
-                print(f"#   {' '.join(expected.split())}", file=sys.stderr)
-                print("#", file=sys.stderr)
-            else:
-                print("# (no target text given — pass -e FILE to be graded)",
-                      file=sys.stderr)
-
-            print(f"# recording from device {device} — key your message, then "
-                  f"press Enter to stop (auto-stops after {args.duration:g}s).",
+        if args.preview and args.target_wpm is None:
+            print("error: --preview requires a target speed (-w/--target-wpm).",
                   file=sys.stderr)
+            return 1
 
-            try:
+        device = _resolve_device(args.device, capture)
+        if device is None:
+            return 1
+
+        if args.save:
+            out_path, keep = args.save, True
+        else:
+            fd, out_path = tempfile.mkstemp(suffix=".wav")
+            os.close(fd)
+            keep = False
+
+        try:
+            _send_header(expected)
+            if args.preview:
+                from . import stream, synth
+                timing = core.target_timing(args.target_wpm,
+                                            args.target_farnsworth)
+                print(f"# live decode ({args.target_wpm:g} wpm) on device "
+                      f"{device} — key now; Enter to stop (auto after "
+                      f"{args.duration:g}s).", file=sys.stderr)
+
+                def on_update(text):
+                    sys.stderr.write("\r" + text + " ")
+                    sys.stderr.flush()
+
+                sig, _ = stream.run_live(device, timing, rate=args.rate,
+                                         tone=args.tone,
+                                         max_seconds=args.duration,
+                                         on_update=on_update)
+                sys.stderr.write("\n")
+                sys.stderr.flush()
+                if sig.size < int(0.2 * args.rate):
+                    raise RuntimeError("capture produced no audio.")
+                synth.write_wav(out_path, sig, args.rate)
+            else:
+                print(f"# recording on device {device} — key your message, "
+                      f"then press Enter to stop (auto-stops after "
+                      f"{args.duration:g}s).", file=sys.stderr)
                 capture.record(device, out_path, rate=args.rate,
                                max_seconds=args.duration)
-                res = core.decode_file(out_path, tone=args.tone,
-                                       target_rate=args.rate,
-                                       bandwidth=args.bandwidth,
-                                       target_wpm=args.target_wpm,
-                                       target_farnsworth=args.target_farnsworth,
-                                       tolerance=tol)
-            finally:
-                if not keep and os.path.exists(out_path):
-                    os.unlink(out_path)
+
+            res = core.decode_file(out_path, tone=args.tone,
+                                   target_rate=args.rate,
+                                   bandwidth=args.bandwidth,
+                                   target_wpm=args.target_wpm,
+                                   target_farnsworth=args.target_farnsworth,
+                                   tolerance=tol)
         except (RuntimeError, ValueError) as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
+        finally:
+            if not keep and os.path.exists(out_path):
+                os.unlink(out_path)
 
         if args.save and verbose:
             print(f"# saved recording to {args.save}", file=sys.stderr)

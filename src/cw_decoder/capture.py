@@ -76,6 +76,20 @@ def _quit_ffmpeg(proc) -> None:
         proc.terminate()
 
 
+def open_stream(device: int, rate: int = RATE):
+    """Start ffmpeg streaming raw mono float32 PCM from `device` to stdout.
+
+    Returns the Popen; caller reads stdout in blocks and calls `_quit_ffmpeg`
+    to stop. Used by live decode.
+    """
+    backend = _backend()
+    cmd = [_ffmpeg(), "-hide_banner", "-loglevel", "error",
+           "-f", backend, "-i", f":{device}",
+           "-ac", "1", "-ar", str(rate), "-f", "f32le", "-"]
+    return subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
 def record(device: int, out_path: str, rate: int = RATE,
            max_seconds: float = DEFAULT_MAX_SECONDS) -> None:
     """Capture audio from `device` into `out_path` (mono WAV at `rate`).

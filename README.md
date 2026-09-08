@@ -62,9 +62,10 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `-e, --expected TEXT\|FILE` | The intended message — literal text (`-e "CQ DE AB1CD"`) or a path to a text file. Scores decode accuracy against it. |
 | `-q, --quiet` | Print only the decoded text (suppresses all reports). |
 | `--json` | Emit a single structured JSON object to stdout (text + speeds + grading + accuracy) and nothing else. |
-| `--listen` | Trainer mode: capture live from an audio input device instead of a file. |
+| `--live` | Trainer mode: capture from an audio input device (live keying) instead of a file, then decode and grade. |
+| `--preview` | With `--live`, also print the decode in **real time** as you key (requires `-w`). |
 | `--list-devices` | List available audio input devices and exit. |
-| `-D, --device N` | Audio input device index for `--listen` (see `--list-devices`). |
+| `-D, --device N` | Audio input device index for `--live` (see `--list-devices`). |
 | `--duration SEC` | Max live-capture length; also stops early on Enter (default 30, prevents runaway recordings). |
 | `--save WAVFILE` | Keep the captured audio (default: discarded after decoding). |
 | `--demo [TEXT]` | Decode a synthesized signal instead of a file (self-test); pairs with `--demo-wpm`, `--demo-farnsworth`, `--demo-noise`. |
@@ -193,15 +194,23 @@ cw-decode -w 25 -f 12 -T 20 -e message.txt recording.wav
 
 ## Trainer: key live and get graded
 
-Instead of recording a file first, `--listen` captures straight from an audio
+Instead of recording a file first, `--live` captures straight from an audio
 input (your rig's sidetone into an interface, a keyer's audio, or a mic) and then
-decodes and grades it — the same reports as above, live. (macOS only for now.)
+decodes and grades it — the same reports as above. Add `--preview` to watch it
+decode in real time as you key. (macOS only for now.)
 
 ```sh
-cw-decode --list-devices                           # see input devices
-cw-decode --listen -D 1 -w 20 -e "CQ DE AB1CD K"   # key against a 20 wpm target
-cw-decode --listen -D 1 -w 20 -e message.txt       # target from a file instead
+cw-decode --list-devices                        # see input devices
+cw-decode --live -D 1                            # just decode what you key
+cw-decode --live -D 1 -w 20                      # + grade timing vs 20 wpm
+cw-decode --live -D 1 -w 20 -e "CQ DE AB1CD K"  # + score against a message
+cw-decode --live -D 1 -w 20 -e message.txt      # target from a file instead
 ```
+
+`--live` means "capture my keying" (as opposed to decoding a file). Both `-w`
+(target speed) and `-e` (intended message) are **optional**: add `-w` for the
+timing/spacing report, add `-e` for the accuracy score, or use neither to just
+decode. (Add `--preview`, below, to watch it decode in real time.)
 
 When you supply the target text (via `-e` or a sibling `.txt`), it prints the
 message to send before recording, so you know what to key:
@@ -210,19 +219,18 @@ message to send before recording, so you know what to key:
 # send this:
 #   CQ CQ DE AB1CD K
 #
-# recording from device 1 — key your message, then press Enter to stop.
+# recording on device 1 — key your message, then press Enter to stop.
 ```
 
 Pick the input with `-D` (index from `--list-devices`); omit it and you'll get a
 prompt. Recording stops when you **press Enter**, or automatically after the
-`--duration` cap (default **30 s**)
-`--save practice.wav` to keep the take.
+`--duration` cap (default **30 s**). Add `--save practice.wav` to keep the take.
 
 A typical practice loop — put the target in a text file once, then repeat:
 
 ```sh
 echo "CQ CQ DE AB1CD K" > message.txt
-cw-decode --listen -D 1 -w 20 -e message.txt   # key it, read the grade, repeat
+cw-decode --live -D 1 -w 20 -e message.txt   # key it, read the grade, repeat
 ```
 
 You get the spacing breakdown and the accuracy diff each time, so you can watch
@@ -233,6 +241,43 @@ your word timing tighten up. Notes:
   `-t`, and `-b` all work the same.
 - `--save` pairs well with the fixture workflow: a good take can be dropped into
   `tests/data/` as a regression fixture.
+
+### Real-time preview (`--preview`)
+
+Add `--preview` to `--live` and it decodes *while* you key — characters stream to
+the screen instead of appearing only at the end. It needs a target speed (`-w`)
+to lock its timing; `-e` is optional (add it only if you want the accuracy
+score):
+
+```sh
+cw-decode --live --preview -D 1 -w 20                     # live decode + timing report
+cw-decode --live --preview -D 1 -w 20 -e "CQ DE AB1CD K"  # + score against a message
+```
+
+```
+# send this:
+#   CQ DE AB1CD K
+# live decode (20 wpm) on device 1 — key now; Enter to stop (auto after 30s).
+CQ DE AB1CD K            <- this line grows as you send
+
+# ===== practice report =====     <- full report + accuracy at stop
+#   character speed : 19.8 wpm (target 20.0) OK
+#   ...
+```
+
+How it works and what to expect:
+
+- The live line refreshes a few times a second and uses your `-w` target for
+  timing (so it doubles as "am I on speed"). A character shows up about one
+  character-gap after you finish it — you have to key the gap for the decoder to
+  know the character ended.
+- When you stop (Enter or the `--duration` cap), it runs the **full batch decode
+  and grading** on the complete audio — that report is the authoritative result;
+  the live line is just feedback.
+- The live text is inherently a bit less precise than the final pass (it decodes
+  causally, without seeing the whole recording), so trust the report for grading.
+- Works with `--save` (keep the take) and `--json` (the live line goes to stderr;
+  the final JSON is the only thing on stdout).
 
 ## JSON output
 
