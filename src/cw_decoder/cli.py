@@ -285,10 +285,12 @@ def _warn_dropouts(path: str, rate: int, backend: str = "") -> None:
     if backend == "ffmpeg":
         # This is ffmpeg's avfoundation audio path, not our use of it: it drops
         # buffers even with the queue raised and every conversion removed.
-        print("#   The ffmpeg backend is known to do this. Install the "
-              "portaudio backend, which", file=sys.stderr)
-        print("#   buffers properly:  pip install 'cw-decoder[live]'",
-              file=sys.stderr)
+        print("#   The ffmpeg backend is known to do this; the portaudio "
+              "backend buffers properly.", file=sys.stderr)
+        print("#   It ships with cw-decoder, so this means PortAudio failed "
+              "to load — see", file=sys.stderr)
+        print("#   'cw-decode --list-devices --capture-backend portaudio' "
+              "for the reason.", file=sys.stderr)
     else:
         print("#   Try a different input device, close other audio apps, or "
               "record externally", file=sys.stderr)
@@ -573,8 +575,8 @@ def main(argv=None) -> int:
                            "disk.")
     live.add_argument("--capture-backend", choices=["auto", "portaudio",
                                                     "ffmpeg"], default="auto",
-                      help="how to capture live audio. 'portaudio' (needs the "
-                           "'live' extra) buffers generously and reports input "
+                      help="how to capture live audio. 'portaudio' buffers "
+                           "generously and reports input "
                            "overflows; 'ffmpeg' is the macOS-only fallback and "
                            "drops buffers on some devices. Default: portaudio "
                            "when available. Device indices differ between "

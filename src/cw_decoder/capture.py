@@ -46,14 +46,41 @@ BACKENDS = ("portaudio", "ffmpeg")
 # --------------------------------------------------------------------------- #
 # Backend selection
 # --------------------------------------------------------------------------- #
+_SD: dict = {}
+
+
 def _sounddevice():
-    """The `sounddevice` module, or None if it isn't installed/usable."""
-    try:
-        import sounddevice
-        sounddevice.query_devices()      # fails fast if PortAudio is broken
-        return sounddevice
-    except Exception:
-        return None
+    """The `sounddevice` module, or None if PortAudio isn't usable here.
+
+    A dependency, not an extra — but still imported lazily (decoding files
+    shouldn't pay for it) and still allowed to fail: the wheel bundles
+    PortAudio on macOS and Windows, while Linux needs a system libportaudio2
+    that may not be there. Resolved once and cached, along with the reason, so
+    the failure can be explained rather than just reported.
+    """
+    if "mod" not in _SD:
+        try:
+            import sounddevice
+            sounddevice.query_devices()   # fails fast if PortAudio is broken
+            _SD["mod"], _SD["err"] = sounddevice, None
+        except Exception as e:            # ImportError, OSError, PortAudioError
+            _SD["mod"], _SD["err"] = None, e
+    return _SD["mod"]
+
+
+def _sounddevice_error() -> str:
+    """Why the portaudio backend is unavailable, in a form worth printing."""
+    _sounddevice()
+    err = _SD.get("err")
+    if err is None:
+        # No import failure on record, so something else ruled it out. Say so
+        # rather than emitting a sentence with a blank where the reason goes.
+        return ("PortAudio is not usable here; check OS audio permissions.")
+    hint = ("install the PortAudio library — on Debian/Ubuntu: "
+            "apt install libportaudio2"
+            if isinstance(err, OSError)
+            else "try: pip install --force-reinstall sounddevice")
+    return f"{type(err).__name__}: {err}. To fix, {hint}."
 
 
 def _ffmpeg() -> str:
@@ -69,8 +96,9 @@ def _backend_name() -> str:
         return "avfoundation"
     raise RuntimeError(
         f"ffmpeg live capture is implemented for macOS only (detected "
-        f"{system}). Install the 'live' extra for the portaudio backend, or "
-        f"record with your OS tools and pass the WAV instead."
+        f"{system}). The portaudio backend has no such limit — if it is "
+        f"unavailable here, install a system PortAudio library. Or record "
+        f"with your OS tools and pass the WAV instead."
     )
 
 
@@ -91,15 +119,15 @@ def resolve_backend(name: str = "auto") -> str:
         if name not in BACKENDS:
             raise RuntimeError(f"unknown capture backend: {name}")
         if name not in usable:
-            extra = ("Install it with: pip install 'cw-decoder[live]'"
-                     if name == "portaudio"
-                     else "Install ffmpeg (macOS only for capture).")
-            raise RuntimeError(f"capture backend {name!r} is unavailable. {extra}")
+            why = (_sounddevice_error() if name == "portaudio"
+                   else "ffmpeg is not on PATH (and capture needs macOS).")
+            raise RuntimeError(f"capture backend {name!r} is unavailable. {why}")
         return name
     if not usable:
         raise RuntimeError(
-            "no live-capture backend available. Install the portaudio backend "
-            "with: pip install 'cw-decoder[live]'  (or install ffmpeg on macOS)."
+            "no live-capture backend available. "
+            f"portaudio: {_sounddevice_error()} "
+            "ffmpeg: not on PATH (and capture needs macOS)."
         )
     return usable[0]
 

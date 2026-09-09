@@ -13,14 +13,15 @@ license-files = ["LICENSE"]
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
+    # Live capture. Not optional: --live is a headline feature, and the ffmpeg
+    # fallback drops audio buffers on real hardware. Imported lazily, so
+    # decoding files never pays for it, and the code still runs if PortAudio
+    # itself is missing (Linux needs a system libportaudio2).
+    "sounddevice>=0.4",
 ]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
-# Live capture via PortAudio. Preferred over the ffmpeg fallback: it buffers
-# generously and reports input overflows instead of silently dropping buffers,
-# and it works beyond macOS. The wheel bundles PortAudio.
-live = ["sounddevice>=0.4"]
 
 [project.scripts]
 cw-decode = "cw_decoder.cli:main"

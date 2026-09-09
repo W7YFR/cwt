@@ -862,6 +862,38 @@ def test_portaudio_backend_captures_and_reports_overflows(monkeypatch,
     assert any("overflow" in p for p in problems)
 
 
+def test_capture_backend_ships_by_default():
+    """`--live` is a headline feature, so its capture library isn't an extra.
+
+    The ffmpeg fallback drops audio buffers on real hardware, so a default
+    install that only had ffmpeg would ship a broken primary path.
+    """
+    import tomllib
+
+    with open(Path(__file__).parent.parent / "pyproject.toml", "rb") as fh:
+        cfg = tomllib.load(fh)
+    deps = " ".join(cfg["project"]["dependencies"])
+    assert "sounddevice" in deps, "capture must not be an optional extra"
+    extras = cfg["project"].get("optional-dependencies", {})
+    assert "live" not in extras, "the 'live' extra is gone; don't reintroduce it"
+
+
+def test_capture_import_is_lazy():
+    """Decoding a file shouldn't pay for the audio stack.
+
+    `sounddevice` opens PortAudio on import, which is slow and can warn on a
+    headless box, so it's imported inside the backend lookup instead.
+    """
+    import subprocess
+    import sys
+
+    probe = ("import sys, cw_decoder.capture, cw_decoder.core;"
+             "print('sounddevice' in sys.modules)")
+    out = subprocess.run([sys.executable, "-c", probe],
+                         capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "False", "capture.py imported sounddevice eagerly"
+
+
 def test_portaudio_is_preferred_and_backends_are_selectable(monkeypatch):
     from cw_decoder import capture
 
@@ -872,10 +904,10 @@ def test_portaudio_is_preferred_and_backends_are_selectable(monkeypatch):
     assert capture.resolve_backend("auto") == "portaudio"
     assert capture.resolve_backend("ffmpeg") == "ffmpeg"
 
-    # An unavailable backend says how to get it rather than failing obscurely.
+    # An unavailable backend explains itself rather than failing obscurely.
     monkeypatch.setattr(capture, "available_backends", lambda: ["ffmpeg"])
     assert capture.resolve_backend("auto") == "ffmpeg"
-    with pytest.raises(RuntimeError, match=r"cw-decoder\[live\]"):
+    with pytest.raises(RuntimeError, match="PortAudio"):
         capture.resolve_backend("portaudio")
 
     monkeypatch.setattr(capture, "available_backends", lambda: [])

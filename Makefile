@@ -20,10 +20,8 @@ $(BIN)/python: ## (internal) create the virtualenv
 venv: $(BIN)/python ## Create the virtualenv
 
 .PHONY: dev
-dev: venv ## Editable install + test and live-capture deps into the venv
-	$(BIN)/pip install -e ".[test,live]" \
-		|| $(BIN)/pip install -e ".[test]" \
-		|| $(BIN)/pip install -e . pytest
+dev: venv ## Editable install + test deps into the venv
+	$(BIN)/pip install -e ".[test]" || $(BIN)/pip install -e . pytest
 
 .PHONY: test
 test: dev ## Run the round-trip test suite
@@ -35,7 +33,7 @@ demo: dev ## Decode a synthesized signal end-to-end
 
 .PHONY: install
 install: venv ## Install into the venv and expose `cw-decode` on your PATH
-	$(BIN)/pip install -e ".[live]" || $(BIN)/pip install -e .
+	$(BIN)/pip install -e .
 	mkdir -p $(LOCALBIN)
 	ln -sf "$(abspath $(BIN)/cw-decode)" "$(LOCALBIN)/cw-decode"
 	@echo ""

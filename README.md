@@ -24,6 +24,10 @@ If `~/.local/bin` isn't on your `PATH`, add it. `make uninstall` removes the
 symlink; `make clean` removes the venv. Because the install is editable, edits to
 the source take effect immediately — no reinstall needed.
 
+That's everything, including live capture. `ffmpeg` is only needed to read
+non-WAV audio files. On Linux, live capture also wants a system PortAudio
+(`apt install libportaudio2`); decoding files doesn't.
+
 ---
 
 ## Quick start
@@ -240,12 +244,12 @@ cw-decode --live -w 20 -e message.txt --web-review   # key it, read the grade, r
 
 Notes:
 
-- **Install the capture extra** for the best results: `pip install
-  'cw-decoder[live]'`. It uses PortAudio, which buffers properly and reports
-  problems. Without it, capture falls back to ffmpeg (macOS only), which drops
-  audio buffers on some devices — that clicks, shortens your dits and dahs, and
-  makes the report read faster than you keyed. Either way the recording is
-  checked afterward and you're warned if buffers were dropped.
+- **Capture uses PortAudio**, which buffers properly and reports problems. It's
+  installed as a dependency, so this just works. If PortAudio can't load (Linux
+  needs a system `libportaudio2`), capture falls back to ffmpeg (macOS only),
+  which drops audio buffers on some devices — that clicks, shortens your dits
+  and dahs, and makes the report read faster than you keyed. Either way the
+  recording is checked afterward and you're warned if buffers were dropped.
 - **The device is remembered** by name, so it survives re-indexing when hardware
   comes and goes. `-D` takes an index or a name fragment (`-D blackhole`), and
   `-D ask` forgets it and asks again. Device indices differ between the two
