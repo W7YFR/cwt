@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import re
 import sys
 import tempfile
@@ -201,6 +202,83 @@ def _wrap(s: str, width: int):
     return out or [""]
 
 
+def _session_dir() -> str:
+    """A fresh timestamped directory under ~/.cw-decoder/sessions."""
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = os.path.join(os.path.expanduser("~"), ".cw-decoder", "sessions",
+                        stamp)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _warn_dropouts(path: str, rate: int) -> None:
+    """Tell the user if the capture has dropped samples.
+
+    A dropped buffer clicks, shortens whatever element it lands in, and — since
+    the unit estimate averages the dit with a third of the dah — reads back as
+    faster sending than was keyed. It used to be silent, discoverable only by
+    ear, so say it out loud.
+    """
+    if not os.path.exists(path):
+        return
+    try:
+        # At the file's own rate: resampling smooths the splice and hides it.
+        sig = core.load_audio(path, rate, normalize=False)
+    except (RuntimeError, OSError, ValueError):
+        return
+    hits = core.find_dropouts(sig, rate)
+    if not hits:
+        return
+    secs = sig.size / rate if rate else 0.0
+    where = ", ".join(f"{t:.2f}s" for t in hits[:6])
+    if len(hits) > 6:
+        where += ", ..."
+    print(f"# warning: {len(hits)} dropped audio buffer(s) in this capture "
+          f"({len(hits) / secs:.1f}/s) at {where}", file=sys.stderr)
+    print("#   Dropped samples click, shorten dits/dahs, and inflate the "
+          "measured speed.", file=sys.stderr)
+    print("#   Try a different input device, close other audio apps, or "
+          "record externally and", file=sys.stderr)
+    print("#   pass the file instead of using --live.", file=sys.stderr)
+
+
+def _web_page_path(out: "str | None") -> str:
+    """Where the review page goes, with its directory created."""
+    if out:
+        path = os.path.abspath(out)
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        return path
+    return os.path.join(_session_dir(), "review.html")
+
+
+def _emit_web_review(res: core.Result, source: str, expected: "str | None",
+                     expected_source: "str | None", tolerance: float,
+                     page_path: str, audio_path: "str | None" = None,
+                     verbose: bool = True) -> None:
+    """Build the self-contained review page, then open it in a browser.
+
+    `audio_path` is the original recording. The page embeds it at its own
+    sample rate rather than the decoder's 8 kHz working copy, so playback
+    sounds like what you recorded.
+    """
+    import webbrowser
+
+    from . import review, webpage
+
+    payload = review.build_payload(res, source=source, expected=expected,
+                                   expected_source=expected_source,
+                                   tolerance=tolerance, audio_path=audio_path)
+    size = webpage.write(page_path, payload)
+    if verbose:
+        print(f"# web review: {page_path} ({size / 1024:.0f} KB, audio at "
+              f"{payload['audio_rate'] / 1000:g} kHz)", file=sys.stderr)
+    webbrowser.open(pathlib.Path(page_path).resolve().as_uri())
+
+
 def _resolve_device(device, capture):
     """Return an audio input device index, listing/prompting if not given.
 
@@ -305,6 +383,19 @@ def main(argv=None) -> int:
     p.add_argument("--demo-noise", type=float, default=0.0,
                    help="additive noise level for --demo (e.g. 0.2).")
 
+    web = p.add_argument_group("web review")
+    web.add_argument("--web-review", action="store_true",
+                     help="also build an interactive review page — your keying "
+                          "drawn on a canvas against perfect timing, with "
+                          "spacing annotated — and open it in a browser. The "
+                          "page is one self-contained file with the recording "
+                          "embedded, so you can replay yourself, hear the "
+                          "target, and re-grade at any speed offline.")
+    web.add_argument("--web-out", metavar="FILE", default=None,
+                     help="write the review page here (implies --web-review). "
+                          "Default: ~/.cw-decoder/sessions/<timestamp>/"
+                          "review.html")
+
     live = p.add_argument_group("live capture (trainer)")
     live.add_argument("--live", action="store_true",
                       help="capture from an audio input device (live keying) "
@@ -317,10 +408,18 @@ def main(argv=None) -> int:
     live.add_argument("-D", "--device", type=int, default=None,
                       help="audio input device index for --live "
                            "(see --list-devices).")
-    live.add_argument("--duration", type=float, default=30.0,
+    live.add_argument("--duration", type=float, default=120.0,
                       help="maximum capture length in seconds; recording also "
-                           "stops early when you press Enter (default 30). This "
-                           "cap prevents a runaway recording filling the disk.")
+                           "stops early when you press Enter (default 120). "
+                           "This cap prevents a runaway recording filling the "
+                           "disk.")
+    live.add_argument("--capture-rate", type=int, default=None,
+                      help="force a capture sample rate. Default: the audio "
+                           "device's own rate, with no resampling — forcing a "
+                           "rate makes ffmpeg resample every sample, which "
+                           "audibly roughens a keyer sidetone. The decoder "
+                           "resamples to its own working rate regardless, so "
+                           "this only affects the saved/played-back audio.")
     live.add_argument("--save", metavar="WAVFILE", default=None,
                       help="keep the captured audio at this path (default: "
                            "discard after decoding).")
@@ -328,17 +427,28 @@ def main(argv=None) -> int:
 
     verbose = not args.quiet
     tol = max(args.tolerance, 0.0) / 100.0
+    web = args.web_review or args.web_out is not None
 
     if args.preview and not args.live:
         p.error("--preview only applies with --live")
 
     pal = _Palette(_color_enabled(args.color))
 
+    # When a review page was asked for, the page *is* the practice report, so
+    # don't also dump it to the terminal — the decoded text still prints, as do
+    # the stderr lines naming the files written. `--json` is an explicit
+    # machine-readable request and is unaffected.
+    report = verbose and not web
+
+    # Resolved up front: a live capture records straight into this directory,
+    # so it has to exist before recording starts.
+    page_path = _web_page_path(args.web_out) if web else None
+
     def emit(res, comparison, source):
         if args.json:
             print(json.dumps(_build_report(res, comparison, source), indent=2))
         else:
-            _print_result(res, verbose, comparison, source, pal)
+            _print_result(res, report, comparison, source, pal)
 
     # --- list audio devices and exit ------------------------------------- #
     if args.list_devices:
@@ -393,8 +503,18 @@ def main(argv=None) -> int:
         if device is None:
             return 1
 
+        # None means "the device's native rate, no resampling"; the actual
+        # rate is read back off the capture afterwards.
+        cap_rate = args.capture_rate
+
         if args.save:
             out_path, keep = args.save, True
+        elif web:
+            # Record straight into the session directory: the page needs the
+            # audio to embed, and a live take is worth keeping as a plain WAV
+            # anyway. Nothing to copy, nothing deleted out from under us.
+            out_path = os.path.join(os.path.dirname(page_path), "session.wav")
+            keep = True
         else:
             fd, out_path = tempfile.mkstemp(suffix=".wav")
             os.close(fd)
@@ -414,28 +534,29 @@ def main(argv=None) -> int:
                     sys.stderr.write("\r" + text + " ")
                     sys.stderr.flush()
 
-                sig, _ = stream.run_live(device, timing, rate=args.rate,
-                                         tone=args.tone,
-                                         max_seconds=args.duration,
-                                         on_update=on_update)
+                sig, _, cap_rate = stream.run_live(
+                    device, timing, rate=cap_rate, tone=args.tone,
+                    max_seconds=args.duration, on_update=on_update,
+                    dsp_rate=args.rate)
                 sys.stderr.write("\n")
                 sys.stderr.flush()
-                if sig.size < int(0.2 * args.rate):
+                if sig.size < int(0.2 * cap_rate):
                     raise RuntimeError("capture produced no audio.")
-                synth.write_wav(out_path, sig, args.rate)
+                synth.write_wav(out_path, sig, cap_rate)
             else:
                 print(f"# recording on device {device} — key your message, "
                       f"then press Enter to stop (auto-stops after "
                       f"{args.duration:g}s).", file=sys.stderr)
-                capture.record(device, out_path, rate=args.rate,
+                capture.record(device, out_path, rate=cap_rate,
                                max_seconds=args.duration)
+                cap_rate = capture.wav_rate(out_path) or args.rate
 
             res = core.decode_file(out_path, tone=args.tone,
                                    target_rate=args.rate,
                                    bandwidth=args.bandwidth,
                                    target_wpm=args.target_wpm,
                                    target_farnsworth=args.target_farnsworth,
-                                   tolerance=tol)
+                                   tolerance=tol, keep_signal=web)
         except (RuntimeError, ValueError) as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
@@ -443,11 +564,17 @@ def main(argv=None) -> int:
             if not keep and os.path.exists(out_path):
                 os.unlink(out_path)
 
-        if args.save and verbose:
-            print(f"# saved recording to {args.save}", file=sys.stderr)
+        if keep and verbose:
+            print(f"# saved recording to {out_path} "
+                  f"({cap_rate / 1000:g} kHz)", file=sys.stderr)
+        _warn_dropouts(out_path, cap_rate)
         comparison = (core.compare_text(expected, res.text)
                       if expected else None)
         emit(res, comparison, expected_source)
+        if web:
+            _emit_web_review(res, "live capture", expected, expected_source,
+                             tol, page_path, audio_path=out_path,
+                             verbose=verbose)
         return 0
 
     if args.demo is not None:
@@ -463,7 +590,7 @@ def main(argv=None) -> int:
                                    bandwidth=args.bandwidth,
                                    target_wpm=args.target_wpm,
                                    target_farnsworth=args.target_farnsworth,
-                                   tolerance=tol)
+                                   tolerance=tol, keep_signal=web)
         # For a demo, compare against the demo text unless a file was supplied.
         if expected is not None:
             cmp_target, cmp_source = expected, expected_source
@@ -472,10 +599,13 @@ def main(argv=None) -> int:
         comparison = core.compare_text(cmp_target, res.text)
         if args.json:
             print(json.dumps(_build_report(res, comparison, cmp_source), indent=2))
-            return 0
-        if verbose:
-            print(f"# demo input     : {args.demo!r}")
-        _print_result(res, verbose, comparison, cmp_source, pal)
+        else:
+            if report:
+                print(f"# demo input     : {args.demo!r}")
+            _print_result(res, report, comparison, cmp_source, pal)
+        if web:
+            _emit_web_review(res, "--demo", cmp_target, cmp_source, tol,
+                             page_path, verbose=verbose)
         return 0
 
     if not args.input:
@@ -499,13 +629,17 @@ def main(argv=None) -> int:
                                target_rate=args.rate, bandwidth=args.bandwidth,
                                target_wpm=args.target_wpm,
                                target_farnsworth=args.target_farnsworth,
-                               tolerance=tol)
+                               tolerance=tol, keep_signal=web)
     except (RuntimeError, FileNotFoundError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
     comparison = core.compare_text(expected, res.text) if expected else None
     emit(res, comparison, expected_source)
+    if web:
+        _emit_web_review(res, os.path.basename(args.input), expected,
+                         expected_source, tol, page_path,
+                         audio_path=args.input, verbose=verbose)
     return 0
 
 

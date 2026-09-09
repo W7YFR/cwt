@@ -154,34 +154,55 @@ def compare_text(expected: str, decoded: str) -> Comparison:
 # --------------------------------------------------------------------------- #
 # 1. Audio loading
 # --------------------------------------------------------------------------- #
-def load_audio(path: str, target_rate: int = TARGET_RATE) -> np.ndarray:
+def load_audio(path: str, target_rate: int = TARGET_RATE,
+               normalize: bool = True) -> np.ndarray:
     """Load `path` as a mono float32 signal at `target_rate`.
 
     WAV files are read directly with scipy; anything else is decoded via ffmpeg,
     so mp3/flac/m4a/aiff/ogg/opus all work as long as ffmpeg is installed.
+
+    `normalize` scales the clip so its peak is 1.0. The decoding pipeline wants
+    that — the Otsu threshold works on absolute amplitude — but it is a
+    ~30 dB boost on a quietly-recorded clip, so anything meant for *listening*
+    (or for handing back to the user as a file) must pass normalize=False and
+    keep the recording at the level it was made.
     """
     if path.lower().endswith(".wav"):
         try:
-            return _load_wav_scipy(path, target_rate)
+            return _load_wav_scipy(path, target_rate, normalize)
         except Exception:
             pass  # fall through to ffmpeg (e.g. exotic WAV codecs)
-    return _load_ffmpeg(path, target_rate)
+    return _load_ffmpeg(path, target_rate, normalize)
 
 
-def _load_wav_scipy(path: str, target_rate: int) -> np.ndarray:
+def _to_unit_scale(data: np.ndarray, dtype) -> np.ndarray:
+    """Convert raw PCM to [-1, 1] by the *format's* full scale.
+
+    Deliberately not by the clip's own peak: dividing by the peak would make
+    every recording equally loud and throw away how loud it actually was.
+    """
+    if np.issubdtype(dtype, np.unsignedinteger):      # 8-bit WAV is unsigned
+        mid = (float(np.iinfo(dtype).max) + 1.0) / 2.0
+        return (data - mid) / mid
+    if np.issubdtype(dtype, np.integer):
+        return data / float(-np.iinfo(dtype).min)     # 32768 for int16
+    return data                                       # already float
+
+
+def _load_wav_scipy(path: str, target_rate: int,
+                    normalize: bool = True) -> np.ndarray:
     from scipy.io import wavfile
     from scipy.signal import resample_poly
 
     rate, data = wavfile.read(path)
     data = np.asarray(data)
-    if data.ndim > 1:          # stereo -> mono
+    dtype = data.dtype                 # note before the float cast
+    if data.ndim > 1:                  # stereo -> mono
         data = data.mean(axis=1)
-    data = data.astype(np.float64)
-    # Normalize integer PCM to [-1, 1].
-    if np.issubdtype(np.asarray(data).dtype, np.floating) is False:
-        pass
-    peak = np.max(np.abs(data)) or 1.0
-    data = data / peak
+    data = _to_unit_scale(data.astype(np.float64), dtype)
+    if normalize:
+        peak = np.max(np.abs(data)) or 1.0
+        data = data / peak
     if rate != target_rate:
         from math import gcd
         g = gcd(int(rate), int(target_rate))
@@ -189,7 +210,8 @@ def _load_wav_scipy(path: str, target_rate: int) -> np.ndarray:
     return data.astype(np.float32)
 
 
-def _load_ffmpeg(path: str, target_rate: int) -> np.ndarray:
+def _load_ffmpeg(path: str, target_rate: int,
+                 normalize: bool = True) -> np.ndarray:
     if shutil.which("ffmpeg") is None:
         raise RuntimeError(
             "ffmpeg not found on PATH and input is not a .wav file. "
@@ -207,8 +229,42 @@ def _load_ffmpeg(path: str, target_rate: int) -> np.ndarray:
     data = np.frombuffer(proc.stdout, dtype="<f4").astype(np.float32)
     if data.size == 0:
         raise RuntimeError("ffmpeg produced no audio samples.")
+    if not normalize:
+        return data                    # ffmpeg's f32 output is already unit-scale
     peak = float(np.max(np.abs(data))) or 1.0
     return data / peak
+
+
+# --------------------------------------------------------------------------- #
+# Capture integrity
+# --------------------------------------------------------------------------- #
+def find_dropouts(sig: np.ndarray, rate: int, factor: float = 2.5) -> list:
+    """Return the times (seconds) where the waveform appears to have been cut.
+
+    A dropped capture buffer removes a block of samples, so the waveform
+    resumes at an arbitrary phase. That leaves a single-sample jump far larger
+    than anything the signal's own frequency content can produce — a click to
+    the ear, a shortened dit or dah to the decoder.
+
+    The threshold is relative to the signal's own 99.9th-percentile slew, so it
+    adapts to level and tone frequency instead of assuming either. Measured
+    against real captures, that ratio is ~1.04 for clean recordings and 1.5 at
+    worst under heavy noise, against 4.1-5.2 for captures with dropped buffers
+    — so `factor` sits between, with margin on both sides. Analyse at the
+    file's own rate: resampling smooths the splice and hides it.
+    """
+    if sig.size < 64:
+        return []
+    dx = np.abs(np.diff(np.asarray(sig, dtype=np.float64)))
+    ref = float(np.percentile(dx, 99.9))
+    if ref <= 0:
+        return []
+    hits = np.flatnonzero(dx > factor * ref)
+    if hits.size == 0:
+        return []
+    # One dropped buffer can trip several adjacent samples; count it once.
+    keep = np.concatenate(([True], np.diff(hits) > rate // 100))
+    return [float(i) / rate for i in hits[keep]]
 
 
 # --------------------------------------------------------------------------- #
@@ -399,6 +455,43 @@ def _dominant_gap(inter) -> float:
 
 
 @dataclass
+class Block:
+    """One keyed mark or one gap, located in absolute time.
+
+    `units` is the measured duration expressed in the reference timing's dit
+    units; `target_units` is what a machine sender would have produced. A
+    `pause` (an inter-transmission silence, far longer than a word gap) has no
+    meaningful target, so its `target_units` is 0 and it is excluded from
+    grading.
+    """
+    t0: float
+    t1: float
+    kind: str                       # dit|dah|element-gap|char-gap|word-gap|pause
+    units: float
+    target_units: float
+    context: str = ""               # decoded text preceding a char/word gap
+
+
+@dataclass
+class Char:
+    """One decoded character and the blocks that produced it."""
+    char: str                       # "L", "<SK>", or "?" if unrecognized
+    pattern: str                    # ".-.."
+    t0: float
+    t1: float
+    blocks: list                    # list[Block]: marks + intra-character gaps
+    lead_gap: "Block | None" = None  # the char/word gap that preceded it
+
+
+@dataclass
+class Timeline:
+    """A decode with its timing structure preserved."""
+    text: str
+    chars: list                     # list[Char]
+    blocks: list                    # list[Block], every block in time order
+
+
+@dataclass
 class Timing:
     unit_sec: float                 # dit length in seconds
     char_wpm: float                 # character speed (element speed)
@@ -504,85 +597,91 @@ def estimate_timing(segs) -> Timing:
 # --------------------------------------------------------------------------- #
 # 7. Decode
 # --------------------------------------------------------------------------- #
-def decode_segments(segs, timing: Timing) -> str:
-    """Turn (state,duration) segments + timing thresholds into text."""
-    text = []
-    current = []  # accumulating dit/dah for the current character
-
-    def flush_char():
-        if current:
-            text.append(decode_pattern("".join(current)))
-            current.clear()
-
-    # Skip leading/trailing silence when iterating.
-    for i, (state, dur) in enumerate(segs):
-        if state == 1:  # mark
-            current.append("." if dur < timing.dit_dah_split else "-")
-        else:  # gap
-            # Ignore the very first/last silence.
-            is_edge = i == 0 or i == len(segs) - 1
-            if is_edge:
-                continue
-            if dur < timing.element_char_split:
-                pass  # intra-character gap
-            elif dur < timing.char_word_split:
-                flush_char()
-            else:
-                flush_char()
-                text.append(" ")
-    flush_char()
-    return "".join(text)
+PAUSE_FACTOR = 2.0
+"""A word gap longer than this many nominal word gaps is an intentional
+inter-transmission pause, not a spacing error."""
 
 
-# --------------------------------------------------------------------------- #
-# Analysis against a target
-# --------------------------------------------------------------------------- #
-def _decode_and_events(segs, timing: Timing):
-    """Decode against `timing` and record every mark/gap as a timed event.
+def build_timeline(segs, timing: Timing) -> Timeline:
+    """Turn (state,duration) segments + timing thresholds into a Timeline.
 
-    Returns (text, events) where each event is
-    (time_sec, kind, value_units, target_units, context).
+    This is the single source of truth for "what did the sender actually key":
+    it produces the decoded text, the per-character grouping, and every mark and
+    gap measured against `timing`. `decode_segments` and `analyze` are both thin
+    layers over it, as is the web review payload.
     """
     u = timing.unit_sec
     char_gap_u = (timing.char_gap_sec / u) if timing.char_gap_sec else 3.0
     word_gap_u = (timing.word_gap_sec / u) if timing.word_gap_sec else 7.0
+    pause_floor = PAUSE_FACTOR * word_gap_u
 
-    text, current, events = [], [], []
+    text, chars, blocks = [], [], []
+    pending, pattern = [], []     # blocks / elements of the character in progress
+    lead = None                   # the char-or-word gap that preceded it
     t = 0.0
     n = len(segs)
 
-    def flush():
-        if current:
-            text.append(decode_pattern("".join(current)))
-            current.clear()
+    def flush() -> None:
+        """Close out the character in progress.
 
-    def tail():
+        A character ends at its own last mark, never at the current cursor:
+        `t` has already advanced past the gap that triggered the flush, and at
+        the end of the loop it sits beyond the trailing silence. Reading the
+        end off `pending` keeps that silence out of the character's span.
+        """
+        nonlocal pending, pattern, lead
+        if not pattern:
+            return
+        pat = "".join(pattern)
+        ch = decode_pattern(pat)
+        text.append(ch)
+        chars.append(Char(char=ch, pattern=pat, t0=pending[0].t0,
+                          t1=pending[-1].t1, blocks=pending, lead_gap=lead))
+        pending, pattern, lead = [], [], None
+
+    def tail() -> str:
         return "".join(text)[-10:].strip()
 
     for i, (state, dur) in enumerate(segs):
         start, t = t, t + dur
         vu = dur / u
-        if state == 1:
+        if state == 1:  # mark
             is_dit = dur < timing.dit_dah_split
-            current.append("." if is_dit else "-")
-            events.append((start, "dit" if is_dit else "dah",
-                           vu, 1.0 if is_dit else 3.0, ""))
-        else:
+            pattern.append("." if is_dit else "-")
+            block = Block(start, t, "dit" if is_dit else "dah", vu,
+                          1.0 if is_dit else 3.0)
+            pending.append(block)
+            blocks.append(block)
+        else:  # gap — the very first and last silences are not spacing
             if i == 0 or i == n - 1:
                 continue
             if dur < timing.element_char_split:
-                events.append((start, "element-gap", vu, 1.0, ""))
+                block = Block(start, t, "element-gap", vu, 1.0)
+                pending.append(block)
+                blocks.append(block)
             elif dur < timing.char_word_split:
                 flush()
-                events.append((start, "char-gap", vu, char_gap_u, tail()))
+                lead = Block(start, t, "char-gap", vu, char_gap_u, tail())
+                blocks.append(lead)
             else:
                 flush()
-                events.append((start, "word-gap", vu, word_gap_u, tail()))
+                is_pause = vu > pause_floor
+                lead = Block(start, t, "pause" if is_pause else "word-gap", vu,
+                             0.0 if is_pause else word_gap_u, tail())
+                blocks.append(lead)
                 text.append(" ")
     flush()
-    return "".join(text), events
+    return Timeline(text="".join(text), chars=chars, blocks=blocks)
 
 
+def decode_segments(segs, timing: Timing) -> str:
+    """Turn (state,duration) segments + timing thresholds into text."""
+    return build_timeline(segs, timing).text
+
+
+# --------------------------------------------------------------------------- #
+# Analysis against a target
+# --------------------------------------------------------------------------- #
 @dataclass
 class ClassStat:
     name: str
@@ -615,31 +714,22 @@ class Analysis:
 _CLASS_ORDER = ["dit", "dah", "element-gap", "char-gap", "word-gap"]
 
 
-def analyze(segs, ref: Timing, measured: Timing, tolerance: float = 0.30) -> Analysis:
-    """Compare the actual keying against the ideal `ref` timing.
+def analyze(timeline: Timeline, ref: Timing, measured: Timing,
+            tolerance: float = 0.30) -> Analysis:
+    """Grade the keying in `timeline` against the ideal `ref` timing.
 
-    Word gaps far longer than the target (the sender pausing between repetitions
-    or transmissions) are treated as intentional pauses, not spacing errors, so
-    they're excluded from the grading and counted separately.
+    `timeline` must have been built against `ref` (that's what makes its
+    `units`/`target_units` comparable). Blocks classified as intentional pauses
+    — the sender resting between repetitions or transmissions — carry no target
+    and are counted separately rather than graded as spacing errors.
     """
-    _, events = _decode_and_events(segs, ref)
-
-    # Reclassify very long word gaps as intentional pauses.
-    pause_floor = 2.0 * (ref.word_gap_sec / ref.unit_sec if ref.word_gap_sec else 7.0)
-    n_pauses = 0
-    kept = []
-    for ev in events:
-        start, kind, vu, tu, ctx = ev
-        if kind == "word-gap" and vu > pause_floor:
-            n_pauses += 1
-            continue
-        kept.append(ev)
-    events = kept
+    n_pauses = sum(1 for b in timeline.blocks if b.kind == "pause")
+    graded = [b for b in timeline.blocks if b.target_units > 0]
 
     groups = {}
-    for start, kind, vu, tu, _ctx in events:
-        g = groups.setdefault(kind, {"vals": [], "target": tu})
-        g["vals"].append(vu)
+    for b in graded:
+        g = groups.setdefault(b.kind, {"vals": [], "target": b.target_units})
+        g["vals"].append(b.units)
 
     stats = []
     for kind in _CLASS_ORDER:
@@ -648,22 +738,20 @@ def analyze(segs, ref: Timing, measured: Timing, tolerance: float = 0.30) -> Ana
             stats.append(ClassStat(kind, vals.size, float(vals.mean()),
                                     float(vals.std()), groups[kind]["target"]))
 
-    devs, within, total = [], 0, 0
-    for start, kind, vu, tu, ctx in events:
-        if tu <= 0:
-            continue
-        total += 1
-        rel = abs(vu - tu) / tu
+    devs, within = [], 0
+    for b in graded:
+        rel = abs(b.units - b.target_units) / b.target_units
         if rel <= tolerance:
             within += 1
         # Flag a deviation only if it's both proportionally and absolutely off,
         # so 1-unit elements aren't flagged for tiny wobble.
-        elif abs(vu - tu) >= 0.4:
-            devs.append(Deviation(start, kind, vu, tu, ctx))
+        elif abs(b.units - b.target_units) >= 0.4:
+            devs.append(Deviation(b.t0, b.kind, b.units, b.target_units,
+                                  b.context))
 
     devs.sort(key=lambda d: abs(d.value_units - d.target_units) / d.target_units,
               reverse=True)
-    frac = within / total if total else 1.0
+    frac = within / len(graded) if graded else 1.0
     return Analysis(ref, measured, stats, devs[:12], frac, tolerance, n_pauses)
 
 
@@ -697,6 +785,9 @@ class Result:
     timing: Timing              # measured (auto-estimated) timing
     rate: int
     analysis: Analysis | None = None  # present when a target was supplied
+    timeline: Timeline | None = None  # the decode with timing preserved
+    segments: list = field(default_factory=list)  # (state, seconds), debounced
+    signal: np.ndarray | None = None  # normalized mono audio at `rate`
 
 
 def decode_file(path: str, tone: float | None = None,
@@ -704,7 +795,8 @@ def decode_file(path: str, tone: float | None = None,
                 bandwidth: float = 200.0,
                 target_wpm: float | None = None,
                 target_farnsworth: float | None = None,
-                tolerance: float = 0.30) -> Result:
+                tolerance: float = 0.30,
+                keep_signal: bool = False) -> Result:
     sig = load_audio(path, target_rate)
     tone_hz = tone if tone is not None else detect_tone(sig, target_rate)
     env = envelope(sig, target_rate, tone_hz, bw=bandwidth)
@@ -725,9 +817,10 @@ def decode_file(path: str, tone: float | None = None,
     if target_wpm is not None:
         # Decode against the target's ideal timing and grade the sending.
         ref = target_timing(target_wpm, target_farnsworth)
-        text = decode_segments(segs, ref)
-        analysis = analyze(segs, ref, measured, tolerance=tolerance)
+        timeline = build_timeline(segs, ref)
+        analysis = analyze(timeline, ref, measured, tolerance=tolerance)
     else:
-        text = decode_segments(segs, measured)
-    return Result(text=text, tone_hz=tone_hz, timing=measured, rate=target_rate,
-                  analysis=analysis)
+        timeline = build_timeline(segs, measured)
+    return Result(text=timeline.text, tone_hz=tone_hz, timing=measured,
+                  rate=target_rate, analysis=analysis, timeline=timeline,
+                  segments=segs, signal=sig if keep_signal else None)

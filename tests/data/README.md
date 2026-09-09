@@ -12,6 +12,7 @@ well under ~200 KB. Content uses the example callsign `AB1CD` (no real stations)
 | File | Message | Speed |
 |------|---------|-------|
 | `cq-ab1cd-20wpm-k3ng.wav` | `CQ CQ DE AB1CD K` | 20 wpm, standard spacing; k3ng keyer, programmatically sent (clean, machine-timed) |
+| `cq-de-w7yfr.wav` | `CQ DE W7YFR` | 25 wpm; keyer captured via Audacity, words run together (no word gaps) |
 
 ## How to (re)generate
 
@@ -34,3 +35,9 @@ valuable than tool-generated — the point is to test on non-ideal keying.
 
 To add a fixture: drop the WAV here and add a row to `FIXTURES` in
 `tests/test_fixture.py` with its expected message and speed.
+
+**Fixtures must be intact recordings.** `test_fixture_has_no_dropouts` rejects
+any file with dropped audio buffers — they click, shorten dits and dahs, and
+read back faster than they were keyed, which would silently poison the speed
+assertions. If a capture fails that check, the recording is the problem, not
+the decoder: capture it again with a different input path.

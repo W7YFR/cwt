@@ -64,3 +64,14 @@ for _name in _PROSIGN_OVERRIDES:
 def decode_pattern(pattern: str) -> str:
     """Map a dit/dah string (e.g. '.-') to a character/prosign, or '?'."""
     return MORSE_TO_CHAR.get(pattern, "?")
+
+
+def tables() -> dict:
+    """Both mappings as plain dicts.
+
+    The web review page needs them in JavaScript; injecting them from here at
+    page-build time means the browser can't disagree with the decoder about what
+    a pattern means, including the prosign collision policy above.
+    """
+    return {"charToMorse": dict(CHAR_TO_MORSE),
+            "morseToChar": dict(MORSE_TO_CHAR)}

@@ -92,5 +92,8 @@ def generate(text: str, wpm: float = 20.0, farnsworth_wpm: float | None = None,
 def write_wav(path: str, sig: np.ndarray, rate: int = 8000) -> None:
     from scipy.io import wavfile
 
-    pcm = np.clip(sig, -1, 1)
-    wavfile.write(path, rate, (pcm * 32767).astype(np.int16))
+    # Round rather than truncate, and scale by 32768, so audio that came from
+    # int16 (a capture) survives the round trip exactly.
+    pcm = np.clip(np.round(np.asarray(sig, dtype=np.float64) * 32768.0),
+                  -32768, 32767).astype(np.int16)
+    wavfile.write(path, rate, pcm)

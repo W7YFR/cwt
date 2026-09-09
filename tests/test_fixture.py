@@ -25,6 +25,9 @@ DATA = os.path.join(os.path.dirname(__file__), "data")
 # word spacing is ambiguous.
 FIXTURES = [
     ("cq-ab1cd-20wpm-k3ng.wav", "CQ CQ DE AB1CD K", 20, 20, True),
+    # A 25 wpm keyer captured through Audacity. Run together without word
+    # gaps, hence exact_spacing=False and no overall-speed assertion.
+    ("cq-de-w7yfr.wav", "CQ DE W7YFR", 25, None, False),
 ]
 
 
@@ -49,6 +52,29 @@ def test_fixture(fname, expected, char_wpm, overall, exact):
 
 
 @pytest.mark.parametrize("fname,expected,char_wpm,overall,exact", FIXTURES)
+def test_fixture_has_no_dropouts(fname, expected, char_wpm, overall, exact):
+    """Committed fixtures must be intact recordings.
+
+    A capture with dropped buffers clicks, shortens elements, and reads back
+    faster than it was keyed — so it would silently poison the speed
+    assertions above. Checking it here documents the standard for adding a
+    fixture, and catches a re-recorded one made with a broken capture path.
+    """
+    path = os.path.join(DATA, fname)
+    if not os.path.exists(path):
+        pytest.skip(f"fixture not present: {fname}")
+
+    from cw_decoder import capture
+
+    rate = capture.wav_rate(path)
+    assert rate, f"could not read the sample rate of {fname}"
+    # At the file's own rate: resampling smooths the splice and hides it.
+    sig = core.load_audio(path, rate, normalize=False)
+    hits = core.find_dropouts(sig, rate)
+    assert hits == [], f"{fname} has {len(hits)} dropped buffer(s) at {hits[:5]}"
+
+
+@pytest.mark.parametrize("fname,expected,char_wpm,overall,exact", FIXTURES)
 def test_fixture_accuracy(fname, expected, char_wpm, overall, exact):
     """With the intended text supplied, a clean recording scores ~100%."""
     path = os.path.join(DATA, fname)
@@ -56,6 +82,13 @@ def test_fixture_accuracy(fname, expected, char_wpm, overall, exact):
         pytest.skip(f"fixture not present: {fname}")
 
     res = core.decode_file(path)
-    cmp = core.compare_text(expected, res.text)
-    threshold = 0.98 if exact else 0.85
+    if exact:
+        cmp = core.compare_text(expected, res.text)
+        threshold = 0.98
+    else:
+        # Same basis as test_fixture: this fixture's word spacing is ambiguous
+        # (the keyer ran the words together), so scoring spaces would measure
+        # the recording's spacing rather than the decoder's character accuracy.
+        cmp = core.compare_text(_letters(expected), _letters(res.text))
+        threshold = 0.85
     assert cmp.accuracy >= threshold, cmp.diff

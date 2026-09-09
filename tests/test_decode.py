@@ -2,6 +2,7 @@
 
 import tempfile
 
+import numpy
 import pytest
 
 from cw_decoder import core, synth
@@ -129,6 +130,98 @@ def test_quick_decode_partial_prefix():
     part = core.quick_decode(sig[: int(sig.size * 0.4)], 8000, 600.0, timing).strip()
     assert full == "PARIS PARIS"
     assert part and full.startswith(part[:3])
+
+
+def test_live_preview_decimates_for_dsp():
+    """Capture runs at 44.1 kHz; the live preview decodes a decimated copy.
+
+    Decoding at the capture rate directly costs ~5x more, and the preview
+    re-decodes the whole buffer several times a second — so the decimation has
+    to be both cheap and lossless enough to decode correctly.
+    """
+    from cw_decoder import stream
+
+    text = "CQ DE AB1CD K"
+    sig = synth.generate(text, wpm=20, tone=600, rate=44100)
+    dsp = stream._for_dsp(sig, 44100, 8000)
+    assert abs(dsp.size - sig.size * 8000 / 44100) < 100      # right length
+    assert dsp.dtype == numpy.float32
+
+    timing = core.target_timing(20)
+    assert text in core.quick_decode(dsp, 8000, 600.0, timing)
+
+    # A no-op when the rates already match, and safe on an empty buffer.
+    assert stream._for_dsp(sig, 8000, 8000) is sig
+    empty = numpy.zeros(0, dtype=numpy.float32)
+    assert stream._for_dsp(empty, 44100, 8000).size == 0
+
+
+def _drop_buffers(sig, rate, at_seconds, frames=512):
+    """Excise `frames` samples at each time — what a dropped capture buffer does.
+
+    The waveform then resumes at an arbitrary phase, which is the audible click
+    and the reason the element it landed in comes out short.
+    """
+    keep = numpy.ones(sig.size, dtype=bool)
+    for t in at_seconds:
+        i = int(t * rate)
+        keep[i:i + frames] = False
+    return sig[keep]
+
+
+def test_find_dropouts_flags_spliced_audio():
+    """Detect dropped capture buffers, which are otherwise silent failures.
+
+    Measured on real captures: clean recordings sit at ~1.04x their own
+    99.9th-percentile slew, captures with dropped buffers at 4.1-5.2x.
+    """
+    rate = 48000
+    clean = synth.generate("CQ CQ DE W7YFR K", wpm=25, tone=600, rate=rate)
+    assert core.find_dropouts(clean, rate) == []
+
+    # Drops land mid-mark, where a phase splice is detectable.
+    holed = _drop_buffers(clean, rate, [1.0, 2.0, 3.0])
+    found = core.find_dropouts(holed, rate)
+    assert len(found) >= 2, f"missed the splices: {found}"
+
+    # Noise must not trip it — a false alarm on good audio is worse than
+    # missing a marginal glitch.
+    for noise in (0.15, 0.3, 0.5):
+        noisy = synth.generate("CQ DE W7YFR", wpm=25, tone=600, rate=rate,
+                               noise=noise)
+        assert core.find_dropouts(noisy, rate) == [], f"false alarm at {noise}"
+
+    # Silence and tiny buffers are handled without blowing up.
+    assert core.find_dropouts(numpy.zeros(4000, dtype=numpy.float32), rate) == []
+    assert core.find_dropouts(numpy.zeros(8, dtype=numpy.float32), rate) == []
+
+
+def test_dropped_buffers_inflate_the_measured_speed():
+    """Why dropouts matter: they make the decoder read the sending as faster.
+
+    The unit estimate averages the dit with a third of the dah, so shortening
+    dahs — which happens three times as often, being three times as long —
+    biases the speed upward. This is the mechanism behind a 25 wpm keyer
+    reading back as ~28.
+    """
+    rate = 48000
+    text = "PARIS PARIS PARIS PARIS"
+    clean = synth.generate(text, wpm=25, tone=600, rate=rate)
+    holed = _drop_buffers(clean, rate, numpy.arange(0.4, 4.0, 0.25))
+
+    with tempfile.NamedTemporaryFile(suffix=".wav") as a, \
+            tempfile.NamedTemporaryFile(suffix=".wav") as b:
+        synth.write_wav(a.name, clean, rate)
+        synth.write_wav(b.name, holed, rate)
+        good = core.decode_file(a.name, target_rate=8000)
+        bad = core.decode_file(b.name, target_rate=8000)
+
+    # Relative, not absolute: synth.generate puts its raised-cosine ramp
+    # *inside* the mark, so a 50%-threshold measurement of synthetic audio
+    # reads (length - ramp) and lands ~2 wpm fast regardless of dropouts. On
+    # real keyer audio the decoder is accurate to within 1 wpm; what matters
+    # here is that excising buffers makes the reading worse.
+    assert bad.timing.char_wpm > good.timing.char_wpm + 1.0
 
 
 def test_capture_device_parser():
@@ -263,6 +356,89 @@ def test_compare_repetitive_localizes_errors():
     c = core.compare_text(exp, got)
     assert c.accuracy > 0.9
     assert c.substitutions == 1
+
+
+def test_timeline_groups_blocks_into_characters():
+    """build_timeline preserves which marks/gaps produced which character."""
+    res = _roundtrip("CQ DE", wpm=20)
+    tl = res.timeline
+    assert tl is not None
+    assert tl.text == res.text
+    assert "".join(c.char for c in tl.chars) == "CQDE"
+
+    # Every character's blocks reconstruct its dit/dah pattern.
+    from cw_decoder.morse import CHAR_TO_MORSE
+    for c in tl.chars:
+        marks = [b for b in c.blocks if b.kind in ("dit", "dah")]
+        pattern = "".join("." if b.kind == "dit" else "-" for b in marks)
+        assert pattern == c.pattern == CHAR_TO_MORSE[c.char]
+        # A character spans exactly its own marks — no silence bleeding in.
+        assert c.t0 == marks[0].t0
+        assert c.t1 == marks[-1].t1
+
+    # Characters are in time order and don't overlap.
+    for a, b in zip(tl.chars, tl.chars[1:]):
+        assert a.t1 <= b.t0
+
+    # The gap between two characters is attributed to the later one.
+    assert tl.chars[0].lead_gap is None                  # first char has none
+    assert tl.chars[1].lead_gap.kind == "char-gap"       # C -> Q
+    assert tl.chars[2].lead_gap.kind == "word-gap"       # Q -> D (word boundary)
+
+
+def test_timeline_excludes_trailing_silence_from_the_last_character():
+    """The final character must not absorb the recording's trailing silence.
+
+    `t` advances past every segment including the edge silences, so closing the
+    last character at the cursor would stretch it to the end of the file —
+    which showed up as a phantom jump at the end of the drift plot, and made
+    click-to-play run on through the silence.
+    """
+    timing = core.target_timing(20)
+    u = timing.unit_sec
+    # K = -.-  wrapped in a long trailing silence.
+    segs = [(0, 0.1), (1, 3 * u), (0, u), (1, u), (0, u), (1, 3 * u),
+            (0, 25 * u)]
+    tl = core.build_timeline(segs, timing)
+    assert tl.text == "K"
+    last = tl.chars[-1]
+    assert last.t1 == tl.blocks[-1].t1                 # ends at its last mark
+    assert (last.t1 - last.t0) == pytest.approx(9 * u)  # -.- spans 9 units
+    # The trailing silence produced no block at all.
+    assert all(b.kind != "pause" for b in tl.blocks)
+
+
+def test_timeline_measures_against_reference_timing():
+    """Blocks are measured in the reference timing's units."""
+    sig = synth.generate("PARIS", wpm=20, tone=600, rate=8000)
+    with tempfile.NamedTemporaryFile(suffix=".wav") as tf:
+        synth.write_wav(tf.name, sig, 8000)
+        res = core.decode_file(tf.name, target_rate=8000, target_wpm=20)
+    tl = res.timeline
+    for b in tl.blocks:
+        if b.kind == "dit":
+            assert b.target_units == 1.0 and abs(b.units - 1.0) < 0.3
+        elif b.kind == "dah":
+            assert b.target_units == 3.0 and abs(b.units - 3.0) < 0.3
+        elif b.kind == "element-gap":
+            assert b.target_units == 1.0 and abs(b.units - 1.0) < 0.3
+
+
+def test_timeline_flags_long_silence_as_pause():
+    """An inter-transmission silence becomes a `pause`, excluded from grading."""
+    timing = core.target_timing(20)
+    u = timing.unit_sec
+    # dit, word gap, dit, a 30-unit silence, dit -- wrapped in edge silence.
+    segs = [(0, 0.1), (1, u), (0, 7 * u), (1, u), (0, 30 * u), (1, u), (0, 0.1)]
+    tl = core.build_timeline(segs, timing)
+    kinds = [b.kind for b in tl.blocks]
+    assert kinds == ["dit", "word-gap", "dit", "pause", "dit"]
+    pause = tl.blocks[3]
+    assert pause.target_units == 0.0            # carries no target
+    a = core.analyze(tl, timing, timing)
+    assert a.n_pauses == 1
+    assert not any(d.kind == "pause" for d in a.deviations)
+    assert all(s.name != "pause" for s in a.stats)
 
 
 def test_prosign_collision_policy():
