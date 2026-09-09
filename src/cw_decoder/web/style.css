@@ -115,15 +115,27 @@ button {
 }
 button:hover:not(:disabled) { border-color: var(--you); }
 button:disabled { opacity: .45; cursor: default; }
+.ico {
+  display: inline-block;
+  width: 1.2em;
+  font-style: normal;
+  text-align: left;
+}
 button.play { border-left: 3px solid var(--you); }
 button.play.alt { border-left-color: var(--tgt); }
 button.on { background: var(--you); border-color: var(--you); color: #fff; }
 button.alt.on { background: var(--tgt); border-color: var(--tgt); }
+/* Fixed width, not min-width: the text changes every frame while playing, and
+   anything elastic here shoves the rest of the control bar sideways. Tabular
+   figures keep the digits from jittering within it. */
 .clock {
   font-family: var(--mono);
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
-  min-width: 52px;
+  flex: 0 0 auto;
+  width: 7ch;
+  text-align: right;
+  overflow: hidden;
 }
 
 /* ---- canvas ------------------------------------------------------------ */

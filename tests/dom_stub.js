@@ -86,6 +86,13 @@ function makeEl(id) {
     removeEventListener: () => {},
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 900, height: 200 }),
     getContext: () => ctx2d(),
+    // Transport buttons hold their play/stop glyph in a nested .ico span, so
+    // swapping it can't resize the button.
+    querySelector: (sel) => {
+      if (sel !== ".ico") return null;
+      if (!el._ico) el._ico = makeEl(`${id}-ico`);
+      return el._ico;
+    },
     dispatch: (t, ev) => (listeners[t] || []).forEach((f) => f(ev || {})),
     _listeners: listeners
   };
@@ -332,6 +339,12 @@ function fire(el, type, ev) {
   }
 }
 
+// Boot state, before anything is touched.
+const initial = {
+  gainOut: byId("gain-out").textContent,
+  clock: byId("clock").textContent
+};
+
 // Move every slider across its range, in every view.
 ["per-char", "absolute", "overlay"].forEach((view) => {
   byId("view").value = view;
@@ -418,20 +431,28 @@ async function exerciseAB() {
 // decoded buffer's real duration bounds it, plus the node's ended event.
 const endReset = {};
 async function exerciseEndReset() {
+  const icon = () => byId("play-you").querySelector(".ico").textContent;
   fire(byId("play-you"), "click");
   await flush();
-  endReset.labelWhilePlaying = byId("play-you").textContent;
+  endReset.labelWhilePlaying = icon();
   endReset.buffered = !!(lastSource && lastSource.buffer);
+  // The clock is scheduled slightly ahead, so an unclamped reading would show
+  // "-0.0s" for the first few frames.
+  endReset.clocksWhilePlaying = [];
+  for (let i = 0; i < 3 && rafCb; i++) {
+    const cb = rafCb; rafCb = null; cb();
+    endReset.clocksWhilePlaying.push(byId("clock").textContent);
+  }
   // Advance the context clock past the buffer's duration and pump the loop.
   lastCtx._t += global.REVIEW.duration_sec + 1;
   for (let i = 0; i < 3 && rafCb; i++) { const cb = rafCb; rafCb = null; cb(); }
-  endReset.labelAfterEnd = byId("play-you").textContent;
+  endReset.labelAfterEnd = icon();
 
   // And again via the source node's own ended event, for a throttled tab.
   fire(byId("play-you"), "click");
   await flush();
   if (lastSource && lastSource.onended) lastSource.onended();
-  endReset.labelAfterEndedEvent = byId("play-you").textContent;
+  endReset.labelAfterEndedEvent = icon();
   fire(byId("stop"), "click");
 }
 
@@ -565,6 +586,7 @@ console.log(JSON.stringify({
   dlStatus: byId("dl-status").textContent,
   abTest: abTest,
   endReset: endReset,
+  initial: initial,
   viewFills: viewFills,
   viewRows: viewRows,
   audio: {

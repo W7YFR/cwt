@@ -15,8 +15,10 @@
 
 <section class="controls">
   <div class="group transport">
-    <button id="play-you" class="play">▶ Your sending</button>
-    <button id="play-tgt" class="play alt">▶ Target</button>
+    <!-- The icon lives in its own fixed-width span so swapping play/stop
+         can't change the button's width and shift the row. -->
+    <button id="play-you" class="play"><i class="ico">▶</i>Your sending</button>
+    <button id="play-tgt" class="play alt"><i class="ico">▶</i>Target</button>
     <button id="stop" disabled>■</button>
     <span class="clock" id="clock">0.0s</span>
   </div>

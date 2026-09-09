@@ -67,6 +67,7 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `--web-review` | Also build an interactive review page (your keying drawn against perfect timing, spacing annotated, both playable) and open it in a browser. See [Web review](#web-review-see-your-spacing). |
 | `--web-out FILE` | Where to write that page (implies `--web-review`). Default: `~/.cw-decoder/sessions/<timestamp>/review.html`. |
 | `--live` | Trainer mode: capture from an audio input device (live keying) instead of a file, then decode and grade. |
+| `--capture-backend` | `auto` (default), `portaudio`, or `ffmpeg`. PortAudio buffers properly and reports overflows; ffmpeg is the macOS-only fallback and **drops buffers on some devices**. **Device indices differ between backends** — list and select with the same one. |
 | `--preview` | With `--live`, also print the decode in **real time** as you key (requires `-w`). |
 | `--list-devices` | List available audio input devices and exit. |
 | `-D, --device N` | Audio input device index for `--live` (see `--list-devices`). |
@@ -323,10 +324,10 @@ zoomed out just enough to stay inside the browser's canvas limit.
 **Levels are never altered.** The decode path peak-normalizes on purpose (the
 Otsu threshold works on absolute amplitude), but the embedded audio and the
 download are the recording at the level it was made — bit-identical to the
-source. A quiet capture stays quiet; the **Listening level** slider boosts it at
-playback via a gain node, applied equally to your track and the target so A/B
-compares timing rather than loudness. That slider changes nothing about the
-files.
+source. The **Listening level** slider starts at unity (0 dB) and boosts at
+playback via a gain node when you want it, applied equally to your track and
+the target so A/B compares timing rather than loudness. That slider changes
+nothing about the files.
 
 **Listening.** Your recording is embedded in the page, so you can replay
 yourself and A/B against the target. It plays from a buffer decoded once on
@@ -356,6 +357,17 @@ Notes:
 - **Opt-in and offline.** Nothing is written unless you pass the flag, and the
   page has no external references at all — no CDN, no fonts, no network. It works
   from `file://` forever and can be archived or mailed as a single file.
+- **Capture backend.** Live capture prefers **PortAudio** (`pip install
+  'cw-decoder[live]'`, bundled in the wheel), falling back to ffmpeg. This is
+  not a preference — ffmpeg's macOS avfoundation audio path drops capture
+  buffers on real hardware even with its input queue raised to 8192 and every
+  conversion removed from the realtime path. PortAudio takes a generous
+  driver-side buffer and *reports* input overflow through its callback, so a
+  glitch is a message instead of something you find by ear.
+
+  Whichever backend runs, capture is a passthrough: the device's own rate and
+  channel count, no filters. Folding to mono and resampling to the decoder's
+  8 kHz working rate happen afterwards, off the clock.
 - **Dropped-buffer detection.** After a live capture the recording is checked
   for dropped audio buffers and you get a warning naming the count and the
   timestamps. A dropped buffer splices the waveform at a random phase: it

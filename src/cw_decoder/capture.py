@@ -1,15 +1,30 @@
-"""Live audio capture via ffmpeg.
+"""Live audio capture.
 
-Currently supports macOS (avfoundation). The rest of the pipeline is unchanged:
-we capture to a mono WAV at the decoder's sample rate, then decode/grade it like
-any other file. Kept separate from core.py because it's platform-specific and
-involves an interactive recording loop.
+Two backends:
+
+* **portaudio** (preferred) — via the `sounddevice` package. Captures through
+  a callback with a large driver-side buffer and *reports* input overflows, so
+  a glitch is a message rather than something you discover by ear. Works on
+  macOS, Linux and Windows.
+* **ffmpeg** (fallback) — avfoundation on macOS only. Kept so live capture
+  still works without the optional dependency, but ffmpeg's avfoundation audio
+  path drops capture buffers on real hardware even with the input queue raised
+  and every conversion removed from the realtime path. A dropped buffer splices
+  the waveform at an arbitrary phase: it clicks, it shortens whatever dit or
+  dah it landed in, and since the decoder's unit estimate averages the dit with
+  a third of the dah, it makes the sending read back *faster* than it was
+  keyed. `core.find_dropouts` catches it after the fact either way.
+
+Whichever backend is used, capture stays a passthrough: the device's own rate
+and channel count, no filters. Rate conversion and channel folding happen
+afterwards, off the clock, in `core.load_audio`.
 """
 
 from __future__ import annotations
 
 import os
 import platform
+import queue
 import re
 import select
 import shutil
@@ -17,26 +32,27 @@ import subprocess
 import sys
 import time
 
+import numpy as np
+
 RATE = 8000
-# Capture at the device's *native* rate: pass rate=None and don't give ffmpeg
-# an -ar at all.
-#
-# Forcing a rate makes ffmpeg resample every sample. On a square-ish keyer
-# sidetone that is audible — resampling 48 kHz to 44.1 kHz leaves the harmonics
-# intact but lifts the noise between them by ~6 dB (worse on a real sidetone),
-# which is exactly the "crunchy" quality it produces. The decoder resamples to
-# its own 8 kHz working rate anyway, so there is nothing to gain by resampling
-# twice.
 DEFAULT_MAX_SECONDS = 120.0  # safety cap so a capture can't run away and fill disk
 _HEADER_TIMEOUT = 15.0       # seconds to wait for ffmpeg's WAV header on a pipe
+_THREAD_QUEUE = "8192"       # ffmpeg input packet queue; the default overflows
 
-# Keep the realtime capture path a pure passthrough: no -ar, no -ac, no filters.
-# Every conversion ffmpeg has to do while the device is streaming is a chance to
-# fall behind and drop a buffer, and a dropped buffer splices the waveform at an
-# arbitrary phase — an audible click, a shortened dit or dah, and a decoder that
-# reads the sending as faster than it was. Channels and rate are sorted out
-# afterwards, off the clock, by load_audio.
-_THREAD_QUEUE = "8192"       # input packet queue; the default overflows here
+BACKENDS = ("portaudio", "ffmpeg")
+
+
+# --------------------------------------------------------------------------- #
+# Backend selection
+# --------------------------------------------------------------------------- #
+def _sounddevice():
+    """The `sounddevice` module, or None if it isn't installed/usable."""
+    try:
+        import sounddevice
+        sounddevice.query_devices()      # fails fast if PortAudio is broken
+        return sounddevice
+    except Exception:
+        return None
 
 
 def _ffmpeg() -> str:
@@ -46,16 +62,50 @@ def _ffmpeg() -> str:
     return exe
 
 
-def _backend() -> str:
+def _backend_name() -> str:
     system = platform.system()
     if system == "Darwin":
         return "avfoundation"
     raise RuntimeError(
-        f"Live capture is currently implemented for macOS only (detected "
-        f"{system}). Record with your OS tools and pass the WAV/MP3 instead."
+        f"ffmpeg live capture is implemented for macOS only (detected "
+        f"{system}). Install the 'live' extra for the portaudio backend, or "
+        f"record with your OS tools and pass the WAV instead."
     )
 
 
+def available_backends() -> list:
+    """Backends usable right now, best first."""
+    out = []
+    if _sounddevice() is not None:
+        out.append("portaudio")
+    if shutil.which("ffmpeg") and platform.system() == "Darwin":
+        out.append("ffmpeg")
+    return out
+
+
+def resolve_backend(name: str = "auto") -> str:
+    """Pick a backend, preferring portaudio. Raises if none is usable."""
+    usable = available_backends()
+    if name != "auto":
+        if name not in BACKENDS:
+            raise RuntimeError(f"unknown capture backend: {name}")
+        if name not in usable:
+            extra = ("Install it with: pip install 'cw-decoder[live]'"
+                     if name == "portaudio"
+                     else "Install ffmpeg (macOS only for capture).")
+            raise RuntimeError(f"capture backend {name!r} is unavailable. {extra}")
+        return name
+    if not usable:
+        raise RuntimeError(
+            "no live-capture backend available. Install the portaudio backend "
+            "with: pip install 'cw-decoder[live]'  (or install ffmpeg on macOS)."
+        )
+    return usable[0]
+
+
+# --------------------------------------------------------------------------- #
+# Device listing
+# --------------------------------------------------------------------------- #
 def _parse_devices(stderr_text: str):
     """Extract (index, name) audio input devices from ffmpeg's device listing."""
     devices, in_audio = [], False
@@ -74,24 +124,104 @@ def _parse_devices(stderr_text: str):
     return devices
 
 
-def list_audio_devices():
-    """Return a list of (index, name) for available audio input devices."""
-    backend = _backend()
-    cmd = [_ffmpeg(), "-hide_banner", "-f", backend,
+def list_audio_devices(backend: str = "auto"):
+    """Return [(index, name), ...] for the given backend's input devices.
+
+    Indices are backend-specific — PortAudio and avfoundation number devices
+    differently — so always list and select with the same backend.
+    """
+    backend = resolve_backend(backend)
+    if backend == "portaudio":
+        sd = _sounddevice()
+        out = []
+        for i, d in enumerate(sd.query_devices()):
+            if d.get("max_input_channels", 0) > 0:
+                out.append((i, f"{d['name']} "
+                               f"({int(d['default_samplerate'])} Hz, "
+                               f"{d['max_input_channels']} ch)"))
+        return out
+    cmd = [_ffmpeg(), "-hide_banner", "-f", _backend_name(),
            "-list_devices", "true", "-i", ""]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     return _parse_devices(proc.stderr)
 
 
-def _quit_ffmpeg(proc) -> None:
-    """Ask ffmpeg to stop and finalize the file (graceful), else terminate."""
-    if proc.poll() is not None:
-        return
-    try:
-        proc.stdin.write(b"q")
-        proc.stdin.flush()
-    except (OSError, ValueError, AttributeError):
-        proc.terminate()
+# --------------------------------------------------------------------------- #
+# Incremental capture
+# --------------------------------------------------------------------------- #
+class LiveStream:
+    """A running capture that can be read incrementally.
+
+    `rate` and `channels` describe what the device actually gave us. `read`
+    returns however many new interleaved samples are available (possibly an
+    empty array) or None once the source has ended.
+    """
+
+    rate: int = 0
+    channels: int = 1
+    backend: str = ""
+
+    def read(self, timeout: float = 0.2):
+        raise NotImplementedError
+
+    def stop(self) -> None:
+        raise NotImplementedError
+
+    def problems(self) -> list:
+        """Backend-reported glitches (e.g. input overflow)."""
+        return []
+
+
+class _PortAudioStream(LiveStream):
+    def __init__(self, sd, device: int, rate: "int | None"):
+        info = sd.query_devices(device, "input")
+        max_ch = int(info.get("max_input_channels") or 1)
+        self.backend = "portaudio"
+        self.rate = int(rate or info.get("default_samplerate") or 48000)
+        self.channels = 1 if max_ch >= 1 else max_ch
+        self._q: queue.Queue = queue.Queue()
+        self._status: list = []
+        self._sd = sd
+
+        def callback(indata, frames, time_info, status):
+            # PortAudio tells us when it had to drop input — record it rather
+            # than letting a glitch pass silently.
+            if status:
+                self._status.append(str(status))
+            self._q.put(np.asarray(indata, dtype=np.float32).reshape(-1).copy())
+
+        # latency="high" asks the driver for a generous buffer, which is what
+        # keeps a capture from overrunning while the rest of this process works.
+        self._stream = sd.InputStream(
+            device=device, samplerate=self.rate, channels=self.channels,
+            dtype="float32", blocksize=0, latency="high", callback=callback)
+        self._stream.start()
+
+    def read(self, timeout: float = 0.2):
+        try:
+            return self._q.get(timeout=timeout)
+        except queue.Empty:
+            return np.zeros(0, dtype=np.float32)
+
+    def stop(self) -> None:
+        try:
+            self._stream.stop()
+        finally:
+            self._stream.close()
+        # Drain whatever the callback queued before we stopped.
+        rest = []
+        while True:
+            try:
+                rest.append(self._q.get_nowait())
+            except queue.Empty:
+                break
+        self._tail = np.concatenate(rest) if rest else np.zeros(0, np.float32)
+
+    def drain(self):
+        return getattr(self, "_tail", np.zeros(0, dtype=np.float32))
+
+    def problems(self) -> list:
+        return list(self._status)
 
 
 def _read_stream_format(stdout):
@@ -135,37 +265,160 @@ def _read_stream_format(stdout):
         size = int.from_bytes(need(4), "little")
         if cid == b"fmt ":
             fmt = need(size)
-            return (int.from_bytes(fmt[4:8], "little"),      # sample rate
+            return (int.from_bytes(fmt[4:8], "little"),       # sample rate
                     int.from_bytes(fmt[2:4], "little") or 1)  # channels
         if cid == b"data":
             raise RuntimeError("audio stream had no format chunk.")
         need(size + (size & 1))          # skip, chunks are word-aligned
 
 
-def open_stream(device: int, rate: "int | None" = None):
-    """Start ffmpeg streaming mono float32 PCM from `device` to stdout.
-
-    Returns (Popen, rate). With `rate=None` the device's native rate is used
-    and reported back — no resampling, which is what keeps a keyer sidetone
-    clean. The caller reads stdout in blocks and calls `_quit_ffmpeg` to stop.
-    """
-    backend = _backend()
-    cmd = [_ffmpeg(), "-hide_banner", "-loglevel", "warning",
-           "-thread_queue_size", _THREAD_QUEUE,
-           "-f", backend, "-i", f":{device}"]
-    if rate:
-        cmd += ["-ar", str(rate)]
-    # A WAV container rather than bare f32le, so the header reports the rate and
-    # channel count the device actually gave us.
-    cmd += ["-c:a", "pcm_f32le", "-f", "wav", "-"]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def _quit_ffmpeg(proc) -> None:
+    """Ask ffmpeg to stop and finalize (graceful), else terminate."""
+    if proc.poll() is not None:
+        return
     try:
-        actual, channels = _read_stream_format(proc.stdout)
-    except Exception:
-        _quit_ffmpeg(proc)
-        raise
-    return proc, actual, channels
+        proc.stdin.write(b"q")
+        proc.stdin.flush()
+    except (OSError, ValueError, AttributeError):
+        proc.terminate()
+
+
+class _FfmpegStream(LiveStream):
+    def __init__(self, device: int, rate: "int | None"):
+        cmd = [_ffmpeg(), "-hide_banner", "-loglevel", "warning",
+               "-thread_queue_size", _THREAD_QUEUE,
+               # Documented for video frames, but avfoundation's audio path
+               # also discards late buffers; ask it not to.
+               "-drop_late_frames", "false",
+               "-f", _backend_name(), "-i", f":{device}"]
+        if rate:
+            cmd += ["-ar", str(rate)]
+        # A WAV container rather than bare f32le, so the header reports the
+        # rate and channel count the device actually gave us.
+        cmd += ["-c:a", "pcm_f32le", "-f", "wav", "-"]
+        self.backend = "ffmpeg"
+        self._proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+        try:
+            self.rate, self.channels = _read_stream_format(self._proc.stdout)
+        except Exception:
+            _quit_ffmpeg(self._proc)
+            raise
+
+    def read(self, timeout: float = 0.2):
+        ready, _, _ = select.select([self._proc.stdout], [], [], timeout)
+        if not ready:
+            return np.zeros(0, dtype=np.float32)
+        data = self._proc.stdout.read1(65536)
+        if not data:
+            return None
+        return np.frombuffer(data, dtype="<f4")
+
+    def stop(self) -> None:
+        _quit_ffmpeg(self._proc)
+        rest = []
+        try:
+            while True:                    # keep the remaining tail audio
+                data = self._proc.stdout.read1(65536)
+                if not data:
+                    break
+                rest.append(np.frombuffer(data, dtype="<f4"))
+        except (OSError, ValueError):
+            pass
+        err = b""
+        try:
+            if self._proc.stderr:
+                err = self._proc.stderr.read()
+        except OSError:
+            pass
+        self._proc.wait()
+        self._tail = np.concatenate(rest) if rest else np.zeros(0, np.float32)
+        self._err = err.decode(errors="replace")
+
+    def drain(self):
+        return getattr(self, "_tail", np.zeros(0, dtype=np.float32))
+
+    def problems(self) -> list:
+        out = []
+        for line in getattr(self, "_err", "").splitlines():
+            line = line.strip()
+            if line and "deprecated" not in line.lower():
+                out.append(line)
+        return out
+
+
+def open_stream(device: int, rate: "int | None" = None,
+                backend: str = "auto") -> LiveStream:
+    """Start capturing from `device`. `rate=None` uses the device's own rate."""
+    backend = resolve_backend(backend)
+    if backend == "portaudio":
+        return _PortAudioStream(_sounddevice(), device, rate)
+    return _FfmpegStream(device, rate)
+
+
+# --------------------------------------------------------------------------- #
+# Recording to a file
+# --------------------------------------------------------------------------- #
+def _stop_requested() -> bool:
+    """True once the user has pressed Enter (non-blocking)."""
+    if not sys.stdin.isatty():
+        return False
+    ready, _, _ = select.select([sys.stdin], [], [], 0)
+    if not ready:
+        return False
+    try:
+        os.read(sys.stdin.fileno(), 4096)      # consume the Enter
+    except OSError:
+        pass
+    return True
+
+
+def capture_samples(device: int, rate: "int | None" = None,
+                    max_seconds: float = DEFAULT_MAX_SECONDS,
+                    backend: str = "auto", on_block=None):
+    """Capture until Enter, end of stream, or `max_seconds`.
+
+    Returns (mono_samples, rate, backend, problems). `on_block` is called with
+    the accumulated *interleaved* buffer as it grows, for a live preview.
+    """
+    if max_seconds <= 0:
+        max_seconds = DEFAULT_MAX_SECONDS
+    stream = open_stream(device, rate, backend)
+    chunks: list = []
+    start = time.monotonic()
+    try:
+        while True:
+            block = stream.read(0.1)
+            if block is None:                  # source ended
+                break
+            if block.size:
+                chunks.append(block)
+                if on_block is not None:
+                    on_block(chunks, stream.rate, stream.channels)
+            if _stop_requested():
+                break
+            if time.monotonic() - start >= max_seconds:
+                break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stream.stop()
+    tail = stream.drain()
+    if tail.size:
+        chunks.append(tail)
+
+    sig = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
+    return (to_mono(sig, stream.channels), stream.rate, stream.backend,
+            stream.problems())
+
+
+def to_mono(sig: np.ndarray, channels: int) -> np.ndarray:
+    """Fold interleaved frames to mono. A no-op for a mono capture."""
+    if channels <= 1 or sig.size < channels:
+        return sig
+    usable = sig.size // channels * channels
+    return sig[:usable].reshape(-1, channels).mean(axis=1).astype(np.float32)
 
 
 def wav_rate(path: str) -> "int | None":
@@ -179,69 +432,18 @@ def wav_rate(path: str) -> "int | None":
 
 
 def record(device: int, out_path: str, rate: "int | None" = None,
-           max_seconds: float = DEFAULT_MAX_SECONDS) -> None:
-    """Capture audio from `device` into `out_path` as a mono WAV.
+           max_seconds: float = DEFAULT_MAX_SECONDS,
+           backend: str = "auto") -> tuple:
+    """Capture from `device` into `out_path` as a mono WAV.
 
-    With `rate=None` (the default) no `-ar` is passed, so ffmpeg records at the
-    device's native rate and no resampling happens — see the note on
-    DEFAULT_MAX_SECONDS above for why that matters. Read the resulting rate off
-    the file with `wav_rate`.
-
-    Recording stops at whichever comes first: the user pressing Enter, or the
-    `max_seconds` cap. ffmpeg is also given `-t max_seconds`, so the file is
-    hard-bounded even if the interactive stop is somehow missed — a capture can
-    never run away and fill the disk.
+    Returns (rate, backend, problems). With `rate=None` the device's own rate
+    is used and no resampling happens anywhere in the capture path.
     """
-    if max_seconds <= 0:
-        max_seconds = DEFAULT_MAX_SECONDS
-    backend = _backend()
-    # No -ac and (by default) no -ar: nothing to convert while the device is
-    # streaming. load_audio downmixes and resamples later, off the clock.
-    cmd = [_ffmpeg(), "-hide_banner", "-loglevel", "warning",
-           "-thread_queue_size", _THREAD_QUEUE,
-           "-f", backend, "-i", f":{device}"]
-    if rate:
-        cmd += ["-ar", str(rate)]
-    cmd += ["-t", str(max_seconds), "-y", out_path]
+    from .synth import write_wav
 
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    try:
-        if sys.stdin.isatty():
-            # Poll for Enter, but never wait past the cap (ffmpeg's -t enforces
-            # the same bound on the file itself).
-            deadline = time.monotonic() + max_seconds
-            while proc.poll() is None and time.monotonic() < deadline:
-                ready, _, _ = select.select([sys.stdin], [], [], 0.5)
-                if ready:
-                    try:
-                        os.read(sys.stdin.fileno(), 4096)  # consume the Enter
-                    except OSError:
-                        pass
-                    break
-            _quit_ffmpeg(proc)
-        else:
-            proc.wait()  # non-interactive: rely on ffmpeg's -t cap
-    except KeyboardInterrupt:
-        _quit_ffmpeg(proc)
-
-    err = b""
-    try:
-        if proc.stderr:
-            err = proc.stderr.read()
-    except OSError:
-        pass
-    proc.wait()
-
-    # ffmpeg returns non-zero when told to quit early; only treat a missing/empty
-    # capture as a real failure.
-    if not os.path.exists(out_path) or os.path.getsize(out_path) < 1000:
-        msg = err.decode(errors="replace") if err else ""
-        raise RuntimeError(f"capture produced no audio.\n{msg}".strip())
-
-    # Pass ffmpeg's own complaints through. These used to be suppressed by
-    # `-loglevel error`, which hid the queue-overflow warning that accompanies
-    # dropped buffers — the thing that makes a capture click and read fast.
-    for line in err.decode(errors="replace").splitlines():
-        line = line.strip()
-        if line and "deprecated" not in line.lower():
-            print(f"# ffmpeg: {line}", file=sys.stderr)
+    sig, rate, backend, problems = capture_samples(
+        device, rate, max_seconds, backend)
+    if sig.size < int(0.05 * max(rate, 1)):
+        raise RuntimeError("capture produced no audio.")
+    write_wav(out_path, sig, rate)
+    return rate, backend, problems

@@ -71,15 +71,11 @@
     expected: P.expected || P.decoded,
     view: "per-char",
     ppu: 14,               // pixels per dit unit — the single zoom knob
-    // Playback gain in dB. The embedded audio is the recording at the level it
-    // was made, so a quiet take needs boosting to listen to — but at playback,
-    // never baked into the samples or the download. Default: bring the peak up
-    // to about -3 dBFS, which is what normalizing would have done, except
-    // reversible and applied to the target track too so A/B stays matched.
-    gainDb: (function () {
-      var pk = P.audio_peak || 1;
-      return Math.max(0, Math.min(42, Math.round(20 * Math.log10(0.7 / pk))));
-    })(),
+    // Playback gain in dB, applied at playback only — never baked into the
+    // samples or the download. Starts at unity: the recording plays back at
+    // the level it was made, and boosting is an explicit choice. Applied
+    // equally to the target track, so A/B compares timing not loudness.
+    gainDb: 0,
     scrollX: 0,            // content px scrolled past the gutter
     hover: null,
     playhead: null         // {t: seconds, side: "you"|"tgt"}
@@ -756,6 +752,13 @@
 
   function linGain() { return Math.pow(10, S.gainDb / 20); }
 
+  /* Swap only a transport button's icon. Rewriting the whole label would
+     resize the button and shift everything to its right. */
+  function setIcon(id, glyph) {
+    var ico = $(id).querySelector(".ico");
+    if (ico) ico.textContent = glyph;
+  }
+
   function applyGain() {
     if (youNodes) youNodes.level.gain.value = linGain();
     if (tgtNodes) tgtNodes.level.gain.value = linGain();
@@ -810,8 +813,8 @@
     $("stop").disabled = true;
     $("play-you").classList.remove("on");
     $("play-tgt").classList.remove("on");
-    $("play-you").textContent = "▶ Your sending";
-    $("play-tgt").textContent = "▶ Target";
+    setIcon("play-you", "▶");
+    setIcon("play-tgt", "▶");
     $("clock").textContent = "0.0s";
     draw();
   }
@@ -826,6 +829,9 @@
     var end = mode === "you" ? youDur : tgtDur;
     if (t >= end - 0.01) { stopAll(); return; }
     var side = mode === "you" ? "you" : "tgt";
+    // Playback is scheduled a beat in the future, so the first few frames sit
+    // slightly before zero — which would otherwise read as "-0.0s".
+    if (t < 0) t = 0;
     S.playhead = { t: t, side: side };
     $("clock").textContent = t.toFixed(1) + "s";
     followPlayhead(timeToX(t, side));
@@ -861,7 +867,7 @@
       stopAt = to === undefined ? null : to;
       $("stop").disabled = false;
       $("play-you").classList.add("on");
-      $("play-you").textContent = "■ Your sending";
+      setIcon("play-you", "■");
       raf = requestAnimationFrame(tick);
     }).catch(function (e) {
       $("clock").textContent = "audio error";
@@ -917,7 +923,7 @@
     stopAt = to === undefined ? null : to;
     $("stop").disabled = false;
     $("play-tgt").classList.add("on");
-    $("play-tgt").textContent = "■ Target";
+    setIcon("play-tgt", "■");
     raf = requestAnimationFrame(tick);
   }
 

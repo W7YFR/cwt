@@ -17,6 +17,10 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
+# Live capture via PortAudio. Preferred over the ffmpeg fallback: it buffers
+# generously and reports input overflows instead of silently dropping buffers,
+# and it works beyond macOS. The wheel bundles PortAudio.
+live = ["sounddevice>=0.4"]
 
 [project.scripts]
 cw-decode = "cw_decoder.cli:main"

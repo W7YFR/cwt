@@ -213,7 +213,7 @@ def _session_dir() -> str:
     return path
 
 
-def _warn_dropouts(path: str, rate: int) -> None:
+def _warn_dropouts(path: str, rate: int, backend: str = "") -> None:
     """Tell the user if the capture has dropped samples.
 
     A dropped buffer clicks, shortens whatever element it lands in, and — since
@@ -239,9 +239,18 @@ def _warn_dropouts(path: str, rate: int) -> None:
           f"({len(hits) / secs:.1f}/s) at {where}", file=sys.stderr)
     print("#   Dropped samples click, shorten dits/dahs, and inflate the "
           "measured speed.", file=sys.stderr)
-    print("#   Try a different input device, close other audio apps, or "
-          "record externally and", file=sys.stderr)
-    print("#   pass the file instead of using --live.", file=sys.stderr)
+    if backend == "ffmpeg":
+        # This is ffmpeg's avfoundation audio path, not our use of it: it drops
+        # buffers even with the queue raised and every conversion removed.
+        print("#   The ffmpeg backend is known to do this. Install the "
+              "portaudio backend, which", file=sys.stderr)
+        print("#   buffers properly:  pip install 'cw-decoder[live]'",
+              file=sys.stderr)
+    else:
+        print("#   Try a different input device, close other audio apps, or "
+              "record externally", file=sys.stderr)
+        print("#   and pass the file instead of using --live.",
+              file=sys.stderr)
 
 
 def _web_page_path(out: "str | None") -> str:
@@ -279,18 +288,21 @@ def _emit_web_review(res: core.Result, source: str, expected: "str | None",
     webbrowser.open(pathlib.Path(page_path).resolve().as_uri())
 
 
-def _resolve_device(device, capture):
+def _resolve_device(device, capture, backend="auto"):
     """Return an audio input device index, listing/prompting if not given.
 
     Returns None (after printing an error) if no device can be determined.
     """
     if device is not None:
         return device
-    devices = capture.list_audio_devices()
+    devices = capture.list_audio_devices(backend)
     if not devices:
         print("no audio input devices found.", file=sys.stderr)
         return None
-    print("audio input devices:", file=sys.stderr)
+    # Name the backend: indices are backend-specific, so a list from one is
+    # meaningless to the other.
+    print(f"audio input devices ({capture.resolve_backend(backend)}):",
+          file=sys.stderr)
     for idx, name in devices:
         print(f"  [{idx}] {name}", file=sys.stderr)
     if not sys.stdin.isatty():
@@ -413,6 +425,14 @@ def main(argv=None) -> int:
                            "stops early when you press Enter (default 120). "
                            "This cap prevents a runaway recording filling the "
                            "disk.")
+    live.add_argument("--capture-backend", choices=["auto", "portaudio",
+                                                    "ffmpeg"], default="auto",
+                      help="how to capture live audio. 'portaudio' (needs the "
+                           "'live' extra) buffers generously and reports input "
+                           "overflows; 'ffmpeg' is the macOS-only fallback and "
+                           "drops buffers on some devices. Default: portaudio "
+                           "when available. Device indices differ between "
+                           "backends — list and select with the same one.")
     live.add_argument("--capture-rate", type=int, default=None,
                       help="force a capture sample rate. Default: the audio "
                            "device's own rate, with no resampling — forcing a "
@@ -454,16 +474,21 @@ def main(argv=None) -> int:
     if args.list_devices:
         from . import capture
         try:
-            devices = capture.list_audio_devices()
+            backend = capture.resolve_backend(args.capture_backend)
+            devices = capture.list_audio_devices(backend)
         except RuntimeError as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
         if not devices:
             print("no audio input devices found.", file=sys.stderr)
             return 1
-        print("audio input devices:")
+        others = [b for b in capture.available_backends() if b != backend]
+        print(f"audio input devices ({backend}):")
         for idx, name in devices:
             print(f"  [{idx}] {name}")
+        if others:
+            print(f"# indices are {backend}-specific; also available: "
+                  f"{', '.join(others)} (--capture-backend)", file=sys.stderr)
         return 0
 
     # Resolve the intended text, if explicitly given: a path to an existing file
@@ -499,7 +524,13 @@ def main(argv=None) -> int:
                   file=sys.stderr)
             return 1
 
-        device = _resolve_device(args.device, capture)
+        try:
+            backend = capture.resolve_backend(args.capture_backend)
+        except RuntimeError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+
+        device = _resolve_device(args.device, capture, backend)
         if device is None:
             return 1
 
@@ -534,22 +565,26 @@ def main(argv=None) -> int:
                     sys.stderr.write("\r" + text + " ")
                     sys.stderr.flush()
 
-                sig, _, cap_rate = stream.run_live(
+                sig, _, cap_rate, used, problems = stream.run_live(
                     device, timing, rate=cap_rate, tone=args.tone,
                     max_seconds=args.duration, on_update=on_update,
-                    dsp_rate=args.rate)
+                    dsp_rate=args.rate, backend=backend)
                 sys.stderr.write("\n")
                 sys.stderr.flush()
                 if sig.size < int(0.2 * cap_rate):
                     raise RuntimeError("capture produced no audio.")
                 synth.write_wav(out_path, sig, cap_rate)
             else:
-                print(f"# recording on device {device} — key your message, "
-                      f"then press Enter to stop (auto-stops after "
+                print(f"# recording on device {device} ({backend}) — key your "
+                      f"message, then press Enter to stop (auto-stops after "
                       f"{args.duration:g}s).", file=sys.stderr)
-                capture.record(device, out_path, rate=cap_rate,
-                               max_seconds=args.duration)
-                cap_rate = capture.wav_rate(out_path) or args.rate
+                cap_rate, used, problems = capture.record(
+                    device, out_path, rate=cap_rate,
+                    max_seconds=args.duration, backend=backend)
+            # Whatever the backend noticed — PortAudio reports input overflow
+            # directly, ffmpeg complains about its queue.
+            for line in problems:
+                print(f"# {used}: {line}", file=sys.stderr)
 
             res = core.decode_file(out_path, tone=args.tone,
                                    target_rate=args.rate,
@@ -566,8 +601,8 @@ def main(argv=None) -> int:
 
         if keep and verbose:
             print(f"# saved recording to {out_path} "
-                  f"({cap_rate / 1000:g} kHz)", file=sys.stderr)
-        _warn_dropouts(out_path, cap_rate)
+                  f"({cap_rate / 1000:g} kHz, {used})", file=sys.stderr)
+        _warn_dropouts(out_path, cap_rate, backend=used)
         comparison = (core.compare_text(expected, res.text)
                       if expected else None)
         emit(res, comparison, expected_source)

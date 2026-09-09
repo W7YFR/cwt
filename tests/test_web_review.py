@@ -8,6 +8,7 @@ agree.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -267,6 +268,14 @@ def test_page_is_self_contained():
     assert "data:audio/wav;base64," in html
     assert "ReviewCore" in html
 
+    # Nothing in the transport row may resize while playing, or everything to
+    # its right shifts. The clock gets a fixed width (not min-width) and the
+    # play/stop glyph lives in its own fixed-width span.
+    assert re.search(r"\.clock\s*\{[^}]*\bwidth:\s*\d", html), \
+        "the clock needs a fixed width, not an elastic one"
+    assert re.search(r"\.ico\s*\{[^}]*\bwidth:", html)
+    assert html.count('class="ico"') == 2      # one per transport button
+
 
 def test_page_escapes_script_breakout_in_text():
     """A </script> in the intended message must not terminate the payload."""
@@ -422,11 +431,23 @@ def test_page_boots_and_draws(tmp_path):
     # test never fired, leaving the button stuck on "playing".
     er = d["endReset"]
     assert er["buffered"], "playback did not use a decoded buffer"
-    assert er["labelWhilePlaying"].startswith("■")
-    assert er["labelAfterEnd"].startswith("▶"), \
+    assert er["labelWhilePlaying"] == "■"
+    assert er["labelAfterEnd"] == "▶", \
         "transport stuck after playback ran past the buffer's duration"
-    assert er["labelAfterEndedEvent"].startswith("▶"), \
+    assert er["labelAfterEndedEvent"] == "▶", \
         "transport stuck after the source node's own ended event"
+
+    # The clock never reads negative. Playback is scheduled a beat ahead, so an
+    # unclamped reading showed "-0.0s" for the first few frames — and the extra
+    # character widened the clock, shoving the rest of the control row sideways.
+    assert er["clocksWhilePlaying"], "the frame loop produced no clock readings"
+    for c in er["clocksWhilePlaying"]:
+        assert not c.startswith("-"), f"clock read {c!r}"
+
+    # The listening level starts at unity: the recording plays back at the
+    # level it was made, and boosting is an explicit choice.
+    assert d["initial"]["gainOut"] == "0 dB", \
+        f"listening level defaulted to {d['initial']['gainOut']!r}"
 
     # The view follows the playhead instead of letting it slide off-screen.
     # Content is translated by (gutter - scrollX), so this trace falls as the
@@ -502,6 +523,17 @@ def no_browser(monkeypatch):
     opened = []
     monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url))
     return opened
+
+
+def _copy_recorder(src, seen=None):
+    """A fake capture.record that copies `src` and reports back like the real one."""
+    def fake_record(dev, out, **kw):
+        if seen is not None:
+            seen.update(kw)
+        shutil.copyfile(src, out)
+        from cw_decoder import capture
+        return capture.wav_rate(str(out)) or 8000, "stub", []
+    return fake_record
 
 
 def _fixture_wav(tmp_path, text="CQ DE AB1CD", wpm=20):
@@ -589,9 +621,11 @@ def test_live_web_review_keeps_the_recording(tmp_path, no_browser, capsys,
     src = _fixture_wav(tmp_path, text="CQ DE AB1CD", wpm=20)
 
     # Stand in for the sound card: "recording" just copies the fixture over.
-    monkeypatch.setattr(capture, "list_audio_devices", lambda: [(0, "stub")])
-    monkeypatch.setattr(capture, "record",
-                        lambda dev, out, **kw: shutil.copyfile(src, out))
+    # record() reports back the rate it captured at, the backend, and any
+    # glitches the backend noticed.
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [(0, "stub")])
+    monkeypatch.setattr(capture, "record", _copy_recorder(src))
 
     out = tmp_path / "live" / "review.html"
     assert cli.main(["--live", "-D", "0", "-w", "20",
@@ -608,9 +642,9 @@ def test_live_web_review_defers_to_explicit_save(tmp_path, no_browser,
     from cw_decoder import capture, cli
 
     src = _fixture_wav(tmp_path, text="CQ DE AB1CD", wpm=20)
-    monkeypatch.setattr(capture, "list_audio_devices", lambda: [(0, "stub")])
-    monkeypatch.setattr(capture, "record",
-                        lambda dev, out, **kw: shutil.copyfile(src, out))
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [(0, "stub")])
+    monkeypatch.setattr(capture, "record", _copy_recorder(src))
 
     out = tmp_path / "live" / "review.html"
     keep = tmp_path / "mine.wav"
@@ -677,7 +711,8 @@ def _fake_device(monkeypatch, native_rate=48000, seen=None,
     """
     from cw_decoder import capture
 
-    monkeypatch.setattr(capture, "list_audio_devices", lambda: [(0, "stub")])
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [(0, "stub")])
 
     def fake_record(dev, out, **kw):
         if seen is not None:
@@ -685,6 +720,7 @@ def _fake_device(monkeypatch, native_rate=48000, seen=None,
         rate = int(kw.get("rate") or native_rate)
         synth.write_wav(out, synth.generate(text, wpm=20, tone=600, rate=rate),
                         rate)
+        return rate, "stub", []
 
     monkeypatch.setattr(capture, "record", fake_record)
 
@@ -730,6 +766,137 @@ def test_capture_rate_can_still_be_forced(tmp_path, monkeypatch):
     assert seen["rate"] == 22050
 
 
+class _StubSoundDevice:
+    """A stand-in for the `sounddevice` module.
+
+    Feeds a known signal through the real _PortAudioStream/capture_samples
+    code, so the backend is exercised end-to-end without opening the machine's
+    audio hardware.
+    """
+
+    def __init__(self, sig, rate=48000, channels=1, block=1024,
+                 overflow_at=None):
+        self._sig = sig
+        self._rate = rate
+        self._channels = channels
+        self._block = block
+        self._overflow_at = overflow_at
+        self.opened = None
+
+    def query_devices(self, device=None, kind=None):
+        info = {"name": "stub", "max_input_channels": self._channels,
+                "default_samplerate": self._rate, "hostapi": 0}
+        return info if device is not None else [info]
+
+    def query_hostapis(self, i=0):
+        return {"name": "stub-api"}
+
+    def InputStream(self, **kw):                       # noqa: N802 - stub API
+        self.opened = kw
+        stub = self
+
+        class _S:
+            def start(self):
+                cb = kw["callback"]
+                n = 0
+                for i in range(0, stub._sig.size, stub._block):
+                    chunk = stub._sig[i:i + stub._block]
+                    status = ("input overflow"
+                              if stub._overflow_at == n else None)
+                    cb(chunk.reshape(-1, kw["channels"]) if kw["channels"] > 1
+                       else chunk.reshape(-1, 1), chunk.size, None, status)
+                    n += 1
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        return _S()
+
+
+def test_portaudio_backend_captures_and_reports_overflows(monkeypatch,
+                                                          tmp_path):
+    """The preferred backend records the device's own format and reports glitches.
+
+    PortAudio surfaces input overflow through the callback status, which is why
+    it's preferred over ffmpeg: a dropped buffer becomes a message instead of
+    something you find by ear.
+    """
+    from cw_decoder import capture
+
+    sig = synth.generate("CQ DE AB1CD", wpm=20, tone=600, rate=48000)
+    stub = _StubSoundDevice(sig, rate=48000)
+    monkeypatch.setattr(capture, "_sounddevice", lambda: stub)
+    monkeypatch.setattr(capture, "available_backends",
+                        lambda: ["portaudio", "ffmpeg"])
+
+    out = tmp_path / "cap.wav"
+    rate, backend, problems = capture.record(0, str(out), backend="portaudio",
+                                       max_seconds=0.5)
+    assert (rate, backend, problems) == (48000, "portaudio", [])
+    assert capture.wav_rate(str(out)) == 48000
+
+    # Nothing is asked of the driver but the device's own format: no rate
+    # conversion, no downmix, and a generous buffer.
+    assert stub.opened["samplerate"] == 48000
+    assert stub.opened["dtype"] == "float32"
+    assert stub.opened["latency"] == "high"
+    assert stub.opened["blocksize"] == 0
+
+    # It decodes, which means the samples arrived intact and in order.
+    assert "CQ DE AB1CD" in core.decode_file(str(out)).text
+
+    # And an overflow is reported rather than swallowed.
+    stub2 = _StubSoundDevice(sig, rate=48000, overflow_at=3)
+    monkeypatch.setattr(capture, "_sounddevice", lambda: stub2)
+    _, _, problems = capture.record(0, str(out), backend="portaudio",
+                                       max_seconds=0.5)
+    assert any("overflow" in p for p in problems)
+
+
+def test_portaudio_is_preferred_and_backends_are_selectable(monkeypatch):
+    from cw_decoder import capture
+
+    monkeypatch.setattr(capture, "_sounddevice", lambda: object())
+    monkeypatch.setattr(capture, "shutil", shutil)
+    monkeypatch.setattr(capture, "available_backends",
+                        lambda: ["portaudio", "ffmpeg"])
+    assert capture.resolve_backend("auto") == "portaudio"
+    assert capture.resolve_backend("ffmpeg") == "ffmpeg"
+
+    # An unavailable backend says how to get it rather than failing obscurely.
+    monkeypatch.setattr(capture, "available_backends", lambda: ["ffmpeg"])
+    assert capture.resolve_backend("auto") == "ffmpeg"
+    with pytest.raises(RuntimeError, match=r"cw-decoder\[live\]"):
+        capture.resolve_backend("portaudio")
+
+    monkeypatch.setattr(capture, "available_backends", lambda: [])
+    with pytest.raises(RuntimeError, match="no live-capture backend"):
+        capture.resolve_backend("auto")
+    with pytest.raises(RuntimeError, match="unknown capture backend"):
+        capture.resolve_backend("nonsense")
+
+
+def test_portaudio_capture_folds_a_stereo_device(monkeypatch, tmp_path):
+    """A stereo device is folded by us, after capture, not by the driver."""
+    from cw_decoder import capture
+
+    mono = synth.generate("TEST", wpm=20, tone=600, rate=48000)
+    stub = _StubSoundDevice(mono, rate=48000, channels=2)
+    monkeypatch.setattr(capture, "_sounddevice", lambda: stub)
+    monkeypatch.setattr(capture, "available_backends", lambda: ["portaudio"])
+
+    out = tmp_path / "st.wav"
+    rate, _, _ = capture.record(0, str(out), backend="portaudio",
+                                       max_seconds=0.5)
+    assert rate == 48000
+    # channels=1 is requested of the driver; folding of anything wider happens
+    # in to_mono afterwards.
+    assert stub.opened["channels"] == 1
+
+
 def test_stream_format_is_read_from_ffmpegs_header():
     """Preview mode learns the device's rate AND channels from the pipe header.
 
@@ -766,18 +933,22 @@ def test_stream_format_is_read_from_ffmpegs_header():
         capture._read_stream_format(io.BytesIO(b"\x00" * 64))
 
 
-def test_stream_folds_multichannel_to_mono():
-    """Interleaved frames are folded here, not by ffmpeg mid-capture."""
+def test_capture_folds_multichannel_to_mono():
+    """Interleaved frames are folded by us, not by the capture backend.
+
+    Asking the backend to downmix puts a conversion in the realtime path,
+    which is a chance for it to fall behind and drop a buffer.
+    """
     import numpy as np
 
-    from cw_decoder import stream
+    from cw_decoder import capture
 
     stereo = np.array([1.0, 3.0, 5.0, 7.0, 9.0, 11.0], dtype=np.float32)
-    assert list(stream._to_mono(stereo, 2)) == [2.0, 6.0, 10.0]
-    assert stream._to_mono(stereo, 1) is stereo          # mono is a no-op
+    assert list(capture.to_mono(stereo, 2)) == [2.0, 6.0, 10.0]
+    assert capture.to_mono(stereo, 1) is stereo          # mono is a no-op
     # A partial trailing frame is dropped rather than mis-aligning the rest.
     odd = np.array([1.0, 3.0, 5.0], dtype=np.float32)
-    assert list(stream._to_mono(odd, 2)) == [2.0]
+    assert list(capture.to_mono(odd, 2)) == [2.0]
 
 
 def _quiet_wav(path, peak=0.04, rate=44100, text="CQ DE AB1CD"):
@@ -849,12 +1020,8 @@ def test_live_duration_default_is_two_minutes(tmp_path, monkeypatch):
 
     src = _fixture_wav(tmp_path)
     seen = {}
-    monkeypatch.setattr(capture, "list_audio_devices", lambda: [(0, "stub")])
-
-    def fake_record(dev, out, **kw):
-        seen.update(kw)
-        shutil.copyfile(src, out)
-
-    monkeypatch.setattr(capture, "record", fake_record)
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [(0, "stub")])
+    monkeypatch.setattr(capture, "record", _copy_recorder(src, seen))
     assert cli.main(["--live", "-D", "0", "-w", "20", "-q"]) == 0
     assert seen["max_seconds"] == 120.0
