@@ -169,6 +169,67 @@ def _drop_buffers(sig, rate, at_seconds, frames=512):
     return sig[keep]
 
 
+def test_trim_silence_keeps_only_the_padding():
+    """Dead air at each end is cut back to the requested padding."""
+    rate, pad = 8000, 0.75
+    keyed = synth.generate("CQ DE W7YFR", wpm=25, tone=600, rate=rate)
+    lead, tail = 4.0, 3.0
+    padded = numpy.concatenate([
+        numpy.zeros(int(lead * rate), numpy.float32), keyed,
+        numpy.zeros(int(tail * rate), numpy.float32)])
+
+    out, cut_lead = core.trim_silence(padded, rate, pad=pad)
+    # synth.generate already wraps the keying in 0.1 s of its own silence.
+    assert cut_lead == pytest.approx(lead - pad, abs=0.15)
+    assert out.size / rate == pytest.approx(
+        keyed.size / rate + 2 * pad - 0.2, abs=0.3)
+    # The keying itself survives intact: it still decodes.
+    assert "CQ DE W7YFR" in core.quick_decode(out, rate, 600.0,
+                                              core.target_timing(25))
+
+
+def test_trim_silence_leaves_audio_it_cannot_account_for():
+    """Refuse to trim rather than risk eating audio."""
+    rate = 8000
+    keyed = synth.generate("TEST", wpm=25, tone=600, rate=rate)
+
+    # Nothing keyed at all: hand it back untouched.
+    silence = numpy.zeros(5 * rate, dtype=numpy.float32)
+    out, lead = core.trim_silence(silence, rate)
+    assert out is silence and lead == 0.0
+
+    # Already tight: nothing to gain, so don't rewrite it.
+    out, lead = core.trim_silence(keyed, rate, pad=2.0)
+    assert out is keyed and lead == 0.0
+
+    # Degenerate inputs.
+    empty = numpy.zeros(0, dtype=numpy.float32)
+    assert core.trim_silence(empty, rate) == (empty, 0.0)
+    tiny = numpy.zeros(100, dtype=numpy.float32)
+    assert core.trim_silence(tiny, rate)[0] is tiny
+
+    # A negative pad is a caller error, not licence to trim everything.
+    out, lead = core.trim_silence(keyed, rate, pad=-1)
+    assert out is keyed and lead == 0.0
+
+
+def test_trim_silence_keys_off_the_tone_not_the_level():
+    """Broadband noise in the 'silence' must not defeat the trim.
+
+    Level-based detection would find no silence at all here; the bandpass and
+    threshold the decoder already uses look for the tone instead.
+    """
+    rate = 8000
+    rng = numpy.random.default_rng(3)
+    keyed = synth.generate("CQ DE W7YFR", wpm=25, tone=600, rate=rate)
+    noise = lambda n: rng.normal(0, 0.05, n).astype(numpy.float32)  # noqa: E731
+    padded = numpy.concatenate([noise(4 * rate), keyed + noise(keyed.size),
+                                noise(3 * rate)])
+    out, lead = core.trim_silence(padded, rate, pad=0.75)
+    assert lead == pytest.approx(4.0 - 0.75, abs=0.3)
+    assert out.size < padded.size - 5 * rate
+
+
 def test_find_dropouts_flags_spliced_audio():
     """Detect dropped capture buffers, which are otherwise silent failures.
 

@@ -31,6 +31,7 @@ import shutil
 import subprocess
 import sys
 import time
+from typing import NamedTuple
 
 import numpy as np
 
@@ -124,11 +125,23 @@ def _parse_devices(stderr_text: str):
     return devices
 
 
-def list_audio_devices(backend: str = "auto"):
-    """Return [(index, name), ...] for the given backend's input devices.
+class Device(NamedTuple):
+    """An input device. `name` is the device's own name — stable across runs,
+    unlike `index` — so it's what gets remembered. `detail` is display-only."""
+    index: int
+    name: str
+    detail: str = ""
+
+    def label(self) -> str:
+        return f"{self.name} ({self.detail})" if self.detail else self.name
+
+
+def list_audio_devices(backend: str = "auto") -> list:
+    """Return [Device, ...] for the given backend's input devices.
 
     Indices are backend-specific — PortAudio and avfoundation number devices
-    differently — so always list and select with the same backend.
+    differently — so always list and select with the same backend. Names are
+    not, which is why they're the durable way to refer to a device.
     """
     backend = resolve_backend(backend)
     if backend == "portaudio":
@@ -136,14 +149,14 @@ def list_audio_devices(backend: str = "auto"):
         out = []
         for i, d in enumerate(sd.query_devices()):
             if d.get("max_input_channels", 0) > 0:
-                out.append((i, f"{d['name']} "
-                               f"({int(d['default_samplerate'])} Hz, "
-                               f"{d['max_input_channels']} ch)"))
+                out.append(Device(i, d["name"],
+                                  f"{int(d['default_samplerate'])} Hz, "
+                                  f"{d['max_input_channels']} ch"))
         return out
     cmd = [_ffmpeg(), "-hide_banner", "-f", _backend_name(),
            "-list_devices", "true", "-i", ""]
     proc = subprocess.run(cmd, capture_output=True, text=True)
-    return _parse_devices(proc.stderr)
+    return [Device(i, n) for i, n in _parse_devices(proc.stderr)]
 
 
 # --------------------------------------------------------------------------- #

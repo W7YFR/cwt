@@ -207,10 +207,35 @@ def _session_dir() -> str:
     from datetime import datetime
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    path = os.path.join(os.path.expanduser("~"), ".cw-decoder", "sessions",
-                        stamp)
+    path = os.path.join(_state_dir(), "sessions", stamp)
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def _trim_capture(path: str, rate: int, pad: float, tone: "float | None",
+                  bandwidth: float, verbose: bool) -> None:
+    """Rewrite `path` with the dead air at each end cut back to `pad` seconds.
+
+    Done in place on the capture, before decoding, so the trimmed audio is what
+    gets decoded, saved, and embedded in the review page — and the review
+    timeline starts at your keying instead of after a long lead-in.
+    """
+    from . import synth
+
+    try:
+        sig = core.load_audio(path, rate, normalize=False)
+    except (RuntimeError, OSError, ValueError):
+        return
+    trimmed, lead = core.trim_silence(sig, rate, pad=pad, tone=tone,
+                                      bandwidth=bandwidth)
+    cut = (sig.size - trimmed.size) / float(rate) if rate else 0.0
+    if cut <= 0.05:
+        return                     # nothing worth rewriting the file for
+    synth.write_wav(path, trimmed, rate)
+    if verbose:
+        print(f"# trimmed {cut:.1f}s of dead air "
+              f"({lead:.1f}s lead, {cut - lead:.1f}s tail), "
+              f"keeping {pad:g}s padding", file=sys.stderr)
 
 
 def _warn_dropouts(path: str, rate: int, backend: str = "") -> None:
@@ -288,32 +313,128 @@ def _emit_web_review(res: core.Result, source: str, expected: "str | None",
     webbrowser.open(pathlib.Path(page_path).resolve().as_uri())
 
 
-def _resolve_device(device, capture, backend="auto"):
-    """Return an audio input device index, listing/prompting if not given.
+# `-D` values that mean "forget what you remembered and ask me again". `?` is
+# the obvious spelling but it's a glob in zsh, so accept words too.
+_RESELECT = {"?", "ask", "list", "select"}
 
-    Returns None (after printing an error) if no device can be determined.
+
+def _state_dir() -> str:
+    """Where per-user state lives. Resolved per call, not at import, so a test
+    (or a caller) can redirect it by setting HOME."""
+    return os.path.join(os.path.expanduser("~"), ".cw-decoder")
+
+
+def _config_path() -> str:
+    return os.path.join(_state_dir(), "config.json")
+
+
+def _load_config() -> dict:
+    try:
+        with open(_config_path(), encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        return cfg if isinstance(cfg, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_config(cfg: dict) -> None:
+    try:
+        path = _config_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(cfg, fh, indent=2)
+    except OSError:
+        pass          # remembering is a convenience; never fail a run over it
+
+
+def _remembered_device(backend: str) -> "str | None":
+    got = _load_config().get("devices", {}).get(backend)
+    return got if isinstance(got, str) else None
+
+
+def _remember_device(backend: str, name: str) -> None:
+    """Store the device *by name*: indices shift when hardware comes and goes."""
+    cfg = _load_config()
+    cfg.setdefault("devices", {})[backend] = name
+    _save_config(cfg)
+
+
+def _match_device(devices, spec: str):
+    """Resolve `-D` — an index, or a device name (or part of one).
+
+    Returns (index, error). Names are matched case-insensitively, preferring an
+    exact match, so a substring that hits several devices is reported rather
+    than guessed at.
     """
-    if device is not None:
-        return device
-    devices = capture.list_audio_devices(backend)
+    s = str(spec).strip()
+    if re.fullmatch(r"\d+", s):
+        idx = int(s)
+        if devices and not any(d.index == idx for d in devices):
+            return None, (f"no device with index {idx}. "
+                          "Use --list-devices to see what's available.")
+        return idx, None
+    low = s.lower()
+    exact = [d for d in devices if d.name.lower() == low]
+    if exact:
+        return exact[0].index, None
+    hits = [d for d in devices if low in d.name.lower()]
+    if len(hits) == 1:
+        return hits[0].index, None
+    if len(hits) > 1:
+        names = ", ".join(f"[{d.index}] {d.name}" for d in hits)
+        return None, f"{spec!r} matches several devices: {names}"
+    return None, (f"no device matching {spec!r}. "
+                  "Use --list-devices to see what's available.")
+
+
+def _resolve_device(device, capture, backend="auto", use_saved=True,
+                    devices=None):
+    """Return an audio input device index, or None (after printing an error).
+
+    Order of preference: an explicit `-D`, then the device remembered from last
+    time (matched by name, so it survives re-indexing), then a prompt.
+    """
+    if devices is None:
+        devices = capture.list_audio_devices(backend)
     if not devices:
         print("no audio input devices found.", file=sys.stderr)
         return None
+
+    if device is not None:
+        idx, err = _match_device(devices, device)
+        if err:
+            print(f"error: {err}", file=sys.stderr)
+        return idx
+
+    if use_saved:
+        saved = _remembered_device(backend)
+        if saved:
+            hit = next((d for d in devices if d.name == saved), None)
+            if hit:
+                print(f"# using remembered device [{hit.index}] {hit.label()}"
+                      f"  (-D ask to choose again)", file=sys.stderr)
+                return hit.index
+            print(f"# remembered device is not available: {saved}",
+                  file=sys.stderr)
+
     # Name the backend: indices are backend-specific, so a list from one is
     # meaningless to the other.
     print(f"audio input devices ({capture.resolve_backend(backend)}):",
           file=sys.stderr)
-    for idx, name in devices:
-        print(f"  [{idx}] {name}", file=sys.stderr)
+    for d in devices:
+        print(f"  [{d.index}] {d.label()}", file=sys.stderr)
     if not sys.stdin.isatty():
         print("error: specify a device with -D/--device.", file=sys.stderr)
         return None
     print("select device index: ", end="", file=sys.stderr, flush=True)
     try:
-        return int(input().strip())
-    except (ValueError, EOFError):
+        idx, err = _match_device(devices, input().strip())
+    except EOFError:
         print("error: invalid device index.", file=sys.stderr)
         return None
+    if err:
+        print(f"error: {err}", file=sys.stderr)
+    return idx
 
 
 def _send_header(expected) -> None:
@@ -417,9 +538,14 @@ def main(argv=None) -> int:
                            "you key (requires -w for timing).")
     live.add_argument("--list-devices", action="store_true",
                       help="list available audio input devices and exit.")
-    live.add_argument("-D", "--device", type=int, default=None,
-                      help="audio input device index for --live "
-                           "(see --list-devices).")
+    live.add_argument("-D", "--device", default=None,
+                      help="audio input device for --live: an index from "
+                           "--list-devices, or the device's name (or any "
+                           "unambiguous part of it, case-insensitive). "
+                           "Whatever you use is remembered by name for next "
+                           "time, so it survives re-indexing when hardware "
+                           "comes and goes. Pass '-D ask' (or -D '?') to "
+                           "forget it and choose again.")
     live.add_argument("--duration", type=float, default=120.0,
                       help="maximum capture length in seconds; recording also "
                            "stops early when you press Enter (default 120). "
@@ -440,6 +566,14 @@ def main(argv=None) -> int:
                            "audibly roughens a keyer sidetone. The decoder "
                            "resamples to its own working rate regardless, so "
                            "this only affects the saved/played-back audio.")
+    live.add_argument("--trim-pad", type=float, default=core.TRIM_PAD,
+                      metavar="SEC",
+                      help=f"seconds of dead air to keep at each end of a live "
+                           f"capture; the rest is trimmed off (default "
+                           f"{core.TRIM_PAD:g}).")
+    live.add_argument("--no-trim", action="store_true",
+                      help="keep a live capture exactly as recorded, including "
+                           "the dead air before and after your keying.")
     live.add_argument("--save", metavar="WAVFILE", default=None,
                       help="keep the captured audio at this path (default: "
                            "discard after decoding).")
@@ -530,9 +664,21 @@ def main(argv=None) -> int:
             print(f"error: {e}", file=sys.stderr)
             return 1
 
-        device = _resolve_device(args.device, capture, backend)
+        # `-D ask` (or -D '?') forgets the remembered device and asks again.
+        # Both spellings, because `?` is a glob in zsh and needs quoting.
+        reselect = str(args.device).strip().lower() in _RESELECT
+        if reselect:
+            cfg = _load_config()
+            if cfg.get("devices", {}).pop(backend, None) is not None:
+                _save_config(cfg)
+
+        devices = capture.list_audio_devices(backend)
+        device = _resolve_device(None if reselect else args.device,
+                                 capture, backend, use_saved=not reselect,
+                                 devices=devices)
         if device is None:
             return 1
+        device_name = next((d.name for d in devices if d.index == device), None)
 
         # None means "the device's native rate, no resampling"; the actual
         # rate is read back off the capture afterwards.
@@ -585,6 +731,15 @@ def main(argv=None) -> int:
             # directly, ffmpeg complains about its queue.
             for line in problems:
                 print(f"# {used}: {line}", file=sys.stderr)
+
+            # Only now that a capture actually worked is the device worth
+            # remembering; memorizing one that failed would be unhelpful.
+            if device_name:
+                _remember_device(backend, device_name)
+
+            if not args.no_trim:
+                _trim_capture(out_path, cap_rate, args.trim_pad, args.tone,
+                              args.bandwidth, verbose)
 
             res = core.decode_file(out_path, tone=args.tone,
                                    target_rate=args.rate,

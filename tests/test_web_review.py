@@ -8,6 +8,7 @@ agree.
 """
 
 import json
+import pathlib
 import re
 import shutil
 import subprocess
@@ -624,7 +625,7 @@ def test_live_web_review_keeps_the_recording(tmp_path, no_browser, capsys,
     # record() reports back the rate it captured at, the backend, and any
     # glitches the backend noticed.
     monkeypatch.setattr(capture, "list_audio_devices",
-                        lambda backend="auto": [(0, "stub")])
+                        lambda backend="auto": [capture.Device(0, "Stub Input", "48000 Hz")])
     monkeypatch.setattr(capture, "record", _copy_recorder(src))
 
     out = tmp_path / "live" / "review.html"
@@ -643,7 +644,7 @@ def test_live_web_review_defers_to_explicit_save(tmp_path, no_browser,
 
     src = _fixture_wav(tmp_path, text="CQ DE AB1CD", wpm=20)
     monkeypatch.setattr(capture, "list_audio_devices",
-                        lambda backend="auto": [(0, "stub")])
+                        lambda backend="auto": [capture.Device(0, "Stub Input", "48000 Hz")])
     monkeypatch.setattr(capture, "record", _copy_recorder(src))
 
     out = tmp_path / "live" / "review.html"
@@ -712,7 +713,7 @@ def _fake_device(monkeypatch, native_rate=48000, seen=None,
     from cw_decoder import capture
 
     monkeypatch.setattr(capture, "list_audio_devices",
-                        lambda backend="auto": [(0, "stub")])
+                        lambda backend="auto": [capture.Device(0, "Stub Input", "48000 Hz")])
 
     def fake_record(dev, out, **kw):
         if seen is not None:
@@ -1014,6 +1015,183 @@ def test_decode_is_unaffected_by_the_playback_change(tmp_path):
     assert res.text.strip() == "CQ CQ DE W7YFR K"   # a very quiet clip decodes
 
 
+def _padded_device(monkeypatch, devices, lead=4.0, tail=3.0, rate=8000,
+                   text="CQ DE AB1CD"):
+    """A fake device whose capture has dead air at both ends."""
+    import numpy as np
+
+    from cw_decoder import capture
+
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": devices)
+
+    def fake_record(dev, out, **kw):
+        keyed = synth.generate(text, wpm=20, tone=600, rate=rate)
+        sig = np.concatenate([np.zeros(int(lead * rate), np.float32), keyed,
+                              np.zeros(int(tail * rate), np.float32)])
+        synth.write_wav(out, sig, rate)
+        return rate, "stub", []
+
+    monkeypatch.setattr(capture, "record", fake_record)
+
+
+def test_live_trims_dead_air_to_the_padding(tmp_path, monkeypatch, capsys):
+    """A live take shouldn't carry seconds of silence before you start keying."""
+    import wave
+
+    from cw_decoder import capture, cli
+
+    lead, tail = 4.0, 3.0
+    _padded_device(monkeypatch, [capture.Device(0, "Stub Input")],
+                   lead=lead, tail=tail)
+    save = tmp_path / "take.wav"
+    assert cli.main(["--live", "-D", "0", "-w", "20",
+                     "--save", str(save)]) == 0
+
+    with wave.open(str(save)) as w:
+        secs = w.getnframes() / w.getframerate()
+    # Derive the expectation rather than hardcoding it: the keying itself plus
+    # 0.75 s either side, and well short of the padded original.
+    keyed = synth.generate("CQ DE AB1CD", wpm=20, tone=600, rate=8000).size / 8000
+    assert secs == pytest.approx(keyed + 2 * 0.75, abs=0.4), \
+        f"trimmed to {secs:.2f}s, expected ~{keyed + 1.5:.2f}s"
+    assert secs < keyed + lead + tail - 4.0
+    assert "trimmed" in capsys.readouterr().err
+    # And it still decodes, so the trim didn't clip the keying.
+    assert "CQ DE AB1CD" in core.decode_file(str(save)).text
+
+
+def test_live_trim_is_configurable_and_optional(tmp_path, monkeypatch):
+    import wave
+
+    from cw_decoder import capture, cli
+
+    def secs(path):
+        with wave.open(str(path)) as w:
+            return w.getnframes() / w.getframerate()
+
+    _padded_device(monkeypatch, [capture.Device(0, "Stub Input")])
+
+    wide = tmp_path / "wide.wav"
+    assert cli.main(["--live", "-D", "0", "-q", "--trim-pad", "2",
+                     "--save", str(wide)]) == 0
+    tight = tmp_path / "tight.wav"
+    assert cli.main(["--live", "-D", "0", "-q", "--trim-pad", "0.1",
+                     "--save", str(tight)]) == 0
+    raw = tmp_path / "raw.wav"
+    assert cli.main(["--live", "-D", "0", "-q", "--no-trim",
+                     "--save", str(raw)]) == 0
+
+    assert secs(tight) < secs(wide) < secs(raw)
+    assert secs(raw) > 9.0            # the original, dead air and all
+
+
+# --------------------------------------------------------------------------- #
+# Remembering the input device
+# --------------------------------------------------------------------------- #
+def test_device_is_remembered_by_name(tmp_path, monkeypatch, capsys):
+    """Indices shift when hardware comes and goes; names don't."""
+    from cw_decoder import capture, cli
+
+    devices = [capture.Device(4, "USB Advanced Audio Device", "48000 Hz"),
+               capture.Device(7, "MacBook Pro Microphone")]
+    _padded_device(monkeypatch, devices)
+
+    # Choose once by index.
+    assert cli.main(["--live", "-D", "4", "-q"]) == 0
+    assert cli._remembered_device("portaudio") == "USB Advanced Audio Device"
+
+    # Next time, no -D needed — and it follows the *name* even though the
+    # device has been re-indexed.
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [
+                            capture.Device(0, "MacBook Pro Microphone"),
+                            capture.Device(2, "USB Advanced Audio Device")])
+    capsys.readouterr()
+    assert cli.main(["--live", "-q"]) == 0
+    err = capsys.readouterr().err
+    assert "remembered device [2] USB Advanced Audio Device" in err
+
+
+def test_unavailable_remembered_device_falls_back_to_the_chooser(
+        tmp_path, monkeypatch, capsys):
+    """Unplugged the interface? Say so and offer the list again."""
+    from cw_decoder import capture, cli
+
+    _padded_device(monkeypatch, [capture.Device(4, "USB Advanced Audio Device")])
+    assert cli.main(["--live", "-D", "4", "-q"]) == 0
+
+    # That device is now gone.
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [
+                            capture.Device(0, "MacBook Pro Microphone")])
+    capsys.readouterr()
+    assert cli.main(["--live", "-q"]) == 1        # non-tty: can't prompt
+    err = capsys.readouterr().err
+    assert "remembered device is not available: USB Advanced Audio Device" in err
+    assert "audio input devices" in err           # the chooser is shown
+    assert "[0] MacBook Pro Microphone" in err
+
+
+def test_device_can_be_named_or_reselected(tmp_path, monkeypatch, capsys):
+    """-D takes a name or part of one; '-D ask' forgets and re-prompts."""
+    from cw_decoder import capture, cli
+
+    devices = [capture.Device(4, "USB Advanced Audio Device"),
+               capture.Device(6, "BlackHole 2ch"),
+               capture.Device(7, "MacBook Pro Microphone")]
+    _padded_device(monkeypatch, devices)
+
+    # A case-insensitive fragment is enough when it's unambiguous.
+    assert cli.main(["--live", "-D", "blackhole", "-q"]) == 0
+    assert cli._remembered_device("portaudio") == "BlackHole 2ch"
+
+    # An ambiguous fragment is reported rather than guessed at.
+    capsys.readouterr()
+    assert cli.main(["--live", "-D", "o", "-q"]) == 1
+    assert "matches several devices" in capsys.readouterr().err
+
+    # A name that matches nothing, and an index that doesn't exist.
+    assert cli.main(["--live", "-D", "nonesuch", "-q"]) == 1
+    assert "no device matching" in capsys.readouterr().err
+    assert cli.main(["--live", "-D", "99", "-q"]) == 1
+    assert "no device with index 99" in capsys.readouterr().err
+
+    # '-D ask' clears the memory and falls to the chooser (non-tty -> exit 1).
+    assert cli._remembered_device("portaudio") == "BlackHole 2ch"
+    assert cli.main(["--live", "-D", "ask", "-q"]) == 1
+    assert cli._remembered_device("portaudio") is None
+    err = capsys.readouterr().err
+    assert "audio input devices" in err
+    assert "remembered" not in err               # it forgot before listing
+
+
+def test_device_memory_is_per_backend(tmp_path, monkeypatch):
+    """PortAudio and ffmpeg number devices differently, so keep them apart."""
+    from cw_decoder import cli
+
+    cli._remember_device("portaudio", "USB Advanced Audio Device")
+    cli._remember_device("ffmpeg", "BlackHole 2ch")
+    assert cli._remembered_device("portaudio") == "USB Advanced Audio Device"
+    assert cli._remembered_device("ffmpeg") == "BlackHole 2ch"
+    assert cli._remembered_device("nonexistent") is None
+
+
+def test_device_memory_survives_a_corrupt_config(tmp_path, monkeypatch):
+    """Never fail a run over a convenience feature."""
+    from cw_decoder import cli
+
+    path = pathlib.Path(cli._config_path())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    for junk in ("", "not json", "[]", "null"):
+        path.write_text(junk)
+        assert cli._load_config() == {}
+        assert cli._remembered_device("portaudio") is None
+    # And it recovers by rewriting.
+    cli._remember_device("portaudio", "Stub Input")
+    assert cli._remembered_device("portaudio") == "Stub Input"
+
+
 def test_live_duration_default_is_two_minutes(tmp_path, monkeypatch):
     """A 30 s cap cut real practice takes short; the default is now 120 s."""
     from cw_decoder import capture, cli
@@ -1021,7 +1199,7 @@ def test_live_duration_default_is_two_minutes(tmp_path, monkeypatch):
     src = _fixture_wav(tmp_path)
     seen = {}
     monkeypatch.setattr(capture, "list_audio_devices",
-                        lambda backend="auto": [(0, "stub")])
+                        lambda backend="auto": [capture.Device(0, "Stub Input", "48000 Hz")])
     monkeypatch.setattr(capture, "record", _copy_recorder(src, seen))
     assert cli.main(["--live", "-D", "0", "-w", "20", "-q"]) == 0
     assert seen["max_seconds"] == 120.0

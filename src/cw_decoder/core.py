@@ -238,6 +238,46 @@ def _load_ffmpeg(path: str, target_rate: int,
 # --------------------------------------------------------------------------- #
 # Capture integrity
 # --------------------------------------------------------------------------- #
+TRIM_PAD = 0.75      # seconds of silence to keep either side of the keying
+
+
+def trim_silence(sig: np.ndarray, rate: int, pad: float = TRIM_PAD,
+                 tone: float | None = None, bandwidth: float = 200.0):
+    """Trim dead air from both ends, keeping `pad` seconds of it.
+
+    Returns (trimmed, lead_seconds) where `lead_seconds` is how much was cut
+    from the front — the offset between the original recording's clock and the
+    trimmed one.
+
+    Detection runs through the same bandpass-and-threshold the decoder uses, so
+    it keys off the *tone* rather than raw level: room noise or hum on an
+    otherwise-idle input won't defeat it. Returns the input untouched when
+    nothing was keyed, when the clip is already shorter than the padding, or
+    when there's nothing to gain — trimming should never be able to eat audio
+    it can't account for.
+    """
+    if sig.size == 0 or pad < 0:
+        return sig, 0.0
+    if sig.size <= int(2 * pad * rate):
+        return sig, 0.0
+    try:
+        if tone is None:
+            tone = detect_tone(sig, rate)
+        env = envelope(sig, rate, tone, bw=bandwidth)
+        thr = keying_threshold(env)
+        on = np.flatnonzero(env > thr)
+    except Exception:
+        return sig, 0.0
+    if on.size == 0:
+        return sig, 0.0
+    p = int(pad * rate)
+    start = max(int(on[0]) - p, 0)
+    end = min(int(on[-1]) + 1 + p, sig.size)
+    if end - start < int(0.1 * rate) or (start == 0 and end == sig.size):
+        return sig, 0.0
+    return sig[start:end], start / float(rate)
+
+
 def find_dropouts(sig: np.ndarray, rate: int, factor: float = 2.5) -> list:
     """Return the times (seconds) where the waveform appears to have been cut.
 

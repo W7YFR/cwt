@@ -70,9 +70,11 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `--capture-backend` | `auto` (default), `portaudio`, or `ffmpeg`. PortAudio buffers properly and reports overflows; ffmpeg is the macOS-only fallback and **drops buffers on some devices**. **Device indices differ between backends** — list and select with the same one. |
 | `--preview` | With `--live`, also print the decode in **real time** as you key (requires `-w`). |
 | `--list-devices` | List available audio input devices and exit. |
-| `-D, --device N` | Audio input device index for `--live` (see `--list-devices`). |
+| `-D, --device` | Audio input device for `--live`: an index, or the device's **name** (or any unambiguous part of it, case-insensitive). Remembered by name for next time, so it survives re-indexing. `-D ask` forgets it and asks again. |
 | `--duration SEC` | Max live-capture length; also stops early on Enter (default 120, prevents runaway recordings). |
 | `--capture-rate HZ` | Force a capture rate. Default: **the device's own rate, no resampling**. Forcing one makes ffmpeg resample every sample, which audibly roughens a keyer sidetone. Only affects the saved/played-back audio — the decoder resamples internally regardless. |
+| `--trim-pad SEC` | Dead air to keep at each end of a live capture; the rest is trimmed (default 0.75). |
+| `--no-trim` | Keep a live capture exactly as recorded, dead air and all. |
 | `--save WAVFILE` | Keep the captured audio (default: discarded after decoding). |
 | `--demo [TEXT]` | Decode a synthesized signal instead of a file (self-test); pairs with `--demo-wpm`, `--demo-farnsworth`, `--demo-noise`. |
 
@@ -357,6 +359,19 @@ Notes:
 - **Opt-in and offline.** Nothing is written unless you pass the flag, and the
   page has no external references at all — no CDN, no fonts, no network. It works
   from `file://` forever and can be archived or mailed as a single file.
+- **Dead air is trimmed.** A live take gets cut back to 0.75 s of silence
+  either side of your keying (`--trim-pad`, or `--no-trim` to keep it all), so
+  the review timeline starts at your sending instead of after however long it
+  took you to reach the paddle. Detection runs through the same
+  bandpass-and-threshold the decoder uses, so it keys off the *tone* — noise or
+  hum on an idle input won't defeat it — and it declines to trim at all rather
+  than risk clipping audio it can't account for.
+- **The device is remembered**, by name rather than index, since indices shift
+  as hardware comes and goes. `-D` accepts a name or a fragment of one
+  (`-D blackhole`), the choice is saved once a capture actually succeeds, and
+  `-D ask` forgets it and re-prompts. If the remembered device isn't there any
+  more you're told so and get the chooser. State lives in
+  `~/.cw-decoder/config.json`, per backend.
 - **Capture backend.** Live capture prefers **PortAudio** (`pip install
   'cw-decoder[live]'`, bundled in the wheel), falling back to ffmpeg. This is
   not a preference — ffmpeg's macOS avfoundation audio path drops capture
