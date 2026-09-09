@@ -129,6 +129,8 @@ Object.assign(globalThis, {
   // point is that the page schedules and encodes without throwing, not that
   // the samples are right (test_js_ideal_timeline_* covers the schedule).
   OfflineAudioContext: function (channels, length, rate) {
+    // The rendered length shows whether the target got its padding.
+    audio.offlineSeconds = length / rate;
     return {
       length, sampleRate: rate,
       destination: {},
@@ -502,7 +504,7 @@ async function exerciseDownloads() {
 /* Per-view render check. Fill count alone can't tell the renderers apart —
    all three paint both tracks — so it only proves something was drawn. The
    YOU/TGT gutter positions are the structural signal: the split views put them
-   in separate rows, overlay stacks them as a colour key inside one band.
+   in separate rows, overlay stacks them as a color key inside one band.
    Reset the zoom first; the sweeps above left it far in. */
 byId("zoom").value = "14";
 fire(byId("zoom"), "input");
@@ -597,6 +599,7 @@ console.log(JSON.stringify({
     maxSeek: audio.seeks.length ? Math.max(...audio.seeks) : 0,
     oscStarts: audio.oscStarts,
     gainEvents: audio.gainEvents,
+    offlineSeconds: audio.offlineSeconds || 0,
     decodes: audio.decodes,             // the embedded WAV was decoded...
     decodedBytes: audio.decodedBytes,   // ...and it had real bytes in it
     // Distinct gain values set. The listening level is a playback control, so

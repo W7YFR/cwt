@@ -458,7 +458,7 @@
   }
 
   /* Overlay: both tracks superimposed on one absolute-time axis, each
-     translucent, so alignment reads as a blend and divergence as a coloured
+     translucent, so alignment reads as a blend and divergence as a colored
      fringe. This is the view that shows drift directly — no drift plot needed
      to infer it. */
   function drawOverlay(v) {
@@ -482,7 +482,7 @@
     }
 
     // Target underneath, yours on top: where they coincide you see the mix,
-    // where they don't you see one colour alone.
+    // where they don't you see one color alone.
     L.items.forEach(function (it) {
       var slot = it.slot;
       if (slot.ideal && it.ix !== null) {
@@ -668,7 +668,7 @@
     ctx.textBaseline = "middle";
     ctx.font = "600 10px " + css("--mono");
     // In overlay the tracks share one band, so the two names stack as a
-    // colour key inside it rather than labelling separate rows.
+    // color key inside it rather than labeling separate rows.
     var rows = S.view === "overlay"
       ? [[Y_YOU + OVER_H / 2 - 9, "YOU", C.you],
          [Y_YOU + OVER_H / 2 + 9, "TGT", C.tgt],
@@ -976,7 +976,10 @@
      just heard. */
   function renderTargetWav() {
     var rate = P.rate || 8000;
-    var dur = Math.max(M.ideal.duration + 0.2, 0.3);
+    // Same silence either side as a trimmed live capture, so the two files
+    // are consistent and the target doesn't stop dead on its last element.
+    var PAD = P.pad_sec == null ? 0.75 : P.pad_sec;
+    var dur = Math.max(M.ideal.duration + 2 * PAD, 0.3);
     var Ctor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     if (!Ctor) return Promise.reject(new Error("OfflineAudioContext missing"));
     var oc = new Ctor(1, Math.ceil(dur * rate), rate);
@@ -993,7 +996,7 @@
     var pk = Math.min(P.audio_peak || 0.5, 1);
     M.ideal.blocks.forEach(function (b) {
       if (b.kind !== "dit" && b.kind !== "dah") return;
-      var a = b.t0 + 0.1, z = b.t1 + 0.1;   // a beat of leading silence
+      var a = b.t0 + PAD, z = b.t1 + PAD;
       gain.gain.setValueAtTime(0, a);
       gain.gain.linearRampToValueAtTime(pk, a + Math.min(RAMP, (z - a) / 2));
       gain.gain.setValueAtTime(pk, Math.max(z - RAMP, a + RAMP));

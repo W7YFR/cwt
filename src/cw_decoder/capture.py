@@ -394,6 +394,11 @@ def capture_samples(device: int, rate: "int | None" = None,
 
     Returns (mono_samples, rate, backend, problems). `on_block` is called with
     the accumulated *interleaved* buffer as it grows, for a live preview.
+
+    Enter means "stop, I'm done" and returns what was captured. Ctrl-C means
+    "forget it" and raises KeyboardInterrupt — the device is still shut down
+    cleanly, but the caller is expected to throw the take away rather than
+    grade a run you meant to abandon.
     """
     if max_seconds <= 0:
         max_seconds = DEFAULT_MAX_SECONDS
@@ -413,8 +418,6 @@ def capture_samples(device: int, rate: "int | None" = None,
                 break
             if time.monotonic() - start >= max_seconds:
                 break
-    except KeyboardInterrupt:
-        pass
     finally:
         stream.stop()
     tail = stream.drain()

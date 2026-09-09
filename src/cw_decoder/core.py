@@ -290,7 +290,7 @@ def find_dropouts(sig: np.ndarray, rate: int, factor: float = 2.5) -> list:
     adapts to level and tone frequency instead of assuming either. Measured
     against real captures, that ratio is ~1.04 for clean recordings and 1.5 at
     worst under heavy noise, against 4.1-5.2 for captures with dropped buffers
-    — so `factor` sits between, with margin on both sides. Analyse at the
+    — so `factor` sits between, with margin on both sides. Analyze at the
     file's own rate: resampling smooths the splice and hides it.
     """
     if sig.size < 64:

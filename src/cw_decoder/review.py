@@ -104,7 +104,8 @@ def build_payload(res: core.Result, source: str,
                   expected: str | None = None,
                   expected_source: str | None = None,
                   tolerance: float = 0.30,
-                  audio_path: str | None = None) -> dict:
+                  audio_path: str | None = None,
+                  pad_sec: float = core.TRIM_PAD) -> dict:
     """Assemble the review payload from a decode result.
 
     `res` must carry `segments` and `signal` (use `keep_signal=True` on
@@ -147,5 +148,9 @@ def build_payload(res: core.Result, source: str,
                      "farnsworth_wpm": round(t.farnsworth_wpm, 2),
                      "unit_ms": round(t.unit_sec * 1000, 2)},
         "tolerance": tolerance,
+        # Silence to put either side of the generated target audio, matching
+        # what a live capture is trimmed to, so the two files are consistent
+        # and the target doesn't end abruptly on its last element.
+        "pad_sec": round(float(pad_sec), 3),
         "audio": encode_wav(play, play_rate),
     }

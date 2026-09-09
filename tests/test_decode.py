@@ -208,7 +208,7 @@ def test_trim_silence_leaves_audio_it_cannot_account_for():
     tiny = numpy.zeros(100, dtype=numpy.float32)
     assert core.trim_silence(tiny, rate)[0] is tiny
 
-    # A negative pad is a caller error, not licence to trim everything.
+    # A negative pad is a caller error, not license to trim everything.
     out, lead = core.trim_silence(keyed, rate, pad=-1)
     assert out is keyed and lead == 0.0
 

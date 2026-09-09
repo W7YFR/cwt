@@ -467,7 +467,7 @@ def test_page_boots_and_draws(tmp_path):
     for view, fills in d["viewFills"].items():
         assert fills > 20, f"the {view} renderer drew almost nothing"
     # ...and overlay really superimposes: the split views label two separate
-    # rows, overlay stacks the names as a colour key inside one band. (Fill
+    # rows, overlay stacks the names as a color key inside one band. (Fill
     # counts can't tell them apart — every view draws both tracks.)
     rows = d["viewRows"]
     for split in ("per-char", "absolute"):
@@ -487,6 +487,11 @@ def test_page_boots_and_draws(tmp_path):
     assert yours[0]["scheme"] == "data" and yours[0]["size"] > 10_000
     assert target[0]["scheme"] == "blob" and target[0]["size"] > 10_000
     assert "wpm" in target[0]["name"]
+    # The target render carries padding at both ends rather than stopping dead
+    # on its last element; see test_target_audio_gets_the_same_padding for the
+    # value itself.
+    pad = 0.75
+    assert d["audio"]["offlineSeconds"] > 2 * pad
     # One chart per view, each named for the view it captured.
     assert {x["name"].rsplit("-", 1)[-1] for x in charts} == {
         "char.png", "absolute.png", "overlay.png"}
@@ -1059,6 +1064,88 @@ def test_live_trims_dead_air_to_the_padding(tmp_path, monkeypatch, capsys):
     assert "trimmed" in capsys.readouterr().err
     # And it still decodes, so the trim didn't clip the keying.
     assert "CQ DE AB1CD" in core.decode_file(str(save)).text
+
+
+def test_ctrl_c_discards_the_take(tmp_path, monkeypatch, capsys, no_browser):
+    """Ctrl-C abandons the run: no decode, no grade, no review page.
+
+    Enter is the "I'm done" key. Interrupting used to fall through to the full
+    evaluation on a take you meant to throw away.
+    """
+    from cw_decoder import capture, cli
+
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [capture.Device(0, "Stub Input")])
+
+    def interrupted(dev, out, **kw):
+        # A real capture writes as it goes, so leave a partial file behind.
+        synth.write_wav(out, synth.generate("CQ", wpm=20, tone=600,
+                                            rate=8000), 8000)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(capture, "record", interrupted)
+
+    out = tmp_path / "session" / "review.html"
+    rc = cli.main(["--live", "-D", "0", "-w", "20", "--web-out", str(out)])
+    cap = capsys.readouterr()
+
+    assert rc == 130                          # conventional for SIGINT
+    assert "cancelled" in cap.err
+    assert cap.out.strip() == ""              # nothing decoded
+    assert not out.exists()                   # no review page
+    assert not (out.parent / "session.wav").exists()   # recording thrown away
+    assert no_browser == []                   # and no browser opened
+
+
+def test_ctrl_c_removes_a_session_dir_it_created(tmp_path, monkeypatch,
+                                                 no_browser, isolated_home):
+    """The default session directory is ours to clean up; a chosen path is not."""
+    from cw_decoder import capture, cli
+
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [capture.Device(0, "Stub Input")])
+
+    def interrupted(dev, out, **kw):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(capture, "record", interrupted)
+    assert cli.main(["--live", "-D", "0", "-w", "20", "--web-review"]) == 130
+    sessions = isolated_home / ".cw-decoder" / "sessions"
+    assert list(sessions.glob("*")) == [], "left an empty session directory"
+
+    # A directory the user named is left alone, even when empty.
+    chosen = tmp_path / "mine"
+    assert cli.main(["--live", "-D", "0", "-w", "20",
+                     "--web-out", str(chosen / "r.html")]) == 130
+    assert chosen.is_dir()
+
+
+def test_ctrl_c_does_not_remember_the_device(tmp_path, monkeypatch):
+    """A cancelled take shouldn't teach it a device preference."""
+    from cw_decoder import capture, cli
+
+    monkeypatch.setattr(capture, "list_audio_devices",
+                        lambda backend="auto": [capture.Device(0, "Stub Input")])
+    monkeypatch.setattr(capture, "record",
+                        lambda dev, out, **kw: (_ for _ in ()).throw(
+                            KeyboardInterrupt()))
+    assert cli.main(["--live", "-D", "0", "-q"]) == 130
+    assert cli._remembered_device("portaudio") is None
+
+
+def test_target_audio_gets_the_same_padding(tmp_path, no_browser):
+    """The generated target shouldn't stop dead on its last element."""
+    from cw_decoder import cli
+
+    wav = _fixture_wav(tmp_path)
+    out = tmp_path / "r.html"
+    assert cli.main([str(wav), "-w", "20", "--web-out", str(out)]) == 0
+    assert '"pad_sec":0.75' in out.read_text(encoding="utf-8")
+
+    # And it tracks --trim-pad, so the two files stay consistent.
+    assert cli.main([str(wav), "-w", "20", "--trim-pad", "1.5",
+                     "--web-out", str(out)]) == 0
+    assert '"pad_sec":1.5' in out.read_text(encoding="utf-8")
 
 
 def test_live_trim_is_configurable_and_optional(tmp_path, monkeypatch):

@@ -212,6 +212,24 @@ def _session_dir() -> str:
     return path
 
 
+def _discard(audio_path: str, page_path: "str | None") -> None:
+    """Clean up an abandoned take: the recording, and the session directory if
+    we were the ones who made it (never a path the user chose)."""
+    try:
+        if audio_path and os.path.exists(audio_path):
+            os.unlink(audio_path)
+    except OSError:
+        pass
+    if not page_path:
+        return
+    try:
+        session = os.path.dirname(page_path)
+        if os.path.isdir(session) and not os.listdir(session):
+            os.rmdir(session)
+    except OSError:
+        pass
+
+
 def _trim_capture(path: str, rate: int, pad: float, tone: "float | None",
                   bandwidth: float, verbose: bool) -> None:
     """Rewrite `path` with the dead air at each end cut back to `pad` seconds.
@@ -292,7 +310,8 @@ def _web_page_path(out: "str | None") -> str:
 def _emit_web_review(res: core.Result, source: str, expected: "str | None",
                      expected_source: "str | None", tolerance: float,
                      page_path: str, audio_path: "str | None" = None,
-                     verbose: bool = True) -> None:
+                     verbose: bool = True,
+                     pad_sec: float = core.TRIM_PAD) -> None:
     """Build the self-contained review page, then open it in a browser.
 
     `audio_path` is the original recording. The page embeds it at its own
@@ -305,7 +324,8 @@ def _emit_web_review(res: core.Result, source: str, expected: "str | None",
 
     payload = review.build_payload(res, source=source, expected=expected,
                                    expected_source=expected_source,
-                                   tolerance=tolerance, audio_path=audio_path)
+                                   tolerance=tolerance, audio_path=audio_path,
+                                   pad_sec=pad_sec)
     size = webpage.write(page_path, payload)
     if verbose:
         print(f"# web review: {page_path} ({size / 1024:.0f} KB, audio at "
@@ -747,6 +767,12 @@ def main(argv=None) -> int:
                                    target_wpm=args.target_wpm,
                                    target_farnsworth=args.target_farnsworth,
                                    tolerance=tol, keep_signal=web)
+        except KeyboardInterrupt:
+            # Ctrl-C means abandon the take — don't decode it, don't grade it,
+            # don't open a review page for it. Enter is the "I'm done" key.
+            print("\n# cancelled — discarding this take.", file=sys.stderr)
+            _discard(out_path, page_path if not args.web_out else None)
+            return 130                     # conventional exit code for SIGINT
         except (RuntimeError, ValueError) as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
@@ -764,7 +790,7 @@ def main(argv=None) -> int:
         if web:
             _emit_web_review(res, "live capture", expected, expected_source,
                              tol, page_path, audio_path=out_path,
-                             verbose=verbose)
+                             verbose=verbose, pad_sec=args.trim_pad)
         return 0
 
     if args.demo is not None:
@@ -829,7 +855,8 @@ def main(argv=None) -> int:
     if web:
         _emit_web_review(res, os.path.basename(args.input), expected,
                          expected_source, tol, page_path,
-                         audio_path=args.input, verbose=verbose)
+                         audio_path=args.input, verbose=verbose,
+                         pad_sec=args.trim_pad)
     return 0
 
 
