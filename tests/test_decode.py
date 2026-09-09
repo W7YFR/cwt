@@ -171,7 +171,7 @@ def _drop_buffers(sig, rate, at_seconds, frames=512):
 
 def test_trim_silence_keeps_only_the_padding():
     """Dead air at each end is cut back to the requested padding."""
-    rate, pad = 8000, 0.75
+    rate, pad = 8000, core.TRIM_PAD
     keyed = synth.generate("CQ DE W7YFR", wpm=25, tone=600, rate=rate)
     lead, tail = 4.0, 3.0
     padded = numpy.concatenate([
@@ -225,8 +225,9 @@ def test_trim_silence_keys_off_the_tone_not_the_level():
     noise = lambda n: rng.normal(0, 0.05, n).astype(numpy.float32)  # noqa: E731
     padded = numpy.concatenate([noise(4 * rate), keyed + noise(keyed.size),
                                 noise(3 * rate)])
-    out, lead = core.trim_silence(padded, rate, pad=0.75)
-    assert lead == pytest.approx(4.0 - 0.75, abs=0.3)
+    pad = core.TRIM_PAD
+    out, lead = core.trim_silence(padded, rate, pad=pad)
+    assert lead == pytest.approx(4.0 - pad, abs=0.3)
     assert out.size < padded.size - 5 * rate
 
 

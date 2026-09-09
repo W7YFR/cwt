@@ -77,7 +77,7 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `-D, --device` | Input device for `--live`: an index, or a name fragment (`-D blackhole`). Remembered for next time; `-D ask` forgets it and asks again. |
 | `--duration SEC` | Max live-capture length; also stops early on Enter (default 120, prevents runaway recordings). |
 | `--capture-rate HZ` | Force a capture rate. Default: the device's own rate, with no resampling (which sounds better). Smaller rates make smaller files. |
-| `--trim-pad SEC` | Dead air to keep at each end of a live capture; the rest is trimmed (default 0.75). |
+| `--trim-pad SEC` | Dead air to keep at each end of a live capture; the rest is trimmed (default 0.5). |
 | `--no-trim` | Keep a live capture exactly as recorded, dead air and all. |
 | `--save WAVFILE` | Keep the captured audio (default: discarded after decoding). |
 | `--demo [TEXT]` | Decode a synthesized signal instead of a file (self-test); pairs with `--demo-wpm`, `--demo-farnsworth`, `--demo-noise`. |
@@ -254,7 +254,7 @@ Notes:
   comes and goes. `-D` takes an index or a name fragment (`-D blackhole`), and
   `-D ask` forgets it and asks again. Device indices differ between the two
   capture backends, so list and select with the same one.
-- **Dead air is trimmed** to 0.75 s either side of your keying (`--trim-pad`, or
+- **Dead air is trimmed** to 0.5 s either side of your keying (`--trim-pad`, or
   `--no-trim` to keep it).
 - First use may trigger a macOS microphone-permission prompt for your terminal.
 - Tone auto-detect, `-t`, and `-b` work exactly as they do for a file.

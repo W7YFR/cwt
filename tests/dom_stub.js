@@ -193,8 +193,10 @@ Object.assign(globalThis, {
           type: "", frequency: { value: 0 }, onended: null,
           connect: function (n) { return n; },
           disconnect: () => {},
-          start: () => { audio.oscStarts++; },
-          stop: () => {}
+          // Record when the tone is scheduled to run: the span shows whether
+          // the target got its padding, or was cut off at the last element.
+          start: (when) => { audio.oscStarts++; audio.oscOn = when || 0; },
+          stop: (when) => { audio.oscSpan = (when || 0) - (audio.oscOn || 0); }
         };
         audio.oscFreqs.push(o.frequency);
         return o;
@@ -458,6 +460,26 @@ async function exerciseEndReset() {
   fire(byId("stop"), "click");
 }
 
+// ---- full target playback keeps its padding ------------------------------ //
+// The download had the padding but live playback didn't, so the tone stopped
+// the instant the last element ended. Restore the payload's speeds first so
+// the expected length is computable from the payload alone.
+const targetPlay = {};
+async function exerciseTargetPlay() {
+  fire(byId("stop"), "click");
+  await flush();
+  for (const [id, v] of [["wpm", global.REVIEW.target.char_wpm],
+                         ["farns", global.REVIEW.target.farnsworth_wpm]]) {
+    byId(id).value = String(v);
+    fire(byId(id), "input");
+  }
+  audio.oscSpan = 0;
+  fire(byId("play-tgt"), "click");
+  await flush();
+  targetPlay.span = audio.oscSpan || 0;
+  fire(byId("stop"), "click");
+}
+
 // ---- does the view follow the playhead? ---------------------------------- //
 // Put the controls back to a state where the content is wider than the view,
 // start playback, then pump the frame loop with advancing audio time. Content
@@ -527,6 +549,7 @@ const viewFills = {}, viewRows = {};
 // Sequenced: each stretch drives the page and leaves it stopped for the next.
 exerciseAB()
   .then(exerciseEndReset)
+  .then(exerciseTargetPlay)
   .then(exerciseFollow)
   .then(exerciseDownloads)
   .then(report)
@@ -600,6 +623,8 @@ console.log(JSON.stringify({
     oscStarts: audio.oscStarts,
     gainEvents: audio.gainEvents,
     offlineSeconds: audio.offlineSeconds || 0,
+    // Scheduled length of a full live target playback.
+    targetPlaySeconds: targetPlay.span || 0,
     decodes: audio.decodes,             // the embedded WAV was decoded...
     decodedBytes: audio.decodedBytes,   // ...and it had real bytes in it
     // Distinct gain values set. The listening level is a playback control, so

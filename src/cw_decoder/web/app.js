@@ -897,14 +897,23 @@
     // shared listening gain above then lifts both equally.
     var pk = Math.min(P.audio_peak || 0.5, 1);
     var t0 = c.currentTime + 0.06;      // a beat of headroom for scheduling
-    var start = from || 0;
+
+    // Playing the whole target runs from -PAD to duration+PAD, the same
+    // silence the recording carries either side of its keying. Without the
+    // tail, playback stopped the instant the last mark ended and cut it off.
+    // Times here are timeline times, so a negative start is just lead-in.
+    var full = to === undefined;
+    var PAD = P.pad_sec == null ? 0.5 : P.pad_sec;
+    var start = full ? -PAD : (from || 0);
+    var endT = full ? M.ideal.duration + PAD : to;
+
     var marks = M.ideal.blocks.filter(function (b) {
       return (b.kind === "dit" || b.kind === "dah") &&
-             b.t1 > start && (to === undefined || b.t0 < to);
+             b.t1 > start && b.t0 < endT;
     });
     marks.forEach(function (b) {
       var a = t0 + Math.max(b.t0 - start, 0);
-      var z = t0 + Math.min(b.t1, to === undefined ? Infinity : to) - start;
+      var z = t0 + Math.min(b.t1, endT) - start;
       if (z <= a) return;
       gain.gain.setValueAtTime(0, a);
       gain.gain.linearRampToValueAtTime(pk, a + Math.min(RAMP, (z - a) / 2));
@@ -912,9 +921,9 @@
       gain.gain.linearRampToValueAtTime(0, z);
     });
 
-    tgtDur = to === undefined ? M.ideal.duration : to;
+    tgtDur = endT;
     osc.start(t0);
-    osc.stop(t0 + Math.max(tgtDur - start, 0.05) + 0.05);
+    osc.stop(t0 + Math.max(endT - start, 0.05) + 0.05);
     osc.onended = function () { if (mode === "tgt") stopAll(); };
     tgtNodes = { osc: osc, gain: gain, level: level };
     tgtStart = t0;
@@ -978,7 +987,7 @@
     var rate = P.rate || 8000;
     // Same silence either side as a trimmed live capture, so the two files
     // are consistent and the target doesn't stop dead on its last element.
-    var PAD = P.pad_sec == null ? 0.75 : P.pad_sec;
+    var PAD = P.pad_sec == null ? 0.5 : P.pad_sec;
     var dur = Math.max(M.ideal.duration + 2 * PAD, 0.3);
     var Ctor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     if (!Ctor) return Promise.reject(new Error("OfflineAudioContext missing"));

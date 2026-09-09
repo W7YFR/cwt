@@ -490,8 +490,7 @@ def test_page_boots_and_draws(tmp_path):
     # The target render carries padding at both ends rather than stopping dead
     # on its last element; see test_target_audio_gets_the_same_padding for the
     # value itself.
-    pad = 0.75
-    assert d["audio"]["offlineSeconds"] > 2 * pad
+    assert d["audio"]["offlineSeconds"] > 2 * core.TRIM_PAD
     # One chart per view, each named for the view it captured.
     assert {x["name"].rsplit("-", 1)[-1] for x in charts} == {
         "char.png", "absolute.png", "overlay.png"}
@@ -1088,10 +1087,11 @@ def test_live_trims_dead_air_to_the_padding(tmp_path, monkeypatch, capsys):
     with wave.open(str(save)) as w:
         secs = w.getnframes() / w.getframerate()
     # Derive the expectation rather than hardcoding it: the keying itself plus
-    # 0.75 s either side, and well short of the padded original.
+    # the default padding either side, and well short of the padded original.
     keyed = synth.generate("CQ DE AB1CD", wpm=20, tone=600, rate=8000).size / 8000
-    assert secs == pytest.approx(keyed + 2 * 0.75, abs=0.4), \
-        f"trimmed to {secs:.2f}s, expected ~{keyed + 1.5:.2f}s"
+    want = keyed + 2 * core.TRIM_PAD
+    assert secs == pytest.approx(want, abs=0.4), \
+        f"trimmed to {secs:.2f}s, expected ~{want:.2f}s"
     assert secs < keyed + lead + tail - 4.0
     assert "trimmed" in capsys.readouterr().err
     # And it still decodes, so the trim didn't clip the keying.
@@ -1172,12 +1172,51 @@ def test_target_audio_gets_the_same_padding(tmp_path, no_browser):
     wav = _fixture_wav(tmp_path)
     out = tmp_path / "r.html"
     assert cli.main([str(wav), "-w", "20", "--web-out", str(out)]) == 0
-    assert '"pad_sec":0.75' in out.read_text(encoding="utf-8")
+    assert f'"pad_sec":{core.TRIM_PAD:g}' in out.read_text(encoding="utf-8")
 
     # And it tracks --trim-pad, so the two files stay consistent.
     assert cli.main([str(wav), "-w", "20", "--trim-pad", "1.5",
                      "--web-out", str(out)]) == 0
     assert '"pad_sec":1.5' in out.read_text(encoding="utf-8")
+
+
+@node
+def test_target_playback_is_padded_not_just_the_download(tmp_path, no_browser):
+    """Live target playback must carry the padding too.
+
+    The download applied it while playTarget() didn't, so the tone was
+    scheduled to stop the moment the last element ended — audibly cut off.
+    """
+    from cw_decoder import cli
+
+    wav = _fixture_wav(tmp_path, text="CQ DE AB1CD K")
+    page = tmp_path / "r.html"
+    assert cli.main([str(wav), "-w", "20", "-e", "CQ DE AB1CD K",
+                     "--web-out", str(page)]) == 0
+    html = page.read_text(encoding="utf-8")
+    payload = json.loads(re.search(r"window\.REVIEW = (\{.*?\});", html,
+                                   re.S).group(1).replace("\\u003c", "<"))
+
+    # What the ideal keying itself measures, from the same code the page runs.
+    ideal = _run_js("""
+      const t = RC.targetTiming(PAYLOAD.target.char_wpm,
+                                PAYLOAD.target.farnsworth_wpm);
+      console.log(JSON.stringify({
+        duration: RC.idealTimeline(PAYLOAD.expected, t).duration }));
+    """, payload)["duration"]
+
+    stub = Path(__file__).parent / "dom_stub.js"
+    proc = subprocess.run(["node", str(stub), str(page)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    span = json.loads(proc.stdout)["audio"]["targetPlaySeconds"]
+
+    pad = payload["pad_sec"]
+    assert span == pytest.approx(ideal + 2 * pad, abs=0.1), (
+        f"target scheduled for {span:.2f}s; keying is {ideal:.2f}s and should "
+        f"carry {pad}s either side")
+    # The specific regression: it must not end at the last element.
+    assert span > ideal + pad
 
 
 def test_live_trim_is_configurable_and_optional(tmp_path, monkeypatch):

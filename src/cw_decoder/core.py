@@ -238,7 +238,7 @@ def _load_ffmpeg(path: str, target_rate: int,
 # --------------------------------------------------------------------------- #
 # Capture integrity
 # --------------------------------------------------------------------------- #
-TRIM_PAD = 0.75      # seconds of silence to keep either side of the keying
+TRIM_PAD = 0.5       # seconds of silence to keep either side of the keying
 
 
 def trim_silence(sig: np.ndarray, rate: int, pad: float = TRIM_PAD,
