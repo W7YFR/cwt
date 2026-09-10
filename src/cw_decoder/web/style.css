@@ -245,6 +245,10 @@ td.play:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   border-radius: 4px;
 }
+/* Match the outline to the track the canvas lights up on hover, so the cell
+   and the highlighted stretch read as one thing. */
+td.play[data-side="you"]:hover { box-shadow: inset 0 0 0 1px var(--you); }
+td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 
 .diff { font-family: var(--mono); font-size: 13px; line-height: 1.8; word-break: break-word; }
 .diff .eq { color: var(--ink); }

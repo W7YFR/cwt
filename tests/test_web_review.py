@@ -516,6 +516,31 @@ def test_page_boots_and_draws(tmp_path):
     # audible with the characters either side of it.
     assert ab["youSpan"] > 0.4
 
+    # Hovering either value points at the stretch of canvas it describes, on
+    # the same track that value would play — so "yours" and "target" light up
+    # different rows — and the highlight goes away when the pointer leaves.
+    # Compared as sets: the stub hands back the same cell objects across
+    # re-renders, so app.js attaches its listener more than once and one
+    # dispatch redraws several times. Which colors got washed is the signal.
+    hov = d["devHover"]
+    assert set(hov["you"]) == {hov["colors"]["you"]}, \
+        f"hovering 'yours' should wash the YOU track: {hov['you']}"
+    assert set(hov["tgt"]) == {hov["colors"]["tgt"]}, \
+        f"hovering 'target' should wash the TGT track: {hov['tgt']}"
+    assert hov["afterLeave"] == [], \
+        f"the highlight outlived the hover: {hov['afterLeave']}"
+
+    # Zoomed in past the viewport, hovering a row for a deviation the view has
+    # scrolled away from brings it on screen — otherwise the highlight lands
+    # outside the viewport and the row looks inert. Two rows at different
+    # moments must land the view in different places; the same row twice must
+    # land it in the same place.
+    assert hov["rows"] >= 2
+    assert hov["translateRowA"] != hov["translateRowB"], \
+        "hovering a deviation off screen did not reveal it"
+    assert hov["translateReHover"] == hov["translateRowB"], \
+        "re-hovering the same row moved the view"
+
     # Playback resets the transport when it ends. The original bug: the payload
     # duration is rounded, so the clock could plateau just under it and a `>=`
     # test never fired, leaving the button stuck on "playing".

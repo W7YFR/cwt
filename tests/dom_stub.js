@@ -13,7 +13,11 @@
 const fs = require("fs");
 
 const calls = { fill: 0, stroke: 0, text: [], textAt: [], rects: 0,
-                clips: [], clipped: 0, translates: [] };
+                clips: [], clipped: 0, translates: [],
+                // Every fill()'s color and opacity, so a test can find a
+                // translucent wash (a highlight) and tell which track's color
+                // it was painted in.
+                fillStyles: [] };
 const audio = { plays: 0, seeks: [], spans: [], oscStarts: 0, gainEvents: 0,
                 decodes: 0, decodedBytes: 0, levels: [], oscFreqs: [] };
 let lastCtx = null, lastSource = null;
@@ -43,7 +47,10 @@ function ctx2d() {
     arcTo: noop, closePath: noop, setLineDash: noop,
     fillRect: function () { calls.rects++; },
     strokeRect: function () { calls.rects++; },
-    fill: function () { calls.fill++; },
+    fill: function () {
+      calls.fill++;
+      calls.fillStyles.push([this.fillStyle, this.globalAlpha]);
+    },
     stroke: function () { calls.stroke++; },
     fillText: function (t, x, y) {
       calls.text.push(String(t));
@@ -290,9 +297,17 @@ global.document = eventTarget({
     return a;
   }
 });
+// Distinct color per custom property, so a test can tell *which* palette entry
+// a given fill used — the real stylesheet isn't parsed here.
+const STUB_COLORS = {
+  "--ink": "#111111", "--ink-dim": "#222222", "--ink-faint": "#333333",
+  "--line": "#444444", "--panel": "#555555", "--panel-2": "#666666",
+  "--you": "#0000ff", "--tgt": "#00ff00", "--ok": "#00aa00",
+  "--warn": "#aaaa00", "--bad": "#ff0000", "--ghost": "#777777"
+};
 global.getComputedStyle = () => ({
-  // Return a real color/font so the drawing code has something plausible.
-  getPropertyValue: (n) => (n === "--mono" ? "monospace" : "#888888")
+  getPropertyValue: (n) =>
+    n === "--mono" ? "monospace" : (STUB_COLORS[n] || "#888888")
 });
 let lastAudio = null;      // so a test can advance playback time by hand
 global.Audio = function () {
@@ -507,6 +522,59 @@ async function exerciseFollow() {
   fire(byId("stop"), "click");
 }
 
+/* ---- hovering a deviation row highlights it on the canvas ---------------- //
+   The highlight is a translucent wash in the hovered track's own color, so a
+   test can find it by opacity and say which row lit up. Recorded per action:
+   the fills painted by the redraw that hover/leave triggered. */
+const devHover = {};
+function exerciseDeviationHover() {
+  byId("view").value = "per-char";
+  fire(byId("view"), "change");
+  const cells = global.document.querySelectorAll("td.play");
+  const you = cells.find((c) => c.dataset.side === "you");
+  const tgt = cells.find((c) => c.dataset.side === "tgt");
+  if (!you || !tgt) return;
+  // A wash is any fill painted at low opacity; report its color with it.
+  const washes = (from) => calls.fillStyles.slice(from)
+    .filter(([, a]) => a > 0 && a < 0.3).map(([c]) => c);
+
+  let n = calls.fillStyles.length;
+  fire(you, "mouseenter");
+  devHover.you = washes(n);
+  n = calls.fillStyles.length;
+  fire(you, "mouseleave");
+  devHover.afterLeave = washes(n);
+  n = calls.fillStyles.length;
+  fire(tgt, "mouseenter");
+  devHover.tgt = washes(n);
+  fire(tgt, "mouseleave");
+  devHover.colors = { you: STUB_COLORS["--you"], tgt: STUB_COLORS["--tgt"] };
+
+  /* Zoomed in far enough that the session overflows the view, hovering a row
+     for a deviation the view has scrolled past has to bring it on screen —
+     otherwise the highlight lands outside the viewport and the row appears to
+     do nothing. Content is translated by (gutter - scrollX), so the translate
+     stands in for the scroll position. The table is sorted by severity, not by
+     time, so these two rows are just "different moments", not first and last. */
+  byId("zoom").value = "60";
+  fire(byId("zoom"), "input");
+  const youCells = cells.filter((c) => c.dataset.side === "you");
+  const other = youCells[youCells.length - 1];
+  const translate = () => calls.translates[calls.translates.length - 1];
+  calls.translates.length = 0;
+  fire(you, "mouseenter");
+  fire(you, "mouseleave");
+  devHover.translateRowA = Math.round(translate());
+  fire(other, "mouseenter");
+  devHover.translateRowB = Math.round(translate());
+  // Coming back to the same row lands the view in the same place.
+  fire(other, "mouseleave");
+  fire(other, "mouseenter");
+  devHover.translateReHover = Math.round(translate());
+  fire(other, "mouseleave");
+  devHover.rows = youCells.length;
+}
+
 // ---- downloads ----------------------------------------------------------- //
 // One of each per view, so the PNG export exercises all three renderers. The
 // target WAV renders through a promise, so this stretch has to be async — and
@@ -551,6 +619,7 @@ exerciseAB()
   .then(exerciseEndReset)
   .then(exerciseTargetPlay)
   .then(exerciseFollow)
+  .then(exerciseDeviationHover)
   .then(exerciseDownloads)
   .then(report)
   .catch((e) => { console.error(e.stack || String(e)); process.exit(1); });
@@ -610,6 +679,7 @@ console.log(JSON.stringify({
   downloads: downloads,
   dlStatus: byId("dl-status").textContent,
   abTest: abTest,
+  devHover: devHover,
   endReset: endReset,
   initial: initial,
   viewFills: viewFills,

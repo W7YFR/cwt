@@ -78,6 +78,9 @@
     gainDb: 0,
     scrollX: 0,            // content px scrolled past the gutter
     hover: null,
+    // {side, idx}: a deviation row is under the pointer, so show which stretch
+    // of the canvas that row is talking about. Set on hover, cleared on leave.
+    focus: null,
     playhead: null         // {t: seconds, side: "you"|"tgt"}
   };
 
@@ -99,6 +102,9 @@
     // class its duration implied.
     var slots = RC.pair(actual, ideal);
     RC.retarget(slots);
+    // Slot indices are about to change under the report table, and its rows
+    // are rebuilt below, so any hovered row is gone.
+    S.focus = null;
     M = {
       timing: timing,
       actual: actual,
@@ -315,6 +321,7 @@
     ctx.translate(GUTTER - S.scrollX, 0);
     ctx.font = "500 11px " + css("--mono");
     drawTicks(v);
+    drawFocus(v);
     if (S.view === "per-char") drawPerChar(v);
     else if (S.view === "overlay") drawOverlay(v);
     else drawAbsolute(v);
@@ -324,6 +331,74 @@
     drawGutter(v);
     drawScrollbar(v);
     drawPlayhead(v);
+  }
+
+  /* The x-range one slot occupies on one track, in content pixels, lead gap
+     included — the gap is usually the thing a deviation row is about. Returns
+     null when that side has no character in the slot (a missed or extra one). */
+  function slotSpan(side, i) {
+    var it = L.items[i];
+    if (!it) return null;
+    var ch = side === "you" ? it.slot.actual : it.slot.ideal;
+    if (!ch) return null;
+    if (S.view === "per-char") {
+      // Both rows' gaps start at the slot's left edge, but the slot is as wide
+      // as the longer of the two, so the shorter one starts further in.
+      var gapW = side === "you" ? it.youGapW : it.tgtGapW;
+      var bx = it.x + it.gapW;
+      return [bx - gapW, bx + charWidth(ch)];
+    }
+    var x = side === "you" ? it.x : it.ix;
+    if (x === null || x === undefined) return null;
+    var g = ch.leadGap;
+    return [x - (g ? g.units * S.ppu : 0), x + charWidth(ch)];
+  }
+
+  /* The same slot range playback uses, so hovering a row previews exactly what
+     clicking it will play: the character before, the deviation, and the one
+     after. */
+  function focusSpan(f) {
+    if (!f) return null;
+    var lo = Math.max(f.idx - 1, 0);
+    var hi = Math.min(f.idx + 1, L.items.length - 1);
+    var x0 = Infinity, x1 = -Infinity;
+    for (var i = lo; i <= hi; i++) {
+      var s = slotSpan(f.side, i);
+      if (!s) continue;
+      x0 = Math.min(x0, s[0]);
+      x1 = Math.max(x1, s[1]);
+    }
+    return x1 > x0 ? [x0, x1] : null;
+  }
+
+  /* Wash the focused stretch, behind the marks so it reads as a spotlight
+     rather than a veil. In overlay both tracks share one band; otherwise only
+     the row the hovered button plays is lit, which is what distinguishes
+     hovering "yours" from hovering "target". */
+  function drawFocus(v) {
+    var span = focusSpan(S.focus);
+    if (!span) return;
+    var pad = 4;
+    var x = span[0] - pad, w = span[1] - span[0] + 2 * pad;
+    if (!visible(x, w, v)) return;
+    var top, h;
+    if (S.view === "overlay") {
+      top = Y_LABEL; h = Y_YOU + OVER_H + 4 - Y_LABEL;
+    } else if (S.focus.side === "you") {
+      top = Y_LABEL; h = Y_YOU + ROW_H + 2 - Y_LABEL;
+    } else {
+      top = Y_TGT - 2; h = ROW_H + 4;
+    }
+    ctx.fillStyle = S.focus.side === "you" ? C.you : C.tgt;
+    ctx.globalAlpha = 0.14;
+    roundRect(x, top, w, h, 4);
+    ctx.fill();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = S.focus.side === "you" ? C.you : C.tgt;
+    ctx.lineWidth = 1;
+    roundRect(x + 0.5, top + 0.5, w - 1, h - 1, 4);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   function visible(x, w, v) {
@@ -1036,11 +1111,13 @@
   var MAX_PNG_DEVICE_W = 16384;
   function exportPng() {
     var wasPpu = S.ppu, wasScroll = S.scrollX, wasCanvas = canvas,
-        wasCtx = ctx, wasHead = S.playhead, wasHover = S.hover;
+        wasCtx = ctx, wasHead = S.playhead, wasHover = S.hover,
+        wasFocus = S.focus;
     var note = "";
     try {
       S.playhead = null;
       S.hover = null;
+      S.focus = null;      // a hover highlight has no business in an export
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
       var budget = MAX_PNG_DEVICE_W / dpr;
       relayoutOnly();
@@ -1076,6 +1153,7 @@
       S.scrollX = wasScroll;
       S.playhead = wasHead;
       S.hover = wasHover;
+      S.focus = wasFocus;
       relayout();
     }
   }
@@ -1238,14 +1316,45 @@
     $("report").innerHTML = html.join("");
     Array.prototype.forEach.call(document.querySelectorAll("td.play"),
       function (td) {
+        var side = td.dataset.side, idx = parseInt(td.dataset.i, 10);
         td.addEventListener("click", function () {
-          var side = td.dataset.side;
-          var w = contextWindow(side, parseInt(td.dataset.i, 10));
+          var w = contextWindow(side, idx);
           if (!w) return;
           if (side === "you") playYou(w[0], w[1]);
           else playTarget(w[0], w[1]);
         });
+        // Hovering a value points at the stretch of canvas it describes, on
+        // the same track the button would play — so "yours" and "target"
+        // light up different rows.
+        td.addEventListener("mouseenter", function () { setFocus(side, idx); });
+        td.addEventListener("mouseleave", clearFocus);
       });
+  }
+
+  function setFocus(side, idx) {
+    S.focus = { side: side, idx: idx };
+    revealFocus();
+    draw();
+  }
+
+  function clearFocus() {
+    if (!S.focus) return;
+    S.focus = null;
+    draw();
+  }
+
+  /* Bring the focused stretch on screen if it is entirely outside the view.
+     Without this, hovering a row for a deviation the view has scrolled past
+     highlights nothing at all. Anything already partly visible is left alone,
+     so moving down the table doesn't shunt the canvas on every row. */
+  function revealFocus() {
+    var span = focusSpan(S.focus);
+    if (!span) return;
+    var v = viewport();
+    if (!v.maxScroll) return;
+    if (span[1] >= S.scrollX && span[0] <= S.scrollX + v.trackW) return;
+    S.scrollX = (span[0] + span[1]) / 2 - v.trackW / 2;
+    clampScroll(v);
   }
 
   /* Which slot a moment on the recording belongs to. Deviations carry a time,
