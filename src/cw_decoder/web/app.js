@@ -93,11 +93,17 @@
     var timing = RC.targetTiming(S.charWpm, S.farnsWpm);
     var actual = RC.buildTimeline(P.segments, timing);
     var ideal = RC.idealTimeline(S.expected, timing);
+    // Retarget from the pairing, so every panel below grades each gap as the
+    // intended text says it should be rather than as its length read. With no
+    // intended text the ideal is empty, nothing pairs, and every gap keeps the
+    // class its duration implied.
+    var slots = RC.pair(actual, ideal);
+    RC.retarget(slots);
     M = {
       timing: timing,
       actual: actual,
       ideal: ideal,
-      slots: RC.pair(actual, ideal),
+      slots: slots,
       grade: RC.grade(actual, S.tolerance),
       compare: RC.compare(S.expected, actual.text)
     };
@@ -526,14 +532,17 @@
     if (!gap || w <= 0) return;
     var y = yTop + (ROW_H - MARK_H) / 2;
     var grade = isTarget ? "none" : gradeOf(gap.units, gap.targetUnits);
-    var color = gap.kind === "pause" ? C["ink-faint"]
+    // targetKind, not kind: a long silence the intended text says is a real
+    // word gap is being graded, so it must not be dimmed as a rest.
+    var isPause = gap.targetKind === "pause";
+    var color = isPause ? C["ink-faint"]
               : isTarget ? C.tgt
               : grade === "warn" ? C.warn : grade === "bad" ? C.bad : C.you;
 
     // The gap itself is drawn as a bracketed void — it's absence of tone, and
     // shading it like a mark would read as keying.
     ctx.strokeStyle = color;
-    ctx.globalAlpha = gap.kind === "pause" ? 0.5 : 0.8;
+    ctx.globalAlpha = isPause ? 0.5 : 0.8;
     ctx.lineWidth = 1;
     var mid = y + MARK_H / 2;
     ctx.beginPath();
@@ -545,8 +554,8 @@
 
     // Label char/word gaps and pauses; element gaps are self-evident.
     if (gap.kind === "element-gap" || w < 22) return;
-    var label = gap.kind === "pause" ? "pause " + gap.units.toFixed(0) + "u"
-                                     : fmtU(gap.units);
+    var label = isPause ? "pause " + gap.units.toFixed(0) + "u"
+                        : fmtU(gap.units);
     ctx.font = "10px " + css("--mono");
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -1395,13 +1404,16 @@
     if (b !== S.hover) { S.hover = b; draw(); }
     if (!h) { tip.hidden = true; return; }
     var ms = b.units * M.timing.unitSec * 1000;
-    var lines = ["<b>" + esc(h.char.char) + "</b> — " + MS[b.kind],
+    // Name the class it's graded as, so the target figure below makes sense,
+    // and say what the decoder actually read when the two disagree.
+    var lines = ["<b>" + esc(h.char.char) + "</b> — " + MS[b.targetKind],
                  ms.toFixed(0) + " ms / " + b.units.toFixed(2) + "u"];
     if (b.targetUnits > 0 && h.row === "you") {
       var pct = (b.units / b.targetUnits - 1) * 100;
       lines.push("target " + b.targetUnits.toFixed(2) + "u (" +
                  (pct >= 0 ? "+" : "") + pct.toFixed(0) + "%)");
     }
+    if (b.targetKind !== b.kind) lines.push("read as " + MS[b.kind]);
     if (h.row === "you") lines.push("at " + b.t0.toFixed(2) + "s");
     tip.innerHTML = lines.join("<br>");
     tip.hidden = false;

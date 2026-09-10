@@ -768,7 +768,8 @@ def main(argv=None) -> int:
                                    bandwidth=args.bandwidth,
                                    target_wpm=args.target_wpm,
                                    target_farnsworth=args.target_farnsworth,
-                                   tolerance=tol, keep_signal=web)
+                                   tolerance=tol, keep_signal=web,
+                                   expected=expected)
         except KeyboardInterrupt:
             # Ctrl-C means abandon the take — don't decode it, don't grade it,
             # don't open a review page for it. Enter is the "I'm done" key.
@@ -802,18 +803,20 @@ def main(argv=None) -> int:
             farnsworth_wpm=args.demo_farnsworth, tone=args.tone or 600.0,
             rate=args.rate, noise=args.demo_noise,
         )
+        # For a demo, compare against the demo text unless a file was supplied.
+        # Resolved before decoding so the spacing is graded against it too.
+        if expected is not None:
+            cmp_target, cmp_source = expected, expected_source
+        else:
+            cmp_target, cmp_source = args.demo, "--demo text"
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tf:
             synth.write_wav(tf.name, sig, args.rate)
             res = core.decode_file(tf.name, tone=args.tone, target_rate=args.rate,
                                    bandwidth=args.bandwidth,
                                    target_wpm=args.target_wpm,
                                    target_farnsworth=args.target_farnsworth,
-                                   tolerance=tol, keep_signal=web)
-        # For a demo, compare against the demo text unless a file was supplied.
-        if expected is not None:
-            cmp_target, cmp_source = expected, expected_source
-        else:
-            cmp_target, cmp_source = args.demo, "--demo text"
+                                   tolerance=tol, keep_signal=web,
+                                   expected=cmp_target)
         comparison = core.compare_text(cmp_target, res.text)
         if args.json:
             print(json.dumps(_build_report(res, comparison, cmp_source), indent=2))
@@ -847,7 +850,8 @@ def main(argv=None) -> int:
                                target_rate=args.rate, bandwidth=args.bandwidth,
                                target_wpm=args.target_wpm,
                                target_farnsworth=args.target_farnsworth,
-                               tolerance=tol, keep_signal=web)
+                               tolerance=tol, keep_signal=web,
+                               expected=expected)
     except (RuntimeError, FileNotFoundError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

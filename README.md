@@ -149,6 +149,15 @@ Note: if your sending doesn't match the target, decoding against it will
 **over-segment** (loose character spacing splits letters apart, e.g. `R O B`) —
 that's the point, it shows where you drifted. Drop `-w/-f` for a clean read.
 
+**Add `-e` when you can.** On its own, the grader has to guess what each silence
+was *meant* to be from how long it lasted, and if your spacing is loose that
+guess goes wrong in a way that flatters you: letter gaps get read as word gaps
+and average out to a passing word-gap score, while the character-gap row
+disappears from the report entirely. Worse, a badly overlong word gap can pass
+the pause floor and be written off as a rest — hiding the largest error in the
+recording. Tell it the intended message and every gap is graded as the class the
+text calls for, whatever it measured.
+
 ---
 
 ## Compare against the intended text
@@ -194,6 +203,10 @@ shows which text it compared against.
 - Comparison is case-insensitive and understands prosigns (`<BK>` is one symbol).
 - Alignment is true minimal-edit (Levenshtein), so repeated text (a call sent
   several times) localizes errors correctly instead of smearing them.
+- The same alignment feeds the **timing** grade: where a decoded character pairs
+  with an intended one, the gap before it is graded as the class the intended
+  text calls for rather than the one its duration read as. See the note under
+  the practice report above for why that matters.
 
 `-w`/`-f`, `-T`, and `-e` combine freely — e.g. grade timing *and* score accuracy
 at once:

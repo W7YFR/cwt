@@ -53,8 +53,10 @@
     };
   }
 
+  // `kind` is what the decoder read from the duration; `targetKind` is what the
+  // gap was meant to be. They only differ after retarget() — see core.Block.
   function block(t0, t1, kind, units, targetUnits, context) {
-    return { t0: t0, t1: t1, kind: kind, units: units,
+    return { t0: t0, t1: t1, kind: kind, targetKind: kind, units: units,
              targetUnits: targetUnits, context: context || "" };
   }
 
@@ -136,7 +138,8 @@
 
   function idealTimeline(text, timing) {
     var u = timing.unitSec;
-    var charGap = timing.charGapSec, wordGap = timing.wordGapSec;
+    var charGap = timing.charGapSec || 3 * u;
+    var wordGap = timing.wordGapSec || 7 * u;
     var chars = [], blocks = [], t = 0.0;
     var words = String(text || "").toUpperCase().trim().split(/\s+/)
                   .filter(function (w) { return w.length > 0; });
@@ -174,17 +177,21 @@
   }
 
   // --- core.analyze -------------------------------------------------------- //
+  // Every verdict reads targetKind/targetUnits, never kind: what a gap was
+  // meant to be is what it gets graded as.
   function grade(timeline, tolerance) {
     var nPauses = 0, graded = [];
     timeline.blocks.forEach(function (b) {
-      if (b.kind === "pause") nPauses++;
+      if (b.targetKind === "pause") nPauses++;
       if (b.targetUnits > 0) graded.push(b);
     });
 
     var groups = {};
     graded.forEach(function (b) {
-      if (!groups[b.kind]) groups[b.kind] = { vals: [], target: b.targetUnits };
-      groups[b.kind].vals.push(b.units);
+      if (!groups[b.targetKind]) {
+        groups[b.targetKind] = { vals: [], target: b.targetUnits };
+      }
+      groups[b.targetKind].vals.push(b.units);
     });
 
     var stats = [];
@@ -208,7 +215,7 @@
       // Flag a deviation only if it's both proportionally and absolutely off,
       // so 1-unit elements aren't flagged for tiny wobble.
       else if (abs >= 0.4) {
-        devs.push({ timeSec: b.t0, kind: b.kind, valueUnits: b.units,
+        devs.push({ timeSec: b.t0, kind: b.targetKind, valueUnits: b.units,
                     targetUnits: b.targetUnits, context: b.context });
       }
     });
@@ -344,6 +351,33 @@
     return slots;
   }
 
+  // --- core.retarget ------------------------------------------------------- //
+  // buildTimeline has to guess a gap's class from its duration. Once the
+  // intended text is known that guess is obsolete: where the alignment pairs a
+  // decoded character with an intended one, the intended lead gap says what the
+  // silence before it was supposed to be, whatever it measured. Without this,
+  // wide letter gaps get graded as word gaps (and average out to a flattering
+  // score), and an over-long word gap trips the pause floor and drops out of
+  // grading entirely — hiding the worst error in the recording.
+  //
+  // Only gaps move, and only targetKind/targetUnits: `kind` keeps reporting
+  // what was read, because the decoded text, the word-boundary diff and pair()'s
+  // own token stream all derive from it. That's what makes this safe to run on
+  // a pairing — it can't invalidate the slots it was handed. Returns how many
+  // gaps changed class.
+  function retarget(slots) {
+    var moved = 0;
+    slots.forEach(function (slot) {
+      if (!slot.actual || !slot.ideal) return;
+      var got = slot.actual.leadGap, want = slot.ideal.leadGap;
+      if (!got || !want) return;
+      if (got.targetKind !== want.kind) moved++;
+      got.targetKind = want.kind;
+      got.targetUnits = want.targetUnits;
+    });
+    return moved;
+  }
+
   var api = {
     PAUSE_FACTOR: PAUSE_FACTOR,
     CLASS_ORDER: CLASS_ORDER,
@@ -356,7 +390,8 @@
     tokenize: tokenize,
     align: align,
     compare: compare,
-    pair: pair
+    pair: pair,
+    retarget: retarget
   };
 
   root.ReviewCore = api;

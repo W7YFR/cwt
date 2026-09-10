@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.signal import butter, filtfilt, hilbert
 
-from .morse import decode_pattern
+from .morse import CHAR_TO_MORSE, decode_pattern
 
 TARGET_RATE = 8000  # Hz; plenty for a sub-1 kHz CW tone.
 
@@ -499,10 +499,19 @@ class Block:
     """One keyed mark or one gap, located in absolute time.
 
     `units` is the measured duration expressed in the reference timing's dit
-    units; `target_units` is what a machine sender would have produced. A
-    `pause` (an inter-transmission silence, far longer than a word gap) has no
+    units; `target_units` is what a machine sender would have produced.
+
+    `kind` is what the decoder *read* — it is inferred from duration alone, so a
+    Farnsworth-spaced letter gap sent against a tighter target reads as a word
+    gap. `target_kind` is what the gap was *meant* to be. Without an intended
+    message the two are identical; `retarget` sets them apart once the intended
+    text says which class each gap belongs to. Grading always uses
+    `target_kind`/`target_units`; the decode and the word-boundary diff always
+    use `kind`, since that is genuinely what came off the air.
+
+    A `pause` (an inter-transmission silence, far longer than a word gap) has no
     meaningful target, so its `target_units` is 0 and it is excluded from
-    grading.
+    grading — unless the intended text places a real gap there.
     """
     t0: float
     t1: float
@@ -510,6 +519,11 @@ class Block:
     units: float
     target_units: float
     context: str = ""               # decoded text preceding a char/word gap
+    target_kind: str = ""           # class graded against; defaults to `kind`
+
+    def __post_init__(self) -> None:
+        if not self.target_kind:
+            self.target_kind = self.kind
 
 
 @dataclass
@@ -529,6 +543,7 @@ class Timeline:
     text: str
     chars: list                     # list[Char]
     blocks: list                    # list[Block], every block in time order
+    duration: float = 0.0           # keyed span; set for synthesized ideals
 
 
 @dataclass
@@ -720,6 +735,167 @@ def decode_segments(segs, timing: Timing) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# The intended message as a timeline, and pairing it against a decode
+# --------------------------------------------------------------------------- #
+def _keyable_symbols(word: str) -> list:
+    """Split a word into keyable symbols, treating <XX> as one prosign."""
+    return [t for t in _SYMBOL.findall(word) if t in CHAR_TO_MORSE]
+
+
+def ideal_timeline(text: str, timing: Timing) -> Timeline:
+    """Render `text` as the timeline a machine sender would have keyed.
+
+    Same shape as a decoded Timeline, laid out the way `synth.generate` builds
+    its on/off list, so "perfect" here is exactly what the synthesizer would
+    produce at `timing`. Every block's `units` equals its `target_units`.
+    """
+    u = timing.unit_sec
+    char_gap = timing.char_gap_sec or 3 * u
+    word_gap = timing.word_gap_sec or 7 * u
+
+    chars, blocks, t = [], [], 0.0
+    words = [w for w in text.upper().split() if w]
+
+    for wi, word in enumerate(words):
+        lead = None
+        if wi > 0:
+            lead = Block(t, t + word_gap, "word-gap", word_gap / u,
+                         word_gap / u)
+            blocks.append(lead)
+            t += word_gap
+        for li, ch in enumerate(_keyable_symbols(word)):
+            if li > 0:
+                lead = Block(t, t + char_gap, "char-gap", char_gap / u,
+                             char_gap / u)
+                blocks.append(lead)
+                t += char_gap
+            pattern = CHAR_TO_MORSE[ch]
+            pending, c0 = [], t
+            for ei, el in enumerate(pattern):
+                if ei > 0:
+                    gap = Block(t, t + u, "element-gap", 1.0, 1.0)
+                    pending.append(gap)
+                    blocks.append(gap)
+                    t += u
+                is_dit = el == "."
+                dur = u if is_dit else 3 * u
+                mark = Block(t, t + dur, "dit" if is_dit else "dah",
+                             1.0 if is_dit else 3.0, 1.0 if is_dit else 3.0)
+                pending.append(mark)
+                blocks.append(mark)
+                t += dur
+            chars.append(Char(char=ch, pattern=pattern, t0=c0, t1=t,
+                              blocks=pending, lead_gap=lead))
+            lead = None
+
+    return Timeline(text=" ".join(words), chars=chars, blocks=blocks,
+                    duration=t)
+
+
+@dataclass
+class Slot:
+    """One aligned position between a decode and the intended message."""
+    op: str                      # equal|sub|del|ins for the characters
+    actual: "Char | None"
+    ideal: "Char | None"
+    space_op: "str | None" = None  # equal|ins|del for the word boundary before
+
+
+def _token_stream(tl: Timeline) -> list:
+    """Characters plus explicit word-boundary tokens, the stream `compare_text`
+    aligns on, so pairing and the accuracy figure never disagree."""
+    out = []
+    for c in tl.chars:
+        g = c.lead_gap
+        if g is not None and g.kind in ("word-gap", "pause"):
+            out.append((" ", None))
+        out.append((c.char, c))
+    return out
+
+
+def pair(actual: Timeline, ideal: Timeline) -> list:
+    """Align a decode against the intended message, character by character.
+
+    Each space op is folded onto the character that follows it, so a
+    word-boundary error is visible twice: as the slot's `space_op`, and as that
+    slot's own gap being the wrong length.
+    """
+    a_items, b_items = _token_stream(actual), _token_stream(ideal)
+    ops = _align([tok for tok, _ in b_items],       # expected
+                 [tok for tok, _ in a_items])       # got
+
+    slots, ai, bi, pending_space = [], 0, 0, None
+    for op, e, g in ops:
+        ideal_item = b_items[bi] if e is not None else None
+        bi += 1 if e is not None else 0
+        actual_item = a_items[ai] if g is not None else None
+        ai += 1 if g is not None else 0
+        # A space token carries no character; it only reports whether the word
+        # boundary landed where it should, which we hang on the next character.
+        if ideal_item is not None and ideal_item[1] is None:
+            pending_space = op if (actual_item is not None
+                                   and actual_item[1] is None) else "del"
+            ideal_item = None
+        if actual_item is not None and actual_item[1] is None:
+            if pending_space is None:
+                pending_space = "ins"
+            actual_item = None
+        if ideal_item is None and actual_item is None:
+            continue
+        # A space aligned against a character leaves one side empty, so the
+        # character's own verdict is no longer `op` — it's an extra or a miss.
+        if ideal_item is None:
+            op = "ins"
+        elif actual_item is None:
+            op = "del"
+        slots.append(Slot(op=op,
+                          actual=actual_item[1] if actual_item else None,
+                          ideal=ideal_item[1] if ideal_item else None,
+                          space_op=pending_space))
+        pending_space = None
+    return slots
+
+
+def retarget(slots: list) -> int:
+    """Re-target each decoded gap from the intended message, in place.
+
+    `build_timeline` has to guess a gap's class from its duration, which is the
+    only information it has. Once the intended text is known that guess is
+    obsolete: if the alignment pairs a decoded character with an intended one,
+    the intended character's lead gap says what the silence before it was
+    *supposed* to be, whatever it measured. That fixes two failure modes:
+
+      * Farnsworth-ish letter gaps that overshoot the target's char/word split
+        get graded as word gaps and average out to a flattering score, while the
+        character-gap row vanishes from the report entirely.
+      * A genuinely over-long word gap trips the pause floor, is written off as
+        an inter-transmission rest, and drops out of grading altogether — hiding
+        the single worst spacing error in the recording.
+
+    Only gaps move. Marks keep the target their own class implies, since a
+    mis-decoded character says nothing reliable about what its elements meant.
+    And only `target_kind`/`target_units` move: `kind` must go on reporting what
+    the decoder read, because the decoded text, the word-boundary diff, and
+    `pair`'s own token stream are all derived from it. That's what keeps this
+    safe to run after pairing — it cannot invalidate the pairing it was handed.
+
+    Returns the number of gaps whose class changed.
+    """
+    moved = 0
+    for slot in slots:
+        if slot.actual is None or slot.ideal is None:
+            continue
+        got, want = slot.actual.lead_gap, slot.ideal.lead_gap
+        if got is None or want is None:
+            continue
+        if got.target_kind != want.kind:
+            moved += 1
+        got.target_kind = want.kind
+        got.target_units = want.target_units
+    return moved
+
+
+# --------------------------------------------------------------------------- #
 # Analysis against a target
 # --------------------------------------------------------------------------- #
 @dataclass
@@ -759,16 +935,20 @@ def analyze(timeline: Timeline, ref: Timing, measured: Timing,
     """Grade the keying in `timeline` against the ideal `ref` timing.
 
     `timeline` must have been built against `ref` (that's what makes its
-    `units`/`target_units` comparable). Blocks classified as intentional pauses
-    — the sender resting between repetitions or transmissions — carry no target
+    `units`/`target_units` comparable), and should already have been through
+    `retarget` if the intended message is known. Every verdict here reads
+    `target_kind`/`target_units`, never `kind`: what a gap was meant to be is
+    what it should be graded as. Blocks still classified as intentional pauses —
+    the sender resting between repetitions or transmissions — carry no target
     and are counted separately rather than graded as spacing errors.
     """
-    n_pauses = sum(1 for b in timeline.blocks if b.kind == "pause")
+    n_pauses = sum(1 for b in timeline.blocks if b.target_kind == "pause")
     graded = [b for b in timeline.blocks if b.target_units > 0]
 
     groups = {}
     for b in graded:
-        g = groups.setdefault(b.kind, {"vals": [], "target": b.target_units})
+        g = groups.setdefault(b.target_kind,
+                              {"vals": [], "target": b.target_units})
         g["vals"].append(b.units)
 
     stats = []
@@ -786,7 +966,7 @@ def analyze(timeline: Timeline, ref: Timing, measured: Timing,
         # Flag a deviation only if it's both proportionally and absolutely off,
         # so 1-unit elements aren't flagged for tiny wobble.
         elif abs(b.units - b.target_units) >= 0.4:
-            devs.append(Deviation(b.t0, b.kind, b.units, b.target_units,
+            devs.append(Deviation(b.t0, b.target_kind, b.units, b.target_units,
                                   b.context))
 
     devs.sort(key=lambda d: abs(d.value_units - d.target_units) / d.target_units,
@@ -836,7 +1016,14 @@ def decode_file(path: str, tone: float | None = None,
                 target_wpm: float | None = None,
                 target_farnsworth: float | None = None,
                 tolerance: float = 0.30,
-                keep_signal: bool = False) -> Result:
+                keep_signal: bool = False,
+                expected: str | None = None) -> Result:
+    """Decode `path`, and grade it if `target_wpm` is given.
+
+    `expected` is the intended message. It changes nothing about the decode —
+    only what the spacing is graded against, via `retarget`: gap classes come
+    from the text the sender meant to send rather than from a duration guess.
+    """
     sig = load_audio(path, target_rate)
     tone_hz = tone if tone is not None else detect_tone(sig, target_rate)
     env = envelope(sig, target_rate, tone_hz, bw=bandwidth)
@@ -858,6 +1045,8 @@ def decode_file(path: str, tone: float | None = None,
         # Decode against the target's ideal timing and grade the sending.
         ref = target_timing(target_wpm, target_farnsworth)
         timeline = build_timeline(segs, ref)
+        if expected and expected.strip():
+            retarget(pair(timeline, ideal_timeline(expected, ref)))
         analysis = analyze(timeline, ref, measured, tolerance=tolerance)
     else:
         timeline = build_timeline(segs, measured)

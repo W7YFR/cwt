@@ -25,7 +25,7 @@ node = pytest.mark.skipif(shutil.which("node") is None,
 
 
 def _decode(text="CQ CQ DE W7YFR K", wpm=22, farns=None, rate=8000,
-            target_wpm=None, target_farns=None, noise=0.0):
+            target_wpm=None, target_farns=None, noise=0.0, expected=None):
     sig = synth.generate(text, wpm=wpm, farnsworth_wpm=farns, tone=600,
                          rate=rate, noise=noise)
     with tempfile.NamedTemporaryFile(suffix=".wav") as tf:
@@ -33,7 +33,7 @@ def _decode(text="CQ CQ DE W7YFR K", wpm=22, farns=None, rate=8000,
         return core.decode_file(tf.name, target_rate=rate,
                                 target_wpm=target_wpm,
                                 target_farnsworth=target_farns,
-                                keep_signal=True)
+                                keep_signal=True, expected=expected)
 
 
 def _flat(rows) -> list:
@@ -71,13 +71,19 @@ def _run_js(script: str, payload: dict) -> dict:
 def test_js_grading_matches_python(text, wpm, farns, tgt_wpm, tgt_farns):
     """review-core.js and core.py must produce the same timeline and grades."""
     res = _decode(text, wpm=wpm, farns=farns,
-                  target_wpm=tgt_wpm, target_farns=tgt_farns)
-    payload = review.build_payload(res, source="test", tolerance=0.30)
+                  target_wpm=tgt_wpm, target_farns=tgt_farns, expected=text)
+    payload = review.build_payload(res, source="test", expected=text,
+                                   tolerance=0.30)
 
     got = _run_js("""
       const t = RC.targetTiming(PAYLOAD.target.char_wpm,
                                 PAYLOAD.target.farnsworth_wpm);
       const tl = RC.buildTimeline(PAYLOAD.segments, t);
+      // Same order the page uses: pair the classified timeline, then let the
+      // intended text re-target the gaps before grading.
+      const ideal = RC.idealTimeline(PAYLOAD.expected, t);
+      const slots = RC.pair(tl, ideal);
+      const moved = RC.retarget(slots);
       const g = RC.grade(tl, PAYLOAD.tolerance);
       console.log(JSON.stringify({
         timing: [t.unitSec, t.ditDahSplit, t.elementCharSplit,
@@ -86,7 +92,14 @@ def test_js_grading_matches_python(text, wpm, farns, tgt_wpm, tgt_farns):
         kinds: tl.blocks.map(b => b.kind),
         units: tl.blocks.map(b => b.units),
         targets: tl.blocks.map(b => b.targetUnits),
+        targetKinds: tl.blocks.map(b => b.targetKind),
         chars: tl.chars.map(c => c.char + ':' + c.pattern),
+        idealText: ideal.text,
+        idealDuration: ideal.duration,
+        idealBlocks: ideal.blocks.map(b => b.kind + ':' + b.units.toFixed(6)),
+        slots: slots.map(s => [s.op, s.actual ? s.actual.char : null,
+                               s.ideal ? s.ideal.char : null, s.spaceOp]),
+        moved: moved,
         stats: g.stats.map(s => [s.name, s.n, s.meanUnits, s.stdUnits,
                                  s.targetUnits]),
         devs: g.deviations.map(d => [d.kind, d.valueUnits, d.targetUnits,
@@ -101,6 +114,9 @@ def test_js_grading_matches_python(text, wpm, farns, tgt_wpm, tgt_farns):
                              payload["target"]["farnsworth_wpm"])
     segs = [(s, d) for s, d in payload["segments"]]
     tl = core.build_timeline(segs, ref)
+    ideal = core.ideal_timeline(payload["expected"], ref)
+    slots = core.pair(tl, ideal)
+    moved = core.retarget(slots)
     a = core.analyze(tl, ref, res.timing, tolerance=payload["tolerance"])
 
     assert got["timing"] == pytest.approx(
@@ -111,7 +127,17 @@ def test_js_grading_matches_python(text, wpm, farns, tgt_wpm, tgt_farns):
     assert got["units"] == pytest.approx([b.units for b in tl.blocks], abs=1e-9)
     assert got["targets"] == pytest.approx([b.target_units for b in tl.blocks],
                                            abs=1e-9)
+    assert got["targetKinds"] == [b.target_kind for b in tl.blocks]
     assert got["chars"] == [f"{c.char}:{c.pattern}" for c in tl.chars]
+    # The intended message, and the alignment that re-targeted the gaps.
+    assert got["idealText"] == ideal.text
+    assert got["idealDuration"] == pytest.approx(ideal.duration, abs=1e-9)
+    assert got["idealBlocks"] == [f"{b.kind}:{b.units:.6f}"
+                                  for b in ideal.blocks]
+    assert got["slots"] == [
+        [s.op, s.actual.char if s.actual else None,
+         s.ideal.char if s.ideal else None, s.space_op] for s in slots]
+    assert got["moved"] == moved
     assert got["pauses"] == a.n_pauses
     assert got["within"] == pytest.approx(a.within_tol_frac, abs=1e-9)
     # Compare labels/counts exactly and the statistics numerically
@@ -219,6 +245,69 @@ def test_js_pair_aligns_characters_and_flags_word_errors():
     # missing on the character that should have started the new word.
     assert [s[1] for s in got["noSpace"]] == ["C", "Q", "D", "E"]
     assert got["noSpace"][2][3] == "del"
+
+
+def _wide_spacing_payload(text="CQ TEST DE K1ABC"):
+    """A payload whose gap classes the duration classifier gets wrong.
+
+    Sent with Farnsworth spacing against a straight 25 wpm target, so every
+    letter gap reads as a word gap and every word gap reads as a pause — the
+    shape that made the deviations table disagree with the graph.
+    """
+    res = _decode(text, wpm=25, farns=13, target_wpm=25, target_farns=25,
+                  expected=text)
+    return review.build_payload(res, source="test", expected=text,
+                                tolerance=0.30)
+
+
+@node
+def test_js_deviation_targets_match_the_target_lane():
+    """The two panels must not disagree: one gap, one target.
+
+    The deviations table and the graph's TGT lane used to read from different
+    places — the duration classifier's guess and the intended text respectively
+    — so a letter gap could be listed against a 7u target while the lane above
+    it was drawn against 3u.
+    """
+    got = _run_js("""
+      const t = RC.targetTiming(PAYLOAD.target.char_wpm,
+                                PAYLOAD.target.farnsworth_wpm);
+      const tl = RC.buildTimeline(PAYLOAD.segments, t);
+      const ideal = RC.idealTimeline(PAYLOAD.expected, t);
+      const slots = RC.pair(tl, ideal);
+      RC.retarget(slots);
+      const g = RC.grade(tl, PAYLOAD.tolerance);
+      // What the graph draws for each paired gap, keyed by the time the
+      // deviations table prints, so the two can be compared directly.
+      const lane = {};
+      for (const s of slots) {
+        if (!s.actual || !s.actual.leadGap || !s.ideal || !s.ideal.leadGap) {
+          continue;
+        }
+        lane[s.actual.leadGap.t0.toFixed(6)] = s.ideal.leadGap.units;
+      }
+      console.log(JSON.stringify({
+        lane: lane,
+        devs: g.deviations.map(d => [d.timeSec.toFixed(6), d.kind,
+                                     d.valueUnits, d.targetUnits]),
+        // Word-boundary errors still reported: retarget() leaves `kind`
+        // alone, so the token stream still shows the spaces the decoder read.
+        spaceOps: slots.filter(s => s.spaceOp).map(s => s.spaceOp),
+        pauses: g.nPauses,
+        classes: g.stats.map(s => s.name),
+      }));
+    """, _wide_spacing_payload())
+
+    assert got["devs"], "wide spacing should produce deviations"
+    for at, kind, value, target in got["devs"]:
+        assert at in got["lane"], f"deviation at {at}s is not a paired gap"
+        assert target == pytest.approx(got["lane"][at], abs=1e-9), (
+            f"{kind} at {at}s graded against {target}u but the target lane "
+            f"draws {got['lane'][at]}u")
+    # Both gap classes are present, and nothing was written off as a rest.
+    assert "char-gap" in got["classes"] and "word-gap" in got["classes"]
+    assert got["pauses"] == 0
+    assert got["spaceOps"]
 
 
 # --------------------------------------------------------------------------- #

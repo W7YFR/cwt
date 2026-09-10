@@ -503,6 +503,123 @@ def test_timeline_flags_long_silence_as_pause():
     assert all(s.name != "pause" for s in a.stats)
 
 
+# --------------------------------------------------------------------------- #
+# Grading against the intended message, not against a duration guess
+# --------------------------------------------------------------------------- #
+def _wide_spacing(text="CQ TEST DE K1ABC", **kw):
+    """Send `text` with Farnsworth spacing but grade it at a tight target.
+
+    The classifier only sees durations, so every letter gap overshoots the
+    target's char/word split and reads as a word gap, and the real word gaps
+    overshoot the pause floor. This is the shape of a real session: a keyer at
+    25 wpm with the spacing wound out, graded against a straight 25.
+    """
+    sig = synth.generate(text, wpm=25, farnsworth_wpm=13, tone=600, rate=8000)
+    with tempfile.NamedTemporaryFile(suffix=".wav") as tf:
+        synth.write_wav(tf.name, sig, 8000)
+        return core.decode_file(tf.name, target_wpm=25, target_farnsworth=25,
+                                **kw)
+
+
+def test_wide_letter_gaps_are_misread_without_the_intended_text():
+    """The starting point: with nothing to align against, the report flatters."""
+    a = _wide_spacing().analysis
+    kinds = {s.name: s for s in a.stats}
+    # Every letter gap landed in the word-gap bucket, so there is no
+    # character-gap row at all and the word-gap row is 9 letter gaps deep.
+    assert "char-gap" not in kinds
+    assert kinds["word-gap"].n == 9
+    # And the three real word gaps were written off as inter-transmission rests.
+    assert a.n_pauses == 3
+    assert not any(d.value_units > 20 for d in a.deviations)
+
+
+def test_intended_text_regrades_gaps_by_what_they_meant():
+    res = _wide_spacing(expected="CQ TEST DE K1ABC")
+    a = res.analysis
+    kinds = {s.name: s for s in a.stats}
+    # The letter gaps are now graded as letter gaps — badly, which is the point.
+    assert kinds["char-gap"].n == 9
+    assert kinds["char-gap"].target_units == pytest.approx(3.0)
+    assert kinds["char-gap"].mean_units > 9        # ~10.4u against a 3u target
+    # The word gaps are graded instead of discarded, and they are the worst
+    # errors in the recording — exactly what was invisible before.
+    assert kinds["word-gap"].n == 3
+    assert kinds["word-gap"].target_units == pytest.approx(7.0)
+    assert a.n_pauses == 0
+    moved = [b for b in res.timeline.blocks if b.target_kind != b.kind]
+    assert len(moved) == 12                        # 9 letter gaps + 3 word gaps
+    assert max(d.value_units for d in a.deviations) > 20
+    # Marks are untouched: a mis-decoded character says nothing about what its
+    # own elements were meant to be.
+    assert kinds["dit"].target_units == 1.0
+    assert kinds["dah"].target_units == 3.0
+
+
+def test_retarget_leaves_the_decode_and_the_word_breaks_alone():
+    """Grading changes; what the decoder read does not."""
+    naive = _wide_spacing()
+    fixed = _wide_spacing(expected="CQ TEST DE K1ABC")
+    assert fixed.text == naive.text                # still the honest decode
+    tl = fixed.timeline
+    # `kind` still reports what came off the air, so the accuracy diff can
+    # keep showing the word-boundary errors.
+    assert [b.kind for b in tl.blocks] == [b.kind for b in naive.timeline.blocks]
+    assert any(b.kind == "pause" and b.target_kind == "word-gap"
+               for b in tl.blocks)
+
+
+def test_retarget_is_a_no_op_when_the_sending_is_already_clean():
+    sig = synth.generate("CQ DE W7YFR K", wpm=20, tone=600, rate=8000)
+    with tempfile.NamedTemporaryFile(suffix=".wav") as tf:
+        synth.write_wav(tf.name, sig, 8000)
+        res = core.decode_file(tf.name, target_wpm=20, target_farnsworth=20,
+                               expected="CQ DE W7YFR K")
+    assert res.text.strip() == "CQ DE W7YFR K"
+    assert all(b.target_kind == b.kind for b in res.timeline.blocks)
+
+
+def test_retarget_skips_characters_with_no_counterpart():
+    """An extra character can't say what its lead gap was meant to be."""
+    timing = core.target_timing(20)
+    u = timing.unit_sec
+    # E, wide gap, N, wide gap, T -- against an intended "EN", so the trailing
+    # T is an insertion with nothing to align its lead gap against.
+    wide = 6 * u
+    segs = [(0, 0.1), (1, u),                          # E
+            (0, wide), (1, 3 * u), (0, u), (1, u),     # N
+            (0, wide), (1, 3 * u), (0, 0.1)]           # T
+    tl = core.build_timeline(segs, timing)
+    assert tl.text == "E N T"
+    assert [b.kind for b in tl.blocks] == ["dit", "word-gap", "dah",
+                                           "element-gap", "dit", "word-gap",
+                                           "dah"]
+    moved = core.retarget(core.pair(tl, core.ideal_timeline("EN", timing)))
+    assert moved == 1
+    assert tl.blocks[1].target_kind == "char-gap"   # E->N aligned, so retargeted
+    assert tl.blocks[5].target_kind == "word-gap"   # T unaligned, left as read
+
+
+def test_ideal_timeline_is_the_keying_synth_would_have_produced():
+    timing = core.target_timing(25, 13)
+    tl = core.ideal_timeline("cq de w7yfr <ar> k", timing)
+    assert tl.text == "CQ DE W7YFR <AR> K"
+    assert [c.char for c in tl.chars][:4] == ["C", "Q", "D", "E"]
+    # Perfect by construction, and it grades as such.
+    assert all(b.units == b.target_units for b in tl.blocks)
+    a = core.analyze(tl, timing, timing, tolerance=0.01)
+    assert a.within_tol_frac == 1.0
+    assert a.deviations == []
+    # Farnsworth spacing, laid out the way synth.generate lays out its on/off
+    # list: gaps stretch, elements do not.
+    gaps = {b.kind: b.units for b in tl.blocks}
+    assert gaps["dit"] == 1.0 and gaps["dah"] == 3.0
+    assert gaps["char-gap"] == pytest.approx(timing.char_gap_sec
+                                             / timing.unit_sec)
+    assert gaps["char-gap"] > 3.0                   # wound out by Farnsworth
+    assert tl.duration == pytest.approx(tl.blocks[-1].t1)
+
+
 def test_prosign_collision_policy():
     # Pattern map: <AR> wins over "+", but "=" wins over <BT>.
     from cw_decoder.morse import decode_pattern
