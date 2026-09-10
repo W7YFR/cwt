@@ -70,7 +70,8 @@ function ctx2d() {
       // tx === 0 marks the un-translated passes: the left gutter and the
       // scrollbar. Content is always drawn translated.
       calls.textAt.push([String(t), Math.round(x + tx), Math.round(y),
-                         this.textAlign, String(t).length * 6, tx === 0]);
+                         this.textAlign, String(t).length * 6, tx === 0,
+                         this.fillStyle]);
     },
     measureText: function (t) { return { width: String(t).length * 6 }; },
     set font(v) {}, get font() { return ""; },
@@ -322,7 +323,8 @@ const STUB_COLORS = {
   "--ink": "#111111", "--ink-dim": "#222222", "--ink-faint": "#333333",
   "--line": "#444444", "--panel": "#555555", "--panel-2": "#666666",
   "--you": "#0000ff", "--tgt": "#00ff00", "--ok": "#00aa00",
-  "--warn": "#aaaa00", "--bad": "#ff0000", "--ghost": "#777777"
+  "--warn": "#aaaa00", "--bad": "#ff0000", "--ghost": "#777777",
+  "--rest": "#ff00ff"
 };
 global.getComputedStyle = () => ({
   getPropertyValue: (n) =>
@@ -644,6 +646,63 @@ async function exerciseDeviationPlay() {
   }
 }
 
+/* ---- the "collapse rests" toggle ---------------------------------------- //
+   Collapsed, a rest keeps out of the grading and takes a fixed sliver of the
+   chart; off, every silence is spacing, graded and drawn to scale. Recorded
+   per setting: the chart's width (the scrollbar thumb's share of the track
+   stands in for it), the gap labels drawn, and the deviation rows. */
+const restToggle = {};
+function measureRests(key) {
+  byId("view").value = "per-char";
+  fire(byId("view"), "change");
+  const zoom = (v) => { byId("zoom").value = String(v);
+                        fire(byId("zoom"), "input"); };
+  const home = () => fire(document, "keydown",
+    { key: "Home", code: "Home", target: {}, preventDefault: () => {} });
+
+  // Zoomed right out the whole chart fits the viewport, so every gap label is
+  // drawn — including the one over the rest, wherever it falls.
+  zoom(4);
+  home();
+  calls.textAt.length = 0;
+  zoom(4);
+  const restLabels = calls.textAt.filter(([t]) => /^Rest /.test(t));
+  const labels = [...new Set(restLabels.map((r) => r[0]))];
+  // A rest is not graded, so it must not be drawn in the graded palette.
+  const labelColors = [...new Set(restLabels.map((r) => r[6]))];
+
+  // At a readable zoom, scrolling to the far end pins the view at maxScroll,
+  // and content is translated by (gutter - scrollX) — so this reads out how
+  // much wider than the viewport the chart is, which is what collapsing does.
+  zoom(14);
+  home();
+  calls.translates.length = 0;
+  fire(document, "keydown",
+       { key: "End", code: "End", target: {}, preventDefault: () => {} });
+
+  const html = byId("report").innerHTML;
+  const re = /data-kind='([\w-]+)' title='hear yours'>([\d.]+)u/g;
+  const devs = [];
+  let m;
+  while ((m = re.exec(html)) !== null) devs.push([m[1], Number(m[2])]);
+  restToggle[key] = {
+    overflow: Math.round(-calls.translates[calls.translates.length - 1]),
+    restLabels: labels,
+    restColors: labelColors,
+    devs: devs,
+    worst: devs.length ? Math.max(...devs.map((d) => d[1])) : 0
+  };
+  restToggle.colors = STUB_COLORS;
+}
+function exerciseRestToggle() {
+  measureRests("collapsed");
+  byId("rests").checked = false;
+  fire(byId("rests"), "change");
+  measureRests("expanded");
+  byId("rests").checked = true;
+  fire(byId("rests"), "change");
+}
+
 // ---- downloads ----------------------------------------------------------- //
 // One of each per view, so the PNG export exercises all three renderers. The
 // target WAV renders through a promise, so this stretch has to be async — and
@@ -690,6 +749,7 @@ exerciseAB()
   .then(exerciseFollow)
   .then(exerciseDeviationHover)
   .then(exerciseDeviationPlay)
+  .then(exerciseRestToggle)
   .then(exerciseDownloads)
   .then(report)
   .catch((e) => { console.error(e.stack || String(e)); process.exit(1); });
@@ -751,6 +811,7 @@ console.log(JSON.stringify({
   abTest: abTest,
   devHover: devHover,
   devPlay: devPlay,
+  restToggle: restToggle,
   endReset: endReset,
   initial: initial,
   viewFills: viewFills,

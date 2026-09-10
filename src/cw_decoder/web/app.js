@@ -56,7 +56,7 @@
   var C = {};
   function readColors() {
     ["--ink", "--ink-dim", "--ink-faint", "--line", "--panel", "--panel-2",
-     "--you", "--tgt", "--ok", "--warn", "--bad", "--ghost"].forEach(
+     "--you", "--tgt", "--ok", "--warn", "--bad", "--ghost", "--rest"].forEach(
       function (n) { C[n.slice(2)] = css(n); });
   }
 
@@ -70,6 +70,11 @@
     // perfectly" and spacing grading still works.
     expected: P.expected || P.decoded,
     view: "per-char",
+    // Treat a silence past PAUSE_FACTOR word gaps as the sender resting: keep
+    // it out of the grading, and give it a fixed sliver of the chart instead of
+    // a width proportional to a silence nobody is being marked on. Off, every
+    // silence is spacing, graded and drawn to scale.
+    collapseRests: true,
     ppu: 14,               // pixels per dit unit — the single zoom knob
     // Playback gain in dB, applied at playback only — never baked into the
     // samples or the download. Starts at unity: the recording plays back at
@@ -94,7 +99,8 @@
   // ---- model ------------------------------------------------------------- //
   function recompute() {
     var timing = RC.targetTiming(S.charWpm, S.farnsWpm);
-    var actual = RC.buildTimeline(P.segments, timing);
+    var actual = RC.buildTimeline(P.segments, timing,
+                                  S.collapseRests ? RC.PAUSE_FACTOR : Infinity);
     var ideal = RC.idealTimeline(S.expected, timing);
     // Retarget from the pairing, so every panel below grades each gap as the
     // intended text says it should be rather than as its length read. With no
@@ -185,10 +191,8 @@
     if (S.view === "per-char") {
       var x = PAD_X;
       M.slots.forEach(function (slot) {
-        var yg = slot.actual && slot.actual.leadGap
-               ? slot.actual.leadGap.units * ppu : 0;
-        var tg = slot.ideal && slot.ideal.leadGap
-               ? slot.ideal.leadGap.units * ppu : 0;
+        var yg = gapWidth(slot.actual && slot.actual.leadGap);
+        var tg = gapWidth(slot.ideal && slot.ideal.leadGap);
         var gapW = Math.max(yg, tg);
         var bodyW = Math.max(charWidth(slot.actual), charWidth(slot.ideal));
         items.push({ x: x, gapW: gapW, youGapW: yg, tgtGapW: tg,
@@ -228,18 +232,50 @@
       var origin = M.actual.chars.length ? M.actual.chars[0].t0 : 0;
       var u = M.timing.unitSec;
       var toX = function (t, base) { return PAD_X + (t - base) / u * ppu; };
-      M.slots.forEach(function (slot) {
-        items.push({ slot: slot,
-                     x: slot.actual ? toX(slot.actual.t0, origin) : null,
-                     ix: slot.ideal ? toX(slot.ideal.t0, 0) : null });
+      /* A collapsed rest re-anchors the axis: both tracks resume side by side
+         after it, each shifted by its own amount. Shifting them equally would
+         keep the drift reading but squash the target track into itself, since
+         the silence it stands against is nothing like as long. Re-anchoring
+         says what a rest actually means — you stopped, and what follows starts
+         fresh — so drift is measured within a transmission, not across a break.
+         `breaks` records where that happened, for the drift plot to honor. */
+      var offYou = 0, offTgt = 0, breaks = [];
+      var endYou = PAD_X, endTgt = PAD_X;
+      M.slots.forEach(function (slot, i) {
+        var lead = slot.actual && slot.actual.leadGap;
+        if (isRest(lead) && slot.actual) {
+          var anchor = Math.max(endYou, endTgt) + REST_W;
+          offYou = toX(slot.actual.t0, origin) - anchor;
+          if (slot.ideal) offTgt = toX(slot.ideal.t0, 0) - anchor;
+          breaks.push(i);
+        }
+        var x = slot.actual ? toX(slot.actual.t0, origin) - offYou : null;
+        var ix = slot.ideal ? toX(slot.ideal.t0, 0) - offTgt : null;
+        if (x !== null) endYou = x + charWidth(slot.actual);
+        if (ix !== null) endTgt = ix + charWidth(slot.ideal);
+        items.push({ slot: slot, x: x, ix: ix });
+        // Breakpoints per character, not just at the ends: with a rest folded
+        // out the axis is piecewise, and the playhead and ruler read it here.
+        if (slot.actual) {
+          if (lead) maps.you.push([lead.t0, x - gapWidth(lead)]);
+          maps.you.push([slot.actual.t0, x], [slot.actual.t1, endYou]);
+        }
+        if (slot.ideal) {
+          var ig = slot.ideal.leadGap;
+          if (ig) maps.tgt.push([ig.t0, ix - gapWidth(ig)]);
+          maps.tgt.push([slot.ideal.t0, ix], [slot.ideal.t1, endTgt]);
+        }
       });
-      maps.you.push([origin, PAD_X]);
-      maps.you.push([P.duration_sec, toX(P.duration_sec, origin)]);
-      maps.tgt.push([0, PAD_X]);
-      maps.tgt.push([M.ideal.duration, toX(M.ideal.duration, 0)]);
-      var w = Math.max(toX(P.duration_sec, origin),
-                       toX(M.ideal.duration, 0)) + PAD_X;
-      L = { items: items, width: w, maps: maps, origin: origin, toX: toX };
+      if (!maps.you.length) maps.you.push([origin, PAD_X]);
+      if (!maps.tgt.length) maps.tgt.push([0, PAD_X]);
+      // Carry each axis out to the full duration at its final scale, so
+      // seeking into the trailing silence still lands somewhere sensible.
+      maps.you.push([P.duration_sec, toX(P.duration_sec, origin) - offYou]);
+      maps.tgt.push([M.ideal.duration, toX(M.ideal.duration, 0) - offTgt]);
+      var w = Math.max(toX(P.duration_sec, origin) - offYou,
+                       toX(M.ideal.duration, 0) - offTgt) + PAD_X;
+      L = { items: items, width: w, maps: maps, origin: origin, toX: toX,
+            breaks: breaks };
     }
   }
 
@@ -305,6 +341,24 @@
 
   function fmtU(u) { return u.toFixed(u < 10 ? 1 : 0) + "u"; }
 
+  /* px a collapsed rest gets, whatever its length. Wide enough that the wavy
+     spine still shows either side of the label — at 62 the label's own
+     background covered the whole thing and it read as a rendering fault. */
+  var REST_W = 124;
+
+  /* How wide to draw a gap. Rests get a fixed sliver: their real width is both
+     uninformative (nobody is graded on it) and ruinous to the rest of the
+     chart, since one 200-unit silence at a readable zoom pushes everything
+     after it off screen. Wide enough for the "rest 206u" label, so the length
+     is still legible — it just isn't to scale, which the label admits. */
+  function isRest(gap) { return !!gap && gap.targetKind === "pause"; }
+
+  function gapWidth(gap) {
+    if (!gap) return 0;
+    var w = gap.units * S.ppu;
+    return isRest(gap) ? Math.min(w, REST_W) : w;
+  }
+
   function draw() {
     var v = viewport();
     clampScroll(v);
@@ -355,8 +409,8 @@
     }
     var x = side === "you" ? it.x : it.ix;
     if (x === null || x === undefined) return null;
-    var g = withLeadGap ? ch.leadGap : null;
-    return [x - (g ? g.units * S.ppu : 0), x + charWidth(ch)];
+    return [x - (withLeadGap ? gapWidth(ch.leadGap) : 0),
+            x + charWidth(ch)];
   }
 
   /* The same slot range playback uses, so hovering a row previews exactly what
@@ -508,7 +562,7 @@
               false);
       drawGap(slot.ideal && slot.ideal.leadGap, it.x, it.tgtGapW, Y_TGT, true);
       // A side with no character gets an outlined ghost, so a missed or an
-      // extra character reads as a hole rather than as a shifted neighbour.
+      // extra character reads as a hole rather than as a shifted neighbor.
       if (slot.actual) drawMarks(slot.actual, bx, Y_YOU, false);
       else drawGhost(bx, it.bodyW, Y_YOU);
       if (slot.ideal) drawMarks(slot.ideal, bx, Y_TGT, true);
@@ -525,8 +579,8 @@
       if (slot.actual && it.x !== null) {
         var w = (slot.actual.t1 - slot.actual.t0) / u * ppu;
         if (visible(it.x, w, v)) {
-          var g = slot.actual.leadGap;
-          if (g) drawGap(g, it.x - g.units * ppu, g.units * ppu, Y_YOU, false);
+          var g = slot.actual.leadGap, gw = gapWidth(g);
+          if (g) drawGap(g, it.x - gw, gw, Y_YOU, false);
           drawMarks(slot.actual, it.x, Y_YOU, false);
           ctx.fillStyle = slot.op === "equal" ? C["ink-dim"] : C.bad;
           ctx.font = "600 11px " + css("--mono");
@@ -538,9 +592,8 @@
       if (slot.ideal && it.ix !== null) {
         var iw = (slot.ideal.t1 - slot.ideal.t0) / u * ppu;
         if (visible(it.ix, iw, v)) {
-          var ig = slot.ideal.leadGap;
-          if (ig) drawGap(ig, it.ix - ig.units * ppu, ig.units * ppu, Y_TGT,
-                          true);
+          var ig = slot.ideal.leadGap, igw = gapWidth(ig);
+          if (ig) drawGap(ig, it.ix - igw, igw, Y_TGT, true);
           drawMarks(slot.ideal, it.ix, Y_TGT, true);
         }
       }
@@ -618,29 +671,40 @@
     var grade = isTarget ? "none" : gradeOf(gap.units, gap.targetUnits);
     // targetKind, not kind: a long silence the intended text says is a real
     // word gap is being graded, so it must not be dimmed as a rest.
-    var isPause = gap.targetKind === "pause";
-    var color = isPause ? C["ink-faint"]
+    var rest = isRest(gap);
+    var color = rest ? C.rest
               : isTarget ? C.tgt
               : grade === "warn" ? C.warn : grade === "bad" ? C.bad : C.you;
 
     // The gap itself is drawn as a bracketed void — it's absence of tone, and
     // shading it like a mark would read as keying.
     ctx.strokeStyle = color;
-    ctx.globalAlpha = isPause ? 0.5 : 0.8;
+    ctx.globalAlpha = rest ? 0.9 : 0.8;
     ctx.lineWidth = 1;
     var mid = y + MARK_H / 2;
     ctx.beginPath();
     ctx.moveTo(x + 1, mid - 4); ctx.lineTo(x + 1, mid + 4);
     ctx.moveTo(x + w - 1, mid - 4); ctx.lineTo(x + w - 1, mid + 4);
-    ctx.moveTo(x + 1, mid); ctx.lineTo(x + w - 1, mid);
+    if (rest) {
+      /* A wave, not a rule: a rest is drawn at a fixed width regardless of how
+         long it really was, and a straight spine would claim a length it isn't
+         keeping. The squiggle is the standard "not to scale" mark, and the
+         label carries the real figure. */
+      for (var wx = x + 1; wx <= x + w - 1; wx += 2) {
+        var wy = mid + Math.sin((wx - x) / 3.2) * 2.5;
+        if (wx === x + 1) ctx.moveTo(wx, wy);
+        else ctx.lineTo(wx, wy);
+      }
+    } else {
+      ctx.moveTo(x + 1, mid); ctx.lineTo(x + w - 1, mid);
+    }
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // Label char/word gaps and pauses; element gaps are self-evident.
+    // Label char/word gaps and rests; element gaps are self-evident.
     if (gap.kind === "element-gap" || w < 22) return;
-    var label = isPause ? "pause " + gap.units.toFixed(0) + "u"
-                        : fmtU(gap.units);
-    ctx.font = "10px " + css("--mono");
+    var label = rest ? "Rest " + gap.units.toFixed(0) + "u" : fmtU(gap.units);
+    ctx.font = (rest ? "600 10px " : "10px ") + css("--mono");
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     var tw = ctx.measureText(label).width + 6;
@@ -715,34 +779,50 @@
 
   /* Cumulative drift: how far behind/ahead of the ideal clock you've fallen.
      This is the information the per-character view necessarily hides. */
+  /* Cumulative timing drift. Measured against a reference that restarts after
+     every rest: a rest is the sender stopping, so the silence isn't drift and
+     whatever follows begins in step again. Without the restart one long rest
+     dwarfs the axis — a 200-unit stop reads as ±580u of "drift" and flattens
+     every real deviation into the center line. The runs are drawn separately so
+     the plot shows a break rather than a cliff between them. */
   function drawDrift(v) {
-    var pts = [];
     var u = M.timing.unitSec;
-    var origin = M.actual.chars.length ? M.actual.chars[0].t0 : 0;
+    var runs = [], pts = null, base = null;
     L.items.forEach(function (it) {
       var slot = it.slot;
       if (!slot.actual || !slot.ideal) return;
-      var drift = ((slot.actual.t1 - origin) - slot.ideal.t1) / u;
+      if (base === null || isRest(slot.actual.leadGap)) {
+        base = slot.actual.t0 - slot.ideal.t0;
+        pts = [];
+        runs.push(pts);
+      }
+      var drift = ((slot.actual.t1 - base) - slot.ideal.t1) / u;
       var x = S.view === "per-char"
             ? it.x + it.gapW + it.bodyW / 2
             : it.x + (slot.actual.t1 - slot.actual.t0) / u * S.ppu / 2;
       pts.push([x, drift]);
     });
     driftMax = 1;
-    if (pts.length < 2) return;
-    pts.forEach(function (p) { driftMax = Math.max(driftMax, Math.abs(p[1])); });
+    runs.forEach(function (run) {
+      run.forEach(function (p) {
+        driftMax = Math.max(driftMax, Math.abs(p[1]));
+      });
+    });
 
     var half = DRIFT_H / 2 - 8;
     var mid = Y_DRIFT + DRIFT_H / 2;
     ctx.strokeStyle = C.you;
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    pts.forEach(function (p, i) {
-      var y = mid - (p[1] / driftMax) * half;
-      if (i === 0) ctx.moveTo(p[0], y);
-      else ctx.lineTo(p[0], y);
+    runs.forEach(function (run) {
+      if (run.length < 2) return;
+      ctx.beginPath();
+      run.forEach(function (p, i) {
+        var y = mid - (p[1] / driftMax) * half;
+        if (i === 0) ctx.moveTo(p[0], y);
+        else ctx.lineTo(p[0], y);
+      });
+      ctx.stroke();
     });
-    ctx.stroke();
   }
 
   /* The left band: track names and the drift axis bounds. Drawn after the
@@ -1419,11 +1499,11 @@
      because that's what makes the error audible and visible:
 
        char-gap  the character before, the gap, the character after — nothing
-                 more, or a neighbouring gap competes with the one in question
+                 more, or a neighboring gap competes with the one in question
        word-gap  the whole word either side, since a word gap separates words
                  and half a word doesn't read as one
        anything  else lives inside a character (a mark, an intra-character
-                 gap), so its own character plus a neighbour for rhythm
+                 gap), so its own character plus a neighbor for rhythm
 
      A gap is the *lead* gap of slot `idx`, so it sits between idx-1 and idx.
      Both the highlight and the playback window come from here — they'd drift
@@ -1493,7 +1573,7 @@
         // A slot with no character on this side has no x; comparing against
         // null would coerce to 0 and match everything to its left.
         if (bx === null || bx === undefined) continue;
-        var gw = gap ? gap.units * S.ppu : 0;
+        var gw = gapWidth(gap);
         if (gap && x >= bx - gw && x < bx) {
           return { block: gap, char: ch, row: row, slot: slot };
         }
@@ -1704,6 +1784,16 @@
     S.view = $("view").value;
     S.scrollX = 0;
     relayout();           // ends in resize -> draw
+  });
+
+  var rests = $("rests");
+  rests.checked = S.collapseRests;
+  rests.addEventListener("change", function () {
+    S.collapseRests = rests.checked;
+    // Changes what counts as a rest, so the whole timeline is rebuilt: this
+    // moves gaps in and out of the grading, not just their drawn width.
+    S.scrollX = 0;
+    recompute();
   });
 
   $("play-you").addEventListener("click", function () {

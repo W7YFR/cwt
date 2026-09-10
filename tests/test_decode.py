@@ -490,17 +490,50 @@ def test_timeline_flags_long_silence_as_pause():
     """An inter-transmission silence becomes a `pause`, excluded from grading."""
     timing = core.target_timing(20)
     u = timing.unit_sec
-    # dit, word gap, dit, a 30-unit silence, dit -- wrapped in edge silence.
-    segs = [(0, 0.1), (1, u), (0, 7 * u), (1, u), (0, 30 * u), (1, u), (0, 0.1)]
+    # Three word gaps, then one silence far out of line with them: that last
+    # one is the sender stopping, and only it should read as a rest.
+    segs = [(0, 0.1), (1, u), (0, 7 * u), (1, u), (0, 7 * u), (1, u),
+            (0, 7 * u), (1, u), (0, 60 * u), (1, u), (0, 0.1)]
     tl = core.build_timeline(segs, timing)
     kinds = [b.kind for b in tl.blocks]
-    assert kinds == ["dit", "word-gap", "dit", "pause", "dit"]
-    pause = tl.blocks[3]
+    assert kinds == ["dit", "word-gap", "dit", "word-gap", "dit",
+                     "word-gap", "dit", "pause", "dit"]
+    pause = tl.blocks[7]
     assert pause.target_units == 0.0            # carries no target
     a = core.analyze(tl, timing, timing)
     assert a.n_pauses == 1
     assert not any(d.kind == "pause" for d in a.deviations)
     assert all(s.name != "pause" for s in a.stats)
+
+
+def test_a_rest_is_judged_against_the_senders_own_spacing():
+    """Wide-but-even spacing is a graded error; one silence out of line is not.
+
+    The two are indistinguishable by any fixed multiple of the *target's* word
+    gap — wound-out spacing puts every gap several times over nominal — so the
+    line is drawn against the sender's own typical gap instead.
+    """
+    timing = core.target_timing(20)
+    u = timing.unit_sec
+
+    def kinds(gap_units):
+        segs = [(0, 0.1)]
+        for g in gap_units:
+            segs += [(1, u), (0, g * u)]
+        segs += [(1, u), (0, 0.1)]
+        return [b.kind for b in core.build_timeline(segs, timing).blocks
+                if b.kind in ("word-gap", "pause")]
+
+    # Every gap 4x the nominal 7u, evenly: sloppy spacing, all of it graded.
+    assert kinds([28, 28, 28, 28]) == ["word-gap"] * 4
+    # The same 28u gaps with one 90u stop among them: only the stop is a rest.
+    assert kinds([28, 28, 90, 28]) == ["word-gap", "word-gap", "pause",
+                                       "word-gap"]
+    # Passing inf grades every silence as spacing, however long.
+    segs = [(0, 0.1), (1, u), (0, 300 * u), (1, u), (0, 0.1)]
+    tl = core.build_timeline(segs, timing, pause_factor=float("inf"))
+    assert [b.kind for b in tl.blocks] == ["dit", "word-gap", "dit"]
+    assert core.analyze(tl, timing, timing).n_pauses == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -525,13 +558,12 @@ def test_wide_letter_gaps_are_misread_without_the_intended_text():
     """The starting point: with nothing to align against, the report flatters."""
     a = _wide_spacing().analysis
     kinds = {s.name: s for s in a.stats}
-    # Every letter gap landed in the word-gap bucket, so there is no
-    # character-gap row at all and the word-gap row is 9 letter gaps deep.
+    # Every letter gap landed in the word-gap bucket alongside the real word
+    # gaps, so there is no character-gap row at all and the word-gap row
+    # averages 9 letter gaps against 3 word gaps into one meaningless figure.
     assert "char-gap" not in kinds
-    assert kinds["word-gap"].n == 9
-    # And the three real word gaps were written off as inter-transmission rests.
-    assert a.n_pauses == 3
-    assert not any(d.value_units > 20 for d in a.deviations)
+    assert kinds["word-gap"].n == 12
+    assert 10 < kinds["word-gap"].mean_units < 20     # neither 10.4u nor 24.1u
 
 
 def test_intended_text_regrades_gaps_by_what_they_meant():
@@ -547,8 +579,12 @@ def test_intended_text_regrades_gaps_by_what_they_meant():
     assert kinds["word-gap"].n == 3
     assert kinds["word-gap"].target_units == pytest.approx(7.0)
     assert a.n_pauses == 0
+    # The nine letter gaps move out of the word-gap bucket; the three real word
+    # gaps were already in the right one and only their target changes.
     moved = [b for b in res.timeline.blocks if b.target_kind != b.kind]
-    assert len(moved) == 12                        # 9 letter gaps + 3 word gaps
+    assert len(moved) == 9
+    assert {b.kind for b in moved} == {"word-gap"}
+    assert {b.target_kind for b in moved} == {"char-gap"}
     assert max(d.value_units for d in a.deviations) > 20
     # Marks are untouched: a mis-decoded character says nothing about what its
     # own elements were meant to be.
@@ -565,8 +601,29 @@ def test_retarget_leaves_the_decode_and_the_word_breaks_alone():
     # `kind` still reports what came off the air, so the accuracy diff can
     # keep showing the word-boundary errors.
     assert [b.kind for b in tl.blocks] == [b.kind for b in naive.timeline.blocks]
-    assert any(b.kind == "pause" and b.target_kind == "word-gap"
-               for b in tl.blocks)
+
+
+def test_intended_text_cannot_turn_a_rest_into_a_spacing_error():
+    """A rest stays a rest even where the intended text has a word gap.
+
+    Practicing a list of separate words means the text has a word gap at every
+    point you stopped between exercises. Grading those as word gaps buries the
+    real errors under 200-unit "deviations" — which is what a rest is not.
+    """
+    timing = core.target_timing(20)
+    u = timing.unit_sec
+    # "E E" with a huge stop between, against an intended "E E".
+    segs = [(0, 0.1), (1, u), (0, 7 * u), (1, u), (0, 7 * u), (1, u),
+            (0, 90 * u), (1, u), (0, 0.1)]
+    tl = core.build_timeline(segs, timing)
+    rest = tl.blocks[5]
+    assert rest.kind == "pause"
+    core.retarget(core.pair(tl, core.ideal_timeline("E E E E", timing)))
+    assert rest.target_kind == "pause"          # not promoted to a word gap
+    assert rest.target_units == 0.0
+    a = core.analyze(tl, timing, timing)
+    assert a.n_pauses == 1
+    assert not any(d.value_units > 50 for d in a.deviations)
 
 
 def test_retarget_is_a_no_op_when_the_sending_is_already_clean():

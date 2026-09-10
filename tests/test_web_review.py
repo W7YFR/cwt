@@ -212,6 +212,55 @@ def test_js_ideal_timeline_is_perfect_and_decodes_back():
 
 
 @node
+@pytest.mark.parametrize("gaps,want", [
+    # Evenly wound-out spacing: every gap 4x nominal, all of it graded.
+    ([28, 28, 28, 28], ["word-gap"] * 4),
+    # The same gaps with one stop among them: only the stop is a rest.
+    ([28, 28, 90, 28], ["word-gap", "word-gap", "pause", "word-gap"]),
+    # Tight sending with one wide word gap: the floor keeps it gradable even
+    # though it towers over this sender's own typical gap.
+    ([3, 3, 13, 3], ["char-gap", "char-gap", "word-gap", "char-gap"]),
+])
+def test_js_rest_detection_matches_python(gaps, want):
+    """Both sides must draw the rest line in the same place.
+
+    A rest is judged against the sender's own median gap, so this is the one
+    piece of buildTimeline that depends on the whole segment list rather than
+    on one duration — easy to get subtly different in a port.
+    """
+    unit = 1.2 / 20
+    segs = [(0, 0.1)]
+    for g in gaps:
+        segs += [(1, unit), (0, g * unit)]
+    segs += [(1, unit), (0, 0.1)]
+
+    got = _run_js("""
+      const t = RC.targetTiming(20, 20);
+      const tl = RC.buildTimeline(PAYLOAD.segments, t);
+      const loose = RC.buildTimeline(PAYLOAD.segments, t, Infinity);
+      console.log(JSON.stringify({
+        kinds: tl.blocks.filter(b => b.kind !== 'dit').map(b => b.kind),
+        targets: tl.blocks.filter(b => b.kind !== 'dit').map(b => b.targetUnits),
+        pauses: RC.grade(tl, 0.3).nPauses,
+        loosePauses: RC.grade(loose, 0.3).nPauses,
+      }));
+    """, {"segments": [list(s) for s in segs]})
+
+    timing = core.target_timing(20, 20)
+    tl = core.build_timeline(segs, timing)
+    kinds = [b.kind for b in tl.blocks if b.kind != "dit"]
+    assert kinds == want                       # the behavior we intend...
+    assert got["kinds"] == kinds               # ...and both sides agree on it
+    assert got["targets"] == pytest.approx(
+        [b.target_units for b in tl.blocks if b.kind != "dit"], abs=1e-9)
+    assert got["pauses"] == core.analyze(tl, timing, timing).n_pauses
+    # Disabling rest detection must agree too: nothing is ever a rest.
+    loose = core.build_timeline(segs, timing, pause_factor=float("inf"))
+    assert got["loosePauses"] == core.analyze(loose, timing, timing).n_pauses
+    assert got["loosePauses"] == 0
+
+
+@node
 def test_js_pair_aligns_characters_and_flags_word_errors():
     got = _run_js("""
       const t = RC.targetTiming(20, 20);
@@ -384,7 +433,9 @@ def _sloppy_wav(path, text="CQ CQ DE W7YFR K", wpm=20, rate=8000):
     """Synthesize keying with real faults, so the page's error paths get drawn.
 
     Deliberately includes: element jitter, squeezed character gaps, one badly
-    stretched gap, a missed word space, a clipped dah, and a long pause.
+    stretched gap, a stretched word gap, a missed word space, a clipped dah,
+    and a rest. The stretched word gap and the rest are distinct on purpose —
+    one is a gradable spacing error, the other is the sender stopping.
     """
     import numpy as np
 
@@ -396,8 +447,10 @@ def _sloppy_wav(path, text="CQ CQ DE W7YFR K", wpm=20, rate=8000):
     for wi, word in enumerate(text.split(" ")):
         if wi > 0:
             gap = 3.0 if wi == 3 else 7.0      # wi==3 -> the space is missed
+            if wi == 1:
+                gap = 12.0                     # a word gap stretched, not a rest
             if wi == 2:
-                gap = 20.0                     # a long inter-transmission pause
+                gap = 20.0                     # the sender stopping: a rest
             on.append((False, gap * unit * rng.normal(1.0, 0.04)))
         for li, ch in enumerate(word):
             if li > 0:
@@ -573,6 +626,38 @@ def test_page_boots_and_draws(tmp_path):
         assert min(words) > max(letters), (
             f"on '{label}', a word gap should reach wider than a letter gap: "
             f"letter {max(letters):.2f}s vs word {min(words):.2f}s")
+
+    # "Collapse rests" (on by default): the fixture's 20-unit stop is the
+    # sender pausing, so it stays out of the grading and takes a fixed sliver
+    # of the chart. Turning it off makes every silence spacing again — which
+    # tops the deviations table with a 20-unit "word gap" and stretches the
+    # chart out by the difference.
+    on, off = d["restToggle"]["collapsed"], d["restToggle"]["expanded"]
+    assert on["restLabels"] == ["Rest 20u"], (
+        f"collapsed, the rest should be labeled as one: {on['restLabels']}")
+    assert off["restLabels"] == [], (
+        f"expanded, nothing should read as a rest: {off['restLabels']}")
+    # And drawn in its own hue, not borrowed from the grade scale — nothing
+    # about a rest is good or bad, so green/amber/red would misread as a
+    # verdict, and the muted gray it used to share with pauses read as a
+    # rendering fault.
+    palette = d["restToggle"]["colors"]
+    assert on["restColors"] == [palette["--rest"]], (
+        f"the rest label should use --rest: {on['restColors']}")
+    assert palette["--rest"] not in (palette["--ok"], palette["--warn"],
+                                     palette["--bad"], palette["--you"],
+                                     palette["--tgt"], palette["--ink-faint"])
+    # Collapsed, the stop is absent from the table; expanded, it leads it.
+    assert on["worst"] < off["worst"]
+    assert off["devs"][0] == ["word-gap", pytest.approx(19.65, abs=0.5)]
+    assert on["devs"] == off["devs"][1:], \
+        "collapsing a rest should only remove the rest's own row"
+    # The fixture's stop is 20u wide; collapsed it gets REST_W = 62px, so at
+    # 14 px/unit the chart is ~218px narrower.
+    assert on["overflow"] < off["overflow"]
+    # The 12.4u word gap is a genuine spacing error and survives either way:
+    # collapsing rests must not swallow real gaps along with the stop.
+    assert ["word-gap", pytest.approx(12.37, abs=0.5)] in on["devs"]
 
     # Playback resets the transport when it ends. The original bug: the payload
     # duration is rounded, so the clock could plateau just under it and a `>=`
@@ -908,7 +993,7 @@ def test_live_capture_does_not_force_a_rate(tmp_path, monkeypatch, no_browser):
 
 
 def test_capture_rate_can_still_be_forced(tmp_path, monkeypatch):
-    """An explicit --capture-rate is honoured (and does resample)."""
+    """An explicit --capture-rate is honored (and does resample)."""
     from cw_decoder import cli
 
     seen = {}
@@ -1269,7 +1354,7 @@ def test_ctrl_c_discards_the_take(tmp_path, monkeypatch, capsys, no_browser):
     cap = capsys.readouterr()
 
     assert rc == 130                          # conventional for SIGINT
-    assert "cancelled" in cap.err
+    assert "canceled" in cap.err
     assert cap.out.strip() == ""              # nothing decoded
     assert not out.exists()                   # no review page
     assert not (out.parent / "session.wav").exists()   # recording thrown away
@@ -1300,7 +1385,7 @@ def test_ctrl_c_removes_a_session_dir_it_created(tmp_path, monkeypatch,
 
 
 def test_ctrl_c_does_not_remember_the_device(tmp_path, monkeypatch):
-    """A cancelled take shouldn't teach it a device preference."""
+    """A canceled take shouldn't teach it a device preference."""
     from cw_decoder import capture, cli
 
     monkeypatch.setattr(capture, "list_audio_devices",

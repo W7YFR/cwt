@@ -22,8 +22,23 @@
 
   var TOKEN = /<[A-Z]+>|[\s\S]/g;
 
-  // core.PAUSE_FACTOR
+  // core.PAUSE_FACTOR — the floor under REST_OUTLIER: a silence shorter than
+  // this many nominal word gaps is always spacing, never a rest.
   var PAUSE_FACTOR = 2.0;
+  /* core.REST_OUTLIER — a silence longer than this many times the sender's own
+     typical inter-character gap is a rest. Judged against the sender, not the
+     target: wound-out spacing puts *every* gap several times over nominal, and
+     that's a gradable error, while stopping puts *one* gap far out of line with
+     the others. No fixed multiple of the target's word gap separates those. */
+  var REST_OUTLIER = 3.0;
+
+  // numpy's median, including its mean-of-the-middle-two for even counts.
+  function median(values) {
+    if (!values.length) return 0.0;
+    var v = values.slice().sort(function (a, b) { return a - b; });
+    var h = v.length >> 1;
+    return v.length % 2 ? v[h] : (v[h - 1] + v[h]) / 2;
+  }
   var CLASS_ORDER = ["dit", "dah", "element-gap", "char-gap", "word-gap"];
 
   // --- morse.decode_pattern ------------------------------------------------ //
@@ -64,11 +79,27 @@
   // `segments` is [[state, seconds], ...] straight from the payload, so the
   // browser re-derives the decode itself: changing the target speed can legally
   // change what the recording decodes to, and that should be visible.
-  function buildTimeline(segments, timing) {
+  // `pauseFactor` is where a long silence stops being spacing and becomes a
+  // rest; pass Infinity to grade every silence as spacing, however long.
+  function buildTimeline(segments, timing, pauseFactor) {
     var u = timing.unitSec;
     var charGapU = timing.charGapSec ? timing.charGapSec / u : 3.0;
     var wordGapU = timing.wordGapSec ? timing.wordGapSec / u : 7.0;
-    var pauseFloor = PAUSE_FACTOR * wordGapU;
+    if (pauseFactor === undefined || pauseFactor === null) {
+      pauseFactor = PAUSE_FACTOR;
+    }
+    // What this sender's own between-character silences look like, so a rest
+    // can be judged as an outlier against them. Median, not mean: one 200-unit
+    // stop would drag a mean up far enough to hide itself.
+    var spacing = [];
+    for (var si = 1; si < segments.length - 1; si++) {
+      if (segments[si][0] === 0 &&
+          segments[si][1] >= timing.elementCharSplit) {
+        spacing.push(segments[si][1] / u);
+      }
+    }
+    var pauseFloor = Math.max(pauseFactor * wordGapU,
+                              REST_OUTLIER * median(spacing));
 
     var text = [], chars = [], blocks = [];
     var pending = [], pattern = [], lead = null;
@@ -360,6 +391,12 @@
   // score), and an over-long word gap trips the pause floor and drops out of
   // grading entirely — hiding the worst error in the recording.
   //
+  // Rests are the exception: buildTimeline has already judged a silence far
+  // past any spacing to be the sender stopping, and the intended text can't
+  // overrule that. Practicing a list of separate words puts a word gap in the
+  // text at every point you rested, and grading those buries the real errors
+  // under 200-unit "deviations".
+  //
   // Only gaps move, and only targetKind/targetUnits: `kind` keeps reporting
   // what was read, because the decoded text, the word-boundary diff and pair()'s
   // own token stream all derive from it. That's what makes this safe to run on
@@ -370,7 +407,7 @@
     slots.forEach(function (slot) {
       if (!slot.actual || !slot.ideal) return;
       var got = slot.actual.leadGap, want = slot.ideal.leadGap;
-      if (!got || !want) return;
+      if (!got || !want || got.kind === "pause") return;
       if (got.targetKind !== want.kind) moved++;
       got.targetKind = want.kind;
       got.targetUnits = want.targetUnits;
@@ -380,6 +417,7 @@
 
   var api = {
     PAUSE_FACTOR: PAUSE_FACTOR,
+    REST_OUTLIER: REST_OUTLIER,
     CLASS_ORDER: CLASS_ORDER,
     setMorse: setMorse,
     decodePattern: decodePattern,

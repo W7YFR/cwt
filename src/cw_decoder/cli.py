@@ -773,7 +773,7 @@ def main(argv=None) -> int:
         except KeyboardInterrupt:
             # Ctrl-C means abandon the take — don't decode it, don't grade it,
             # don't open a review page for it. Enter is the "I'm done" key.
-            print("\n# cancelled — discarding this take.", file=sys.stderr)
+            print("\n# canceled — discarding this take.", file=sys.stderr)
             _discard(out_path, page_path if not args.web_out else None)
             return 130                     # conventional exit code for SIGINT
         except (RuntimeError, ValueError) as e:

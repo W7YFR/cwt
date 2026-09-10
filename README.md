@@ -142,8 +142,15 @@ How to read it:
   green / yellow / red so you can scan the report at a glance.
 - **largest deviations** are timestamped and labeled with the text they follow,
   so you can find the exact spot in your recording.
-- **Long pauses** between transmissions are detected and excluded so they don't
-  count as spacing errors.
+- **Rests** — stopping between exercises, or between transmissions — are
+  detected and left out of the grading, so they don't show up as enormous
+  spacing errors. A rest is a silence out of line with *your own* spacing (more
+  than 3× your typical gap between characters), not one over some multiple of
+  the target's word gap: sending with the spacing wound out puts every gap
+  several times over nominal, consistently, and that **is** a spacing error
+  worth grading, whereas stopping to read the next word puts one gap far out of
+  line with all the others. No fixed multiple of the target can tell those
+  apart. The report says how many it set aside.
 
 Note: if your sending doesn't match the target, decoding against it will
 **over-segment** (loose character spacing splits letters apart, e.g. `R O B`) —
@@ -153,10 +160,10 @@ that's the point, it shows where you drifted. Drop `-w/-f` for a clean read.
 was *meant* to be from how long it lasted, and if your spacing is loose that
 guess goes wrong in a way that flatters you: letter gaps get read as word gaps
 and average out to a passing word-gap score, while the character-gap row
-disappears from the report entirely. Worse, a badly overlong word gap can pass
-the pause floor and be written off as a rest — hiding the largest error in the
-recording. Tell it the intended message and every gap is graded as the class the
-text calls for, whatever it measured.
+disappears from the report entirely. Tell it the intended message and every gap
+is graded as the class the text calls for, whatever it measured. Rests are the
+one exception — practicing a list of separate words means the text has a word
+gap at every point you stopped, and grading those would bury the real errors.
 
 ---
 
@@ -330,6 +337,24 @@ character; click the ruler to seek.
 and the intended message are all re-derived in the browser, so you can ask "was
 that actually 22 wpm sending?" without re-running anything. Signal-processing
 options (`-t`, `-b`) need a re-run.
+
+**Collapse rests** (on by default). Practicing along with a lesson leaves long
+silences while you listen or find your place. Drawn to scale those dominate
+everything: one ten-second stop pushes the rest of the session off the far right
+of the chart and flattens the drift strip against its own axis. Collapsed, a
+rest takes a fixed sliver of the chart — drawn in purple with a wavy spine,
+`|~~~~ Rest 207u ~~~~|`, so it reads as "not to scale" rather than as a word gap
+and carries its real length on the label. Purple because a rest isn't graded, so
+the green/amber/red scale would misread as a verdict on it. It stays out of the
+grading, and the drift strip restarts after it —
+because you stopped, so what follows begins in step again rather than inheriting
+ten seconds of "drift". In **Absolute time** and **Overlay** the two tracks
+re-anchor side by side after each rest for the same reason. Turn it off to see
+every silence graded and drawn to scale.
+
+Hovering a value in **largest deviations** highlights the stretch of chart that
+row is about, scrolling it into view if it's off screen — the characters either
+side of a letter gap, the words either side of a word gap.
 
 **Listening.** Your recording is embedded, and the target is synthesized live at
 the tone frequency detected in your audio, so it re-renders as you move the speed

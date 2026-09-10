@@ -406,7 +406,7 @@ def run_lengths(binary: np.ndarray, rate: int):
 
 
 def debounce(segs, min_dur: float):
-    """Drop runs shorter than `min_dur` by merging them into their neighbours."""
+    """Drop runs shorter than `min_dur` by merging them into their neighbors."""
     if not segs:
         return segs
     # Repeatedly remove the shortest sub-threshold segment and merge across.
@@ -653,22 +653,51 @@ def estimate_timing(segs) -> Timing:
 # 7. Decode
 # --------------------------------------------------------------------------- #
 PAUSE_FACTOR = 2.0
-"""A word gap longer than this many nominal word gaps is an intentional
-inter-transmission pause, not a spacing error."""
+"""A silence shorter than this many nominal word gaps is always spacing, never
+a rest — the floor under `REST_OUTLIER`, so a wide word gap in otherwise tight
+sending can't be written off as a stop."""
+
+REST_OUTLIER = 3.0
+"""A silence longer than this many times the sender's own typical inter-character
+gap is the sender resting between transmissions, not a spacing error.
+
+Measured against the sender rather than the target because that's what actually
+separates the two cases. Sending with the spacing wound out puts *every* gap
+several times over the nominal one — consistently, and that is a spacing error
+worth grading. Stopping to read the next exercise puts *one* gap far out of line
+with all the others. A fixed multiple of the target's word gap cannot tell those
+apart at any setting: measured that way, wide-but-even spacing and a genuine
+stop overlap.
+"""
 
 
-def build_timeline(segs, timing: Timing) -> Timeline:
+def _median(values) -> float:
+    return float(np.median(values)) if len(values) else 0.0
+
+
+def build_timeline(segs, timing: Timing,
+                   pause_factor: float = PAUSE_FACTOR) -> Timeline:
     """Turn (state,duration) segments + timing thresholds into a Timeline.
 
     This is the single source of truth for "what did the sender actually key":
     it produces the decoded text, the per-character grouping, and every mark and
     gap measured against `timing`. `decode_segments` and `analyze` are both thin
     layers over it, as is the web review payload.
+
+    `pause_factor` is where a long silence stops being spacing and becomes a
+    rest; pass `math.inf` to grade every silence as spacing, however long.
     """
     u = timing.unit_sec
     char_gap_u = (timing.char_gap_sec / u) if timing.char_gap_sec else 3.0
     word_gap_u = (timing.word_gap_sec / u) if timing.word_gap_sec else 7.0
-    pause_floor = PAUSE_FACTOR * word_gap_u
+
+    # What this sender's own between-character silences look like, so a rest can
+    # be judged as an outlier against them. Median, not mean: one 200-unit stop
+    # would drag a mean up far enough to hide itself.
+    spacing = [d / u for i, (state, d) in enumerate(segs)
+               if state == 0 and 0 < i < len(segs) - 1
+               and d >= timing.element_char_split]
+    pause_floor = max(pause_factor * word_gap_u, REST_OUTLIER * _median(spacing))
 
     text, chars, blocks = [], [], []
     pending, pattern = [], []     # blocks / elements of the character in progress
@@ -863,14 +892,17 @@ def retarget(slots: list) -> int:
     only information it has. Once the intended text is known that guess is
     obsolete: if the alignment pairs a decoded character with an intended one,
     the intended character's lead gap says what the silence before it was
-    *supposed* to be, whatever it measured. That fixes two failure modes:
+    *supposed* to be, whatever it measured. Without this, Farnsworth-ish letter
+    gaps that overshoot the target's char/word split get graded as word gaps and
+    average out to a flattering score, while the character-gap row vanishes from
+    the report entirely.
 
-      * Farnsworth-ish letter gaps that overshoot the target's char/word split
-        get graded as word gaps and average out to a flattering score, while the
-        character-gap row vanishes from the report entirely.
-      * A genuinely over-long word gap trips the pause floor, is written off as
-        an inter-transmission rest, and drops out of grading altogether — hiding
-        the single worst spacing error in the recording.
+    Rests are the exception, and deliberately so. `build_timeline` has already
+    judged a silence far past any spacing to be the sender stopping, and the
+    intended text can't overrule that: practicing a list of separate words means
+    the text has a word gap at every point you paused between exercises, and
+    grading those as word gaps buries the real errors under 200-unit
+    "deviations". Where the line falls is `pause_factor`'s job, not this one's.
 
     Only gaps move. Marks keep the target their own class implies, since a
     mis-decoded character says nothing reliable about what its elements meant.
@@ -886,7 +918,7 @@ def retarget(slots: list) -> int:
         if slot.actual is None or slot.ideal is None:
             continue
         got, want = slot.actual.lead_gap, slot.ideal.lead_gap
-        if got is None or want is None:
+        if got is None or want is None or got.kind == "pause":
             continue
         if got.target_kind != want.kind:
             moved += 1

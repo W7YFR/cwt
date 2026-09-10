@@ -62,6 +62,12 @@
     <label for="zoom">Zoom <output id="zoom-out"></output></label>
     <input type="range" id="zoom" min="4" max="60" step="1">
   </div>
+
+  <div class="group">
+    <label class="check" for="rests"
+           title="A silence more than three word gaps long is you stopping, not mis-spacing. Collapsed, it takes a fixed sliver of the chart, stays out of the grading, and the drift plot restarts after it. Off, every silence is graded and drawn to scale.">
+      <input type="checkbox" id="rests" checked> Collapse rests</label>
+  </div>
 </section>
 
 <section class="canvas-wrap">
@@ -73,6 +79,7 @@
       <span class="sw warn"></span> up to 2&times; off
       <span class="sw bad"></span> worse
       <span class="sw ghost"></span> missing
+      <span class="sw rest"></span> rest (not graded)
       &nbsp;·&nbsp; click a character to hear it &nbsp;·&nbsp;
       click the ruler to seek &nbsp;·&nbsp; drag or scroll to pan
       (the view follows playback)

@@ -14,6 +14,9 @@
   --warn: #d29922;
   --bad: #f4564a;
   --ghost: #4b5566;
+  /* Rests are not graded, so they get a hue outside the green/amber/red scale
+     entirely — nothing about a rest is good or bad, it just isn't spacing. */
+  --rest: #a371f7;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -32,6 +35,7 @@
     --warn: #9a6700;
     --bad: #cf222e;
     --ghost: #c2c9d4;
+    --rest: #8250df;
   }
 }
 
@@ -85,6 +89,15 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   align-items: baseline;
 }
 .group output { color: var(--ink); font-family: var(--mono); font-size: 12px; }
+/* A checkbox sits on the same baseline as its words, not above them like the
+   sliders' captions do, so the whole label is one click target. */
+.group label.check {
+  align-items: center;
+  cursor: pointer;
+  margin-top: auto;
+  padding-bottom: 5px;
+}
+.group label.check input { accent-color: var(--you); margin: 0; }
 .hint { text-transform: none; letter-spacing: 0; color: var(--ink-faint); }
 
 input[type=range] { width: 100%; accent-color: var(--you); margin: 4px 0 0; }
@@ -199,6 +212,7 @@ canvas.grabbing { cursor: grabbing; }
 .sw.warn { background: var(--warn); }
 .sw.bad { background: var(--bad); }
 .sw.ghost { background: transparent; border: 1px dashed var(--ghost); }
+.sw.rest { background: var(--rest); }
 
 /* ---- report ------------------------------------------------------------ */
 .report {
