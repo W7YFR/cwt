@@ -14,9 +14,10 @@ const fs = require("fs");
 
 const calls = { fill: 0, stroke: 0, text: [], textAt: [], rects: 0,
                 clips: [], clipped: 0, translates: [],
-                // Every fill()'s color and opacity, so a test can find a
-                // translucent wash (a highlight) and tell which track's color
-                // it was painted in.
+                // Every fill(): color, opacity, and the path's x-extent. Lets a
+                // test find a translucent wash (a highlight), say which track's
+                // color it was painted in, and check where it starts and ends
+                // relative to the marks inside it.
                 fillStyles: [] };
 const audio = { plays: 0, seeks: [], spans: [], oscStarts: 0, gainEvents: 0,
                 decodes: 0, decodedBytes: 0, levels: [], oscFreqs: [] };
@@ -35,6 +36,7 @@ function ctx2d() {
   const noop = function () {};
   let tx = 0;
   const stack = [];
+  const path = [];       // x coordinates of the path being built
   return {
     canvas: null,
     save: () => { stack.push(tx); },
@@ -43,13 +45,22 @@ function ctx2d() {
     setTransform: () => { tx = 0; },              // resize() resets the matrix
     rect: (x, y, w, h) => { calls.clips.push([x + tx, y, w, h]); },
     clip: () => { calls.clipped++; },
-    clearRect: noop, beginPath: noop, moveTo: noop, lineTo: noop,
-    arcTo: noop, closePath: noop, setLineDash: noop,
+    clearRect: noop, closePath: noop, setLineDash: noop,
+    // Enough path tracking to recover a filled shape's x-extent. roundRect's
+    // arcTo control points are the rect's corners, so the extremes of these
+    // are its left and right edges.
+    beginPath: () => { path.length = 0; },
+    moveTo: (x) => { path.push(x + tx); },
+    lineTo: (x) => { path.push(x + tx); },
+    arcTo: (x1, y1, x2) => { path.push(x1 + tx, x2 + tx); },
     fillRect: function () { calls.rects++; },
     strokeRect: function () { calls.rects++; },
     fill: function () {
       calls.fill++;
-      calls.fillStyles.push([this.fillStyle, this.globalAlpha]);
+      calls.fillStyles.push([this.fillStyle, this.globalAlpha,
+                             path.length ? Math.round(Math.min(...path)) : null,
+                             path.length ? Math.round(Math.max(...path))
+                                         : null]);
     },
     stroke: function () { calls.stroke++; },
     fillText: function (t, x, y) {
@@ -262,12 +273,20 @@ global.document = eventTarget({
     const html = byId("report").innerHTML;
     if (playCells.html === html) return playCells.cells;
     const cells = [];
-    const re = /<td class='(?:bad )?play' data-side='(\w+)' data-i='(-?\d+)'/g;
-    let m;
-    while ((m = re.exec(html)) !== null) {
-      const td = makeEl("play-cell");
-      td.dataset = { side: m[1], i: m[2] };
-      cells.push(td);
+    // Row-wise, so each cell also carries the timestamp its row names — that's
+    // what lets a test check the played window actually contains that moment.
+    const rowRe = /<tr><td>(-?[\d.]+)s<\/td><td>([\w-]+)<\/td>(.*?)<\/tr>/g;
+    const cellRe =
+      /<td class='(?:bad )?play' data-side='(\w+)' data-i='(-?\d+)' data-kind='([\w-]+)'/g;
+    let row;
+    while ((row = rowRe.exec(html)) !== null) {
+      let m;
+      cellRe.lastIndex = 0;
+      while ((m = cellRe.exec(row[3])) !== null) {
+        const td = makeEl("play-cell");
+        td.dataset = { side: m[1], i: m[2], kind: m[3], t: row[1] };
+        cells.push(td);
+      }
     }
     playCells.html = html;
     playCells.cells = cells;
@@ -538,9 +557,27 @@ function exerciseDeviationHover() {
   const washes = (from) => calls.fillStyles.slice(from)
     .filter(([, a]) => a > 0 && a < 0.3).map(([c]) => c);
 
+  /* Where the highlight starts, against where the marks inside it start.
+     The highlight must open at the leading character's first mark — the gap
+     *before* that character belongs to the character before it, and including
+     it made a letter-gap highlight read as gap-char-gap-char. Marks are the
+     only opaque fills in the band, so the leftmost one inside the wash is that
+     first mark. */
+  const leadIn = (from) => {
+    const painted = calls.fillStyles.slice(from);
+    const wash = painted.find(([, a]) => a > 0 && a < 0.3);
+    if (!wash) return null;
+    const [, , wx0, wx1] = wash;
+    const marks = painted.filter(([, a, x0, x1]) =>
+      a >= 0.9 && x0 !== null && x0 >= wx0 - 1 && x1 <= wx1 + 1);
+    if (!marks.length) return null;
+    return Math.min(...marks.map((m) => m[2])) - wx0;
+  };
+
   let n = calls.fillStyles.length;
   fire(you, "mouseenter");
   devHover.you = washes(n);
+  devHover.youLeadIn = leadIn(n);
   n = calls.fillStyles.length;
   fire(you, "mouseleave");
   devHover.afterLeave = washes(n);
@@ -573,6 +610,38 @@ function exerciseDeviationHover() {
   devHover.translateReHover = Math.round(translate());
   fire(other, "mouseleave");
   devHover.rows = youCells.length;
+}
+
+/* ---- what a deviation row plays ----------------------------------------- //
+   Scope is per class: a letter gap gets the characters either side, a word gap
+   the words either side. Recorded per row as [kind, the moment the row names,
+   window start, window length] — enough to check the window contains that
+   moment (the off-by-one that scoped every gap a character early) and that a
+   word gap reaches wider than a letter gap. */
+const devPlay = [];
+async function exerciseDeviationPlay() {
+  fire(byId("stop"), "click");
+  const cells = global.document.querySelectorAll("td.play");
+  // Cells come in (yours, target) pairs, one pair per row.
+  for (let i = 0; i + 1 < cells.length; i += 2) {
+    const you = cells[i], tgt = cells[i + 1];
+    if (you.dataset.side !== "you" || tgt.dataset.side !== "tgt") continue;
+    const n = audio.spans.length;
+    fire(you, "click");
+    await flush();
+    if (audio.spans.length === n) { fire(byId("stop"), "click"); continue; }
+    const start = audio.seeks[audio.seeks.length - 1];
+    const dur = audio.spans[audio.spans.length - 1];
+    fire(byId("stop"), "click");
+    // The target side is scoped the same way, so record its span too — it is
+    // the ideal keying's own timeline, hence a different absolute length.
+    audio.oscSpan = 0;
+    fire(tgt, "click");
+    await flush();
+    devPlay.push([you.dataset.kind, Number(you.dataset.t), start, dur,
+                  audio.oscSpan || 0]);
+    fire(byId("stop"), "click");
+  }
 }
 
 // ---- downloads ----------------------------------------------------------- //
@@ -620,6 +689,7 @@ exerciseAB()
   .then(exerciseTargetPlay)
   .then(exerciseFollow)
   .then(exerciseDeviationHover)
+  .then(exerciseDeviationPlay)
   .then(exerciseDownloads)
   .then(report)
   .catch((e) => { console.error(e.stack || String(e)); process.exit(1); });
@@ -680,6 +750,7 @@ console.log(JSON.stringify({
   dlStatus: byId("dl-status").textContent,
   abTest: abTest,
   devHover: devHover,
+  devPlay: devPlay,
   endReset: endReset,
   initial: initial,
   viewFills: viewFills,

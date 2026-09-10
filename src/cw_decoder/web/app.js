@@ -333,10 +333,15 @@
     drawPlayhead(v);
   }
 
-  /* The x-range one slot occupies on one track, in content pixels, lead gap
-     included — the gap is usually the thing a deviation row is about. Returns
-     null when that side has no character in the slot (a missed or extra one). */
-  function slotSpan(side, i) {
+  /* The x-range one slot occupies on one track, in content pixels. Returns null
+     when that side has no character in the slot (a missed or extra one).
+
+     `withLeadGap` because only the gaps *between* the characters of a range
+     belong to it: the leading character's own lead gap sits outside, and
+     including it made a letter-gap highlight read as gap-char-gap-char. The
+     time window playback uses starts at `Char.t0`, which is the first mark, so
+     this is what keeps the two agreeing. */
+  function slotSpan(side, i, withLeadGap) {
     var it = L.items[i];
     if (!it) return null;
     var ch = side === "you" ? it.slot.actual : it.slot.ideal;
@@ -344,27 +349,31 @@
     if (S.view === "per-char") {
       // Both rows' gaps start at the slot's left edge, but the slot is as wide
       // as the longer of the two, so the shorter one starts further in.
-      var gapW = side === "you" ? it.youGapW : it.tgtGapW;
+      var gapW = !withLeadGap ? 0 : side === "you" ? it.youGapW : it.tgtGapW;
       var bx = it.x + it.gapW;
       return [bx - gapW, bx + charWidth(ch)];
     }
     var x = side === "you" ? it.x : it.ix;
     if (x === null || x === undefined) return null;
-    var g = ch.leadGap;
+    var g = withLeadGap ? ch.leadGap : null;
     return [x - (g ? g.units * S.ppu : 0), x + charWidth(ch)];
   }
 
   /* The same slot range playback uses, so hovering a row previews exactly what
-     clicking it will play: the character before, the deviation, and the one
-     after. */
+     clicking it will play. */
   function focusSpan(f) {
     if (!f) return null;
-    var lo = Math.max(f.idx - 1, 0);
-    var hi = Math.min(f.idx + 1, L.items.length - 1);
-    var x0 = Infinity, x1 = -Infinity;
+    var r = contextSlots(f.side, f.idx, f.kind);
+    if (!r) return null;
+    var lo = r[0], hi = Math.min(r[1], L.items.length - 1);
+    var x0 = Infinity, x1 = -Infinity, leading = true;
     for (var i = lo; i <= hi; i++) {
-      var s = slotSpan(f.side, i);
+      // The first character *present* on this side opens the range, so its own
+      // lead gap is excluded; every later one contributes the gap that joins
+      // it to the character before.
+      var s = slotSpan(f.side, i, !leading);
       if (!s) continue;
+      leading = false;
       x0 = Math.min(x0, s[0]);
       x1 = Math.max(x1, s[1]);
     }
@@ -1269,20 +1278,25 @@
     // Worst deviations. Each value is its own play control, so you can click
     // back and forth between yours and the target and hear the difference.
     var devs = g.deviations.map(function (d) {
+      // data-kind is the graded class, which scopes how much either side
+      // plays and highlights — see contextSlots.
       var i = slotIndexAtTime(d.timeSec);
+      var at = " data-i='" + i + "' data-kind='" + d.kind + "'";
       return "<tr><td>" + d.timeSec.toFixed(2) + "s</td><td>" + d.kind +
-             "</td><td class='bad play' data-side='you' data-i='" + i +
-             "' title='hear yours'>" + d.valueUnits.toFixed(2) + "u ▸</td>" +
-             "<td class='play' data-side='tgt' data-i='" + i +
-             "' title='hear the target'>" + d.targetUnits.toFixed(2) +
+             "</td><td class='bad play' data-side='you'" + at +
+             " title='hear yours'>" + d.valueUnits.toFixed(2) + "u ▸</td>" +
+             "<td class='play' data-side='tgt'" + at +
+             " title='hear the target'>" + d.targetUnits.toFixed(2) +
              "u ▸</td><td>" + (d.context ? "after " + d.context : "") +
              "</td></tr>";
     }).join("");
     html.push('<div class="card"><h2>Largest deviations</h2>' +
       (devs ? "<table><tr><th>at</th><th>class</th><th>yours</th>" +
               "<th>target</th><th>context</th></tr>" + devs + "</table>" +
-              '<p class="note">Click either value to hear it — yours or the ' +
-              "target — with the characters either side for rhythm.</p>"
+              '<p class="note">Hover a value to find it on the canvas, click ' +
+              "to hear it — yours or the target. Either way you get the " +
+              "characters around a letter gap, or the words around a word " +
+              "gap.</p>"
             : '<p class="note empty">No significant spacing deviations. ' +
               "Clean sending.</p>") + "</div>");
 
@@ -1317,8 +1331,9 @@
     Array.prototype.forEach.call(document.querySelectorAll("td.play"),
       function (td) {
         var side = td.dataset.side, idx = parseInt(td.dataset.i, 10);
+        var kind = td.dataset.kind;
         td.addEventListener("click", function () {
-          var w = contextWindow(side, idx);
+          var w = contextWindow(side, idx, kind);
           if (!w) return;
           if (side === "you") playYou(w[0], w[1]);
           else playTarget(w[0], w[1]);
@@ -1326,13 +1341,15 @@
         // Hovering a value points at the stretch of canvas it describes, on
         // the same track the button would play — so "yours" and "target"
         // light up different rows.
-        td.addEventListener("mouseenter", function () { setFocus(side, idx); });
+        td.addEventListener("mouseenter", function () {
+          setFocus(side, idx, kind);
+        });
         td.addEventListener("mouseleave", clearFocus);
       });
   }
 
-  function setFocus(side, idx) {
-    S.focus = { side: side, idx: idx };
+  function setFocus(side, idx, kind) {
+    S.focus = { side: side, idx: idx, kind: kind };
     revealFocus();
     draw();
   }
@@ -1359,11 +1376,23 @@
 
   /* Which slot a moment on the recording belongs to. Deviations carry a time,
      not a character, so this is how a report row finds its counterpart on the
-     target track. */
+     target track.
+
+     A gap deviation's time is its lead gap's start, which is also the instant
+     the *previous* slot ends — and a slot's span runs from its lead gap to its
+     last mark, so both slots contain it. Matching the lead gap first resolves
+     that tie the right way: the row is about the gap before this character, so
+     it belongs to the character the gap leads into. Getting this backwards
+     scoped every gap row one character early. */
   function slotIndexAtTime(t) {
+    var i, a;
+    for (i = 0; i < M.slots.length; i++) {
+      a = M.slots[i].actual;
+      if (a && a.leadGap && Math.abs(a.leadGap.t0 - t) < 1e-9) return i;
+    }
     var best = -1, bestD = Infinity;
-    for (var i = 0; i < M.slots.length; i++) {
-      var a = M.slots[i].actual;
+    for (i = 0; i < M.slots.length; i++) {
+      a = M.slots[i].actual;
       if (!a) continue;
       var from = a.leadGap ? a.leadGap.t0 : a.t0;
       if (t >= from - 1e-9 && t <= a.t1 + 1e-9) return i;
@@ -1373,17 +1402,54 @@
     return best;
   }
 
-  /* A play window covering the slot plus its neighbours. Spacing is only
-     audible in context: to judge a gap you need the character before it, the
-     gap, and the character after. */
-  function contextWindow(side, idx) {
+  function charAt(side, i) {
+    var s = M.slots[i];
+    return s ? (side === "you" ? s.actual : s.ideal) : null;
+  }
+
+  /* Does this character open a word? Read off `targetKind`, so the words are
+     the ones the intended text has, not the ones an overlong gap made the
+     decoder see — which is the same basis the row's own class comes from. */
+  function opensWord(ch) {
+    var g = ch && ch.leadGap;
+    return !!g && (g.targetKind === "word-gap" || g.targetKind === "pause");
+  }
+
+  /* The slot range a deviation is about. Scoped to the class being graded,
+     because that's what makes the error audible and visible:
+
+       char-gap  the character before, the gap, the character after — nothing
+                 more, or a neighbouring gap competes with the one in question
+       word-gap  the whole word either side, since a word gap separates words
+                 and half a word doesn't read as one
+       anything  else lives inside a character (a mark, an intra-character
+                 gap), so its own character plus a neighbour for rhythm
+
+     A gap is the *lead* gap of slot `idx`, so it sits between idx-1 and idx.
+     Both the highlight and the playback window come from here — they'd drift
+     apart within a week if each did its own arithmetic. */
+  function contextSlots(side, idx, kind) {
     if (!(idx >= 0)) return null;
+    var last = M.slots.length - 1;
+    if (kind === "char-gap") return [Math.max(idx - 1, 0), Math.min(idx, last)];
+    if (kind === "word-gap") {
+      var lo = idx - 1;
+      while (lo > 0 && !opensWord(charAt(side, lo))) lo--;
+      var hi = Math.min(idx, last);
+      while (hi < last && !opensWord(charAt(side, hi + 1))) hi++;
+      return [Math.max(lo, 0), hi];
+    }
+    return [Math.max(idx - 1, 0), Math.min(idx + 1, last)];
+  }
+
+  /* The same range as a time window, for playback. */
+  function contextWindow(side, idx, kind) {
+    var r = contextSlots(side, idx, kind);
+    if (!r) return null;
     var pad = 0.08;
-    var lo = Math.max(idx - 1, 0);
-    var hi = Math.min(idx + 1, M.slots.length - 1);
     var first = null, last = null;
-    for (var i = lo; i <= hi; i++) {
-      var c = side === "you" ? M.slots[i].actual : M.slots[i].ideal;
+    for (var i = r[0]; i <= r[1]; i++) {
+      var c = charAt(side, i);
       if (!c) continue;
       if (!first) first = c;
       last = c;

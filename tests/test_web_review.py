@@ -530,6 +530,15 @@ def test_page_boots_and_draws(tmp_path):
     assert hov["afterLeave"] == [], \
         f"the highlight outlived the hover: {hov['afterLeave']}"
 
+    # The highlight opens at the leading character's first mark, give or take
+    # its 4px pad. Only the gaps *between* a range's characters belong to it —
+    # the one before the first character belongs to the character before that,
+    # and including it made a letter-gap highlight read as gap-char-gap-char.
+    assert hov["youLeadIn"] is not None, "found no marks inside the highlight"
+    assert 0 <= hov["youLeadIn"] <= 8, (
+        f"the highlight starts {hov['youLeadIn']}px before the first mark it "
+        "contains, so it has swallowed the gap ahead of the range")
+
     # Zoomed in past the viewport, hovering a row for a deviation the view has
     # scrolled away from brings it on screen — otherwise the highlight lands
     # outside the viewport and the row looks inert. Two rows at different
@@ -540,6 +549,30 @@ def test_page_boots_and_draws(tmp_path):
         "hovering a deviation off screen did not reveal it"
     assert hov["translateReHover"] == hov["translateRowB"], \
         "re-hovering the same row moved the view"
+
+    # What a row plays is scoped to the class it grades: a letter gap gets the
+    # characters either side, a word gap the words either side. Recorded as
+    # [kind, the moment the row names, window start, length, target length].
+    dp = d["devPlay"]
+    assert dp, "no deviation row played anything"
+    assert {"char-gap", "word-gap"} <= {r[0] for r in dp}
+    # The window must contain the moment its row names. A gap's timestamp is
+    # also the instant the previous character ends, and resolving that tie the
+    # wrong way scoped every gap row one character early — which put the gap
+    # itself at the very edge of the window instead of in the middle of it.
+    for kind, at, start, dur, tgt_dur in dp:
+        assert start < at < start + dur, (
+            f"{kind} row at {at}s played [{start:.2f}, {start + dur:.2f}], "
+            "which doesn't contain the moment the row names")
+        assert tgt_dur > 0, f"{kind} row played nothing on the target track"
+    # Both sides are scoped by the same rule, so a word gap reaches wider than
+    # a letter gap on both. (Fixture-specific: words here are 2-5 characters.)
+    for i, label in ((3, "yours"), (4, "target")):
+        letters = [r[i] for r in dp if r[0] == "char-gap"]
+        words = [r[i] for r in dp if r[0] == "word-gap"]
+        assert min(words) > max(letters), (
+            f"on '{label}', a word gap should reach wider than a letter gap: "
+            f"letter {max(letters):.2f}s vs word {min(words):.2f}s")
 
     # Playback resets the transport when it ends. The original bug: the payload
     # duration is rounded, so the clock could plateau just under it and a `>=`
