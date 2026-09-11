@@ -570,7 +570,8 @@ def main(argv=None) -> int:
                            "forget it and choose again.")
     live.add_argument("--duration", type=float, default=120.0,
                       help="maximum capture length in seconds; recording also "
-                           "stops early when you press Enter (default 120). "
+                           "stops early when you press Enter, or starts over on "
+                           "Ctrl-R (default 120). "
                            "This cap prevents a runaway recording filling the "
                            "disk.")
     live.add_argument("--capture-backend", choices=["auto", "portaudio",
@@ -721,13 +722,23 @@ def main(argv=None) -> int:
 
         try:
             _send_header(expected)
+
+            def on_restart(n):
+                # Return to the start of the line and wipe it, so this lands
+                # cleanly instead of after a half-written preview decode.
+                if sys.stderr.isatty():
+                    sys.stderr.write("\r\033[K")
+                print(f"# take {n + 1}: started over, previous take "
+                      "discarded.", file=sys.stderr)
+
             if args.preview:
                 from . import stream, synth
                 timing = core.target_timing(args.target_wpm,
                                             args.target_farnsworth)
                 print(f"# live decode ({args.target_wpm:g} wpm) on device "
-                      f"{device} — key now; Enter to stop (auto after "
-                      f"{args.duration:g}s).", file=sys.stderr)
+                      f"{device} — key now; Enter to stop, Ctrl-R to start "
+                      f"over (auto after {args.duration:g}s).",
+                      file=sys.stderr)
 
                 def on_update(text):
                     sys.stderr.write("\r" + text + " ")
@@ -736,7 +747,8 @@ def main(argv=None) -> int:
                 sig, _, cap_rate, used, problems = stream.run_live(
                     device, timing, rate=cap_rate, tone=args.tone,
                     max_seconds=args.duration, on_update=on_update,
-                    dsp_rate=args.rate, backend=backend)
+                    dsp_rate=args.rate, backend=backend,
+                    on_restart=on_restart)
                 sys.stderr.write("\n")
                 sys.stderr.flush()
                 if sig.size < int(0.2 * cap_rate):
@@ -744,11 +756,13 @@ def main(argv=None) -> int:
                 synth.write_wav(out_path, sig, cap_rate)
             else:
                 print(f"# recording on device {device} ({backend}) — key your "
-                      f"message, then press Enter to stop (auto-stops after "
-                      f"{args.duration:g}s).", file=sys.stderr)
+                      f"message, then press Enter to stop, or Ctrl-R to start "
+                      f"over (auto-stops after {args.duration:g}s).",
+                      file=sys.stderr)
                 cap_rate, used, problems = capture.record(
                     device, out_path, rate=cap_rate,
-                    max_seconds=args.duration, backend=backend)
+                    max_seconds=args.duration, backend=backend,
+                    on_restart=on_restart)
             # Whatever the backend noticed — PortAudio reports input overflow
             # directly, ffmpeg complains about its queue.
             for line in problems:

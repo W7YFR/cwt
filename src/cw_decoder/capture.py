@@ -22,6 +22,7 @@ afterwards, off the clock, in `core.load_audio`.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import platform
 import queue
@@ -212,6 +213,14 @@ class LiveStream:
         """Backend-reported glitches (e.g. input overflow)."""
         return []
 
+    def forget_problems(self) -> None:
+        """Discard glitches reported so far.
+
+        Called when a take is abandoned: a dropout during audio nobody is going
+        to decode isn't worth warning about, and reporting it against the take
+        that replaced it would be wrong.
+        """
+
 
 class _PortAudioStream(LiveStream):
     def __init__(self, sd, device: int, rate: "int | None"):
@@ -263,6 +272,9 @@ class _PortAudioStream(LiveStream):
 
     def problems(self) -> list:
         return list(self._status)
+
+    def forget_problems(self) -> None:
+        self._status.clear()
 
 
 def _read_stream_format(stdout):
@@ -401,51 +413,116 @@ def open_stream(device: int, rate: "int | None" = None,
 # --------------------------------------------------------------------------- #
 # Recording to a file
 # --------------------------------------------------------------------------- #
-def _stop_requested() -> bool:
-    """True once the user has pressed Enter (non-blocking)."""
+KEY_RESTART = "\x12"        # Ctrl-R
+_STOP_KEYS = ("\r", "\n", "\x04")   # Enter, or Ctrl-D
+
+
+@contextlib.contextmanager
+def raw_keys():
+    """Deliver single keypresses immediately, without echoing them.
+
+    A line-buffered terminal hands over nothing until Enter, so Ctrl-R would
+    arrive — if at all — as an invisible byte in the middle of a line. cbreak
+    leaves ISIG alone, so Ctrl-C still raises KeyboardInterrupt as before.
+
+    A no-op when stdin isn't a terminal (pipes, tests) or the platform has no
+    termios, which is also what makes `_read_key` safe to call unconditionally.
+    """
+    try:
+        import termios
+        import tty
+    except ImportError:                        # not a POSIX terminal
+        yield
+        return
     if not sys.stdin.isatty():
-        return False
+        yield
+        return
+    fd = sys.stdin.fileno()
+    saved = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)
+        yield
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+
+
+def _read_key() -> "str | None":
+    """Whatever the user just pressed: "restart", "stop", or None.
+
+    Non-blocking. Keys other than the ones we act on are swallowed, so a stray
+    arrow key can't end a take the way "any input stops" once let it.
+    """
+    if not sys.stdin.isatty():
+        return None
     ready, _, _ = select.select([sys.stdin], [], [], 0)
     if not ready:
-        return False
+        return None
     try:
-        os.read(sys.stdin.fileno(), 4096)      # consume the Enter
+        buf = os.read(sys.stdin.fileno(), 4096).decode("utf-8", "replace")
     except OSError:
-        pass
-    return True
+        return None
+    # Restart wins over stop: if both are in the same burst, the last thing the
+    # user asked for was a fresh take, not the end of this one.
+    if KEY_RESTART in buf:
+        return "restart"
+    if any(k in buf for k in _STOP_KEYS):
+        return "stop"
+    return None
 
 
 def capture_samples(device: int, rate: "int | None" = None,
                     max_seconds: float = DEFAULT_MAX_SECONDS,
-                    backend: str = "auto", on_block=None):
+                    backend: str = "auto", on_block=None, on_restart=None):
     """Capture until Enter, end of stream, or `max_seconds`.
 
     Returns (mono_samples, rate, backend, problems). `on_block` is called with
     the accumulated *interleaved* buffer as it grows, for a live preview.
 
-    Enter means "stop, I'm done" and returns what was captured. Ctrl-C means
-    "forget it" and raises KeyboardInterrupt — the device is still shut down
-    cleanly, but the caller is expected to throw the take away rather than
-    grade a run you meant to abandon.
+    Enter means "stop, I'm done" and returns what was captured. Ctrl-R throws
+    the take away and starts over on the same open device — nothing is
+    re-opened, so it begins again immediately — and calls `on_restart` so the
+    caller can say so and reset any preview. Ctrl-C means "forget it" and
+    raises KeyboardInterrupt — the device is still shut down cleanly, but the
+    caller is expected to throw the take away rather than grade a run you meant
+    to abandon.
     """
     if max_seconds <= 0:
         max_seconds = DEFAULT_MAX_SECONDS
     stream = open_stream(device, rate, backend)
     chunks: list = []
     start = time.monotonic()
+    restarts = 0
     try:
-        while True:
-            block = stream.read(0.1)
-            if block is None:                  # source ended
-                break
-            if block.size:
-                chunks.append(block)
-                if on_block is not None:
-                    on_block(chunks, stream.rate, stream.channels)
-            if _stop_requested():
-                break
-            if time.monotonic() - start >= max_seconds:
-                break
+        with raw_keys():
+            while True:
+                block = stream.read(0.1)
+                if block is None:              # source ended
+                    break
+                if block.size:
+                    chunks.append(block)
+                    if on_block is not None:
+                        on_block(chunks, stream.rate, stream.channels)
+                key = _read_key()
+                if key == "restart":
+                    # Drop the take and the glitches it collected, then keep
+                    # reading the same stream. Anything the device queued while
+                    # the old take was being abandoned goes too, or the new one
+                    # would open with the tail of the old.
+                    chunks.clear()
+                    stream.forget_problems()
+                    while True:
+                        pending = stream.read(0.0)
+                        if pending is None or not pending.size:
+                            break
+                    start = time.monotonic()
+                    restarts += 1
+                    if on_restart is not None:
+                        on_restart(restarts)
+                    continue
+                if key == "stop":
+                    break
+                if time.monotonic() - start >= max_seconds:
+                    break
     finally:
         stream.stop()
     tail = stream.drain()
@@ -477,7 +554,7 @@ def wav_rate(path: str) -> "int | None":
 
 def record(device: int, out_path: str, rate: "int | None" = None,
            max_seconds: float = DEFAULT_MAX_SECONDS,
-           backend: str = "auto") -> tuple:
+           backend: str = "auto", on_restart=None) -> tuple:
     """Capture from `device` into `out_path` as a mono WAV.
 
     Returns (rate, backend, problems). With `rate=None` the device's own rate
@@ -486,7 +563,7 @@ def record(device: int, out_path: str, rate: "int | None" = None,
     from .synth import write_wav
 
     sig, rate, backend, problems = capture_samples(
-        device, rate, max_seconds, backend)
+        device, rate, max_seconds, backend, on_restart=on_restart)
     if sig.size < int(0.05 * max(rate, 1)):
         raise RuntimeError("capture produced no audio.")
     write_wav(out_path, sig, rate)

@@ -12,6 +12,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -1200,6 +1201,150 @@ def test_stream_format_is_read_from_ffmpegs_header():
     # A stream that isn't WAV at all is reported, not silently misread.
     with pytest.raises(RuntimeError, match="unexpected audio stream header"):
         capture._read_stream_format(io.BytesIO(b"\x00" * 64))
+
+
+class _ScriptedStream:
+    """A LiveStream whose blocks arrive on a schedule the test controls.
+
+    Models the real backends' shape: a queue a driver fills asynchronously,
+    which `read` drains one block at a time and returns empty when there's
+    nothing waiting. That's what lets a test say "this much audio was already
+    queued when the user hit Ctrl-R".
+    """
+
+    def __init__(self, rate=8000, channels=1):
+        import collections
+        self.rate, self.channels, self.backend = rate, channels, "scripted"
+        self._q = collections.deque()
+        self._problems = []
+        self.stopped = False
+
+    def feed(self, value, blocks=1, size=64):
+        import numpy as np
+        for _ in range(blocks):
+            self._q.append(np.full(size, value, dtype=np.float32))
+
+    def read(self, timeout=0.2):
+        import numpy as np
+        return self._q.popleft() if self._q else np.zeros(0, dtype=np.float32)
+
+    def stop(self):
+        self.stopped = True
+
+    def drain(self):
+        import numpy as np
+        return np.zeros(0, dtype=np.float32)
+
+    def problems(self):
+        return list(self._problems)
+
+    def forget_problems(self):
+        self._problems.clear()
+
+
+def test_ctrl_r_restarts_the_take_on_the_same_stream(monkeypatch):
+    """Ctrl-R throws the take away and starts over without reopening anything.
+
+    The value in each block marks which take it came from, so the returned
+    audio says exactly what survived.
+    """
+    import numpy as np
+
+    from cw_decoder import capture
+
+    stream = _ScriptedStream()
+    monkeypatch.setattr(capture, "open_stream",
+                        lambda *a, **kw: stream)
+
+    stream.feed(1.0, blocks=3)               # take one
+    stream._problems.append("input overflow")  # ...and a glitch during it
+    restarts = []
+
+    # One entry per pass of the capture loop. By the time "restart" fires, two
+    # take-one blocks have been read and a third is still sitting in the
+    # queue — that one has to be discarded too, not folded into take two.
+    script = ["", "restart", "feed", "", "", "", "", "stop"]
+
+    def fake_key():
+        step = script.pop(0) if script else "stop"
+        if step == "feed":                   # take two starts arriving
+            stream.feed(2.0, blocks=4)
+            return None
+        return step or None
+
+    monkeypatch.setattr(capture, "_read_key", fake_key)
+
+    sig, rate, backend, problems = capture.capture_samples(
+        0, max_seconds=30, on_restart=restarts.append)
+
+    # Only take two came back, and all of it: the clock restarted too, or the
+    # 30-second cap would have fired straight after the restart.
+    assert np.unique(sig).tolist() == [2.0]
+    assert sig.size == 4 * 64
+    # One restart, numbered so the CLI can say "take 2".
+    assert restarts == [1]
+    # The glitch belonged to the take that was thrown away.
+    assert problems == []
+    assert (rate, backend) == (8000, "scripted")
+    assert stream.stopped                    # still shut down cleanly
+
+
+def test_restart_keys_are_the_only_special_ones(monkeypatch):
+    """Enter stops, Ctrl-R restarts, and a stray key does neither.
+
+    "Any input stops" was fine when a line-buffered terminal meant you had to
+    press Enter for anything to arrive at all. Now that single keys come
+    through immediately, an arrow key must not end a take.
+    """
+    from cw_decoder import capture
+
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+    # pytest's stdin has no fileno, and io.UnsupportedOperation is an OSError,
+    # so without this every read would be swallowed as "nothing pressed".
+    monkeypatch.setattr(sys.stdin, "fileno", lambda: 0, raising=False)
+    reads = {}
+    monkeypatch.setattr(capture.select, "select",
+                        lambda *a: ([sys.stdin], [], []))
+    monkeypatch.setattr(capture.os, "read",
+                        lambda fd, n: reads["buf"])
+
+    for buf, want in [
+        (b"\r", "stop"),                     # Enter
+        (b"\n", "stop"),
+        (b"\x04", "stop"),                   # Ctrl-D
+        (b"\x12", "restart"),                # Ctrl-R
+        (b"x", None),                        # a stray letter
+        (b"\x1b[C", None),                   # right arrow
+        (b"\x12\r", "restart"),              # both at once: restart wins
+    ]:
+        reads["buf"] = buf
+        assert capture._read_key() == want, f"{buf!r} should read as {want}"
+
+
+def test_raw_keys_restores_the_terminal(monkeypatch):
+    """cbreak mode is a loan, not a purchase — and a no-op off a terminal."""
+    from cw_decoder import capture
+
+    # Not a tty: nothing is touched, so piping input can't wedge the terminal.
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False, raising=False)
+    with capture.raw_keys():
+        pass
+
+    termios = pytest.importorskip("termios")
+    calls = []
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr(sys.stdin, "fileno", lambda: 0, raising=False)
+    monkeypatch.setattr(termios, "tcgetattr", lambda fd: "SAVED")
+    monkeypatch.setattr(termios, "tcsetattr",
+                        lambda fd, when, attrs: calls.append(attrs))
+    import tty
+    monkeypatch.setattr(tty, "setcbreak", lambda fd: calls.append("cbreak"))
+
+    with pytest.raises(RuntimeError):
+        with capture.raw_keys():
+            raise RuntimeError("boom")
+    # Restored even when the body blows up, or Ctrl-C would leave no echo.
+    assert calls == ["cbreak", "SAVED"]
 
 
 def test_capture_folds_multichannel_to_mono():

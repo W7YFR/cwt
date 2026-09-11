@@ -75,7 +75,7 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `--preview` | With `--live`, also print the decode in **real time** as you key (requires `-w`). |
 | `--list-devices` | List available audio input devices and exit. |
 | `-D, --device` | Input device for `--live`: an index, or a name fragment (`-D blackhole`). Remembered for next time; `-D ask` forgets it and asks again. |
-| `--duration SEC` | Max live-capture length; also stops early on Enter (default 120, prevents runaway recordings). |
+| `--duration SEC` | Max live-capture length; Enter stops early, Ctrl-R starts the take over (default 120, prevents runaway recordings). |
 | `--capture-rate HZ` | Force a capture rate. Default: the device's own rate, with no resampling (which sounds better). Smaller rates make smaller files. |
 | `--trim-pad SEC` | Dead air to keep at each end of a live capture; the rest is trimmed (default 0.5). |
 | `--no-trim` | Keep a live capture exactly as recorded, dead air and all. |
@@ -248,12 +248,20 @@ printed before recording so you know what to key:
 # send this:
 #   CQ CQ DE AB1CD K
 #
-# recording on device 1 (portaudio) — key your message, then press Enter to stop.
+# recording on device 1 (portaudio) — key your message, then press Enter to stop,
+# or Ctrl-R to start over.
 ```
 
-**Press Enter** to stop, or let the `--duration` cap end it (default 120 s).
-**Ctrl-C** cancels instead and throws the take away. `--save practice.wav` keeps
-the audio.
+Three keys while it's recording:
+
+| Key | Does |
+|-----|------|
+| **Enter** | Stop — decode and grade what you keyed. The `--duration` cap (default 120 s) does the same if you don't. |
+| **Ctrl-R** | Start over. Throws away the take so far and begins a fresh one on the same open device, so it restarts instantly. Use it the moment you fumble, instead of finishing a take you know is spoiled. |
+| **Ctrl-C** | Cancel. Throws the take away and exits without decoding or grading. |
+
+Any other key is ignored, so a stray keypress can't end a take. `--save
+practice.wav` keeps the audio.
 
 A practice loop — put the target in a file once, then repeat:
 
@@ -291,7 +299,8 @@ cw-decode --live --preview -D 1 -w 20
 ```
 # send this:
 #   CQ DE AB1CD K
-# live decode (20 wpm) on device 1 — key now; Enter to stop (auto after 120s).
+# live decode (20 wpm) on device 1 — key now; Enter to stop, Ctrl-R to start
+# over (auto after 120s).
 CQ DE AB1CD K            <- this line grows as you send
 ```
 

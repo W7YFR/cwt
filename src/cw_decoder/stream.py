@@ -41,7 +41,7 @@ def run_live(device: int, timing: core.Timing, rate: int | None = None,
              tone: float | None = None,
              max_seconds: float = capture.DEFAULT_MAX_SECONDS,
              on_update=None, dsp_rate: int = core.TARGET_RATE,
-             backend: str = "auto"):
+             backend: str = "auto", on_restart=None):
     """Capture and live-decode until Enter, end of stream, or `max_seconds`.
 
     Returns (samples, tone, rate, backend, problems) — the full captured mono
@@ -75,7 +75,17 @@ def run_live(device: int, timing: core.Timing, rate: int | None = None,
         if state["tone"]:
             on_update(core.quick_decode(dsp, dsp_rate, state["tone"], timing))
 
+    def on_take_restart(n):
+        # The preview's tick schedule counts captured frames, and the take just
+        # went back to zero — leaving it would stall the preview until the new
+        # take grew past the old one's length. The detected tone is kept: it's a
+        # property of the rig, not of the take.
+        state["next_tick"] = 0.0
+        state["seen"] = 0
+        if on_restart is not None:
+            on_restart(n)
+
     sig, cap_rate, backend_used, problems = capture.capture_samples(
         device, rate=rate, max_seconds=max_seconds, backend=backend,
-        on_block=on_block)
+        on_block=on_block, on_restart=on_take_restart)
     return sig, state["tone"], cap_rate, backend_used, problems
