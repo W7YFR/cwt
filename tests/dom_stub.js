@@ -246,7 +246,11 @@ let blobSeq = 0;
 global.Blob = function (parts, opts) {
   const size = parts.reduce(
     (n, p) => n + (p.byteLength ?? p.size ?? String(p).length), 0);
-  return { size, type: (opts || {}).type || "" };
+  // Text parts are kept whole: the JSON report download is only worth testing
+  // if the test can parse what came out, not just weigh it.
+  const text = parts.every((p) => typeof p === "string")
+    ? parts.join("") : null;
+  return { size, type: (opts || {}).type || "", text };
 };
 global.URL = {
   createObjectURL: (b) => {
@@ -310,7 +314,8 @@ global.document = eventTarget({
       downloads.push({
         name: a.download,
         scheme: String(a.href).split(":")[0],
-        size: b ? b.size : String(a.href).length
+        size: b ? b.size : String(a.href).length,
+        text: b && b.text ? b.text : null
       });
     };
     a.remove = () => {};
@@ -716,12 +721,72 @@ async function exerciseDownloads() {
   for (const view of ["per-char", "absolute", "overlay"]) {
     byId("view").value = view;
     fire(byId("view"), "change");
-    for (const id of ["dl-you", "dl-tgt", "dl-png"]) {
+    for (const id of ["dl-you", "dl-tgt", "dl-png", "dl-json"]) {
       fire(byId(id), "click");
       // Let the offline render and its .then chain settle.
       for (let i = 0; i < 8; i++) await Promise.resolve();
     }
   }
+}
+
+/* The JSON report download, twice: once as the page opened, once after moving
+   the controls that feed the grading. Two dumps of one recording are the only
+   way to show the file reports what's on screen rather than a snapshot baked
+   in at build time. Everything touched is put back, since later stretches
+   assert against the report table and the scores. */
+const jsonReports = {};
+
+function grabJson(key) {
+  const before = downloads.length;
+  fire(byId("dl-json"), "click");
+  const got = downloads.slice(before).filter((d) => d.text);
+  jsonReports[key] = got.length ? JSON.parse(got[got.length - 1].text) : null;
+  jsonReports[key + "Name"] = got.length ? got[got.length - 1].name : null;
+}
+
+function exerciseJsonReport() {
+  const was = { wpm: byId("wpm").value, farns: byId("farns").value,
+                tol: byId("tol").value, exp: byId("expected").value,
+                rests: byId("rests").checked, view: byId("view").value };
+  byId("view").value = "per-char";
+  fire(byId("view"), "change");
+  // Put the controls back where the page opened them — earlier stretches have
+  // been dragging them around — so the first dump really is the payload's own
+  // grading and can be compared against what the CLI would write.
+  byId("wpm").value = String(global.REVIEW.target.char_wpm);
+  fire(byId("wpm"), "input");
+  byId("farns").value = String(global.REVIEW.target.farnsworth_wpm);
+  fire(byId("farns"), "input");
+  byId("tol").value = String(Math.round(global.REVIEW.tolerance * 100));
+  fire(byId("tol"), "input");
+  byId("expected").value = global.REVIEW.expected || global.REVIEW.decoded;
+  fire(byId("expected"), "input");
+  byId("rests").checked = true;
+  fire(byId("rests"), "change");
+  grabJson("asOpened");
+
+  byId("wpm").value = "13";
+  fire(byId("wpm"), "input");
+  byId("tol").value = "10";
+  fire(byId("tol"), "input");
+  byId("expected").value = "SOS";
+  fire(byId("expected"), "input");
+  byId("rests").checked = false;
+  fire(byId("rests"), "change");
+  grabJson("regraded");
+
+  byId("wpm").value = was.wpm;
+  fire(byId("wpm"), "input");
+  byId("farns").value = was.farns;
+  fire(byId("farns"), "input");
+  byId("tol").value = was.tol;
+  fire(byId("tol"), "input");
+  byId("expected").value = was.exp;
+  fire(byId("expected"), "input");
+  byId("rests").checked = was.rests;
+  fire(byId("rests"), "change");
+  byId("view").value = was.view;
+  fire(byId("view"), "change");
 }
 
 /* Per-view render check. Fill count alone can't tell the renderers apart —
@@ -756,6 +821,7 @@ exerciseAB()
   .then(exerciseDeviationPlay)
   .then(exerciseRestToggle)
   .then(exerciseDownloads)
+  .then(exerciseJsonReport)
   .then(report)
   .catch((e) => { console.error(e.stack || String(e)); process.exit(1); });
 
@@ -811,7 +877,11 @@ console.log(JSON.stringify({
   // Content translate per frame while audio advanced; falls as the view
   // scrolls to keep the playhead visible.
   follow: follow,
-  downloads: downloads,
+  // Names and sizes only: the JSON report's own text is reported once, under
+  // jsonReports, instead of a copy per download.
+  downloads: downloads.map(
+    ({ name, scheme, size }) => ({ name, scheme, size })),
+  jsonReports: jsonReports,
   dlStatus: byId("dl-status").textContent,
   abTest: abTest,
   devHover: devHover,

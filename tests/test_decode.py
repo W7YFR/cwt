@@ -324,11 +324,13 @@ def test_color_modes(capsys, tmp_path):
     wav = tmp_path / "m.wav"
     _write_wav(wav, text="CQ DE AB1CD")
     ESC = "\033["
+    # --basic, because color only applies to the terminal report and the
+    # default output is the review page.
     # 'never' -> no ANSI
-    cli.main([str(wav), "-w", "20", "--color", "never"])
+    cli.main([str(wav), "-w", "20", "--basic", "--color", "never"])
     assert ESC not in capsys.readouterr().out
     # 'always' -> ANSI present
-    cli.main([str(wav), "-w", "20", "--color", "always"])
+    cli.main([str(wav), "-w", "20", "--basic", "--color", "always"])
     assert ESC in capsys.readouterr().out
     # JSON never carries color, even with --color always
     cli.main([str(wav), "-w", "20", "--color", "always", "--json"])

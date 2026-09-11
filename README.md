@@ -1,9 +1,23 @@
 # cw-decoder
 
-Decode Morse code (CW) from an audio recording into text. It auto-detects the
+Decode Morse code (CW) into text and grade how you keyed it. It auto-detects the
 tone frequency and speed, decodes the message, and — optionally — grades your
 keying against a target speed and scores it against the message you *meant* to
 send. Built for CW practice (CWops, LCWO, etc.).
+
+Two defaults, because they're what you want nearly every time:
+
+- **No input file means record one.** `cw-decode -w 20` keys straight from your
+  audio input; pass a file to decode that instead.
+- **The output is the review page.** Your keying drawn against perfect timing,
+  in a browser, with the audio to replay. `--basic` prints the terminal report
+  instead, `--json` dumps numbers.
+
+So the shortest useful command is:
+
+```sh
+cw-decode -w 20 -e "CQ DE AB1CD K"   # key it, then read the review page
+```
 
 ---
 
@@ -33,23 +47,32 @@ non-WAV audio files. On Linux, live capture also wants a system PortAudio
 ## Quick start
 
 ```sh
-cw-decode recording.wav                 # decode; speed/tone report + text
-cw-decode recording.mp3 -q              # just the decoded text
+cw-decode -w 20                         # key live, review it in a browser
+cw-decode recording.wav                 # decode a file instead
 cw-decode -w 25 -f 12 recording.wav     # grade my keying against 25/12 wpm
 cw-decode -e message.txt recording.wav  # score accuracy vs the intended text
-cw-decode --web-review recording.wav    # ...and see it drawn in a browser
+cw-decode --basic recording.wav         # skip the page, print the report
 ```
 
-Everything prints to **stdout**: the decoded text, plus any report lines
-(prefixed with `#`). Only real errors go to stderr. To get *just* the decoded
-text, use `-q`; for a machine-readable report, use `--json`:
+### Where the output goes
+
+The review page opens in a browser and is written to
+`~/.cw-decoder/sessions/<timestamp>/review.html` (or wherever `--web-out` says).
+The decoded text always prints to **stdout**; report lines are prefixed with `#`
+so they're easy to strip, and only real errors go to stderr.
+
+Three flags say "not the page":
 
 ```sh
-cw-decode recording.wav              # report (#-lines) + decoded text
-cw-decode -q recording.wav           # decoded text only
-cw-decode -q recording.wav > out.txt # save just the text
-cw-decode --json recording.wav       # structured JSON, nothing else
+cw-decode --basic recording.wav      # the practice report, in the terminal
+cw-decode --json  recording.wav      # structured JSON, nothing else
+cw-decode -q      recording.wav      # decoded text only
+cw-decode -q recording.wav > out.txt # ...which is what you'd redirect
 ```
+
+`--basic` and `--json` are alternatives — pick one. Either can be combined with
+`--web-review` to get the page *as well*, which is the only reason that flag
+still exists.
 
 ---
 
@@ -57,7 +80,7 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 
 | Flag | Meaning |
 |------|---------|
-| `input` | Audio file. WAV is read directly; other formats go through ffmpeg. |
+| `input` | Audio file to decode. WAV is read directly; other formats go through ffmpeg. **Omit it to record live instead.** |
 | `-t, --tone HZ` | Force the CW tone frequency. Default: auto-detect. |
 | `-b, --bandwidth HZ` | Bandpass half-width around the tone (default 200). Narrow it (e.g. `-b 100`) on a crowded/noisy band. |
 | `-r, --rate HZ` | Internal sample rate (default 8000; rarely needs changing). |
@@ -65,16 +88,17 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 | `-f, --target-farnsworth N` | Your target **overall** (Farnsworth) speed. Defaults to `--target-wpm`. Only meaningful with `-w`. |
 | `-T, --tolerance PCT` | Grading tolerance in percent (default 30). Smaller = stricter. |
 | `-e, --expected TEXT\|FILE` | The intended message — literal text (`-e "CQ DE AB1CD"`) or a path to a text file. Scores decode accuracy against it. |
-| `-q, --quiet` | Print only the decoded text (suppresses all reports). |
-| `--json` | Emit a single structured JSON object to stdout (text + speeds + grading + accuracy) and nothing else. |
+| `-q, --quiet` | Print only the decoded text: no report, no page. |
+| `--basic` | Print the practice report to the terminal instead of opening the page. |
+| `--json` | Emit a single structured JSON object to stdout (text + speeds + grading + accuracy) instead of opening the page. Same shape as the page's **JSON report** download. |
 | `--color auto\|always\|never` | Colorize the report — green/yellow/red for good/marginal/bad (default `auto`: only on a terminal, honors `NO_COLOR`). Never applied to `--json`. |
-| `--web-review` | Also build an interactive review page and open it in a browser. See [Web review](#web-review-see-your-spacing). |
+| `--web-review` | Build the interactive review page and open it in a browser. This is the **default**; pass it explicitly only to get the page *as well as* `--json` or `--basic`. See [Web review](#web-review-see-your-spacing). |
 | `--web-out FILE` | Where to write that page (implies `--web-review`). Default: `~/.cw-decoder/sessions/<timestamp>/review.html`. |
-| `--live` | Trainer mode: capture from an audio input device (live keying) instead of a file, then decode and grade. |
+| `--live` | Capture from an audio input device (live keying) instead of a file. The **default** when no input file is given; pass it to be explicit. |
 | `--capture-backend` | `auto` (default), `portaudio`, or `ffmpeg`. Device indices differ between the two, so list and select with the same one. |
-| `--preview` | With `--live`, also print the decode in **real time** as you key (requires `-w`). |
+| `--preview` | On a live capture, also print the decode in **real time** as you key (requires `-w`). |
 | `--list-devices` | List available audio input devices and exit. |
-| `-D, --device` | Input device for `--live`: an index, or a name fragment (`-D blackhole`). Remembered for next time; `-D ask` forgets it and asks again. |
+| `-D, --device` | Input device for live capture: an index, or a name fragment (`-D blackhole`). Remembered for next time; `-D ask` forgets it and asks again. |
 | `--duration SEC` | Max live-capture length; Enter stops early, Ctrl-R starts the take over (default 120, prevents runaway recordings). |
 | `--capture-rate HZ` | Force a capture rate. Default: the device's own rate, with no resampling (which sounds better). Smaller rates make smaller files. |
 | `--trim-pad SEC` | Dead air to keep at each end of a live capture; the rest is trimmed (default 0.5). |
@@ -86,7 +110,8 @@ cw-decode --json recording.wav       # structured JSON, nothing else
 
 ## Reading the basic report
 
-Without a target, you get tone and measured speed:
+`--basic` prints to the terminal instead of opening the page. Without a target,
+you get tone and measured speed:
 
 ```
 # tone           : 700.3 Hz
@@ -110,6 +135,8 @@ cw-decode -w 25 recording.wav           # target 25 wpm, standard spacing
 cw-decode -w 25 -f 12 recording.wav     # 25 wpm characters, 12 wpm overall
 cw-decode -w 25 -f 12 -T 15 rec.wav     # same, but stricter (±15%) grading
 ```
+
+The review page draws all of this; `--basic` prints it:
 
 ```
 # ===== practice report =====
@@ -222,23 +249,28 @@ at once:
 cw-decode -w 25 -f 12 -T 20 -e message.txt recording.wav
 ```
 
-(`-q` suppresses the reports, including accuracy — omit it to see them.)
+(`-q` suppresses everything but the decoded text, accuracy included. Drop it for
+the review page, or add `--basic` for the report in the terminal.)
 
 ---
 
 ## Trainer: key live and get graded
 
-Instead of recording a file first, `--live` captures straight from an audio input
-(your rig's sidetone through an interface, a keyer's audio, or a mic) and then
-decodes and grades it — the same reports as above.
+This is the default. With no input file, capture comes straight from an audio
+input (your rig's sidetone through an interface, a keyer's audio, or a mic) and
+then gets decoded and graded — the same grading as above.
 
 ```sh
-cw-decode --list-devices                         # see input devices
-cw-decode --live -D 1                            # just decode what you key
-cw-decode --live -D 1 -w 20                      # + grade timing vs 20 wpm
-cw-decode --live -D 1 -w 20 -e "CQ DE AB1CD K"   # + score against a message
-cw-decode --live -w 20 -e message.txt            # device remembered from before
+cw-decode --list-devices                  # see input devices
+cw-decode -D 1                            # just decode what you key
+cw-decode -D 1 -w 20                      # + grade timing vs 20 wpm
+cw-decode -D 1 -w 20 -e "CQ DE AB1CD K"   # + score against a message
+cw-decode -w 20 -e message.txt            # device remembered from before
 ```
+
+`--live` says the same thing explicitly, and is worth typing when a script needs
+to be obvious about it. Passing both `--live` and a file is an error — there'd be
+two recordings and no way to choose.
 
 Both `-w` and `-e` are optional: add `-w` for the timing report, `-e` for the
 accuracy score, or neither to just decode. When a target message is known it's
@@ -267,7 +299,7 @@ A practice loop — put the target in a file once, then repeat:
 
 ```sh
 echo "CQ CQ DE AB1CD K" > message.txt
-cw-decode --live -w 20 -e message.txt --web-review   # key it, read the grade, repeat
+cw-decode -w 20 -e message.txt   # key it, read the review page, repeat
 ```
 
 Notes:
@@ -293,7 +325,7 @@ Add `--preview` and it decodes *while* you key, streaming characters to the
 screen instead of only showing them at the end. It needs `-w` to lock its timing:
 
 ```sh
-cw-decode --live --preview -D 1 -w 20
+cw-decode --preview -D 1 -w 20
 ```
 
 ```
@@ -311,13 +343,14 @@ is the authoritative one.
 
 ## Web review: see your spacing
 
-The terminal report tells you *that* your character gaps ran long. `--web-review`
-shows you **where**, drawn against what perfect keying would have looked like:
+This is the default output, because it's the one worth reading. The terminal
+report tells you *that* your character gaps ran long; the page shows you
+**where**, drawn against what perfect keying would have looked like:
 
 ```sh
-cw-decode -w 25 -f 12 -e message.txt --web-review recording.wav
-cw-decode --live -w 20 -e message.txt --web-review        # after a live take
-cw-decode --web-out ~/cw/today.html recording.wav         # keep it somewhere
+cw-decode -w 25 -f 12 -e message.txt recording.wav
+cw-decode -w 20 -e message.txt                        # after a live take
+cw-decode --web-out ~/cw/today.html recording.wav     # keep it somewhere
 ```
 
 It writes one self-contained HTML file and opens it. Two stacked tracks — **YOU**
@@ -372,21 +405,23 @@ separate play buttons — click back and forth to hear the difference, with the
 neighboring characters included since spacing is only audible in context. The
 **Listening level** slider boosts playback only; it never alters the files.
 
-**Downloads.** Your audio, the target audio (at the current speed), and a PNG of
-the whole chart — not just the visible part.
+**Downloads.** Your audio, the target audio (at the current speed), a PNG of the
+whole chart — not just the visible part — and a **JSON report**: every number on
+the page, in the same shape `--json` writes, so browser and terminal sessions
+stack up into one trend file. See [JSON output](#json-output).
 
 Other things worth knowing:
 
-- **Opt-in and offline.** Nothing is written without the flag. The page has no
-  external references at all, so it works from `file://` forever and can be
-  archived or emailed as one file. Size is mostly the embedded audio: about
-  4 MB for a 30-second take at 48 kHz.
+- **Offline.** The page has no external references at all, so it works from
+  `file://` forever and can be archived or emailed as one file. Size is mostly
+  the embedded audio: about 4 MB for a 30-second take at 48 kHz.
 - **No `-e`?** The target track falls back to your own decode — spacing grading
   still works, character grading doesn't apply.
 - **No `-w`?** The target defaults to your own measured speed: "what you sent,
   keyed perfectly."
-- The terminal practice report is skipped when a page is requested, since the
-  page is the report. The decoded text still prints, and `--json` still works.
+- The terminal practice report is skipped when the page is built, since the page
+  *is* the report. The decoded text still prints. `--basic` prints the report
+  anyway; `--json` is unaffected.
 
 ## JSON output
 
@@ -400,6 +435,8 @@ cw-decode -w 25 -f 12 -e message.txt --json recording.wav > session.json
 
 ```jsonc
 {
+  "source": "recording.wav",
+  "generated": "2026-03-14T15:09:26+00:00",
   "text": "ROB DE W7YFR ...",
   "tone_hz": 700.4,
   "measured": { "char_wpm": 24.98, "farnsworth_wpm": 6.83, "unit_ms": 48.04 },
@@ -419,13 +456,50 @@ cw-decode -w 25 -f 12 -e message.txt --json recording.wav > session.json
 ```
 
 `target`, `analysis`, and `comparison` are `null` unless you pass `-w`/`-f` and
-`-e` respectively. Pipe to `jq` to extract fields, e.g. accuracy over a folder:
+`-e` respectively. `source` and `generated` say what was decoded and when, which
+is what makes a folder of these a time series. Pipe to `jq` to extract fields,
+e.g. accuracy over a folder:
 
 ```sh
 for f in *.wav; do
   acc=$(cw-decode -e message.txt --json "$f" | jq -r '.comparison.accuracy')
   echo "$f: $acc"
 done
+```
+
+### The same report from the review page
+
+The page's **↓ JSON report** button writes this object too, so a session you
+reviewed in the browser lands in the same trend file as one dumped from the
+terminal. Two differences, both deliberate:
+
+- It reports **the grading currently on screen**, not what the CLI graded at
+  build time. Move the speed, Farnsworth, tolerance or intended-message controls
+  and the download follows. That's the reason to download from the page rather
+  than re-run the CLI — and why the filename carries the speed
+  (`session-20wpm-report.json`), so two re-grades of one take don't collide.
+- It adds a `review` block for the settings only the page has, without which a
+  re-graded dump can't be read later:
+
+```jsonc
+"review": {
+  "from": "web-review",
+  "payload_generated": "2026-03-14T15:02:11+00:00",  // when the page was built
+  "expected": "CQ CQ DE AB1CD K",                    // the target as graded
+  "collapse_rests": true                             // off = long silences graded
+}
+```
+
+If you retyped the intended message in the page, `comparison.expected_source`
+says `"(edited in the review page)"` rather than repeating the file the CLI
+used.
+
+Tracking a trend, then, is just a matter of collecting the files:
+
+```sh
+jq -s 'map({at: .generated, src: .source,
+            consistency: .analysis.within_tolerance_frac,
+            accuracy: (.comparison.accuracy // null)})' ~/cw/reports/*.json
 ```
 
 ---

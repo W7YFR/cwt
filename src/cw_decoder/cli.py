@@ -15,10 +15,21 @@ from . import core
 
 def _build_report(res: core.Result,
                   comparison: "core.Comparison | None",
-                  comparison_source: "str | None" = None) -> dict:
-    """Assemble a JSON-serializable report from a decode result."""
+                  comparison_source: "str | None" = None,
+                  source: "str | None" = None) -> dict:
+    """Assemble a JSON-serializable report from a decode result.
+
+    The shape is shared with the review page's "JSON report" download, so a
+    directory of these is one time series whether the runs came from the
+    terminal or the browser — hence the provenance keys up front: a dump that
+    can't say what it decoded or when is no use for tracking a trend.
+    """
+    from datetime import datetime, timezone
+
     t = res.timing
     report = {
+        "source": source,
+        "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "text": res.text,
         "tone_hz": round(res.tone_hz, 1),
         "sample_rate": res.rate,
@@ -495,11 +506,15 @@ def _print_result(res: core.Result, verbose: bool,
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(
         prog="cw-decode",
-        description="Decode Morse code (CW) from an audio recording into text.",
+        description="Decode Morse code (CW) into text and grade the keying. "
+                    "With no input file it records from an audio device; "
+                    "either way it opens an interactive review page. See "
+                    "--basic and --json for terminal output.",
     )
     p.add_argument("input", nargs="?",
-                   help="audio file (wav/mp3/flac/m4a/ogg/...). "
-                        "Non-WAV requires ffmpeg.")
+                   help="audio file to decode (wav/mp3/flac/m4a/ogg/...); "
+                        "non-WAV requires ffmpeg. Omit it to record live "
+                        "instead.")
     p.add_argument("-t", "--tone", type=float, default=None,
                    help="CW tone frequency in Hz (default: auto-detect).")
     p.add_argument("-b", "--bandwidth", type=float, default=200.0,
@@ -520,11 +535,17 @@ def main(argv=None) -> int:
                         "text file (an existing file is read; otherwise the "
                         "value is the message). The decode is scored against it.")
     p.add_argument("-q", "--quiet", action="store_true",
-                   help="print only the decoded text (no report).")
+                   help="print only the decoded text: no report, no review "
+                        "page.")
     p.add_argument("--json", action="store_true",
-                   help="emit a structured JSON report to stdout (and nothing "
-                        "else). Includes the decoded text, speeds, grading, and "
-                        "accuracy.")
+                   help="emit a structured JSON report to stdout instead of "
+                        "opening the review page. Includes the decoded text, "
+                        "speeds, grading, and accuracy — the same shape the "
+                        "page's 'JSON report' download writes, so terminal and "
+                        "browser runs can go in one trend file.")
+    p.add_argument("--basic", action="store_true",
+                   help="print the practice report to the terminal instead of "
+                        "opening the review page.")
     p.add_argument("--color", choices=["auto", "always", "never"], default="auto",
                    help="colorize the report: auto (only on a terminal; also "
                         "honors NO_COLOR), always, or never.")
@@ -538,14 +559,16 @@ def main(argv=None) -> int:
     p.add_argument("--demo-noise", type=float, default=0.0,
                    help="additive noise level for --demo (e.g. 0.2).")
 
-    web = p.add_argument_group("web review")
+    web = p.add_argument_group("web review (the default output)")
     web.add_argument("--web-review", action="store_true",
-                     help="also build an interactive review page — your keying "
+                     help="build an interactive review page — your keying "
                           "drawn on a canvas against perfect timing, with "
                           "spacing annotated — and open it in a browser. The "
                           "page is one self-contained file with the recording "
                           "embedded, so you can replay yourself, hear the "
-                          "target, and re-grade at any speed offline.")
+                          "target, and re-grade at any speed offline. This is "
+                          "what happens by default; pass it explicitly only to "
+                          "get the page as well as --json or --basic.")
     web.add_argument("--web-out", metavar="FILE", default=None,
                      help="write the review page here (implies --web-review). "
                           "Default: ~/.cw-decoder/sessions/<timestamp>/"
@@ -554,10 +577,13 @@ def main(argv=None) -> int:
     live = p.add_argument_group("live capture (trainer)")
     live.add_argument("--live", action="store_true",
                       help="capture from an audio input device (live keying) "
-                           "instead of decoding a file, then decode and grade.")
+                           "instead of decoding a file, then decode and grade. "
+                           "This is what happens by default when no input file "
+                           "is given, so the flag is only needed to be "
+                           "explicit.")
     live.add_argument("--preview", action="store_true",
-                      help="with --live, also print the decode in real time as "
-                           "you key (requires -w for timing).")
+                      help="on a live capture, also print the decode in real "
+                           "time as you key (requires -w for timing).")
     live.add_argument("--list-devices", action="store_true",
                       help="list available audio input devices and exit.")
     live.add_argument("-D", "--device", default=None,
@@ -604,28 +630,45 @@ def main(argv=None) -> int:
 
     verbose = not args.quiet
     tol = max(args.tolerance, 0.0) / 100.0
-    web = args.web_review or args.web_out is not None
 
-    if args.preview and not args.live:
-        p.error("--preview only applies with --live")
+    if args.json and args.basic:
+        p.error("--json and --basic are two different reports; pick one")
+
+    # Both defaults point at the interactive path, because that's where the
+    # tool earns its keep: the review page is the report worth reading, and
+    # live keying is what there is to review. An input file opts out of the
+    # capture; --json, --basic or -q opt out of the page. --web-review and
+    # --web-out ask for the page back explicitly, so one run can produce a JSON
+    # dump *and* a page.
+    want_page = (args.web_review or args.web_out is not None
+                 or not (args.json or args.basic or args.quiet))
+    want_live = args.live or (args.input is None and args.demo is None)
+
+    if args.live and args.input:
+        p.error("--live captures from an audio device — don't also pass an "
+                "input file")
+    if args.preview and not want_live:
+        p.error("--preview only applies to a live capture")
 
     pal = _Palette(_color_enabled(args.color))
 
-    # When a review page was asked for, the page *is* the practice report, so
+    # When the review page is built, the page *is* the practice report, so
     # don't also dump it to the terminal — the decoded text still prints, as do
-    # the stderr lines naming the files written. `--json` is an explicit
+    # the stderr lines naming the files written. --basic asks for the terminal
+    # report by name, so it gets it either way; --json is an explicit
     # machine-readable request and is unaffected.
-    report = verbose and not web
+    report = verbose and (args.basic or not want_page)
 
     # Resolved up front: a live capture records straight into this directory,
     # so it has to exist before recording starts.
-    page_path = _web_page_path(args.web_out) if web else None
+    page_path = _web_page_path(args.web_out) if want_page else None
 
-    def emit(res, comparison, source):
+    def emit(res, comparison, exp_source, source):
         if args.json:
-            print(json.dumps(_build_report(res, comparison, source), indent=2))
+            print(json.dumps(_build_report(res, comparison, exp_source,
+                                           source), indent=2))
         else:
-            _print_result(res, report, comparison, source, pal)
+            _print_result(res, report, comparison, exp_source, pal)
 
     # --- list audio devices and exit ------------------------------------- #
     if args.list_devices:
@@ -673,7 +716,7 @@ def main(argv=None) -> int:
             expected_source = "(inline text)"
 
     # --- live capture (trainer) ------------------------------------------ #
-    if args.live:
+    if want_live:
         from . import capture
 
         if args.preview and args.target_wpm is None:
@@ -709,7 +752,7 @@ def main(argv=None) -> int:
 
         if args.save:
             out_path, keep = args.save, True
-        elif web:
+        elif want_page:
             # Record straight into the session directory: the page needs the
             # audio to embed, and a live take is worth keeping as a plain WAV
             # anyway. Nothing to copy, nothing deleted out from under us.
@@ -782,7 +825,7 @@ def main(argv=None) -> int:
                                    bandwidth=args.bandwidth,
                                    target_wpm=args.target_wpm,
                                    target_farnsworth=args.target_farnsworth,
-                                   tolerance=tol, keep_signal=web,
+                                   tolerance=tol, keep_signal=want_page,
                                    expected=expected)
         except KeyboardInterrupt:
             # Ctrl-C means abandon the take — don't decode it, don't grade it,
@@ -803,8 +846,8 @@ def main(argv=None) -> int:
         _warn_dropouts(out_path, cap_rate, backend=used)
         comparison = (core.compare_text(expected, res.text)
                       if expected else None)
-        emit(res, comparison, expected_source)
-        if web:
+        emit(res, comparison, expected_source, "live capture")
+        if want_page:
             _emit_web_review(res, "live capture", expected, expected_source,
                              tol, page_path, audio_path=out_path,
                              verbose=verbose, pad_sec=args.trim_pad)
@@ -829,23 +872,23 @@ def main(argv=None) -> int:
                                    bandwidth=args.bandwidth,
                                    target_wpm=args.target_wpm,
                                    target_farnsworth=args.target_farnsworth,
-                                   tolerance=tol, keep_signal=web,
+                                   tolerance=tol, keep_signal=want_page,
                                    expected=cmp_target)
         comparison = core.compare_text(cmp_target, res.text)
         if args.json:
-            print(json.dumps(_build_report(res, comparison, cmp_source), indent=2))
+            print(json.dumps(_build_report(res, comparison, cmp_source,
+                                           "--demo"), indent=2))
         else:
             if report:
                 print(f"# demo input     : {args.demo!r}")
             _print_result(res, report, comparison, cmp_source, pal)
-        if web:
+        if want_page:
             _emit_web_review(res, "--demo", cmp_target, cmp_source, tol,
                              page_path, verbose=verbose)
         return 0
 
-    if not args.input:
-        p.error("an input file is required (or use --demo)")
-
+    # Reaching here means there is an input file: no --demo, and `want_live` is
+    # false, which only happens when one was given.
     # If no --expected was given, fall back to a sibling text file with the same
     # base name as the audio (e.g. qso.wav -> qso.txt).
     if expected is None:
@@ -864,15 +907,15 @@ def main(argv=None) -> int:
                                target_rate=args.rate, bandwidth=args.bandwidth,
                                target_wpm=args.target_wpm,
                                target_farnsworth=args.target_farnsworth,
-                               tolerance=tol, keep_signal=web,
+                               tolerance=tol, keep_signal=want_page,
                                expected=expected)
     except (RuntimeError, FileNotFoundError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
     comparison = core.compare_text(expected, res.text) if expected else None
-    emit(res, comparison, expected_source)
-    if web:
+    emit(res, comparison, expected_source, os.path.basename(args.input))
+    if want_page:
         _emit_web_review(res, os.path.basename(args.input), expected,
                          expected_source, tol, page_path,
                          audio_path=args.input, verbose=verbose,

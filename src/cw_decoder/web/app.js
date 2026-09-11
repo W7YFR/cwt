@@ -1250,6 +1250,102 @@
     }
   }
 
+  // To `n` decimals, matching the precision cli._build_report rounds to.
+  function round(v, n) {
+    var f = Math.pow(10, n);
+    return Math.round(v * f) / f;
+  }
+
+  /* The grading, as numbers, in exactly the shape cli._build_report writes —
+     so a session downloaded from the page and one dumped with `--json` drop
+     into the same trend file and compare key for key.
+
+     It reports what is on screen *now*, not what the CLI graded at build time:
+     move the speed, tolerance or intended-message controls and this follows.
+     That's the value of downloading from here rather than re-running the CLI —
+     and why the `review` block records the page-only settings that shaped the
+     numbers, without which a re-graded dump can't be interpreted later. */
+  function buildJsonReport() {
+    var g = M.grade, tol = S.tolerance;
+    // Whatever is in the intended-message box is the target — including a
+    // message typed in here, which is the whole reason the box is editable.
+    // The one exception: with nothing supplied the box defaults to your own
+    // decode, and scoring that would be a meaningless 100%, so an untouched
+    // box with no payload target reports no comparison at all, same as
+    // `--json` with no -e.
+    var edited = S.expected !== (P.expected || P.decoded);
+    var intended = edited ? S.expected : (P.expected || null);
+    var report = {
+      // Python writes `...+00:00` at second resolution; match it so the two
+      // sources sort and parse identically.
+      source: P.source,
+      generated: new Date().toISOString().replace(/\.\d+Z$/, "+00:00"),
+      text: M.actual.text,
+      tone_hz: P.tone_hz,
+      sample_rate: P.rate,
+      // Measured speed comes from the decode's own DSP, which the page can't
+      // redo — it's the payload's figure at any setting.
+      measured: {
+        char_wpm: P.measured.char_wpm,
+        farnsworth_wpm: P.measured.farnsworth_wpm,
+        unit_ms: P.measured.unit_ms
+      },
+      target: {
+        char_wpm: round(S.charWpm, 2),
+        farnsworth_wpm: round(S.farnsWpm, 2),
+        unit_ms: round(M.timing.unitSec * 1000, 2)
+      },
+      analysis: {
+        tolerance: tol,
+        within_tolerance_frac: round(g.withinTolFrac, 4),
+        pauses_ignored: g.nPauses,
+        elements: g.stats.map(function (s) {
+          return {
+            name: s.name,
+            n: s.n,
+            mean_units: round(s.meanUnits, 3),
+            std_units: round(s.stdUnits, 3),
+            target_units: round(s.targetUnits, 3),
+            ok: Math.abs(s.meanUnits - s.targetUnits) <= tol * s.targetUnits
+          };
+        }),
+        deviations: g.deviations.map(function (d) {
+          return {
+            time_sec: round(d.timeSec, 2),
+            kind: d.kind,
+            value_units: round(d.valueUnits, 2),
+            target_units: round(d.targetUnits, 2),
+            context: d.context
+          };
+        })
+      },
+      comparison: null,
+      review: {
+        from: "web-review",
+        payload_generated: P.generated,
+        expected: intended,
+        // Off, every long silence is graded as spacing, which moves both the
+        // consistency figure and the deviation list. Recording it is what
+        // keeps two dumps of the same session comparable.
+        collapse_rests: S.collapseRests
+      }
+    };
+    if (intended) {
+      var c = M.compare;
+      report.comparison = {
+        expected_source: edited ? "(edited in the review page)"
+                                : P.expected_source,
+        accuracy: round(c.accuracy, 4),
+        n_expected: c.nExpected,
+        substitutions: c.substitutions,
+        insertions: c.insertions,
+        deletions: c.deletions,
+        diff: diffText(c.ops)
+      };
+    }
+    return report;
+  }
+
   function status(msg) {
     var el2 = $("dl-status");
     if (el2) el2.textContent = msg || "";
@@ -1298,6 +1394,23 @@
     } else {
       done(out.canvas.toDataURL("image/png"));
     }
+  });
+
+  $("dl-json").addEventListener("click", function () {
+    var text;
+    try {
+      text = JSON.stringify(buildJsonReport(), null, 2) + "\n";
+    } catch (e) {
+      status("report failed: " + e.message);
+      return;
+    }
+    var blob = new Blob([text], { type: "application/json" });
+    // The speed is in the name because this dump is of the *current* grading,
+    // and re-grading at another speed is a click away — two downloads of one
+    // session shouldn't land on the same filename.
+    save(URL.createObjectURL(blob),
+         baseName() + "-" + S.charWpm + "wpm-report.json", true);
+    status("");
   });
 
   // ---- report ------------------------------------------------------------ //
@@ -1385,24 +1498,14 @@
 
     // Accuracy diff, grouped into runs the way core.compare_text formats it.
     if (S.expected) {
-      var out = [], runOp = null, runE = [], runG = [];
-      var flush = function () {
-        if (runOp === null) return;
-        var e = runE.join(""), got = runG.join("");
-        if (runOp === "equal") out.push('<span class="eq">' + esc(e) + "</span>");
-        else if (runOp === "sub") out.push('<span class="er">[' + esc(e) +
-                                          "→" + esc(got) + "]</span>");
-        else if (runOp === "del") out.push('<span class="er">[-' + esc(e) +
-                                          "]</span>");
-        else out.push('<span class="er">[+' + esc(got) + "]</span>");
-        runE = []; runG = [];
-      };
-      c.ops.forEach(function (o) {
-        if (o[0] !== runOp) { flush(); runOp = o[0]; }
-        if (o[1] !== null) runE.push(o[1]);
-        if (o[2] !== null) runG.push(o[2]);
+      var out = diffRuns(c.ops).map(function (run) {
+        var e = esc(run[1]), got = esc(run[2]);
+        if (run[0] === "equal") return '<span class="eq">' + e + "</span>";
+        if (run[0] === "sub") return '<span class="er">[' + e + "→" + got +
+                                     "]</span>";
+        if (run[0] === "del") return '<span class="er">[-' + e + "]</span>";
+        return '<span class="er">[+' + got + "]</span>";
       });
-      flush();
       html.push('<div class="card"><h2>Accuracy vs intended text</h2>' +
         '<p class="note">' + c.nExpected + " symbols · " +
         c.substitutions + " sub · " + c.insertions + " extra · " +
@@ -1539,6 +1642,36 @@
     }
     if (!first) return null;
     return [Math.max(first.t0 - pad, 0), last.t1 + pad];
+  }
+
+  /* Collapse an alignment into runs of one op: [op, expected, got]. Both the
+     colored diff above and the plain-text `diff` in the JSON download read
+     from here, so the two can't tell different stories about the same edits.
+     core.compare_text groups the same way. */
+  function diffRuns(ops) {
+    var runs = [], op = null, e = [], g = [];
+    var flush = function () {
+      if (op === null) return;
+      runs.push([op, e.join(""), g.join("")]);
+      e = []; g = [];
+    };
+    ops.forEach(function (o) {
+      if (o[0] !== op) { flush(); op = o[0]; }
+      if (o[1] !== null) e.push(o[1]);
+      if (o[2] !== null) g.push(o[2]);
+    });
+    flush();
+    return runs;
+  }
+
+  /* The same annotated string core.compare_text puts in `diff`. */
+  function diffText(ops) {
+    return diffRuns(ops).map(function (run) {
+      if (run[0] === "equal") return run[1];
+      if (run[0] === "sub") return "[" + run[1] + "→" + run[2] + "]";
+      if (run[0] === "del") return "[-" + run[1] + "]";
+      return "[+" + run[2] + "]";
+    }).join("");
   }
 
   function esc(s) {

@@ -482,6 +482,56 @@ def _sloppy_wav(path, text="CQ CQ DE W7YFR K", wpm=20, rate=8000):
                     rate)
 
 
+# The intended text behind the boot fixture, named so a test can grade the
+# same recording in Python and compare.
+SLOPPY_EXPECTED = "CQ CQ DE W7YFR K"
+SLOPPY_WPM = 20
+SLOPPY_TOL = 0.30
+
+
+def _same_numbers(a, b, path="report"):
+    """Assert two report blocks agree, allowing the last decimal place to move.
+
+    Both sides round to the same precision, but Python rounds a half to even
+    and JavaScript rounds it up, so a value sitting exactly on the boundary can
+    land one step apart. That's a formatting tie, not a disagreement about the
+    grading — which test_js_matches_python_on_the_same_fixture holds to 1e-9.
+    """
+    if isinstance(a, dict):
+        assert set(a) == set(b), f"keys differ at {path}"
+        for k in a:
+            _same_numbers(a[k], b[k], f"{path}.{k}")
+    elif isinstance(a, list):
+        assert len(a) == len(b), f"length differs at {path}"
+        for i, (x, y) in enumerate(zip(a, b)):
+            _same_numbers(x, y, f"{path}[{i}]")
+    elif isinstance(a, bool) or isinstance(b, bool):
+        assert a is b, f"{path}: {a!r} != {b!r}"
+    elif isinstance(a, float) or isinstance(b, float):
+        assert a == pytest.approx(b, abs=1.5e-3), f"{path}: {a} != {b}"
+    else:
+        assert a == b, f"{path}: {a!r} != {b!r}"
+
+
+def _boot_sloppy_page(tmp_path):
+    """Build the review page for the sloppy fixture, run it under the stub DOM,
+    and return everything the stub observed."""
+    wav = tmp_path / "sloppy.wav"
+    _sloppy_wav(wav)
+    res = core.decode_file(str(wav), target_rate=8000, target_wpm=SLOPPY_WPM,
+                           keep_signal=True)
+    page = tmp_path / "review.html"
+    webpage.write(str(page), review.build_payload(
+        res, source="sloppy.wav", expected=SLOPPY_EXPECTED,
+        expected_source="(inline text)", tolerance=SLOPPY_TOL))
+
+    stub = Path(__file__).parent / "dom_stub.js"
+    proc = subprocess.run(["node", str(stub), str(page)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, f"page failed to run:\n{proc.stderr}"
+    return json.loads(proc.stdout), page
+
+
 @node
 def test_page_boots_and_draws(tmp_path):
     """Boot the real page under a stub DOM and drive every control.
@@ -491,20 +541,7 @@ def test_page_boots_and_draws(tmp_path):
     annotated spacing, flagged the faults, and wired up audio — not how it
     looks.
     """
-    wav = tmp_path / "sloppy.wav"
-    _sloppy_wav(wav)
-    res = core.decode_file(str(wav), target_rate=8000, target_wpm=20,
-                           keep_signal=True)
-    page = tmp_path / "review.html"
-    webpage.write(str(page), review.build_payload(
-        res, source="sloppy.wav", expected="CQ CQ DE W7YFR K",
-        expected_source="(inline text)", tolerance=0.30))
-
-    stub = Path(__file__).parent / "dom_stub.js"
-    proc = subprocess.run(["node", str(stub), str(page)],
-                          capture_output=True, text=True)
-    assert proc.returncode == 0, f"page failed to run:\n{proc.stderr}"
-    d = json.loads(proc.stdout)
+    d, page = _boot_sloppy_page(tmp_path)
 
     assert d["scripts"] == 4                       # morse, payload, core, app
     assert d["actions"] > 300                      # every control was driven
@@ -723,14 +760,17 @@ def test_page_boots_and_draws(tmp_path):
     over = abs(rows["overlay"]["YOU"] - rows["overlay"]["TGT"])
     assert over < 25, "overlay should share one band"
 
-    # Three downloads, offered in every view. The recording rides along as the
+    # Four downloads, offered in every view. The recording rides along as the
     # payload's data URI; the target is rendered fresh (so its filename carries
-    # the speed it was rendered at) and the chart is a full-width PNG.
+    # the speed it was rendered at), the chart is a full-width PNG, and the
+    # report is JSON.
     dl = d["downloads"]
     yours = [x for x in dl if x["name"].endswith("-yours.wav")]
     target = [x for x in dl if "-target-" in x["name"]]
     charts = [x for x in dl if x["name"].endswith(".png")]
-    assert yours and target and charts
+    reports = [x for x in dl if x["name"].endswith("-report.json")]
+    assert yours and target and charts and reports
+    assert reports[0]["scheme"] == "blob" and reports[0]["size"] > 500
     assert yours[0]["scheme"] == "data" and yours[0]["size"] > 10_000
     assert target[0]["scheme"] == "blob" and target[0]["size"] > 10_000
     assert "wpm" in target[0]["name"]
@@ -758,6 +798,94 @@ def test_page_boots_and_draws(tmp_path):
     assert "consistent" in d["scoresWithoutTarget"]
 
 
+@node
+def test_the_pages_json_report_matches_the_cli_schema(tmp_path):
+    """A report downloaded from the page and one dumped by `--json` are the
+    same shape, so a folder of both reads as one trend rather than two.
+
+    Key-for-key, and — since the page opens at exactly the settings the CLI
+    graded at — number-for-number too.
+    """
+    from cw_decoder import cli
+
+    d, _ = _boot_sloppy_page(tmp_path)
+    page = d["jsonReports"]["asOpened"]
+    assert page, "the page produced no JSON report"
+
+    res = core.decode_file(str(tmp_path / "sloppy.wav"), target_rate=8000,
+                           target_wpm=SLOPPY_WPM, tolerance=SLOPPY_TOL,
+                           expected=SLOPPY_EXPECTED)
+    mine = cli._build_report(res, core.compare_text(SLOPPY_EXPECTED, res.text),
+                             "(inline text)", "sloppy.wav")
+
+    # The page adds one block for the settings only it has; everything else is
+    # the CLI's schema exactly.
+    assert set(page) == set(mine) | {"review"}
+    for key in ("measured", "target", "analysis", "comparison"):
+        assert set(page[key]) == set(mine[key]), f"{key} block drifted"
+    assert set(page["analysis"]["elements"][0]) == \
+        set(mine["analysis"]["elements"][0])
+    assert set(page["analysis"]["deviations"][0]) == \
+        set(mine["analysis"]["deviations"][0])
+
+    # Same numbers, not just the same keys. (`generated` is when the dump was
+    # taken, so it legitimately differs.)
+    assert page["source"] == mine["source"] == "sloppy.wav"
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00",
+                        page["generated"])
+    for key in ("text", "tone_hz", "sample_rate", "measured", "target",
+                "analysis", "comparison"):
+        _same_numbers(page[key], mine[key], key)
+
+    rev = page["review"]
+    assert rev["from"] == "web-review"
+    assert rev["expected"] == SLOPPY_EXPECTED
+    assert rev["collapse_rests"] is True
+    # When the page itself was built, as distinct from when this dump was
+    # taken: the two together say how stale the recording behind it is.
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00",
+                        rev["payload_generated"])
+    assert d["jsonReports"]["asOpenedName"].endswith(
+        f"-{SLOPPY_WPM}wpm-report.json")
+
+
+@node
+def test_the_json_report_follows_the_pages_controls(tmp_path):
+    """The point of downloading from the page rather than re-running the CLI:
+    the dump is of the grading currently on screen, and it records the
+    page-only settings that shaped it."""
+    d, _ = _boot_sloppy_page(tmp_path)
+    opened, regraded = (d["jsonReports"]["asOpened"],
+                        d["jsonReports"]["regraded"])
+    assert opened and regraded
+
+    # The stub moved the speed, the tolerance, the intended message, and the
+    # rest toggle between the two downloads.
+    assert opened["target"]["char_wpm"] == SLOPPY_WPM
+    assert regraded["target"]["char_wpm"] == 13
+    assert regraded["target"]["unit_ms"] == pytest.approx(1200 / 13, abs=0.01)
+    assert opened["analysis"]["tolerance"] == SLOPPY_TOL
+    assert regraded["analysis"]["tolerance"] == 0.10
+    assert regraded["review"]["expected"] == "SOS"
+    # Retyping the target makes the payload's provenance a lie; say so.
+    assert regraded["comparison"]["expected_source"] == \
+        "(edited in the review page)"
+    assert opened["comparison"]["expected_source"] == "(inline text)"
+
+    # Rests collapsed, the long silence is out of the grading; expanded, it is
+    # graded as spacing. Both the flag and its consequence are in the file.
+    assert opened["review"]["collapse_rests"] is True
+    assert opened["analysis"]["pauses_ignored"] >= 1
+    assert regraded["review"]["collapse_rests"] is False
+    assert regraded["analysis"]["pauses_ignored"] == 0
+    assert (regraded["analysis"]["within_tolerance_frac"] !=
+            opened["analysis"]["within_tolerance_frac"])
+    # And the filename distinguishes the two, so they don't collide on disk.
+    assert d["jsonReports"]["regradedName"].endswith("-13wpm-report.json")
+    assert (d["jsonReports"]["regradedName"] !=
+            d["jsonReports"]["asOpenedName"])
+
+
 def test_write_returns_size(tmp_path):
     res = _decode(target_wpm=22)
     p = review.build_payload(res, source="x.wav")
@@ -769,14 +897,9 @@ def test_write_returns_size(tmp_path):
 # --------------------------------------------------------------------------- #
 # CLI wiring
 # --------------------------------------------------------------------------- #
-@pytest.fixture
-def no_browser(monkeypatch):
-    """Capture the URL the CLI would open instead of launching a browser."""
-    opened = []
-    monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url))
-    return opened
-
-
+# `no_browser` — the list of URLs the CLI would have opened — is an autouse
+# fixture in conftest.py, since the page is the default output and no test
+# should be able to launch a real browser by forgetting it.
 def _copy_recorder(src, seen=None):
     """A fake capture.record that copies `src` and reports back like the real one."""
     def fake_record(dev, out, **kw):
@@ -793,6 +916,108 @@ def _fixture_wav(tmp_path, text="CQ DE AB1CD", wpm=20):
     synth.write_wav(str(wav), synth.generate(text, wpm=wpm, tone=600,
                                              rate=8000), 8000)
     return wav
+
+
+# --------------------------------------------------------------------------- #
+# What the tool does when you don't tell it: open the review page, and record
+# if there's nothing to decode.
+# --------------------------------------------------------------------------- #
+def test_the_review_page_is_the_default_output(tmp_path, no_browser, capsys,
+                                               monkeypatch):
+    """No flags at all: the page is the report, and the terminal keeps only the
+    decoded text."""
+    from cw_decoder import cli
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr("os.path.expanduser",
+                        lambda p: p.replace("~", str(tmp_path), 1))
+    wav = _fixture_wav(tmp_path)
+    assert cli.main([str(wav), "-w", "20", "--color", "never"]) == 0
+    cap = capsys.readouterr()
+
+    pages = list((tmp_path / ".cw-decoder" / "sessions").glob("*/review.html"))
+    assert len(pages) == 1
+    assert no_browser == [pages[0].resolve().as_uri()]
+    assert cap.out.strip() == "CQ DE AB1CD"
+    assert "practice report" not in cap.out
+
+
+def test_live_capture_is_the_default_with_no_input_file(tmp_path, monkeypatch,
+                                                        no_browser, capsys):
+    """Nothing to decode means there is something to record."""
+    from cw_decoder import capture, cli
+
+    src = _fixture_wav(tmp_path)
+    seen = {}
+    monkeypatch.setattr(
+        capture, "list_audio_devices",
+        lambda backend="auto": [capture.Device(0, "Stub Input", "48000 Hz")])
+    monkeypatch.setattr(capture, "record", _copy_recorder(src, seen))
+    # No --live, and no file to decode.
+    assert cli.main(["-D", "0", "-w", "20", "-q"]) == 0
+    assert seen, "nothing was recorded"
+    assert "recording on device" in capsys.readouterr().err
+
+
+def test_an_input_file_opts_out_of_the_live_capture(tmp_path, monkeypatch,
+                                                    no_browser, capsys):
+    from cw_decoder import capture, cli
+
+    recorded = []
+    monkeypatch.setattr(capture, "record",
+                        lambda *a, **k: recorded.append(1))
+    wav = _fixture_wav(tmp_path)
+    assert cli.main([str(wav), "-w", "20", "-q"]) == 0
+    assert capsys.readouterr().out.strip() == "CQ DE AB1CD"
+    assert recorded == []
+
+
+def test_live_and_an_input_file_together_are_refused(tmp_path, capsys):
+    """Two sources of audio, and no sensible way to pick one."""
+    from cw_decoder import cli
+
+    wav = _fixture_wav(tmp_path)
+    with pytest.raises(SystemExit):
+        cli.main(["--live", str(wav)])
+    assert "don't also pass an input file" in capsys.readouterr().err
+
+
+def test_json_and_basic_together_are_refused(capsys):
+    from cw_decoder import cli
+
+    with pytest.raises(SystemExit):
+        cli.main(["--json", "--basic", "--demo", "PARIS"])
+    assert "pick one" in capsys.readouterr().err
+
+
+def test_preview_no_longer_needs_the_live_flag(capsys):
+    """--live is the default, so --preview on its own is not a contradiction.
+    It gets as far as the check it should: the one for a target speed."""
+    from cw_decoder import cli
+
+    assert cli.main(["--preview"]) == 1
+    assert "--preview requires a target speed" in capsys.readouterr().err
+
+
+def test_preview_is_still_refused_when_decoding_a_file(tmp_path, capsys):
+    from cw_decoder import cli
+
+    wav = _fixture_wav(tmp_path)
+    with pytest.raises(SystemExit):
+        cli.main(["--preview", "-w", "20", str(wav)])
+    assert "only applies to a live capture" in capsys.readouterr().err
+
+
+def test_json_report_says_what_it_decoded_and_when(tmp_path, capsys):
+    """Provenance, so a directory of dumps reads as a time series."""
+    from cw_decoder import cli
+
+    wav = _fixture_wav(tmp_path)
+    assert cli.main([str(wav), "-w", "20", "--json"]) == 0
+    d = json.loads(capsys.readouterr().out)
+    assert d["source"] == wav.name
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00",
+                        d["generated"])
 
 
 def test_cli_web_out_implies_review(tmp_path, no_browser, capsys):
@@ -823,11 +1048,15 @@ def test_cli_web_review_defaults_to_session_dir(tmp_path, no_browser,
     assert no_browser == [pages[0].resolve().as_uri()]
 
 
-def test_cli_without_web_review_writes_nothing(tmp_path, no_browser):
+@pytest.mark.parametrize("flag", ["--basic", "--json", "-q"])
+def test_the_review_page_can_be_opted_out_of(tmp_path, no_browser, capsys,
+                                             flag):
+    """Each of the three report flags means "not the page"."""
     from cw_decoder import cli
 
     wav = _fixture_wav(tmp_path)
-    assert cli.main([str(wav), "-w", "20"]) == 0
+    assert cli.main([str(wav), "-w", "20", flag]) == 0
+    capsys.readouterr()
     assert no_browser == []
     assert list(tmp_path.glob("*.html")) == []
 
@@ -926,16 +1155,32 @@ def test_web_review_suppresses_the_practice_report(tmp_path, no_browser,
     assert out.is_file()
 
 
-def test_report_still_prints_without_web_review(tmp_path, capsys):
-    """Regression guard: the suppression must not leak into normal runs."""
+def test_basic_prints_the_terminal_report(tmp_path, capsys, no_browser):
+    """Regression guard: the suppression must not leak into --basic runs."""
     from cw_decoder import cli
 
     wav = _fixture_wav(tmp_path)
-    assert cli.main([str(wav), "-w", "20", "--color", "never"]) == 0
+    assert cli.main([str(wav), "-w", "20", "--basic", "--color", "never"]) == 0
     out = capsys.readouterr().out
     assert "practice report" in out
     assert "consistency" in out
     assert "CQ DE AB1CD" in out
+    assert no_browser == []
+
+
+def test_basic_and_the_page_can_be_asked_for_together(tmp_path, capsys,
+                                                      no_browser):
+    """--basic names the terminal report; asking for the page back with
+    --web-review shouldn't take it away again."""
+    from cw_decoder import cli
+
+    wav = _fixture_wav(tmp_path)
+    out = tmp_path / "r.html"
+    assert cli.main([str(wav), "-w", "20", "--basic", "--color", "never",
+                     "--web-out", str(out)]) == 0
+    assert "practice report" in capsys.readouterr().out
+    assert out.is_file()
+    assert no_browser == [out.resolve().as_uri()]
 
 
 def test_json_survives_web_review(tmp_path, no_browser, capsys):
