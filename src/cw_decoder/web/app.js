@@ -75,7 +75,10 @@
     // a width proportional to a silence nobody is being marked on. Off, every
     // silence is spacing, graded and drawn to scale.
     collapseRests: true,
-    ppu: 14,               // pixels per dit unit — the single zoom knob
+    // Pixels per dit unit — the single zoom knob. Opens at the slider's
+    // minimum so the whole session is on screen from the start: where the
+    // trouble is comes first, and zooming in on it comes second.
+    ppu: 4,
     // Playback gain in dB, applied at playback only — never baked into the
     // samples or the download. Starts at unity: the recording plays back at
     // the level it was made, and boosting is an explicit choice. Applied

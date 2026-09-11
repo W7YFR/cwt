@@ -382,7 +382,12 @@ function fire(el, type, ev) {
 // Boot state, before anything is touched.
 const initial = {
   gainOut: byId("gain-out").textContent,
-  clock: byId("clock").textContent
+  clock: byId("clock").textContent,
+  // Where the zoom slider sits before anything is touched. The range it allows
+  // lives in the page's own markup, which this stub doesn't parse — the test
+  // reads that from the HTML and compares.
+  zoom: byId("zoom").value,
+  zoomOut: byId("zoom-out").textContent
 };
 
 // Move every slider across its range, in every view.

@@ -683,6 +683,20 @@ def test_page_boots_and_draws(tmp_path):
     assert d["initial"]["gainOut"] == "0 dB", \
         f"listening level defaulted to {d['initial']['gainOut']!r}"
 
+    # The page opens fully zoomed out, so the whole session is on screen before
+    # you touch anything: find where the trouble is, then zoom in on it. The
+    # slider's floor lives in the markup, so read it from there rather than
+    # restating 4 in two places.
+    zoom_min = re.search(r'id="zoom"[^>]*\bmin="(\d+)"', page.read_text())
+    assert zoom_min, "could not find the zoom slider's min in the page"
+    floor = int(zoom_min.group(1))
+    # Compared as numbers: a real input coerces .value to a string, the stub
+    # keeps whatever app.js assigned.
+    assert int(d["initial"]["zoom"]) == floor, (
+        f"zoom opened at {d['initial']['zoom']!r}, not the slider's minimum "
+        f"{floor}")
+    assert d["initial"]["zoomOut"] == f"{floor} px/unit"
+
     # The view follows the playhead instead of letting it slide off-screen.
     # Content is translated by (gutter - scrollX), so this trace falls as the
     # view scrolls. It page-jumps rather than sliding every frame, so expect
