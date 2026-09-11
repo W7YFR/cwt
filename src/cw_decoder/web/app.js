@@ -1838,17 +1838,47 @@
     else playTarget(Math.max(h.char.t0 - pad, 0), h.char.t1 + pad);
   });
 
+  /* The wheel zooms, anchored on the pointer so whatever you are looking at
+     stays under it. The chart is one long horizontal strip with nothing to
+     scroll vertically, so zoom is what a wheel over it is actually for.
+
+     Panning is still a wheel gesture, just a horizontal one — a trackpad's
+     sideways swipe, or shift+wheel, the usual way to say "pan" where the wheel
+     means zoom. Dragging, the arrow keys and the scrollbar all still pan too.
+
+     A macOS trackpad pinch arrives as ctrl+wheel, so it lands on the zoom path
+     as well, which is right; preventDefault is what keeps it from zooming the
+     whole page instead of the chart. */
+  var ZOOM_RATE = 0.0025;     // e-folds of px/unit per unit of wheel delta
+
   canvas.addEventListener("wheel", function (ev) {
-    var v = viewport();
-    if (!v.maxScroll) return;
-    // There's nothing to scroll vertically, so a plain wheel pans.
-    var d = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
-    if (!d) return;
+    if (ev.shiftKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) {
+      var v = viewport();
+      if (!v.maxScroll) return;
+      var d = ev.deltaX || ev.deltaY;    // shift+wheel reports on deltaY
+      if (!d) return;
+      ev.preventDefault();
+      scrollTo(S.scrollX + d);
+      return;
+    }
+    if (!ev.deltaY) return;
     ev.preventDefault();
-    scrollTo(S.scrollX + d);
+    setZoom(S.ppu * Math.exp(-ev.deltaY * ZOOM_RATE), localPos(ev).x);
   }, { passive: false });
 
   // ---- controls ---------------------------------------------------------- //
+  /* Right-align a reading into a field `w` characters wide. Every readout is
+     followed by its unit, and the row is laid out from the width of its
+     contents — so a number that gains a digit shoves the whole control row
+     sideways unless it's padded to a constant width. The output boxes are
+     monospace with `white-space: pre` to make this land exactly; see the note
+     on `.group output` in style.css. */
+  function pad(s, w) {
+    s = String(s);
+    while (s.length < w) s = " " + s;
+    return s;
+  }
+
   function bindRange(id, outId, get, set, fmt) {
     var input = $(id), out = $(outId);
     input.value = get();
@@ -1861,33 +1891,38 @@
     return input;
   }
 
+  // Both speeds read 5-45, so two characters covers them.
+  function fmtWpm(v) { return pad(v, 2) + " wpm"; }
+
   bindRange("wpm", "wpm-out",
     function () { return S.charWpm; },
     function (v) {
       S.charWpm = v;
       // Overall speed can't exceed character speed; drag it along.
       if (S.farnsWpm > v) { S.farnsWpm = v; $("farns").value = v;
-                            $("farns-out").textContent = v + " wpm"; }
+                            $("farns-out").textContent = fmtWpm(v); }
       $("farns").max = v;
     },
-    function (v) { return v + " wpm"; });
+    fmtWpm);
 
   bindRange("farns", "farns-out",
     function () { return S.farnsWpm; },
     function (v) { S.farnsWpm = Math.min(v, S.charWpm); },
-    function (v) { return v + " wpm"; });
+    fmtWpm);
   $("farns").max = S.charWpm;
 
   bindRange("tol", "tol-out",
     function () { return Math.round(S.tolerance * 100); },
     function (v) { S.tolerance = v / 100; },
-    function (v) { return v + "%"; });
+    function (v) { return pad(v, 2) + "%"; });          // 5-60
 
   // Level is playback-only, so it needs no recompute or redraw.
   (function () {
     var input = $("gain"), out = $("gain-out");
     var show = function () {
-      out.textContent = (S.gainDb > 0 ? "+" : "") + S.gainDb + " dB";
+      // Three characters: the widest reading is a signed two-digit boost.
+      out.textContent =
+        pad((S.gainDb > 0 ? "+" : "") + S.gainDb, 3) + " dB";
     };
     input.value = S.gainDb;
     show();
@@ -1898,16 +1933,55 @@
     });
   })();
 
-  bindRange("zoom", "zoom-out",
-    function () { return S.ppu; },
-    function (v) {
-      // Zoom about the middle of the view, so you don't lose your place.
-      var vp = viewport();
-      var anchor = (S.scrollX + vp.trackW / 2) / Math.max(S.ppu, 0.001);
-      S.ppu = v;
-      S.scrollX = anchor * v - vp.trackW / 2;
-    },
-    function (v) { return v + " px/unit"; });
+  /* Zoom. The slider and the wheel both go through setZoom so they can't
+     disagree about the limits or the anchoring — and so both take the cheap
+     path: zoom is pure geometry, it changes no verdict, so there is nothing to
+     recompute and the report table below stays as it is (along with any
+     deviation row you were hovering). */
+  var zoomEl = $("zoom");
+  var ZOOM_MIN = parseFloat(zoomEl.min) || 4;
+  var ZOOM_MAX = parseFloat(zoomEl.max) || 60;
+
+  function fmtPpu(v) {
+    // The wheel lands on fractions; the slider can only say whole numbers, so
+    // show the fraction here rather than rounding it away behind your back.
+    // Four characters, which is "18.9" — the widest this can read.
+    return pad(v % 1 ? v.toFixed(1) : v, 4) + " px/unit";
+  }
+
+  function setZoom(v, atScreenX) {
+    // A tenth of a pixel per unit is the finest step worth taking: it keeps the
+    // readout honest and stops wheel arithmetic accumulating float noise.
+    v = Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v)) * 10) / 10;
+    if (v === S.ppu) return;
+    var vp = viewport();
+    // What to hold still. A slider can't point at anything, so it holds the
+    // middle of the view; the wheel holds whatever is under the pointer. An
+    // event that arrives without usable coordinates holds the middle too —
+    // better than letting a NaN through into the scroll position.
+    var at = vp.trackW / 2;
+    if (atScreenX != null && isFinite(atScreenX)) {
+      at = Math.max(0, Math.min(atScreenX - GUTTER, vp.trackW));
+    }
+    // Anchor on the *moment* at that point — read off the layout before, looked
+    // up again after. Scaling scrollX by the zoom ratio would only approximate
+    // it: the per-character view pads every slot by a fixed 10px, and that
+    // padding doesn't stretch with the zoom.
+    var t = xToTime(contentX(GUTTER + at), "you");
+    S.ppu = v;
+    relayoutOnly();
+    S.scrollX = timeToX(t, "you") - at;
+    clampScroll(viewport());
+    zoomEl.value = v;
+    $("zoom-out").textContent = fmtPpu(v);
+    resize();                 // ends in draw
+  }
+
+  zoomEl.value = S.ppu;
+  $("zoom-out").textContent = fmtPpu(S.ppu);
+  zoomEl.addEventListener("input", function () {
+    setZoom(parseFloat(zoomEl.value));
+  });
 
   var expIn = $("expected");
   expIn.value = S.expected;

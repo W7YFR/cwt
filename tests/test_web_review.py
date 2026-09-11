@@ -610,14 +610,13 @@ def test_page_boots_and_draws(tmp_path):
     # Hovering either value points at the stretch of canvas it describes, on
     # the same track that value would play — so "yours" and "target" light up
     # different rows — and the highlight goes away when the pointer leaves.
-    # Compared as sets: the stub hands back the same cell objects across
-    # re-renders, so app.js attaches its listener more than once and one
-    # dispatch redraws several times. Which colors got washed is the signal.
+    # Exactly one wash per hover, in the hovered track's own color: one listener
+    # on the row, one redraw, one highlight.
     hov = d["devHover"]
-    assert set(hov["you"]) == {hov["colors"]["you"]}, \
-        f"hovering 'yours' should wash the YOU track: {hov['you']}"
-    assert set(hov["tgt"]) == {hov["colors"]["tgt"]}, \
-        f"hovering 'target' should wash the TGT track: {hov['tgt']}"
+    assert hov["you"] == [hov["colors"]["you"]], \
+        f"hovering 'yours' should wash the YOU track once: {hov['you']}"
+    assert hov["tgt"] == [hov["colors"]["tgt"]], \
+        f"hovering 'target' should wash the TGT track once: {hov['tgt']}"
     assert hov["afterLeave"] == [], \
         f"the highlight outlived the hover: {hov['afterLeave']}"
 
@@ -716,9 +715,23 @@ def test_page_boots_and_draws(tmp_path):
         assert not c.startswith("-"), f"clock read {c!r}"
 
     # The listening level starts at unity: the recording plays back at the
-    # level it was made, and boosting is an explicit choice.
-    assert d["initial"]["gainOut"] == "0 dB", \
+    # level it was made, and boosting is an explicit choice. (Readings are
+    # space-padded to a constant width — see the readout check below.)
+    assert d["initial"]["gainOut"].strip() == "0 dB", \
         f"listening level defaulted to {d['initial']['gainOut']!r}"
+
+    # No readout may change width. The control groups are sized by their
+    # contents and the intended-message field absorbs the slack, so a reading
+    # that gains a digit shoves the row sideways and re-wraps that field's
+    # caption. Dragging a slider made that twitch; the wheel zoom made it
+    # constant. Every reading each output showed, across every sweep above:
+    assert d["readouts"], "no readouts were recorded"
+    for name, seen in d["readouts"].items():
+        assert seen, f"{name} never showed a reading"
+        widths = sorted({len(s) for s in seen})
+        assert len(widths) == 1, (
+            f"{name} rendered at {widths} characters wide across {sorted(seen)}"
+            " — the control row will twitch as it updates")
 
     # The page opens fully zoomed out, so the whole session is on screen before
     # you touch anything: find where the trouble is, then zoom in on it. The
@@ -727,12 +740,56 @@ def test_page_boots_and_draws(tmp_path):
     zoom_min = re.search(r'id="zoom"[^>]*\bmin="(\d+)"', page.read_text())
     assert zoom_min, "could not find the zoom slider's min in the page"
     floor = int(zoom_min.group(1))
-    # Compared as numbers: a real input coerces .value to a string, the stub
-    # keeps whatever app.js assigned.
+    # Compared as numbers: an input's .value is a string.
     assert int(d["initial"]["zoom"]) == floor, (
         f"zoom opened at {d['initial']['zoom']!r}, not the slider's minimum "
         f"{floor}")
-    assert d["initial"]["zoomOut"] == f"{floor} px/unit"
+    assert d["initial"]["zoomOut"].strip() == f"{floor} px/unit"
+
+    # --- the wheel zooms ------------------------------------------------- #
+    src = page.read_text()
+    ceiling = int(re.search(r'id="zoom"[^>]*\bmax="(\d+)"', src).group(1))
+    steps = dict(d["wheelZoom"]["steps"])
+
+    # Wheel up zooms in, wheel down zooms out. Two notches up then two back
+    # down returns you exactly where you started: the step is proportional, so
+    # it has to be symmetric or the zoom would creep with every gesture.
+    assert steps["in"]["ppu"] > steps["start"]["ppu"], "wheel up did not zoom in"
+    assert steps["in-again"]["ppu"] > steps["in"]["ppu"], "zoom stopped moving"
+    assert steps["out"]["ppu"] == steps["in"]["ppu"]
+    assert steps["out-again"]["ppu"] == steps["start"]["ppu"], (
+        f"two notches up and two back down landed on "
+        f"{steps['out-again']['ppu']}, not {steps['start']['ppu']}")
+    # Shift means pan, so it must leave the zoom exactly where it was...
+    assert steps["shift"]["ppu"] == steps["out-again"]["ppu"], \
+        "shift+wheel changed the zoom instead of panning"
+    # ...and it must actually pan. Content is translated by (gutter - scrollX).
+    assert steps["shift"]["translate"] < steps["out-again"]["translate"], \
+        "shift+wheel did not scroll the view"
+
+    # Spinning the wheel stops at the slider's own limits rather than running
+    # off into a zoom the slider can't express.
+    assert steps["pinned-in"]["ppu"] == ceiling
+    assert steps["pinned-out"]["ppu"] == floor
+
+    # The slider thumb follows the wheel, snapped to its whole-number step
+    # while the readout keeps the fraction the wheel actually landed on.
+    for name in ("in", "in-again", "out"):
+        s = steps[name]
+        assert abs(s["slider"] - s["ppu"]) <= 0.5, (
+            f"the slider ({s['slider']}) drifted from the zoom ({s['ppu']})")
+    assert any(s["ppu"] % 1 for _, s in d["wheelZoom"]["steps"] if "ppu" in s), \
+        "the wheel only ever produced whole zoom levels; nothing to snap"
+
+    # Anchoring: the same gesture over the left edge and over the right edge of
+    # an identical view. Both reach the same zoom, but each holds the content
+    # under the pointer still, so they leave the view in very different places.
+    # Zoom about the middle only would make these two identical.
+    anc = d["wheelZoom"]["anchored"]
+    assert anc["left"]["ppu"] == anc["right"]["ppu"]
+    assert anc["left"]["translate"] - anc["right"]["translate"] > 200, (
+        "zooming at the left and at the right edge left the view in the same "
+        f"place — the pointer is not anchoring it: {anc}")
 
     # The view follows the playhead instead of letting it slide off-screen.
     # Content is translated by (gutter - scrollX), so this trace falls as the

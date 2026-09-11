@@ -367,6 +367,20 @@ Blocks are colored green / yellow / red on the same thresholds as the terminal
 report. Hover anything for its exact length; click a character to hear just that
 character; click the ruler to seek.
 
+**Moving around.** The page opens fully zoomed out so the whole session is on
+screen — find where the trouble is, then go in on it:
+
+| Gesture | Does |
+|---------|------|
+| **Scroll** | Zoom, about the pointer — whatever is under the cursor stays under it. A trackpad pinch does the same. |
+| **Shift-scroll**, or a sideways trackpad swipe | Pan. |
+| **Drag** the chart, or the scrollbar under it | Pan. |
+| **←/→**, **Home**/**End** | Pan by a quarter view, or jump to either end. |
+
+The **Zoom** slider does the same in whole px/unit, anchored on the middle of
+the view since it has no pointer to anchor on. The view also follows the
+playhead during playback.
+
 **Three views** (the View selector):
 
 | View | Shows |

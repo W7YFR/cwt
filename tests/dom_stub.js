@@ -26,8 +26,11 @@ global.atob = (s) => Buffer.from(s, "base64").toString("binary");
 // Every download the page triggers: filename, scheme, and byte size where the
 // stub can tell (a Blob's size, or a data: URI's length).
 const downloads = [];
-// Cache of the deviations table's play cells, keyed on the report markup.
-const playCells = { html: null, cells: [] };
+// Cache of the deviations table's play cells, keyed on which render produced
+// them — `reportGen` counts assignments to the report's innerHTML, each of
+// which throws away the previous cells the way a real DOM does.
+const playCells = { gen: -1, cells: [] };
+let reportGen = 0;
 
 /* Tracks the horizontal translate so text positions can be reported in screen
    coordinates. That's what lets a test check that the track labels live in the
@@ -269,14 +272,17 @@ global.document = eventTarget({
   body: { appendChild: () => {}, removeChild: () => {} },
   getElementById: byId,
   // The report re-renders innerHTML and then wires up its play cells; the stub
-  // has no parser, so synthesize cells from the recorded markup. Cached on the
-  // markup itself: app.js attaches listeners to whatever this returns, so a
-  // later lookup of the same report must hand back the *same* objects or the
-  // listeners would be invisible to a test.
+  // has no parser, so synthesize cells from the recorded markup. Cached, since
+  // app.js attaches listeners to whatever this returns and a second lookup of
+  // the *same* rendered report must hand back the same objects or those
+  // listeners would be invisible to a test — but keyed on the generation, not
+  // on the markup: assigning innerHTML destroys the old nodes and their
+  // listeners even when it writes identical text, and matching by text instead
+  // let one dispatch reach a listener per render.
   querySelectorAll: (sel) => {
     if (sel !== "td.play") return [];
     const html = byId("report").innerHTML;
-    if (playCells.html === html) return playCells.cells;
+    if (playCells.gen === reportGen) return playCells.cells;
     const cells = [];
     // Row-wise, so each cell also carries the timestamp its row names — that's
     // what lets a test check the played window actually contains that moment.
@@ -293,7 +299,7 @@ global.document = eventTarget({
         cells.push(td);
       }
     }
-    playCells.html = html;
+    playCells.gen = reportGen;
     playCells.cells = cells;
     return cells;
   },
@@ -361,6 +367,68 @@ const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
 if (scripts.length !== 4) {
   throw new Error(`expected 4 inline scripts, found ${scripts.length}`);
 }
+/* Range inputs keep their limits in the page markup, and app.js reads them back
+   — the wheel zoom clamps to the zoom slider's own min/max. There's no HTML
+   parser here, so lift those attributes across rather than letting every slider
+   claim a made-up range, and give the ones that have a step a real setter:
+   a browser sanitizes an assigned value by clamping and snapping it, which is
+   why the slider can't hold the fractional zooms the wheel produces. Must run
+   before the scripts, which read all of this at boot. */
+[...html.matchAll(/<input\b[^>]*>/g)].forEach(([tag]) => {
+  const id = /\bid="([\w-]+)"/.exec(tag);
+  if (!id) return;
+  const el = byId(id[1]);
+  const attrs = {};
+  for (const name of ["min", "max", "step"]) {
+    const got = new RegExp(`\\b${name}="([^"]*)"`).exec(tag);
+    if (got) el[name] = attrs[name] = got[1];
+  }
+  if (attrs.step === undefined) return;
+  let held = el.value;
+  Object.defineProperty(el, "value", {
+    get: () => held,
+    set: (v) => {
+      const n = parseFloat(v);
+      if (!isFinite(n)) { held = String(v); return; }
+      const lo = parseFloat(el.min), hi = parseFloat(el.max);
+      const step = parseFloat(el.step) || 1;
+      let x = n;
+      if (isFinite(lo)) x = Math.max(lo, x);
+      if (isFinite(hi)) x = Math.min(hi, x);
+      if (isFinite(lo)) x = lo + Math.round((x - lo) / step) * step;
+      held = String(Math.round(x * 1e6) / 1e6);
+    }
+  });
+});
+
+/* Writing innerHTML replaces the element's children, so anything the stub
+   synthesized from the old markup — and every listener app.js hung on it — is
+   gone. Count the writes so the play-cell cache can tell one render from the
+   next even when both produce the same text. */
+(function () {
+  const el = byId("report");
+  let held = el.innerHTML;
+  Object.defineProperty(el, "innerHTML", {
+    get: () => held,
+    set: (v) => { held = String(v); reportGen++; }
+  });
+})();
+
+/* Every value each readout has ever shown. A reading that changes width drags
+   the control row sideways with it, so what matters is that one output's
+   strings are all the same length. Collected by watching the property rather
+   than sampling at call sites, so nothing the page does can slip past. */
+const readouts = {};
+["wpm-out", "farns-out", "tol-out", "gain-out", "zoom-out"].forEach((id) => {
+  const el = byId(id);
+  const seen = (readouts[id] = []);
+  let held = el.textContent;
+  Object.defineProperty(el, "textContent", {
+    get: () => held,
+    set: (v) => { held = String(v); seen.push(held); }
+  });
+});
+
 scripts.forEach((src, i) => {
   try {
     // Indirect eval so each runs in global scope, like a real <script>.
@@ -400,7 +468,15 @@ const initial = {
   byId("view").value = view;
   fire(byId("view"), "change");
   [["wpm", 13], ["wpm", 35], ["farns", 9], ["tol", 8], ["tol", 55],
-   ["gain", 0], ["gain", 30], ["zoom", 6], ["zoom", 48]].forEach(([id, v]) => {
+   ["gain", 0], ["gain", 30], ["zoom", 6], ["zoom", 48],
+   // Both extremes of every slider as well, so the readout-width check sees
+   // the widest and the narrowest reading each one can show — a signed
+   // two-digit boost, a one-digit speed. Ordered to leave the speeds back at
+   // the payload's, and wpm raised before farns follows it up (overall speed
+   // can't exceed character speed, so the first drags the second down).
+   ["wpm", 45], ["farns", 45], ["wpm", 5], ["tol", 5], ["tol", 60],
+   ["gain", -6], ["gain", 42], ["gain", 0],
+   ["wpm", 20], ["farns", 20]].forEach(([id, v]) => {
     byId(id).value = String(v);
     fire(byId(id), "input");
   });
@@ -416,8 +492,15 @@ const initial = {
 
   // Internal scrolling: wheel, keyboard paging, drag-to-pan, and dragging the
   // scrollbar thumb (which must not also register as a character click).
-  fire(canvas, "wheel", { deltaX: 240, deltaY: 0, preventDefault: () => {} });
-  fire(canvas, "wheel", { deltaX: 0, deltaY: -90, preventDefault: () => {} });
+  // A horizontal wheel pans; shift+wheel pans on deltaY; a plain vertical
+  // wheel zooms (measured on its own further down).
+  fire(canvas, "wheel", { deltaX: 240, deltaY: 0, clientX: 400, clientY: 100,
+                          preventDefault: () => {} });
+  fire(canvas, "wheel", { deltaX: 0, deltaY: 120, shiftKey: true,
+                          clientX: 400, clientY: 100,
+                          preventDefault: () => {} });
+  fire(canvas, "wheel", { deltaX: 0, deltaY: -90, clientX: 400, clientY: 100,
+                          preventDefault: () => {} });
   ["ArrowRight", "ArrowLeft", "End", "Home"].forEach((key) =>
     fire(document, "keydown", { key, code: key, target: {},
                                 preventDefault: () => {} }));
@@ -671,11 +754,12 @@ function measureRests(key) {
     { key: "Home", code: "Home", target: {}, preventDefault: () => {} });
 
   // Zoomed right out the whole chart fits the viewport, so every gap label is
-  // drawn — including the one over the rest, wherever it falls.
+  // drawn — including the one over the rest, wherever it falls. Re-zooming to
+  // the same value is no longer how you ask for a redraw (setZoom skips a
+  // no-op); a scroll to the top always repaints, even from the top.
   zoom(4);
-  home();
   calls.textAt.length = 0;
-  zoom(4);
+  home();
   const restLabels = calls.textAt.filter(([t]) => /^Rest /.test(t));
   const labels = [...new Set(restLabels.map((r) => r[0]))];
   // A rest is not graded, so it must not be drawn in the graded palette.
@@ -711,6 +795,66 @@ function exerciseRestToggle() {
   measureRests("expanded");
   byId("rests").checked = true;
   fire(byId("rests"), "change");
+}
+
+/* ---- the wheel zooms ---------------------------------------------------- //
+   Each gesture is recorded as the zoom it left behind plus the content
+   translate, which is (gutter - scrollX) — so a test can check the direction,
+   that the slider follows, that the slider's own limits hold, and the one
+   property that makes pointer-anchored zoom worth the trouble: the same
+   gesture at the left and right edges of an identical view must not leave the
+   view in the same place. */
+const wheelZoom = { steps: [], anchored: {} };
+
+// The readout is the honest source for the zoom: the slider snaps to whole
+// numbers, so it can't report the fractions the wheel lands on.
+const zoomState = () => ({ ppu: parseFloat(byId("zoom-out").textContent),
+                           slider: Number(byId("zoom").value) });
+
+function wheelAt(x, deltaY, shiftKey) {
+  calls.translates.length = 0;
+  fire(canvas, "wheel", { deltaX: 0, deltaY: deltaY, shiftKey: !!shiftKey,
+                          clientX: x, clientY: 100,
+                          preventDefault: () => {} });
+  const s = zoomState();
+  // null when the gesture drew nothing, which is itself worth seeing.
+  s.translate = calls.translates.length
+    ? Math.round(calls.translates[0]) : null;
+  return s;
+}
+
+function exerciseWheelZoom() {
+  byId("view").value = "per-char";
+  fire(byId("view"), "change");
+  const setSlider = (v) => {
+    byId("zoom").value = String(v);
+    fire(byId("zoom"), "input");
+  };
+  const home = () => fire(document, "keydown",
+                          { key: "Home", code: "Home", target: {},
+                            preventDefault: () => {} });
+
+  setSlider(14);
+  wheelZoom.steps.push(["start", zoomState()]);
+  wheelZoom.steps.push(["in", wheelAt(400, -120)]);
+  wheelZoom.steps.push(["in-again", wheelAt(400, -120)]);
+  wheelZoom.steps.push(["out", wheelAt(400, 120)]);
+  wheelZoom.steps.push(["out-again", wheelAt(400, 120)]);
+  // A shift+wheel is a pan, so it must leave the zoom alone entirely.
+  wheelZoom.steps.push(["shift", wheelAt(400, 240, true)]);
+  // Far past either end: it stops at the slider's limits rather than running on.
+  for (let i = 0; i < 40; i++) wheelAt(400, -240);
+  wheelZoom.steps.push(["pinned-in", zoomState()]);
+  for (let i = 0; i < 60; i++) wheelAt(400, 240);
+  wheelZoom.steps.push(["pinned-out", zoomState()]);
+
+  // Identical starting view, one gesture, two pointer positions.
+  for (const [side, x] of [["left", 60], ["right", 860]]) {
+    setSlider(10);
+    home();
+    wheelZoom.anchored[side] = wheelAt(x, -240);
+  }
+  setSlider(14);
 }
 
 // ---- downloads ----------------------------------------------------------- //
@@ -820,6 +964,7 @@ exerciseAB()
   .then(exerciseDeviationHover)
   .then(exerciseDeviationPlay)
   .then(exerciseRestToggle)
+  .then(exerciseWheelZoom)
   .then(exerciseDownloads)
   .then(exerciseJsonReport)
   .then(report)
@@ -887,6 +1032,10 @@ console.log(JSON.stringify({
   devHover: devHover,
   devPlay: devPlay,
   restToggle: restToggle,
+  wheelZoom: wheelZoom,
+  // Deduplicated: it's the set of distinct readings that has to be one width.
+  readouts: Object.fromEntries(Object.entries(readouts).map(
+    ([id, seen]) => [id, [...new Set(seen)]])),
   endReset: endReset,
   initial: initial,
   viewFills: viewFills,

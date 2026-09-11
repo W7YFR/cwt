@@ -88,7 +88,23 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   gap: 6px;
   align-items: baseline;
 }
-.group output { color: var(--ink); font-family: var(--mono); font-size: 12px; }
+/* A readout must never change width. The groups are sized by their content and
+   the intended-message field absorbs the slack, so a reading that gains a digit
+   drags the whole control row with it — the caption there wraps and unwraps as
+   the number beside it grows. Dragging a slider made that twitch once; zooming
+   with the wheel made it constant.
+   The numbers are right-aligned into a fixed field by the padding app.js puts
+   on them, which needs `pre` to survive HTML whitespace collapsing. Monospace
+   and tabular figures are what make that padding exact. Same end as .clock, by
+   the means a value with a unit stuck to it allows. */
+.group output {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+  flex: 0 0 auto;
+}
 /* A checkbox sits on the same baseline as its words, not above them like the
    sliders' captions do, so the whole label is one click target. */
 .group label.check {
