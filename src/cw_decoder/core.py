@@ -587,8 +587,18 @@ def target_timing(char_wpm: float, farnsworth_wpm: float | None = None) -> Timin
     )
 
 
-def estimate_timing(segs) -> Timing:
-    """Derive dit length, speeds, and classification thresholds from segments."""
+def _gap_classes(text: str) -> "tuple[int, int]":
+    """How many character gaps and word gaps the intended text calls for."""
+    words = [w for w in (_keyable_symbols(w) for w in text.upper().split()) if w]
+    return (sum(max(len(w) - 1, 0) for w in words), max(len(words) - 1, 0))
+
+
+def estimate_timing(segs, expected: str | None = None) -> Timing:
+    """Derive dit length, speeds, and classification thresholds from segments.
+
+    `expected` is the intended message, used only to settle what the dominant
+    inter-character silence *is* — see the note where it's read below.
+    """
     marks = [d for s, d in segs if s == 1]
     gaps = [d for s, d in segs if s == 0]
     if not marks:
@@ -618,6 +628,23 @@ def estimate_timing(segs) -> Timing:
     char_gap = unit * 3.0
     if inter:
         char_gap = _dominant_gap(inter)
+        # _dominant_gap returns the most populous inter-character silence and
+        # calls it the character gap, which holds for ordinary text. It does not
+        # hold for a single-letter drill: "A B C D E F" has no character gaps at
+        # all, so the dominant silence there is a *word* gap, and reading it as a
+        # character gap puts `ta` out by 7/3 — an overall speed of 8 wpm for
+        # sending that was 14, and a decode of "ABCDEF" with every word break
+        # swallowed, because char_word_split lands above the gaps that made it.
+        #
+        # The audio can't settle this. Equal silences between single letters are
+        # loose character gaps or word gaps depending only on what was meant, and
+        # both readings fit the same recording. The intended text is the one
+        # thing that knows, so use it when it's there: whichever class the text
+        # has more of is the class the dominant cluster belongs to.
+        if expected:
+            n_char, n_word = _gap_classes(expected)
+            if n_word > n_char:
+                char_gap *= 3.0 / 7.0     # it was a word gap all along
     word_gap = char_gap * (7.0 / 3.0)
     char_word_split = char_gap * (5.0 / 3.0)
 
@@ -1071,7 +1098,7 @@ def decode_file(path: str, tone: float | None = None,
         rough_unit = float(np.percentile(marks, 20))
         segs = debounce(segs, min_dur=0.35 * rough_unit)
 
-    measured = estimate_timing(segs)
+    measured = estimate_timing(segs, expected=expected)
     analysis = None
     if target_wpm is not None:
         # Decode against the target's ideal timing and grade the sending.

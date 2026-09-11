@@ -1452,6 +1452,43 @@
   var LABELS = { dit: "dit", dah: "dah", "element-gap": "intra-char gap",
                  "char-gap": "character gap", "word-gap": "word gap" };
 
+  /* What each class actually refers to, for hovering. Worth spelling out
+     because the names are only obvious once you already know the model: an
+     "intra-char gap" is easy to read as the gap *between* characters, which is
+     a different class with a target more than three times as large. Each says
+     where to look on the chart as well as what the number should be, since a
+     flagged element you cannot find is a flagged element you cannot fix. */
+  var CLASS_HELP = {
+    dit: "A short mark. The unit everything else is measured in: it should be "
+       + "1.00u by definition, so a dit off target means your dits are "
+       + "uneven, not slow.",
+    dah: "A long mark. Should be 3.00u — exactly three dits. A dah keyed "
+       + "short is the usual reason a letter comes back as a different one.",
+    "element-gap":
+      "The silence INSIDE a single character, between its own dits and dahs "
+      + "(the gap between the dot and the dash of an A). Should be 1.00u. "
+      + "These are the narrowest gaps drawn, so their labels are left off "
+      + "until you zoom in — hover the bracket on the chart for the exact "
+      + "length. Hovering this row highlights just the one character the gap "
+      + "is inside, and clicking plays that character alone.",
+    "char-gap":
+      "The silence BETWEEN two letters of the same word. Should be 3.00u, and "
+      + "wider than that when you send Farnsworth — the target column has the "
+      + "figure for the speeds now set.",
+    "word-gap":
+      "The silence between two words. Should be 7.00u, and wider under "
+      + "Farnsworth. Long enough and it stops being a gap at all and becomes "
+      + "a rest, which is not graded."
+  };
+
+  /* A class name with its explanation attached. Titles are double-quoted
+     because the text has apostrophes in it; the play cells nearby use single
+     quotes and are parsed that way by tests/dom_stub.js. */
+  function classCell(kind, extra) {
+    return '<td class="why" title="' + LABELS[kind] + " — " + CLASS_HELP[kind]
+         + (extra || "") + '">' + LABELS[kind] + "</td>";
+  }
+
   function renderReport() {
     var g = M.grade, c = M.compare;
     var html = [];
@@ -1459,7 +1496,7 @@
     // Element / spacing table — the same figures cli._print_analysis prints.
     var rows = g.stats.map(function (s) {
       var grade = gradeOf(s.meanUnits, s.targetUnits);
-      return "<tr><td>" + LABELS[s.name] + "</td><td class='" + grade + "'>" +
+      return "<tr>" + classCell(s.name) + "<td class='" + grade + "'>" +
              s.meanUnits.toFixed(2) + "u</td><td>" +
              s.targetUnits.toFixed(2) + "u</td><td>±" +
              s.stdUnits.toFixed(2) + "</td><td>" + s.n + "</td>" +
@@ -1478,8 +1515,11 @@
       // plays and highlights — see contextSlots.
       var i = slotIndexAtTime(d.timeSec);
       var at = " data-i='" + i + "' data-kind='" + d.kind + "'";
-      return "<tr><td>" + d.timeSec.toFixed(2) + "s</td><td>" + d.kind +
-             "</td><td class='bad play' data-side='you'" + at +
+      return "<tr><td>" + d.timeSec.toFixed(2) + "s</td>" +
+             classCell(d.kind, " This row is one of them, not the average — "
+                               + "the class can sit inside tolerance overall "
+                               + "and still have a single element out here.") +
+             "<td class='bad play' data-side='you'" + at +
              " title='hear yours'>" + d.valueUnits.toFixed(2) + "u ▸</td>" +
              "<td class='play' data-side='tgt'" + at +
              " title='hear the target'>" + d.targetUnits.toFixed(2) +
@@ -1490,9 +1530,10 @@
       (devs ? "<table><tr><th>at</th><th>class</th><th>yours</th>" +
               "<th>target</th><th>context</th></tr>" + devs + "</table>" +
               '<p class="note">Hover a value to find it on the canvas, click ' +
-              "to hear it — yours or the target. Either way you get the " +
-              "characters around a letter gap, or the words around a word " +
-              "gap.</p>"
+              "to hear it — yours or the target. Either way you get just what " +
+              "the class covers: the character itself for a dit, dah or " +
+              "intra-char gap, the characters either side of a letter gap, " +
+              "the words either side of a word gap.</p>"
             : '<p class="note empty">No significant spacing deviations. ' +
               "Clean sending.</p>") + "</div>");
 
@@ -1608,8 +1649,14 @@
                  more, or a neighboring gap competes with the one in question
        word-gap  the whole word either side, since a word gap separates words
                  and half a word doesn't read as one
-       anything  else lives inside a character (a mark, an intra-character
-                 gap), so its own character plus a neighbor for rhythm
+       anything  else — a dit, a dah, an intra-character gap — lives *inside*
+                 one character, so that character and nothing else
+
+     The last one used to take a neighbor on each side too, on the theory that
+     a mark's length only reads in context. That was wrong twice over: it
+     highlighted three characters for a fault in the middle one, and it buried
+     a 23 ms hesitation inside a second and a half of audio. The character is
+     its own context — the other elements it is made of are right there.
 
      A gap is the *lead* gap of slot `idx`, so it sits between idx-1 and idx.
      Both the highlight and the playback window come from here — they'd drift
@@ -1625,7 +1672,8 @@
       while (hi < last && !opensWord(charAt(side, hi + 1))) hi++;
       return [Math.max(lo, 0), hi];
     }
-    return [Math.max(idx - 1, 0), Math.min(idx + 1, last)];
+    var at = Math.min(idx, last);
+    return [at, at];
   }
 
   /* The same range as a time window, for playback. */
@@ -1983,6 +2031,44 @@
     setZoom(parseFloat(zoomEl.value));
   });
 
+  /* The zoom that just fills the track, never below the slider's minimum.
+
+     Measured rather than solved for: content width is not proportional to the
+     zoom, because the per-character view pads every slot by a fixed amount and
+     a collapsed rest is a fixed sliver whatever the scale. That fixed part
+     means the obvious guess (scale by how much room is left over) always
+     undershoots, so it converges from below without ever overshooting — a few
+     passes and it's inside a tenth of a pixel.
+
+     Pure measurement: S.ppu and the layout are put back before returning, so
+     the caller can hand the answer to setZoom like any other zoom. setZoom
+     clamps as well, so the clamp inside the loop is not what keeps the result
+     legal — it's what lets the search settle, by not chasing a width the zoom
+     is not allowed to reach. */
+  function fitZoom() {
+    var target = viewport().trackW;
+    var was = S.ppu;
+    var ppu = ZOOM_MIN;
+    for (var i = 0; i < 8; i++) {
+      S.ppu = ppu;
+      relayoutOnly();
+      if (!(L.width > 0)) break;
+      var next = Math.max(ZOOM_MIN,
+                          Math.min(ZOOM_MAX, ppu * target / L.width));
+      var settled = Math.abs(next - ppu) < 0.05;
+      ppu = next;
+      if (settled) break;
+    }
+    S.ppu = was;
+    relayoutOnly();
+    return Math.round(ppu * 10) / 10;
+  }
+
+  // Get back to the opening zoom after going in on something. Worth a button
+  // because it is not a zoom level you can dial up: it depends on the session
+  // and on how wide the window is right now.
+  $("zoom-fit").addEventListener("click", function () { setZoom(fitZoom()); });
+
   var expIn = $("expected");
   expIn.value = S.expected;
   expIn.addEventListener("input", function () {
@@ -2046,4 +2132,11 @@
 
   readColors();
   recompute();
+  /* Open filling the width. S.ppu starts at the slider's minimum so a long
+     session is wholly on screen, but that leaves a short one stranded in a
+     third of the chart — and empty pixels are the one thing a timing chart has
+     no use for. Zooming in only: whatever doesn't fit at the minimum still
+     scrolls. Done after recompute() because the fit is measured off the real
+     layout, and through setZoom so the slider and the readout come along. */
+  setZoom(fitZoom());
 })();

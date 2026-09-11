@@ -117,6 +117,12 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .hint { text-transform: none; letter-spacing: 0; color: var(--ink-faint); }
 
 input[type=range] { width: 100%; accent-color: var(--you); margin: 4px 0 0; }
+/* A slider with a button beside it. The slider takes the slack; `min-width: 0`
+   because a flex item won't shrink below its intrinsic width without it, which
+   would push the button out of the group. */
+.sliderow { display: flex; gap: 8px; align-items: center; }
+.sliderow input[type=range] { flex: 1 1 auto; min-width: 0; }
+.sliderow button { flex: 0 0 auto; padding: 3px 8px; font-size: 11px; }
 input[type=text], select {
   background: var(--bg);
   color: var(--ink);
@@ -229,6 +235,14 @@ canvas.grabbing { cursor: grabbing; }
 .sw.bad { background: var(--bad); }
 .sw.ghost { background: transparent; border: 1px dashed var(--ghost); }
 .sw.rest { background: var(--rest); }
+
+/* A class name you can hover for what the class means. Marked, because a
+   tooltip nobody knows is there explains nothing. */
+.report td.why {
+  cursor: help;
+  text-decoration: underline dotted var(--ink-faint);
+  text-underline-offset: 3px;
+}
 
 /* ---- report ------------------------------------------------------------ */
 .report {

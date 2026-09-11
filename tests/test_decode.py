@@ -300,6 +300,66 @@ def test_capture_device_parser():
     assert devices == [(0, "MacBook Pro Microphone"), (1, "USB Audio CODEC")]
 
 
+def test_a_single_letter_drill_is_not_read_as_loose_letter_spacing(tmp_path):
+    """Every silence in "A B C D E F" is a word gap — each letter is its own
+    word, so there are no character gaps at all.
+
+    The audio can't settle that: the same recording reads as six words at 25/14
+    or as one loosely-spaced word at 25/8, and nothing in the signal prefers
+    either. Guessing "character gap" (the right guess for ordinary text) puts
+    the overall speed out by 7/3 and swallows every space in the decode. The
+    intended text is what knows, so passing it must fix both.
+    """
+    wav = tmp_path / "drill.wav"
+    synth.write_wav(str(wav), synth.generate("A B C D E F", wpm=25,
+                                             farnsworth_wpm=14, tone=600,
+                                             rate=8000), 8000)
+
+    blind = core.decode_file(str(wav), target_rate=8000)
+    told = core.decode_file(str(wav), target_rate=8000,
+                            expected="a b c d e f")
+
+    # Character speed comes from the marks alone, so both readings agree on it.
+    # (Loose: six single letters is only 15 marks for the dit/dah clustering.)
+    assert blind.timing.char_wpm == pytest.approx(25, abs=2.5)
+    assert told.timing.char_wpm == pytest.approx(blind.timing.char_wpm,
+                                                 rel=1e-9)
+
+    # Only the intended text gets the overall speed right...
+    assert told.timing.farnsworth_wpm == pytest.approx(14, abs=1.0), (
+        f"told the text, overall speed read {told.timing.farnsworth_wpm:.1f} "
+        "wpm instead of 14")
+    # ...and what the text moved is exactly one thing: the gap taken to be the
+    # character gap, by the 3:7 ratio between the two classes. That's the
+    # mechanism, not just a number that came out wrong.
+    assert told.timing.char_gap_sec == pytest.approx(
+        blind.timing.char_gap_sec * 3 / 7, rel=1e-9)
+    # The overall speed doesn't scale by that ratio — only the Farnsworth
+    # padding inside it does — but it's dramatic all the same: near half.
+    assert blind.timing.farnsworth_wpm < 9, (
+        f"the blind reading is meant to come out far too slow, not "
+        f"{blind.timing.farnsworth_wpm:.1f} wpm")
+
+    # ...and only it keeps the word breaks, since char_word_split is derived
+    # from the same gap.
+    assert told.text == "A B C D E F"
+    assert blind.text == "ABCDEF"
+
+
+def test_the_intended_text_only_moves_the_gap_it_cannot_settle(tmp_path):
+    """Ordinary text has more character gaps than word gaps, so the dominant
+    silence really is a character gap and naming the text changes nothing."""
+    wav = tmp_path / "qso.wav"
+    _write_wav(wav, text="CQ CQ DE W1AW K", wpm=20)
+
+    blind = core.decode_file(str(wav), target_rate=8000)
+    told = core.decode_file(str(wav), target_rate=8000,
+                            expected="CQ CQ DE W1AW K")
+    assert told.timing.farnsworth_wpm == pytest.approx(
+        blind.timing.farnsworth_wpm, rel=1e-9)
+    assert told.text == blind.text == "CQ CQ DE W1AW K"
+
+
 def _write_wav(path, text="CQ DE AB1CD", wpm=20):
     synth.write_wav(str(path), synth.generate(text, wpm=wpm, tone=600, rate=8000),
                     8000)

@@ -61,7 +61,12 @@
   <div class="group">
     <label for="zoom" title="Or scroll over the chart, which zooms about the pointer">
       Zoom <output id="zoom-out"></output></label>
-    <input type="range" id="zoom" min="4" max="60" step="1">
+    <!-- The button is a sibling of the label, not inside it: a label may not
+         contain another labelable element. -->
+    <div class="sliderow">
+      <input type="range" id="zoom" min="4" max="60" step="1">
+      <button id="zoom-fit" title="Zoom so the session fills the width — what the page does when it opens">Fit</button>
+    </div>
   </div>
 
   <div class="group">

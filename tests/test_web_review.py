@@ -513,6 +513,25 @@ def _same_numbers(a, b, path="report"):
         assert a == b, f"{path}: {a!r} != {b!r}"
 
 
+def _run_stub(page):
+    """Boot `page` under the stub DOM and return everything it observed."""
+    stub = Path(__file__).parent / "dom_stub.js"
+    proc = subprocess.run(["node", str(stub), str(page)],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, f"page failed to run:\n{proc.stderr}"
+    return json.loads(proc.stdout)
+
+
+def _zoom_range(page):
+    """The zoom slider's limits, read from the page's own markup rather than
+    restated here — the stub lifts them across, and app.js clamps to them."""
+    src = page.read_text()
+    lo = re.search(r'id="zoom"[^>]*\bmin="(\d+)"', src)
+    hi = re.search(r'id="zoom"[^>]*\bmax="(\d+)"', src)
+    assert lo and hi, "could not find the zoom slider's range in the page"
+    return int(lo.group(1)), int(hi.group(1))
+
+
 def _boot_sloppy_page(tmp_path):
     """Build the review page for the sloppy fixture, run it under the stub DOM,
     and return everything the stub observed."""
@@ -524,12 +543,7 @@ def _boot_sloppy_page(tmp_path):
     webpage.write(str(page), review.build_payload(
         res, source="sloppy.wav", expected=SLOPPY_EXPECTED,
         expected_source="(inline text)", tolerance=SLOPPY_TOL))
-
-    stub = Path(__file__).parent / "dom_stub.js"
-    proc = subprocess.run(["node", str(stub), str(page)],
-                          capture_output=True, text=True)
-    assert proc.returncode == 0, f"page failed to run:\n{proc.stderr}"
-    return json.loads(proc.stdout), page
+    return _run_stub(page), page
 
 
 @node
@@ -733,22 +747,26 @@ def test_page_boots_and_draws(tmp_path):
             f"{name} rendered at {widths} characters wide across {sorted(seen)}"
             " — the control row will twitch as it updates")
 
-    # The page opens fully zoomed out, so the whole session is on screen before
-    # you touch anything: find where the trouble is, then zoom in on it. The
-    # slider's floor lives in the markup, so read it from there rather than
-    # restating 4 in two places.
-    zoom_min = re.search(r'id="zoom"[^>]*\bmin="(\d+)"', page.read_text())
-    assert zoom_min, "could not find the zoom slider's min in the page"
-    floor = int(zoom_min.group(1))
+    # This session is too long to fit the window, so it opens fully zoomed out:
+    # the whole thing on screen before you touch anything, so you can find
+    # where the trouble is and then go in on it. (A session short enough to fit
+    # zooms in instead — test_the_page_opens_filling_the_width.)
+    floor, ceiling = _zoom_range(page)
     # Compared as numbers: an input's .value is a string.
     assert int(d["initial"]["zoom"]) == floor, (
         f"zoom opened at {d['initial']['zoom']!r}, not the slider's minimum "
         f"{floor}")
     assert d["initial"]["zoomOut"].strip() == f"{floor} px/unit"
+    # And it stayed there because there was nothing to gain: even fully zoomed
+    # out the chart is wider than the track.
+    assert d["fitOpen"]["room"] > 0, \
+        "this fixture is meant to overflow the window at the minimum zoom"
+    # For a session this long "fit" means all the way out, and the Fit button
+    # gets back there from anywhere — here, from the far end of the slider.
+    assert float(d["fitOpen"]["zoomedIn"]["zoom"].split()[0]) == ceiling
+    assert float(d["fitOpen"]["refit"]["zoom"].split()[0]) == floor
 
     # --- the wheel zooms ------------------------------------------------- #
-    src = page.read_text()
-    ceiling = int(re.search(r'id="zoom"[^>]*\bmax="(\d+)"', src).group(1))
     steps = dict(d["wheelZoom"]["steps"])
 
     # Wheel up zooms in, wheel down zooms out. Two notches up then two back
@@ -848,11 +866,181 @@ def test_page_boots_and_draws(tmp_path):
     assert "Hz tone" in d["scoresHTML"]
     assert "dBFS peak" in d["scoresHTML"]
     assert "Element" in d["reportHTML"]
+
+    # Every class named in either table explains itself on hover. Without it
+    # the names only make sense once you know the model — "intra-char gap"
+    # reads naturally as the gap *between* characters, which is a different
+    # class with a target three times larger.
+    help_by_label = {}
+    for label, text in d["classHelp"]:
+        help_by_label.setdefault(label, []).append(text)
+    assert help_by_label, "no class carried hover text"
+    for label, texts in help_by_label.items():
+        for text in texts:
+            assert text.startswith(label + " — "), \
+                f"{label!r} hover text does not name its own class: {text!r}"
+            assert len(text) > 60, f"{label!r} hover text is too thin: {text!r}"
+
+    # Both tables use the same words for the same class, so a flagged class can
+    # be looked up in the averages above it. The deviations table used to print
+    # the raw internal name ("element-gap") against a table that said
+    # "intra-char gap", with nothing to connect the two.
+    labels = set(help_by_label)
+    assert "intra-char gap" in labels
+    assert not [x for x in labels if "-gap" in x], \
+        f"a raw internal class name reached the report: {sorted(labels)}"
+
+    # The one that actually confuses people says which side of the character
+    # it is on, and where to find it when it is too narrow to be labeled.
+    intra = help_by_label["intra-char gap"][0]
+    assert "INSIDE" in intra and "zoom in" in intra
+
+    # And a deviation row says it is a single element, not the average sitting
+    # in the table above — a class can be within tolerance overall and still
+    # have one element flagged out here.
+    assert any("not the average" in t
+               for texts in help_by_label.values() for t in texts), \
+        "nothing tells you a deviation row is one element, not an average"
     assert d["title"].startswith("CW review")
     # Clearing the intended message drops accuracy but keeps spacing grading,
     # which is the whole point of the no-target fallback.
     assert "accurate" not in d["scoresWithoutTarget"]
     assert "consistent" in d["scoresWithoutTarget"]
+
+
+@node
+def test_a_deviation_plays_exactly_what_its_class_covers(tmp_path):
+    """The window a row plays must hold what the class covers and no more.
+
+    A dit, a dah and an intra-character gap all live *inside* one character, so
+    those rows get that character alone. They used to take a neighbor on each
+    side as well, which highlighted three letters for a fault in the middle one
+    and buried a 20 ms hesitation in a second and a half of audio.
+
+    Checked against the decode's own character spans rather than against
+    durations, so it says the thing that matters — which characters are in and
+    which are out — without depending on the padding or the fixture's lengths.
+    """
+    d, _ = _boot_sloppy_page(tmp_path)
+    res = core.decode_file(str(tmp_path / "sloppy.wav"), target_rate=8000,
+                           target_wpm=SLOPPY_WPM, tolerance=SLOPPY_TOL,
+                           expected=SLOPPY_EXPECTED)
+    chars = res.timeline.chars
+    assert chars
+
+    inside_one_character = {"dit", "dah", "element-gap"}
+    seen = set()
+    for kind, at, start, dur, _tgt in d["devPlay"]:
+        stop = start + dur
+        # The character the flagged element belongs to: for a mark or an
+        # intra-character gap that's the one containing it; for a gap between
+        # characters it's the one the gap leads into.
+        # The table prints the moment to 2dp, so match to within that.
+        eps = 0.01
+        if kind in inside_one_character:
+            hit = [i for i, c in enumerate(chars)
+                   if c.t0 - eps <= at <= c.t1 + eps]
+        else:
+            hit = [i for i, c in enumerate(chars)
+                   if c.lead_gap is not None
+                   and abs(c.lead_gap.t0 - at) <= eps]
+        assert len(hit) == 1, f"{kind} at {at}s matched {len(hit)} characters"
+        i = hit[0]
+        seen.add(kind)
+
+        # However wide the class is, the flagged character itself is in.
+        assert start <= chars[i].t0 and stop >= chars[i].t1, (
+            f"{kind} at {at}s played [{start:.2f}, {stop:.2f}], which does not "
+            f"cover the character it is about "
+            f"([{chars[i].t0:.2f}, {chars[i].t1:.2f}])")
+
+        if kind in inside_one_character:
+            # ...and for a fault inside a character, nothing else is.
+            if i > 0:
+                assert start > chars[i - 1].t1, (
+                    f"{kind} at {at}s reaches back into the previous "
+                    f"character — the fault is inside one character")
+            if i + 1 < len(chars):
+                assert stop < chars[i + 1].t0, (
+                    f"{kind} at {at}s reaches into the next character — the "
+                    f"fault is inside one character")
+        elif kind == "char-gap":
+            # A letter gap needs the character either side of it, and stops
+            # there: another gap next door would compete with the one flagged.
+            assert start <= chars[i - 1].t0, \
+                "a letter gap must include the character before it"
+            if i + 1 < len(chars):
+                assert stop < chars[i + 1].t0, \
+                    "a letter gap must stop at the character after it"
+
+    assert inside_one_character & seen, (
+        "this fixture is meant to flag something inside a character; nothing "
+        f"here did: {sorted(seen)}")
+    assert "char-gap" in seen
+
+
+@node
+def test_the_page_opens_filling_the_width(tmp_path):
+    """A session short enough to fit gets zoomed in until it fills the window.
+
+    Opening fully zoomed out is right for a long take — the whole thing lands
+    on screen at once — but it strands a short one in a corner of the chart,
+    and empty pixels are the one thing a timing chart has no use for.
+    """
+    res = _decode(text="SOS", wpm=SLOPPY_WPM, target_wpm=SLOPPY_WPM,
+                  expected="SOS")
+    page = tmp_path / "review.html"
+    webpage.write(str(page), review.build_payload(
+        res, source="short.wav", expected="SOS",
+        expected_source="(inline text)", tolerance=SLOPPY_TOL))
+    d = _run_stub(page)
+
+    floor, ceiling = _zoom_range(page)
+    fit = d["fitOpen"]
+    opened = float(fit["zoom"].split()[0])
+    assert floor < opened < ceiling, (
+        f"three characters opened at {opened} px/unit; expected somewhere "
+        f"between the slider's {floor} and {ceiling}")
+    # The readout is the honest one — the slider can only say whole numbers, so
+    # the fit lands on a fraction it has to round.
+    assert float(d["initial"]["zoomOut"].split()[0]) == opened
+
+    # It fills the track: nothing left to scroll at the zoom it chose...
+    assert fit["room"] == 0, \
+        f"the chart still scrolls {fit['room']}px after fitting the width"
+    # ...and that is the most it could have used — one px/unit further in
+    # overflows. Without this, "fills the width" would also be satisfied by
+    # doing nothing at all on a chart that already fit.
+    assert fit["oneStepIn"]["room"] > 0, (
+        "one step further in still fits, so the fit stopped short of the width "
+        f"available: {fit}")
+
+    # And the Fit button gets you back here after going in on something. It
+    # earns a button because it isn't a zoom you can dial up: it depends on the
+    # session and on how wide the window happens to be.
+    assert fit["zoomedIn"]["room"] > 0, "zooming to the ceiling did not overflow"
+    assert fit["refit"]["zoom"] == fit["zoom"], (
+        f"Fit landed on {fit['refit']['zoom']!r} rather than the opening "
+        f"{fit['zoom']!r}")
+    assert fit["refit"]["room"] == 0, "Fit left the chart scrollable"
+
+
+@node
+def test_the_fit_never_zooms_past_the_sliders_ceiling(tmp_path):
+    """A single character can't fill the window at any zoom the slider offers,
+    so the fit stops at the top of its range instead of running away."""
+    res = _decode(text="E", wpm=SLOPPY_WPM, target_wpm=SLOPPY_WPM, expected="E")
+    page = tmp_path / "review.html"
+    webpage.write(str(page), review.build_payload(
+        res, source="tiny.wav", expected="E",
+        expected_source="(inline text)", tolerance=SLOPPY_TOL))
+    d = _run_stub(page)
+
+    _, ceiling = _zoom_range(page)
+    assert float(d["fitOpen"]["zoom"].split()[0]) == ceiling
+    # Still short of filling the track, and that's fine — it's as far as the
+    # zoom goes.
+    assert d["fitOpen"]["room"] == 0
 
 
 @node

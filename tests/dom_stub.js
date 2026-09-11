@@ -286,14 +286,16 @@ global.document = eventTarget({
     const cells = [];
     // Row-wise, so each cell also carries the timestamp its row names — that's
     // what lets a test check the played window actually contains that moment.
-    const rowRe = /<tr><td>(-?[\d.]+)s<\/td><td>([\w-]+)<\/td>(.*?)<\/tr>/g;
+    // The class cell carries a title explaining the class, so allow attributes
+    // on it and any label text — only the row's timestamp and its cells matter.
+    const rowRe = /<tr><td>(-?[\d.]+)s<\/td><td[^>]*>[^<]*<\/td>(.*?)<\/tr>/g;
     const cellRe =
       /<td class='(?:bad )?play' data-side='(\w+)' data-i='(-?\d+)' data-kind='([\w-]+)'/g;
     let row;
     while ((row = rowRe.exec(html)) !== null) {
       let m;
       cellRe.lastIndex = 0;
-      while ((m = cellRe.exec(row[3])) !== null) {
+      while ((m = cellRe.exec(row[2])) !== null) {
         const td = makeEl("play-cell");
         td.dataset = { side: m[1], i: m[2], kind: m[3], t: row[1] };
         cells.push(td);
@@ -462,6 +464,39 @@ const initial = {
   zoom: byId("zoom").value,
   zoomOut: byId("zoom-out").textContent
 };
+
+/* Did the page open filling the track? `room` is how much scroll the chart has
+   at the zoom it chose — zero means the content fits the width — and
+   `oneStepIn` is the same one whole px/unit further in, which must be positive
+   or the fit stopped short of the width it could have used. Probed here, before
+   the sweeps below start moving things. */
+function scrollRoom() {
+  // Content is translated by (gutter - scrollX). Home pins scrollX at 0 and
+  // End at maxScroll, so the difference is the scrollable width — measured
+  // rather than derived, since the gutter is app.js's own constant.
+  const at = (key) => {
+    calls.translates.length = 0;
+    fire(document, "keydown",
+         { key, code: key, target: {}, preventDefault: () => {} });
+    return calls.translates.length ? calls.translates[0] : null;
+  };
+  const top = at("Home"), end = at("End");
+  return top === null || end === null ? null : Math.round(top - end);
+}
+
+const fitOpen = { zoom: byId("zoom-out").textContent, room: scrollRoom() };
+byId("zoom").value = String(parseFloat(byId("zoom-out").textContent) + 1);
+fire(byId("zoom"), "input");
+fitOpen.oneStepIn = { zoom: byId("zoom-out").textContent,
+                      room: scrollRoom() };
+// Zoom right in, then click Fit: it must land back on the opening zoom and
+// fill the width again. That's the button's whole job — it's a zoom you can't
+// dial up, since it depends on the session and on the window's width.
+byId("zoom").value = byId("zoom").max;
+fire(byId("zoom"), "input");
+fitOpen.zoomedIn = { zoom: byId("zoom-out").textContent, room: scrollRoom() };
+fire(byId("zoom-fit"), "click");
+fitOpen.refit = { zoom: byId("zoom-out").textContent, room: scrollRoom() };
 
 // Move every slider across its range, in every view.
 ["per-char", "absolute", "overlay"].forEach((view) => {
@@ -1038,6 +1073,7 @@ console.log(JSON.stringify({
     ([id, seen]) => [id, [...new Set(seen)]])),
   endReset: endReset,
   initial: initial,
+  fitOpen: fitOpen,
   viewFills: viewFills,
   viewRows: viewRows,
   audio: {
@@ -1059,6 +1095,10 @@ console.log(JSON.stringify({
       (a, b) => a - b),
     maxLevel: audio.levels.length ? Math.max(...audio.levels) : 0
   },
+  // Every class name in the report with the hover text attached to it, so a
+  // test can check each flagged class explains itself.
+  classHelp: [...byId("report").innerHTML.matchAll(
+    /<td class="why" title="([^"]*)">([^<]*)<\/td>/g)].map((m) => [m[2], m[1]]),
   scoresHTML: byId("scores").innerHTML,
   scoresWithoutTarget: scoresWithoutTarget,
   reportHTML: byId("report").innerHTML,

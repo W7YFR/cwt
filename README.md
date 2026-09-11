@@ -241,6 +241,14 @@ shows which text it compared against.
   with an intended one, the gap before it is graded as the class the intended
   text calls for rather than the one its duration read as. See the note under
   the practice report above for why that matters.
+- It also settles what your **measured overall speed** is, in the one case the
+  audio cannot. Single-letter drills (`-e "a b c d e f"`) have no character gaps
+  at all — every silence is a word gap — and a recording of six letters spaced
+  20 units apart fits two readings equally well: six words at 25/14, or one
+  loosely-spaced word at 25/8. Without the text the decoder guesses "character
+  gap", which is right for ordinary sending and wrong here by a factor of 7/3;
+  it would report 8 wpm overall for sending that was 14, and decode `ABCDEF`
+  with every space swallowed. Naming the text fixes both.
 
 `-w`/`-f`, `-T`, and `-e` combine freely — e.g. grade timing *and* score accuracy
 at once:
@@ -367,8 +375,10 @@ Blocks are colored green / yellow / red on the same thresholds as the terminal
 report. Hover anything for its exact length; click a character to hear just that
 character; click the ruler to seek.
 
-**Moving around.** The page opens fully zoomed out so the whole session is on
-screen — find where the trouble is, then go in on it:
+**Moving around.** The page opens at whatever zoom puts the session on screen
+and no tighter: short takes are zoomed in until they fill the width, longer ones
+open fully zoomed out with the rest a scroll away. Either way you start by
+seeing where the trouble is, then go in on it:
 
 | Gesture | Does |
 |---------|------|
@@ -378,8 +388,10 @@ screen — find where the trouble is, then go in on it:
 | **←/→**, **Home**/**End** | Pan by a quarter view, or jump to either end. |
 
 The **Zoom** slider does the same in whole px/unit, anchored on the middle of
-the view since it has no pointer to anchor on. The view also follows the
-playhead during playback.
+the view since it has no pointer to anchor on, and **Fit** beside it returns to
+that opening zoom — worth a button because it isn't a level you can dial up: it
+depends on the session and on how wide the window is at the time. The view also
+follows the playhead during playback.
 
 **Three views** (the View selector):
 
@@ -409,8 +421,16 @@ re-anchor side by side after each rest for the same reason. Turn it off to see
 every silence graded and drawn to scale.
 
 Hovering a value in **largest deviations** highlights the stretch of chart that
-row is about, scrolling it into view if it's off screen — the characters either
-side of a letter gap, the words either side of a word gap.
+row is about, scrolling it into view if it's off screen. The stretch is scoped
+to what the class actually covers: the single character it is inside for a dit,
+a dah or an intra-char gap; the characters either side of a letter gap; the
+words either side of a word gap. Hovering the **class**
+name in either table says what that class is: an *intra-char gap* is the silence
+inside one character, between its own dits and dahs, which is easy to read as
+the gap *between* characters — a different class with a target three times
+larger. It also notes that a deviation row is a single element rather than the
+average above it, so a class can sit inside tolerance overall and still have one
+element flagged.
 
 **Listening.** Your recording is embedded, and the target is synthesized live at
 the tone frequency detected in your audio, so it re-renders as you move the speed
