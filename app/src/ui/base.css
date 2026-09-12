@@ -408,33 +408,45 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
    sits where a tall one would rather than clinging to the top of the box. */
 .landing .wordmark {
   margin: 0;
+  /* The room a drawing gets. Both bounds matter: width alone let a tall
+     drawing run to 330 pixels and push the controls off the bottom of a short
+     window, and a height budget in vh means a short window spends less of
+     itself on a logo. Everything else here follows from these two. */
   --wm-w: min(90vw, 640px);
-  --wm-max: 30px;
-  /* Named because the reserve arithmetic below has to add them back on. */
+  --wm-h: clamp(64px, 17vh, 176px);
+  /* Part of the box, so they are named where the box height adds them on. */
   --wm-morse-gap: 16px;
   --wm-morse-line: 20px;
 }
 
-/* A box of fixed height, holding the drawing and the keyed line centred
-   together. A min-height on the heading is not enough: the drawing's own
-   height is rows times a fractional font size, so a rounded-up pixel can push
-   past the reserve and move the page by one. Nothing the drawing does can
-   change this box. */
+/* A box of a fixed height, holding the drawing and the keyed line centred
+   together. Fixed because the drawings are 4 to 11 rows tall and every reload
+   brings a different one: a box that hugged its contents would move the whole
+   page up and down as the roll changed. A min-height on the heading is not
+   enough either — the drawing's own height is rows times a fractional font
+   size, so a rounded-up pixel can push past it and move the page by one.
+   Nothing the drawing does can change this box. */
 .landing .wordmark > .artbox {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--wm-morse-gap);
-  height: calc(var(--wm-reserve, 0px) + var(--wm-morse-gap) + var(--wm-morse-line));
+  height: calc(var(--wm-h) + var(--wm-morse-gap) + var(--wm-morse-line));
 }
 .landing .wordmark .art {
   display: block;
   white-space: pre;
   font-family: var(--mono);
-  /* --wm-w and --wm-max are the knobs; the gallery below turns both down
-     so sixteen drawings fit on one screenful. */
-  font-size: clamp(4px, calc(var(--wm-w) / var(--cols, 30) / 0.6), var(--wm-max));
+  /* Scaled to fit the box in whichever direction runs out first. 0.6em is the
+     advance of a monospace cell in every face in the stack, near enough, so
+     `cols / 0.6` is the drawing's width in ems and `rows` is its height. A
+     wide drawing hits the width bound, a tall one hits the height bound, and
+     either way it lands inside. */
+  font-size: min(
+    calc(var(--wm-w) / var(--cols, 30) / 0.6),
+    calc(var(--wm-h) / var(--rows, 6))
+  );
   line-height: 1;
   font-weight: 400;
   letter-spacing: 0;

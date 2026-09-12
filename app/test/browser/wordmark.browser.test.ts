@@ -149,20 +149,29 @@ describe("a wordmark on the page", () => {
     expect(style.fontFamily).toMatch(/mono/i);
   });
 
-  it("sizes wide and narrow drawings to about the same width", async () => {
-    // The catalog runs from 20 to 68 columns. One fixed font size would leave
-    // half of them either unreadably small or off the side of the page.
-    const widths: number[] = [];
+  it("scales each drawing to fill the room it is given", async () => {
+    /* The catalog runs from 20 to 68 columns and 4 to 11 rows, so one font
+       size would leave some of them unreadably small and push others off the
+       page. Each is scaled to whichever bound runs out first, which means two
+       things worth holding: none overflows its box, and none rattles around
+       inside it — whichever dimension binds is filled. */
     for (let i = 0; i < WORDMARKS.length; i++) {
-      const el = await draw(i);
-      widths.push(el.getBoundingClientRect().width);
-      act(() => root!.unmount());
-      root = null;
+      const art = await draw(i);
+      const box = host.querySelector<HTMLElement>(".artbox")!.getBoundingClientRect();
+      const drawn = art.getBoundingClientRect();
+      const id = WORDMARKS[i]!.id;
+
+      expect(drawn.width, `${id} is wider than the page`).toBeLessThanOrEqual(
+        document.documentElement.clientWidth,
+      );
+      expect(drawn.height, `${id} overflows its box`).toBeLessThanOrEqual(box.height + 1);
+
+      // One of the two is filled to within a cell, or the drawing is smaller
+      // than it needs to be.
+      const fillsHeight = drawn.height > box.height * 0.75;
+      const fillsWidth = drawn.width > host.getBoundingClientRect().width * 0.75;
+      expect(fillsHeight || fillsWidth, `${id} rattles around in its box`).toBe(true);
     }
-    const widest = Math.max(...widths);
-    const narrowest = Math.min(...widths);
-    expect(widest).toBeLessThanOrEqual(document.documentElement.clientWidth);
-    expect(narrowest / widest).toBeGreaterThan(0.45);
   });
 
   it("fits any drawing into the header's row, whatever its shape", async () => {

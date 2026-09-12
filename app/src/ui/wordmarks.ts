@@ -278,29 +278,3 @@ export function visitWordmark(): WordmarkArt {
 export function resetVisitRoll(): void {
   visitRoll = null;
 }
-
-/* How much vertical room to hold open for whichever drawing turns up.
- *
- * They are 4 to 11 rows tall and the hero is sized to fill the page width, so
- * the rendered height swings from about 120px to about 330px depending on the
- * roll. Without a reserve, reloading the page makes everything below the
- * wordmark jump — which is a strange thing for a random logo to do to the rest
- * of the layout.
- *
- * So this is the height of the tallest one, as a CSS expression rather than a
- * measured number: the size the CSS gives a drawing is
- * `rows * clamp(4px, W / cols / 0.6, cap)`, and the tallest is whichever of the
- * sixteen wins that at the current width. Which one that is changes with the
- * viewport — the cap binds for the narrow drawings and not for the wide ones —
- * so the answer is a max() over all of them rather than a single winner picked
- * here. Generated from the catalog, so adding a drawing cannot leave it stale.
- *
- * `--wm-w` and `--wm-max` are the same custom properties the sizing rule
- * reads, which is what keeps the two in step. */
-export const HERO_RESERVE: string = `max(${WORDMARKS.map((art) => {
-  const rows = art.rows.length;
-  return (
-    `min(calc(var(--wm-w) * ${rows} / ${wordmarkCols(art)} / 0.6), ` +
-    `calc(var(--wm-max) * ${rows}))`
-  );
-}).join(", ")})`;

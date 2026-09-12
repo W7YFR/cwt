@@ -7,10 +7,9 @@
  *
  * The drawing is one of sixteen, picked at random on each visit — see
  * wordmarks.ts for the catalog and for the roll. Nothing here assumes a size,
- * because they range from 20 to 68 columns and from 4 to 11 rows; the CSS
- * derives the font size from the shape this passes it, so a wide drawing and a
- * narrow one land at about the same width in the hero, and all of them fit the
- * same row in the header.
+ * because they range from 20 to 68 columns and from 4 to 11 rows. All this
+ * passes on is the shape; the CSS scales each drawing to fit the room it has,
+ * which is a page-width box in the hero and a row height in the header.
  *
  * Two rules in the CSS are what make the art art, and it falls apart without
  * either: `white-space: pre`, and `line-height: 1` so consecutive rows touch
@@ -20,7 +19,7 @@
  */
 
 import type { WordmarkArt } from "./wordmarks";
-import { HERO_RESERVE, wordmarkCols, wordmarkText } from "./wordmarks";
+import { wordmarkCols, wordmarkText } from "./wordmarks";
 
 export const APP_NAME = "CWT";
 export const APP_LONG_NAME = "CW Trainer";
@@ -44,11 +43,7 @@ function sizing(art: WordmarkArt): React.CSSProperties {
 
 export function Wordmark({ art }: { art: WordmarkArt }): React.ReactElement {
   return (
-    /* The reserve box holds open the height of the tallest drawing, so that
-       reloading the page does not shove everything below the wordmark up and
-       down as the roll changes. See HERO_RESERVE for how the height is
-       arrived at. */
-    <h1 className="wordmark" style={{ "--wm-reserve": HERO_RESERVE } as React.CSSProperties}>
+    <h1 className="wordmark">
       <span className="artbox">
         <span
           className="art"
