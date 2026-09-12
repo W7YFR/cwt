@@ -1,0 +1,304 @@
+/* Keeping takes between visits, in the browser.
+ *
+ * IndexedDB rather than localStorage: a take's segment list runs to a few
+ * thousand numbers, localStorage caps out around 5 MB across the whole origin,
+ * and it stores strings — so every read and write would be a JSON parse of the
+ * entire history.
+ *
+ * Audio is stored as a Blob in the same record. That is the bulk of it by far,
+ * and it is why `list()` reads a lean index rather than whole takes: a history
+ * page should not pull sixty megabytes of WAV to show sixty rows.
+ *
+ * Nothing here leaves the machine. There is no account and no server, which is
+ * the other half of why the analysis runs client-side.
+ */
+
+import type { ReviewSettings, Take } from "@/types";
+
+const DB_NAME = "cw-trainer";
+const DB_VERSION = 1;
+const TAKES = "takes";
+
+export interface StoredTake {
+  take: Take;
+  /** The recording itself, at the level and rate it was made. */
+  audio: Blob;
+  /** How it was last being looked at. Optional because a take is meaningful
+   *  without it — the review re-grades from the segments at whatever settings
+   *  are current, and these only restore the ones you had chosen. */
+  settings?: ReviewSettings;
+}
+
+/** What `list()` returns: enough to render a row, without the audio. */
+export interface TakeSummary {
+  id: string;
+  recordedAt: string;
+  source: string;
+  durationSec: number;
+  decoded: string;
+  expected: string | null;
+  charWpm: number;
+  farnsworthWpm: number;
+}
+
+function summarize(take: Take): TakeSummary {
+  return {
+    id: take.id,
+    recordedAt: take.recordedAt,
+    source: take.source,
+    durationSec: take.durationSec,
+    decoded: take.decoded,
+    expected: take.expected,
+    charWpm: take.measured.charWpm,
+    farnsworthWpm: take.measured.farnsworthWpm,
+  };
+}
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("this browser has no IndexedDB, so takes cannot be kept"));
+      return;
+    }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(TAKES)) {
+        const store = db.createObjectStore(TAKES, { keyPath: "id" });
+        // Sorted by when it was recorded, so the history reads newest-first
+        // without loading everything to sort it.
+        store.createIndex("recordedAt", "recordedAt");
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("could not open the database"));
+  });
+}
+
+function tx<T>(
+  db: IDBDatabase,
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(TAKES, mode);
+    const req = run(t.objectStore(TAKES));
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("database request failed"));
+  });
+}
+
+/** Row as stored. `summary` is duplicated out of `take` so a list can be built
+ *  from the index without deserializing the segments. */
+interface Row extends TakeSummary {
+  id: string;
+  take: Take;
+  audio: Blob;
+  settings?: ReviewSettings;
+}
+
+/** How many takes are kept.
+ *
+ * The audio is the bulk of a row and a long take is tens of megabytes, so this
+ * cannot grow without a bound. Ten is enough to cover a practice sitting and
+ * leaves room for a history view later without deciding its shape now. */
+export const KEEP_TAKES = 10;
+
+export interface TakeStore {
+  save(entry: StoredTake): Promise<void>;
+  /** Update just the settings on a take already saved, without rewriting its
+   *  audio — this runs every time a slider settles. */
+  saveSettings(id: string, settings: ReviewSettings): Promise<void>;
+  get(id: string): Promise<StoredTake | null>;
+  list(): Promise<TakeSummary[]>;
+  remove(id: string): Promise<void>;
+  clear(): Promise<void>;
+  close(): void;
+}
+
+export async function openTakeStore(): Promise<TakeStore> {
+  const db = await openDb();
+  return {
+    async save({ take, audio, settings }) {
+      const row: Row = {
+        ...summarize(take),
+        id: take.id,
+        take,
+        audio,
+        ...(settings ? { settings } : {}),
+      };
+      await tx(db, "readwrite", (s) => s.put(row));
+      await prune(db);
+    },
+
+    async saveSettings(id, settings) {
+      const row = await tx<Row | undefined>(db, "readonly", (s) => s.get(id));
+      // Gone, because it aged out or the history was cleared. Writing it back
+      // from a settings change would resurrect a take with no audio.
+      if (!row) return;
+      await tx(db, "readwrite", (s) => s.put({ ...row, settings }));
+    },
+
+    async get(id) {
+      const row = await tx<Row | undefined>(db, "readonly", (s) => s.get(id));
+      if (!row) return null;
+      return {
+        take: row.take,
+        audio: row.audio,
+        ...(row.settings ? { settings: row.settings } : {}),
+      };
+    },
+
+    async list() {
+      const rows = await tx<Row[]>(db, "readonly", (s) => s.getAll());
+      // The summary fields live on the row itself, so this never touches
+      // `take` — which is the whole point of duplicating them on save.
+      return rows
+        .map(({ take: _take, audio: _audio, ...summary }) => summary)
+        .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+    },
+
+    async remove(id) {
+      await tx(db, "readwrite", (s) => s.delete(id));
+    },
+
+    async clear() {
+      await tx(db, "readwrite", (s) => s.clear());
+    },
+
+    close() {
+      db.close();
+    },
+  };
+}
+
+/** Drop the oldest rows once there are more than KEEP_TAKES of them.
+ *
+ * Reads the index rather than the rows, so pruning sixty takes does not pull
+ * sixty recordings into memory to decide which to delete. */
+async function prune(db: IDBDatabase): Promise<void> {
+  const ids = await new Promise<string[]>((resolve, reject) => {
+    const t = db.transaction(TAKES, "readonly");
+    const req = t.objectStore(TAKES).index("recordedAt").getAllKeys();
+    req.onsuccess = () => resolve(req.result as string[]);
+    req.onerror = () => reject(req.error ?? new Error("could not read the index"));
+  });
+  // getAllKeys on the index comes back oldest-first, which is the order we
+  // want to delete in.
+  const doomed = ids.slice(0, Math.max(0, ids.length - KEEP_TAKES));
+  for (const id of doomed) {
+    await tx(db, "readwrite", (s) => s.delete(id));
+  }
+}
+
+/* ---- settings ----------------------------------------------------------- */
+
+const SETTINGS_KEY = "cw-trainer:prefs";
+
+/** Preferences that should outlive a take, kept small enough for localStorage.
+ *
+ * Deliberately not the whole ReviewSettings: the speed and the intended message
+ * belong to a recording, but which input device you use and how loud you like
+ * the playback are about you. */
+export interface Prefs {
+  deviceId?: string;
+  /** The take the review is currently showing, so a reload comes back to it
+   *  rather than to an empty landing screen. */
+  currentId?: string;
+  gainDb?: number;
+  tolerance?: number;
+  charWpm?: number;
+  farnsworthWpm?: number;
+  expected?: string;
+  view?: string;
+  collapseRests?: boolean;
+}
+
+export function loadPrefs(): Prefs {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw ? (JSON.parse(raw) as Prefs) : {};
+  } catch {
+    // A corrupt or blocked store is not worth failing the app over.
+    return {};
+  }
+}
+
+export function savePrefs(prefs: Prefs): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* private mode, quota, or storage disabled — all survivable */
+  }
+}
+
+/* ---- the session you were last looking at -------------------------------- */
+
+/* A reload must not drop a recording you just spent thirty seconds keying. So
+ * the current take is kept — audio and all — and the id of it is noted in the
+ * preferences, which is the only part that has to be readable synchronously at
+ * boot.
+ *
+ * Every function here swallows its own failures. Storage can be blocked by
+ * private browsing, a quota, or a policy, and none of that is a reason to stop
+ * the app working for this session: forgetting is a worse experience, not a
+ * broken one. */
+
+let opening: Promise<TakeStore> | null = null;
+
+function store(): Promise<TakeStore> {
+  if (!opening) {
+    // A failed open must not be cached, or one transient error would disable
+    // storage for the life of the tab.
+    opening = openTakeStore().catch((e: unknown) => {
+      opening = null;
+      throw e;
+    });
+  }
+  return opening;
+}
+
+/** Keep this take, and make it the one a reload comes back to. */
+export async function rememberTake(entry: StoredTake): Promise<void> {
+  try {
+    await (await store()).save(entry);
+    // Read the preferences again *after* the write: a settings change may have
+    // landed while it was in flight.
+    savePrefs({ ...loadPrefs(), currentId: entry.take.id });
+  } catch {
+    /* nothing kept; the session still works */
+  }
+}
+
+/** Update the settings on the remembered take. */
+export async function rememberSettings(
+  id: string,
+  settings: ReviewSettings,
+): Promise<void> {
+  try {
+    await (await store()).saveSettings(id, settings);
+  } catch {
+    /* as above */
+  }
+}
+
+/** The take the review was last showing, or null to start fresh. */
+export async function recallTake(): Promise<StoredTake | null> {
+  try {
+    const id = loadPrefs().currentId;
+    if (!id) return null;
+    return await (await store()).get(id);
+  } catch {
+    return null;
+  }
+}
+
+/** Stop coming back to the current take.
+ *
+ * The row itself stays — leaving the review is not throwing the recording
+ * away, and a history view will want it. */
+export function forgetCurrentTake(): void {
+  const next = { ...loadPrefs() };
+  delete next.currentId;
+  savePrefs(next);
+}

@@ -1,0 +1,3591 @@
+{
+ "name": "cq-de-w7yfr.wav",
+ "expected": "CQ DE W7YFR",
+ "charWpm": 25,
+ "farnsworthWpm": null,
+ "dspRate": 8000,
+ "toneHz": 600.461544281769,
+ "segments": [
+  [
+   0,
+   0.282125
+  ],
+  [
+   1,
+   0.141875
+  ],
+  [
+   0,
+   0.051125
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.0515
+  ],
+  [
+   1,
+   0.14175
+  ],
+  [
+   0,
+   0.0585
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.277
+  ],
+  [
+   1,
+   0.141875
+  ],
+  [
+   0,
+   0.051
+  ],
+  [
+   1,
+   0.14175
+  ],
+  [
+   0,
+   0.058375
+  ],
+  [
+   1,
+   0.045375
+  ],
+  [
+   0,
+   0.0515
+  ],
+  [
+   1,
+   0.14175
+  ],
+  [
+   0,
+   0.39625
+  ],
+  [
+   1,
+   0.141875
+  ],
+  [
+   0,
+   0.06575
+  ],
+  [
+   1,
+   0.045375
+  ],
+  [
+   0,
+   0.0515
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.25275
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.36625
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.06625
+  ],
+  [
+   1,
+   0.141875
+  ],
+  [
+   0,
+   0.051
+  ],
+  [
+   1,
+   0.14175
+  ],
+  [
+   0,
+   0.21675
+  ],
+  [
+   1,
+   0.141875
+  ],
+  [
+   0,
+   0.051
+  ],
+  [
+   1,
+   0.14175
+  ],
+  [
+   0,
+   0.058375
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.051625
+  ],
+  [
+   1,
+   0.045125
+  ],
+  [
+   0,
+   0.058875
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.181375
+  ],
+  [
+   1,
+   0.141875
+  ],
+  [
+   0,
+   0.051
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.0515
+  ],
+  [
+   1,
+   0.14175
+  ],
+  [
+   0,
+   0.058375
+  ],
+  [
+   1,
+   0.141875
+  ],
+  [
+   0,
+   0.146375
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.051625
+  ],
+  [
+   1,
+   0.045125
+  ],
+  [
+   0,
+   0.0515
+  ],
+  [
+   1,
+   0.14175
+  ],
+  [
+   0,
+   0.05825
+  ],
+  [
+   1,
+   0.045375
+  ],
+  [
+   0,
+   0.199125
+  ],
+  [
+   1,
+   0.04525
+  ],
+  [
+   0,
+   0.0515
+  ],
+  [
+   1,
+   0.141625
+  ],
+  [
+   0,
+   0.051125
+  ],
+  [
+   1,
+   0.045125
+  ],
+  [
+   0,
+   0.238
+  ]
+ ],
+ "grading": {
+  "measured": {
+   "unitSec": 0.04625833333333333,
+   "charWpm": 25.94127184291119,
+   "farnsworthWpm": 20.079985274677465,
+   "ditDahSplit": 0.093525,
+   "elementCharSplit": 0.09251666666666666,
+   "charWordSplit": 0.4089583333333333,
+   "charGapSec": 0.24537499999999998,
+   "wordGapSec": 0.5725416666666666
+  },
+  "ref": {
+   "unitSec": 0.048,
+   "charWpm": 25,
+   "farnsworthWpm": 25,
+   "ditDahSplit": 0.096,
+   "elementCharSplit": 0.096,
+   "charWordSplit": 0.24,
+   "charGapSec": 0.14400000000000002,
+   "wordGapSec": 0.336
+  },
+  "rests": {
+   "timeline": {
+    "text": "C Q D E W7YFR",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.282125,
+      "t1": 0.42400000000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.42400000000000004,
+      "t1": 0.475125,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.475125,
+      "t1": 0.520375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.520375,
+      "t1": 0.571875,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.571875,
+      "t1": 0.713625,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.713625,
+      "t1": 0.772125,
+      "kind": "element-gap",
+      "units": 1.21875,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.772125,
+      "t1": 0.817375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.817375,
+      "t1": 1.0943749999999999,
+      "kind": "word-gap",
+      "units": 5.770833333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C"
+     },
+     {
+      "t0": 1.0943749999999999,
+      "t1": 1.2362499999999998,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.2362499999999998,
+      "t1": 1.2872499999999998,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2872499999999998,
+      "t1": 1.4289999999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.4289999999999998,
+      "t1": 1.487375,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.487375,
+      "t1": 1.5327499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5327499999999998,
+      "t1": 1.58425,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.58425,
+      "t1": 1.726,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.726,
+      "t1": 2.12225,
+      "kind": "word-gap",
+      "units": 8.255208333333332,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q"
+     },
+     {
+      "t0": 2.12225,
+      "t1": 2.2641250000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.2641250000000004,
+      "t1": 2.3298750000000004,
+      "kind": "element-gap",
+      "units": 1.3697916666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3298750000000004,
+      "t1": 2.3752500000000003,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3752500000000003,
+      "t1": 2.42675,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.42675,
+      "t1": 2.472,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.472,
+      "t1": 2.72475,
+      "kind": "word-gap",
+      "units": 5.265624999999999,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q D"
+     },
+     {
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.7699999999999996,
+      "t1": 3.1362499999999995,
+      "kind": "word-gap",
+      "units": 7.630208333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q D E"
+     },
+     {
+      "t0": 3.1362499999999995,
+      "t1": 3.1814999999999993,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.1814999999999993,
+      "t1": 3.2477499999999995,
+      "kind": "element-gap",
+      "units": 1.3802083333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.2477499999999995,
+      "t1": 3.3896249999999997,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.3896249999999997,
+      "t1": 3.440625,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.440625,
+      "t1": 3.582375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.582375,
+      "t1": 3.799125,
+      "kind": "char-gap",
+      "units": 4.515625,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W"
+     },
+     {
+      "t0": 3.799125,
+      "t1": 3.9410000000000003,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.9410000000000003,
+      "t1": 3.9920000000000004,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.9920000000000004,
+      "t1": 4.13375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.13375,
+      "t1": 4.192125,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.192125,
+      "t1": 4.237375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.237375,
+      "t1": 4.289,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.289,
+      "t1": 4.334124999999999,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.334124999999999,
+      "t1": 4.392999999999999,
+      "kind": "element-gap",
+      "units": 1.2265625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.392999999999999,
+      "t1": 4.438249999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.438249999999999,
+      "t1": 4.619624999999999,
+      "kind": "char-gap",
+      "units": 3.7786458333333335,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W7"
+     },
+     {
+      "t0": 4.619624999999999,
+      "t1": 4.761499999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.761499999999999,
+      "t1": 4.812499999999999,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.812499999999999,
+      "t1": 4.857749999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.857749999999999,
+      "t1": 4.909249999999999,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.909249999999999,
+      "t1": 5.050999999999999,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.050999999999999,
+      "t1": 5.109374999999999,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.109374999999999,
+      "t1": 5.251249999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.251249999999999,
+      "t1": 5.397624999999999,
+      "kind": "char-gap",
+      "units": 3.0494791666666665,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7Y"
+     },
+     {
+      "t0": 5.397624999999999,
+      "t1": 5.442874999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.442874999999999,
+      "t1": 5.494499999999999,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.494499999999999,
+      "t1": 5.539624999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.539624999999998,
+      "t1": 5.591124999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.591124999999998,
+      "t1": 5.732874999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.732874999999998,
+      "t1": 5.791124999999998,
+      "kind": "element-gap",
+      "units": 1.2135416666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.791124999999998,
+      "t1": 5.836499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.836499999999998,
+      "t1": 6.035624999999998,
+      "kind": "char-gap",
+      "units": 4.1484375,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7YF"
+     },
+     {
+      "t0": 6.035624999999998,
+      "t1": 6.080874999999998,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.080874999999998,
+      "t1": 6.132374999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.132374999999998,
+      "t1": 6.273999999999998,
+      "kind": "dah",
+      "units": 2.9505208333333335,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.273999999999998,
+      "t1": 6.325124999999998,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.325124999999998,
+      "t1": 6.370249999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "C",
+      "pattern": "-.-.",
+      "t0": 0.282125,
+      "t1": 0.817375,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "Q",
+      "pattern": "--.-",
+      "t0": 1.0943749999999999,
+      "t1": 1.726,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.12225,
+      "t1": 2.472,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 3.1362499999999995,
+      "t1": 3.582375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "7",
+      "pattern": "--...",
+      "t0": 3.799125,
+      "t1": 4.438249999999999,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "Y",
+      "pattern": "-.--",
+      "t0": 4.619624999999999,
+      "t1": 5.251249999999999,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "F",
+      "pattern": "..-.",
+      "t0": 5.397624999999999,
+      "t1": 5.836499999999998,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 6.035624999999998,
+      "t1": 6.370249999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargetedTimeline": {
+    "text": "C Q D E W7YFR",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.282125,
+      "t1": 0.42400000000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.42400000000000004,
+      "t1": 0.475125,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.475125,
+      "t1": 0.520375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.520375,
+      "t1": 0.571875,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.571875,
+      "t1": 0.713625,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.713625,
+      "t1": 0.772125,
+      "kind": "element-gap",
+      "units": 1.21875,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.772125,
+      "t1": 0.817375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.817375,
+      "t1": 1.0943749999999999,
+      "kind": "word-gap",
+      "units": 5.770833333333334,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C"
+     },
+     {
+      "t0": 1.0943749999999999,
+      "t1": 1.2362499999999998,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.2362499999999998,
+      "t1": 1.2872499999999998,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2872499999999998,
+      "t1": 1.4289999999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.4289999999999998,
+      "t1": 1.487375,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.487375,
+      "t1": 1.5327499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5327499999999998,
+      "t1": 1.58425,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.58425,
+      "t1": 1.726,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.726,
+      "t1": 2.12225,
+      "kind": "word-gap",
+      "units": 8.255208333333332,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q"
+     },
+     {
+      "t0": 2.12225,
+      "t1": 2.2641250000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.2641250000000004,
+      "t1": 2.3298750000000004,
+      "kind": "element-gap",
+      "units": 1.3697916666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3298750000000004,
+      "t1": 2.3752500000000003,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3752500000000003,
+      "t1": 2.42675,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.42675,
+      "t1": 2.472,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.472,
+      "t1": 2.72475,
+      "kind": "word-gap",
+      "units": 5.265624999999999,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D"
+     },
+     {
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.7699999999999996,
+      "t1": 3.1362499999999995,
+      "kind": "word-gap",
+      "units": 7.630208333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q D E"
+     },
+     {
+      "t0": 3.1362499999999995,
+      "t1": 3.1814999999999993,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.1814999999999993,
+      "t1": 3.2477499999999995,
+      "kind": "element-gap",
+      "units": 1.3802083333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.2477499999999995,
+      "t1": 3.3896249999999997,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.3896249999999997,
+      "t1": 3.440625,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.440625,
+      "t1": 3.582375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.582375,
+      "t1": 3.799125,
+      "kind": "char-gap",
+      "units": 4.515625,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W"
+     },
+     {
+      "t0": 3.799125,
+      "t1": 3.9410000000000003,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.9410000000000003,
+      "t1": 3.9920000000000004,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.9920000000000004,
+      "t1": 4.13375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.13375,
+      "t1": 4.192125,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.192125,
+      "t1": 4.237375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.237375,
+      "t1": 4.289,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.289,
+      "t1": 4.334124999999999,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.334124999999999,
+      "t1": 4.392999999999999,
+      "kind": "element-gap",
+      "units": 1.2265625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.392999999999999,
+      "t1": 4.438249999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.438249999999999,
+      "t1": 4.619624999999999,
+      "kind": "char-gap",
+      "units": 3.7786458333333335,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W7"
+     },
+     {
+      "t0": 4.619624999999999,
+      "t1": 4.761499999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.761499999999999,
+      "t1": 4.812499999999999,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.812499999999999,
+      "t1": 4.857749999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.857749999999999,
+      "t1": 4.909249999999999,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.909249999999999,
+      "t1": 5.050999999999999,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.050999999999999,
+      "t1": 5.109374999999999,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.109374999999999,
+      "t1": 5.251249999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.251249999999999,
+      "t1": 5.397624999999999,
+      "kind": "char-gap",
+      "units": 3.0494791666666665,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7Y"
+     },
+     {
+      "t0": 5.397624999999999,
+      "t1": 5.442874999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.442874999999999,
+      "t1": 5.494499999999999,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.494499999999999,
+      "t1": 5.539624999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.539624999999998,
+      "t1": 5.591124999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.591124999999998,
+      "t1": 5.732874999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.732874999999998,
+      "t1": 5.791124999999998,
+      "kind": "element-gap",
+      "units": 1.2135416666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.791124999999998,
+      "t1": 5.836499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.836499999999998,
+      "t1": 6.035624999999998,
+      "kind": "char-gap",
+      "units": 4.1484375,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7YF"
+     },
+     {
+      "t0": 6.035624999999998,
+      "t1": 6.080874999999998,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.080874999999998,
+      "t1": 6.132374999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.132374999999998,
+      "t1": 6.273999999999998,
+      "kind": "dah",
+      "units": 2.9505208333333335,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.273999999999998,
+      "t1": 6.325124999999998,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.325124999999998,
+      "t1": 6.370249999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "C",
+      "pattern": "-.-.",
+      "t0": 0.282125,
+      "t1": 0.817375,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "Q",
+      "pattern": "--.-",
+      "t0": 1.0943749999999999,
+      "t1": 1.726,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.12225,
+      "t1": 2.472,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 3.1362499999999995,
+      "t1": 3.582375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "7",
+      "pattern": "--...",
+      "t0": 3.799125,
+      "t1": 4.438249999999999,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "Y",
+      "pattern": "-.--",
+      "t0": 4.619624999999999,
+      "t1": 5.251249999999999,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "F",
+      "pattern": "..-.",
+      "t0": 5.397624999999999,
+      "t1": 5.836499999999998,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 6.035624999999998,
+      "t1": 6.370249999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargeted": 2,
+   "analysis": {
+    "tolerance": 0.3,
+    "withinTolFrac": 0.9016393442622951,
+    "nPauses": 0,
+    "stats": [
+     {
+      "name": "dit",
+      "n": 16,
+      "meanUnits": 0.9427083333333333,
+      "stdUnits": 0.0015947198846244762,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "dah",
+      "n": 15,
+      "meanUnits": 2.9541666666666666,
+      "stdUnits": 0.0015911721163041565,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "element-gap",
+      "n": 22,
+      "meanUnits": 1.1375473484848486,
+      "stdUnits": 0.0994140609143882,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "char-gap",
+      "n": 6,
+      "meanUnits": 4.421440972222222,
+      "stdUnits": 0.9048363323824935,
+      "targetUnits": 3.0000000000000004
+     },
+     {
+      "name": "word-gap",
+      "n": 2,
+      "meanUnits": 7.942708333333333,
+      "stdUnits": 0.3124999999999991,
+      "targetUnits": 7.0
+     }
+    ],
+    "deviations": [
+     {
+      "timeSec": 0.817375,
+      "kind": "char-gap",
+      "valueUnits": 5.770833333333334,
+      "targetUnits": 3.0000000000000004,
+      "context": "C"
+     },
+     {
+      "timeSec": 2.472,
+      "kind": "char-gap",
+      "valueUnits": 5.265624999999999,
+      "targetUnits": 3.0000000000000004,
+      "context": "C Q D"
+     },
+     {
+      "timeSec": 3.582375,
+      "kind": "char-gap",
+      "valueUnits": 4.515625,
+      "targetUnits": 3.0000000000000004,
+      "context": "C Q D E W"
+     },
+     {
+      "timeSec": 5.836499999999998,
+      "kind": "char-gap",
+      "valueUnits": 4.1484375,
+      "targetUnits": 3.0000000000000004,
+      "context": "Q D E W7YF"
+     }
+    ]
+   }
+  },
+  "noRests": {
+   "timeline": {
+    "text": "C Q D E W7YFR",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.282125,
+      "t1": 0.42400000000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.42400000000000004,
+      "t1": 0.475125,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.475125,
+      "t1": 0.520375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.520375,
+      "t1": 0.571875,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.571875,
+      "t1": 0.713625,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.713625,
+      "t1": 0.772125,
+      "kind": "element-gap",
+      "units": 1.21875,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.772125,
+      "t1": 0.817375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.817375,
+      "t1": 1.0943749999999999,
+      "kind": "word-gap",
+      "units": 5.770833333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C"
+     },
+     {
+      "t0": 1.0943749999999999,
+      "t1": 1.2362499999999998,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.2362499999999998,
+      "t1": 1.2872499999999998,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2872499999999998,
+      "t1": 1.4289999999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.4289999999999998,
+      "t1": 1.487375,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.487375,
+      "t1": 1.5327499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5327499999999998,
+      "t1": 1.58425,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.58425,
+      "t1": 1.726,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.726,
+      "t1": 2.12225,
+      "kind": "word-gap",
+      "units": 8.255208333333332,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q"
+     },
+     {
+      "t0": 2.12225,
+      "t1": 2.2641250000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.2641250000000004,
+      "t1": 2.3298750000000004,
+      "kind": "element-gap",
+      "units": 1.3697916666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3298750000000004,
+      "t1": 2.3752500000000003,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3752500000000003,
+      "t1": 2.42675,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.42675,
+      "t1": 2.472,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.472,
+      "t1": 2.72475,
+      "kind": "word-gap",
+      "units": 5.265624999999999,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q D"
+     },
+     {
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.7699999999999996,
+      "t1": 3.1362499999999995,
+      "kind": "word-gap",
+      "units": 7.630208333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q D E"
+     },
+     {
+      "t0": 3.1362499999999995,
+      "t1": 3.1814999999999993,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.1814999999999993,
+      "t1": 3.2477499999999995,
+      "kind": "element-gap",
+      "units": 1.3802083333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.2477499999999995,
+      "t1": 3.3896249999999997,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.3896249999999997,
+      "t1": 3.440625,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.440625,
+      "t1": 3.582375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.582375,
+      "t1": 3.799125,
+      "kind": "char-gap",
+      "units": 4.515625,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W"
+     },
+     {
+      "t0": 3.799125,
+      "t1": 3.9410000000000003,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.9410000000000003,
+      "t1": 3.9920000000000004,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.9920000000000004,
+      "t1": 4.13375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.13375,
+      "t1": 4.192125,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.192125,
+      "t1": 4.237375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.237375,
+      "t1": 4.289,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.289,
+      "t1": 4.334124999999999,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.334124999999999,
+      "t1": 4.392999999999999,
+      "kind": "element-gap",
+      "units": 1.2265625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.392999999999999,
+      "t1": 4.438249999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.438249999999999,
+      "t1": 4.619624999999999,
+      "kind": "char-gap",
+      "units": 3.7786458333333335,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W7"
+     },
+     {
+      "t0": 4.619624999999999,
+      "t1": 4.761499999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.761499999999999,
+      "t1": 4.812499999999999,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.812499999999999,
+      "t1": 4.857749999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.857749999999999,
+      "t1": 4.909249999999999,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.909249999999999,
+      "t1": 5.050999999999999,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.050999999999999,
+      "t1": 5.109374999999999,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.109374999999999,
+      "t1": 5.251249999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.251249999999999,
+      "t1": 5.397624999999999,
+      "kind": "char-gap",
+      "units": 3.0494791666666665,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7Y"
+     },
+     {
+      "t0": 5.397624999999999,
+      "t1": 5.442874999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.442874999999999,
+      "t1": 5.494499999999999,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.494499999999999,
+      "t1": 5.539624999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.539624999999998,
+      "t1": 5.591124999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.591124999999998,
+      "t1": 5.732874999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.732874999999998,
+      "t1": 5.791124999999998,
+      "kind": "element-gap",
+      "units": 1.2135416666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.791124999999998,
+      "t1": 5.836499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.836499999999998,
+      "t1": 6.035624999999998,
+      "kind": "char-gap",
+      "units": 4.1484375,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7YF"
+     },
+     {
+      "t0": 6.035624999999998,
+      "t1": 6.080874999999998,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.080874999999998,
+      "t1": 6.132374999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.132374999999998,
+      "t1": 6.273999999999998,
+      "kind": "dah",
+      "units": 2.9505208333333335,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.273999999999998,
+      "t1": 6.325124999999998,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.325124999999998,
+      "t1": 6.370249999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "C",
+      "pattern": "-.-.",
+      "t0": 0.282125,
+      "t1": 0.817375,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "Q",
+      "pattern": "--.-",
+      "t0": 1.0943749999999999,
+      "t1": 1.726,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.12225,
+      "t1": 2.472,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 3.1362499999999995,
+      "t1": 3.582375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "7",
+      "pattern": "--...",
+      "t0": 3.799125,
+      "t1": 4.438249999999999,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "Y",
+      "pattern": "-.--",
+      "t0": 4.619624999999999,
+      "t1": 5.251249999999999,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "F",
+      "pattern": "..-.",
+      "t0": 5.397624999999999,
+      "t1": 5.836499999999998,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 6.035624999999998,
+      "t1": 6.370249999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargetedTimeline": {
+    "text": "C Q D E W7YFR",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.282125,
+      "t1": 0.42400000000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.42400000000000004,
+      "t1": 0.475125,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.475125,
+      "t1": 0.520375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.520375,
+      "t1": 0.571875,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.571875,
+      "t1": 0.713625,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.713625,
+      "t1": 0.772125,
+      "kind": "element-gap",
+      "units": 1.21875,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.772125,
+      "t1": 0.817375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.817375,
+      "t1": 1.0943749999999999,
+      "kind": "word-gap",
+      "units": 5.770833333333334,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C"
+     },
+     {
+      "t0": 1.0943749999999999,
+      "t1": 1.2362499999999998,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.2362499999999998,
+      "t1": 1.2872499999999998,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2872499999999998,
+      "t1": 1.4289999999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.4289999999999998,
+      "t1": 1.487375,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.487375,
+      "t1": 1.5327499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5327499999999998,
+      "t1": 1.58425,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.58425,
+      "t1": 1.726,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.726,
+      "t1": 2.12225,
+      "kind": "word-gap",
+      "units": 8.255208333333332,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q"
+     },
+     {
+      "t0": 2.12225,
+      "t1": 2.2641250000000004,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.2641250000000004,
+      "t1": 2.3298750000000004,
+      "kind": "element-gap",
+      "units": 1.3697916666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3298750000000004,
+      "t1": 2.3752500000000003,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3752500000000003,
+      "t1": 2.42675,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.42675,
+      "t1": 2.472,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.472,
+      "t1": 2.72475,
+      "kind": "word-gap",
+      "units": 5.265624999999999,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D"
+     },
+     {
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.7699999999999996,
+      "t1": 3.1362499999999995,
+      "kind": "word-gap",
+      "units": 7.630208333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "C Q D E"
+     },
+     {
+      "t0": 3.1362499999999995,
+      "t1": 3.1814999999999993,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.1814999999999993,
+      "t1": 3.2477499999999995,
+      "kind": "element-gap",
+      "units": 1.3802083333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.2477499999999995,
+      "t1": 3.3896249999999997,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.3896249999999997,
+      "t1": 3.440625,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.440625,
+      "t1": 3.582375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.582375,
+      "t1": 3.799125,
+      "kind": "char-gap",
+      "units": 4.515625,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W"
+     },
+     {
+      "t0": 3.799125,
+      "t1": 3.9410000000000003,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.9410000000000003,
+      "t1": 3.9920000000000004,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.9920000000000004,
+      "t1": 4.13375,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.13375,
+      "t1": 4.192125,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.192125,
+      "t1": 4.237375,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.237375,
+      "t1": 4.289,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.289,
+      "t1": 4.334124999999999,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.334124999999999,
+      "t1": 4.392999999999999,
+      "kind": "element-gap",
+      "units": 1.2265625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.392999999999999,
+      "t1": 4.438249999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.438249999999999,
+      "t1": 4.619624999999999,
+      "kind": "char-gap",
+      "units": 3.7786458333333335,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "C Q D E W7"
+     },
+     {
+      "t0": 4.619624999999999,
+      "t1": 4.761499999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.761499999999999,
+      "t1": 4.812499999999999,
+      "kind": "element-gap",
+      "units": 1.0625,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.812499999999999,
+      "t1": 4.857749999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.857749999999999,
+      "t1": 4.909249999999999,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.909249999999999,
+      "t1": 5.050999999999999,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.050999999999999,
+      "t1": 5.109374999999999,
+      "kind": "element-gap",
+      "units": 1.2161458333333335,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.109374999999999,
+      "t1": 5.251249999999999,
+      "kind": "dah",
+      "units": 2.9557291666666665,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.251249999999999,
+      "t1": 5.397624999999999,
+      "kind": "char-gap",
+      "units": 3.0494791666666665,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7Y"
+     },
+     {
+      "t0": 5.397624999999999,
+      "t1": 5.442874999999999,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.442874999999999,
+      "t1": 5.494499999999999,
+      "kind": "element-gap",
+      "units": 1.0755208333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.494499999999999,
+      "t1": 5.539624999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.539624999999998,
+      "t1": 5.591124999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.591124999999998,
+      "t1": 5.732874999999998,
+      "kind": "dah",
+      "units": 2.9531249999999996,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.732874999999998,
+      "t1": 5.791124999999998,
+      "kind": "element-gap",
+      "units": 1.2135416666666667,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.791124999999998,
+      "t1": 5.836499999999998,
+      "kind": "dit",
+      "units": 0.9453125,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 5.836499999999998,
+      "t1": 6.035624999999998,
+      "kind": "char-gap",
+      "units": 4.1484375,
+      "targetUnits": 3.0000000000000004,
+      "targetKind": "char-gap",
+      "context": "Q D E W7YF"
+     },
+     {
+      "t0": 6.035624999999998,
+      "t1": 6.080874999999998,
+      "kind": "dit",
+      "units": 0.9427083333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.080874999999998,
+      "t1": 6.132374999999998,
+      "kind": "element-gap",
+      "units": 1.0729166666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.132374999999998,
+      "t1": 6.273999999999998,
+      "kind": "dah",
+      "units": 2.9505208333333335,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.273999999999998,
+      "t1": 6.325124999999998,
+      "kind": "element-gap",
+      "units": 1.0651041666666665,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.325124999999998,
+      "t1": 6.370249999999998,
+      "kind": "dit",
+      "units": 0.9401041666666666,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "C",
+      "pattern": "-.-.",
+      "t0": 0.282125,
+      "t1": 0.817375,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "Q",
+      "pattern": "--.-",
+      "t0": 1.0943749999999999,
+      "t1": 1.726,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.12225,
+      "t1": 2.472,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 2.72475,
+      "t1": 2.7699999999999996,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 3.1362499999999995,
+      "t1": 3.582375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "7",
+      "pattern": "--...",
+      "t0": 3.799125,
+      "t1": 4.438249999999999,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "Y",
+      "pattern": "-.--",
+      "t0": 4.619624999999999,
+      "t1": 5.251249999999999,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "F",
+      "pattern": "..-.",
+      "t0": 5.397624999999999,
+      "t1": 5.836499999999998,
+      "nBlocks": 7,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 6.035624999999998,
+      "t1": 6.370249999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargeted": 2,
+   "analysis": {
+    "tolerance": 0.3,
+    "withinTolFrac": 0.9016393442622951,
+    "nPauses": 0,
+    "stats": [
+     {
+      "name": "dit",
+      "n": 16,
+      "meanUnits": 0.9427083333333333,
+      "stdUnits": 0.0015947198846244762,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "dah",
+      "n": 15,
+      "meanUnits": 2.9541666666666666,
+      "stdUnits": 0.0015911721163041565,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "element-gap",
+      "n": 22,
+      "meanUnits": 1.1375473484848486,
+      "stdUnits": 0.0994140609143882,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "char-gap",
+      "n": 6,
+      "meanUnits": 4.421440972222222,
+      "stdUnits": 0.9048363323824935,
+      "targetUnits": 3.0000000000000004
+     },
+     {
+      "name": "word-gap",
+      "n": 2,
+      "meanUnits": 7.942708333333333,
+      "stdUnits": 0.3124999999999991,
+      "targetUnits": 7.0
+     }
+    ],
+    "deviations": [
+     {
+      "timeSec": 0.817375,
+      "kind": "char-gap",
+      "valueUnits": 5.770833333333334,
+      "targetUnits": 3.0000000000000004,
+      "context": "C"
+     },
+     {
+      "timeSec": 2.472,
+      "kind": "char-gap",
+      "valueUnits": 5.265624999999999,
+      "targetUnits": 3.0000000000000004,
+      "context": "C Q D"
+     },
+     {
+      "timeSec": 3.582375,
+      "kind": "char-gap",
+      "valueUnits": 4.515625,
+      "targetUnits": 3.0000000000000004,
+      "context": "C Q D E W"
+     },
+     {
+      "timeSec": 5.836499999999998,
+      "kind": "char-gap",
+      "valueUnits": 4.1484375,
+      "targetUnits": 3.0000000000000004,
+      "context": "Q D E W7YF"
+     }
+    ]
+   }
+  },
+  "ideal": {
+   "text": "CQ DE W7YFR",
+   "duration": 5.520000000000003,
+   "blocks": [
+    {
+     "t0": 0.0,
+     "t1": 0.14400000000000002,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.14400000000000002,
+     "t1": 0.192,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.192,
+     "t1": 0.24,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.24,
+     "t1": 0.288,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.288,
+     "t1": 0.432,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.432,
+     "t1": 0.48,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.48,
+     "t1": 0.528,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.528,
+     "t1": 0.672,
+     "kind": "char-gap",
+     "units": 3.0000000000000004,
+     "targetUnits": 3.0000000000000004,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.672,
+     "t1": 0.8160000000000001,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.8160000000000001,
+     "t1": 0.8640000000000001,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.8640000000000001,
+     "t1": 1.008,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 1.008,
+     "t1": 1.056,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.056,
+     "t1": 1.104,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.104,
+     "t1": 1.1520000000000001,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.1520000000000001,
+     "t1": 1.2960000000000003,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 1.2960000000000003,
+     "t1": 1.6320000000000003,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.6320000000000003,
+     "t1": 1.7760000000000002,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 1.7760000000000002,
+     "t1": 1.8240000000000003,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.8240000000000003,
+     "t1": 1.8720000000000003,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.8720000000000003,
+     "t1": 1.9200000000000004,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.9200000000000004,
+     "t1": 1.9680000000000004,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.9680000000000004,
+     "t1": 2.1120000000000005,
+     "kind": "char-gap",
+     "units": 3.0000000000000004,
+     "targetUnits": 3.0000000000000004,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.1120000000000005,
+     "t1": 2.1600000000000006,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.1600000000000006,
+     "t1": 2.4960000000000004,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.4960000000000004,
+     "t1": 2.5440000000000005,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.5440000000000005,
+     "t1": 2.5920000000000005,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.5920000000000005,
+     "t1": 2.7360000000000007,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 2.7360000000000007,
+     "t1": 2.7840000000000007,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.7840000000000007,
+     "t1": 2.928000000000001,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 2.928000000000001,
+     "t1": 3.072000000000001,
+     "kind": "char-gap",
+     "units": 3.0000000000000004,
+     "targetUnits": 3.0000000000000004,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.072000000000001,
+     "t1": 3.216000000000001,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 3.216000000000001,
+     "t1": 3.264000000000001,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.264000000000001,
+     "t1": 3.4080000000000013,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 3.4080000000000013,
+     "t1": 3.4560000000000013,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.4560000000000013,
+     "t1": 3.5040000000000013,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.5040000000000013,
+     "t1": 3.5520000000000014,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.5520000000000014,
+     "t1": 3.6000000000000014,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.6000000000000014,
+     "t1": 3.6480000000000015,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.6480000000000015,
+     "t1": 3.6960000000000015,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.6960000000000015,
+     "t1": 3.8400000000000016,
+     "kind": "char-gap",
+     "units": 3.0000000000000004,
+     "targetUnits": 3.0000000000000004,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.8400000000000016,
+     "t1": 3.9840000000000018,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 3.9840000000000018,
+     "t1": 4.032000000000002,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.032000000000002,
+     "t1": 4.080000000000002,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.080000000000002,
+     "t1": 4.128000000000002,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.128000000000002,
+     "t1": 4.272000000000002,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.272000000000002,
+     "t1": 4.320000000000002,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.320000000000002,
+     "t1": 4.464000000000002,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.464000000000002,
+     "t1": 4.608000000000002,
+     "kind": "char-gap",
+     "units": 3.0000000000000004,
+     "targetUnits": 3.0000000000000004,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.608000000000002,
+     "t1": 4.656000000000002,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.656000000000002,
+     "t1": 4.704000000000002,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.704000000000002,
+     "t1": 4.7520000000000024,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.7520000000000024,
+     "t1": 4.8000000000000025,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.8000000000000025,
+     "t1": 4.944000000000003,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.944000000000003,
+     "t1": 4.992000000000003,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.992000000000003,
+     "t1": 5.040000000000003,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 5.040000000000003,
+     "t1": 5.184000000000003,
+     "kind": "char-gap",
+     "units": 3.0000000000000004,
+     "targetUnits": 3.0000000000000004,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.184000000000003,
+     "t1": 5.232000000000003,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 5.232000000000003,
+     "t1": 5.280000000000003,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.280000000000003,
+     "t1": 5.424000000000003,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 5.424000000000003,
+     "t1": 5.472000000000003,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.472000000000003,
+     "t1": 5.520000000000003,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    }
+   ],
+   "chars": [
+    {
+     "char": "C",
+     "pattern": "-.-.",
+     "t0": 0.0,
+     "t1": 0.528,
+     "nBlocks": 7,
+     "leadGapKind": null
+    },
+    {
+     "char": "Q",
+     "pattern": "--.-",
+     "t0": 0.672,
+     "t1": 1.2960000000000003,
+     "nBlocks": 7,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "D",
+     "pattern": "-..",
+     "t0": 1.6320000000000003,
+     "t1": 1.9680000000000004,
+     "nBlocks": 5,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "E",
+     "pattern": ".",
+     "t0": 2.1120000000000005,
+     "t1": 2.1600000000000006,
+     "nBlocks": 1,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "W",
+     "pattern": ".--",
+     "t0": 2.4960000000000004,
+     "t1": 2.928000000000001,
+     "nBlocks": 5,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "7",
+     "pattern": "--...",
+     "t0": 3.072000000000001,
+     "t1": 3.6960000000000015,
+     "nBlocks": 9,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "Y",
+     "pattern": "-.--",
+     "t0": 3.8400000000000016,
+     "t1": 4.464000000000002,
+     "nBlocks": 7,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "F",
+     "pattern": "..-.",
+     "t0": 4.608000000000002,
+     "t1": 5.040000000000003,
+     "nBlocks": 7,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "R",
+     "pattern": ".-.",
+     "t0": 5.184000000000003,
+     "t1": 5.520000000000003,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    }
+   ]
+  },
+  "comparison": {
+   "expected": "CQ DE W7YFR",
+   "decoded": "C Q D E W7YFR",
+   "accuracy": 1.0,
+   "nExpected": 11,
+   "substitutions": 0,
+   "insertions": 2,
+   "deletions": 0,
+   "diff": "C[+ ]Q D[+ ]E W7YFR"
+  }
+ },
+ "sourceWav": "cq-de-w7yfr.wav",
+ "nominalWpm": 25
+}

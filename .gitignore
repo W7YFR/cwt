@@ -8,13 +8,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Packaging / build artifacts
+# Packaging / build artifacts.
+# dist/ is the built browser app; `npm run build` regenerates it.
 build/
 dist/
 *.egg-info/
 *.egg
 .eggs/
 pip-wheel-metadata/
+
+# Node / browser app
+node_modules/
+.vite/
+*.tsbuildinfo
 
 # Test / tooling caches
 .pytest_cache/
@@ -39,3 +45,10 @@ htmlcov/
 
 # ...but DO commit the small real-audio test fixtures
 !tests/data/*.wav
+
+# Playwright's downloaded browsers live in a user cache, but its reports don't
+playwright-report/
+test-results/
+# The browser test runner creates these per test file whether or not any
+# screenshot is taken; nothing here asserts on images.
+app/test/**/__screenshots__/

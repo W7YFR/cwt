@@ -1,0 +1,4517 @@
+{
+ "name": "synth-prosigns",
+ "expected": "<BT> TEST DE W1AW <AR> <SK>",
+ "charWpm": 20,
+ "farnsworthWpm": 20,
+ "dspRate": 8000,
+ "toneHz": 600.0,
+ "segments": [
+  [
+   0,
+   0.10275
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.425375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.185375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.185375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.185375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.425375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.185375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.425375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.185375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.185375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.185375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.425375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.425375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.054625
+  ],
+  [
+   0,
+   0.065375
+  ],
+  [
+   1,
+   0.174625
+  ],
+  [
+   0,
+   0.102625
+  ]
+ ],
+ "grading": {
+  "measured": {
+   "unitSec": 0.05641666666666667,
+   "charWpm": 21.270310192023633,
+   "farnsworthWpm": 20.527148579492806,
+   "ditDahSplit": 0.114625,
+   "elementCharSplit": 0.11283333333333334,
+   "charWordSplit": 0.3089583333333334,
+   "charGapSec": 0.185375,
+   "wordGapSec": 0.4325416666666667
+  },
+  "ref": {
+   "unitSec": 0.06,
+   "charWpm": 20,
+   "farnsworthWpm": 20,
+   "ditDahSplit": 0.12,
+   "elementCharSplit": 0.12,
+   "charWordSplit": 0.3,
+   "charGapSec": 0.18,
+   "wordGapSec": 0.42
+  },
+  "rests": {
+   "timeline": {
+    "text": "= TEST DE W1AW <AR> <SK>",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.10275,
+      "t1": 0.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.277375,
+      "t1": 0.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.34275,
+      "t1": 0.397375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.397375,
+      "t1": 0.46275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.46275,
+      "t1": 0.517375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.517375,
+      "t1": 0.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.58275,
+      "t1": 0.637375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.637375,
+      "t1": 0.70275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.70275,
+      "t1": 0.877375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.877375,
+      "t1": 1.30275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "="
+     },
+     {
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.477375,
+      "t1": 1.6627500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= T"
+     },
+     {
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.717375,
+      "t1": 1.9027500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TE"
+     },
+     {
+      "t0": 1.9027500000000002,
+      "t1": 1.957375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.957375,
+      "t1": 2.0227500000000003,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0227500000000003,
+      "t1": 2.0773750000000004,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.0773750000000004,
+      "t1": 2.1427500000000004,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1427500000000004,
+      "t1": 2.1973750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1973750000000005,
+      "t1": 2.3827500000000006,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TES"
+     },
+     {
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.5573750000000004,
+      "t1": 2.9827500000000002,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST"
+     },
+     {
+      "t0": 2.9827500000000002,
+      "t1": 3.157375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.157375,
+      "t1": 3.22275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.22275,
+      "t1": 3.277375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.277375,
+      "t1": 3.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.34275,
+      "t1": 3.3973750000000003,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.3973750000000003,
+      "t1": 3.5827500000000003,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TEST D"
+     },
+     {
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.6373750000000005,
+      "t1": 4.06275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST DE"
+     },
+     {
+      "t0": 4.06275,
+      "t1": 4.117375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.117375,
+      "t1": 4.18275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.18275,
+      "t1": 4.357375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.357375,
+      "t1": 4.422750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.422750000000001,
+      "t1": 4.597375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.597375,
+      "t1": 4.78275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W"
+     },
+     {
+      "t0": 4.78275,
+      "t1": 4.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.837375,
+      "t1": 4.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.90275,
+      "t1": 5.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.077375,
+      "t1": 5.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.14275,
+      "t1": 5.317375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.317375,
+      "t1": 5.382750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.382750000000001,
+      "t1": 5.557375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.557375,
+      "t1": 5.622750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.622750000000001,
+      "t1": 5.797375000000001,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.797375000000001,
+      "t1": 5.98275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W1"
+     },
+     {
+      "t0": 5.98275,
+      "t1": 6.037375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.037375,
+      "t1": 6.10275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.10275,
+      "t1": 6.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.277375,
+      "t1": 6.46275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "EST DE W1A"
+     },
+     {
+      "t0": 6.46275,
+      "t1": 6.5173749999999995,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.5173749999999995,
+      "t1": 6.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.58275,
+      "t1": 6.757375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.757375,
+      "t1": 6.82275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.82275,
+      "t1": 6.997375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.997375,
+      "t1": 7.42275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ST DE W1AW"
+     },
+     {
+      "t0": 7.42275,
+      "t1": 7.477374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.477374999999999,
+      "t1": 7.54275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.54275,
+      "t1": 7.717375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 7.717375,
+      "t1": 7.78275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.78275,
+      "t1": 7.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.837375,
+      "t1": 7.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.90275,
+      "t1": 8.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 8.077375,
+      "t1": 8.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.14275,
+      "t1": 8.197375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.197375,
+      "t1": 8.62275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "W1AW <AR>"
+     },
+     {
+      "t0": 8.62275,
+      "t1": 8.677375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.677375,
+      "t1": 8.74275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.74275,
+      "t1": 8.797374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.797374999999999,
+      "t1": 8.862749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.862749999999998,
+      "t1": 8.917374999999998,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.917374999999998,
+      "t1": 8.982749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.982749999999998,
+      "t1": 9.157374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 9.157374999999998,
+      "t1": 9.222749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.222749999999998,
+      "t1": 9.277374999999997,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 9.277374999999997,
+      "t1": 9.342749999999997,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.342749999999997,
+      "t1": 9.517374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "=",
+      "pattern": "-...-",
+      "t0": 0.10275,
+      "t1": 0.877375,
+      "nBlocks": 9,
+      "leadGapKind": null
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.9027500000000002,
+      "t1": 2.1973750000000005,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.9827500000000002,
+      "t1": 3.3973750000000003,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 4.06275,
+      "t1": 4.597375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "1",
+      "pattern": ".----",
+      "t0": 4.78275,
+      "t1": 5.797375000000001,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 5.98275,
+      "t1": 6.277375,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 6.46275,
+      "t1": 6.997375,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "<AR>",
+      "pattern": ".-.-.",
+      "t0": 7.42275,
+      "t1": 8.197375,
+      "nBlocks": 9,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "<SK>",
+      "pattern": "...-.-",
+      "t0": 8.62275,
+      "t1": 9.517374999999998,
+      "nBlocks": 11,
+      "leadGapKind": "word-gap"
+     }
+    ]
+   },
+   "retargetedTimeline": {
+    "text": "= TEST DE W1AW <AR> <SK>",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.10275,
+      "t1": 0.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.277375,
+      "t1": 0.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.34275,
+      "t1": 0.397375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.397375,
+      "t1": 0.46275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.46275,
+      "t1": 0.517375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.517375,
+      "t1": 0.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.58275,
+      "t1": 0.637375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.637375,
+      "t1": 0.70275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.70275,
+      "t1": 0.877375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.877375,
+      "t1": 1.30275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "="
+     },
+     {
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.477375,
+      "t1": 1.6627500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= T"
+     },
+     {
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.717375,
+      "t1": 1.9027500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TE"
+     },
+     {
+      "t0": 1.9027500000000002,
+      "t1": 1.957375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.957375,
+      "t1": 2.0227500000000003,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0227500000000003,
+      "t1": 2.0773750000000004,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.0773750000000004,
+      "t1": 2.1427500000000004,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1427500000000004,
+      "t1": 2.1973750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1973750000000005,
+      "t1": 2.3827500000000006,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TES"
+     },
+     {
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.5573750000000004,
+      "t1": 2.9827500000000002,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST"
+     },
+     {
+      "t0": 2.9827500000000002,
+      "t1": 3.157375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.157375,
+      "t1": 3.22275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.22275,
+      "t1": 3.277375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.277375,
+      "t1": 3.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.34275,
+      "t1": 3.3973750000000003,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.3973750000000003,
+      "t1": 3.5827500000000003,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TEST D"
+     },
+     {
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.6373750000000005,
+      "t1": 4.06275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST DE"
+     },
+     {
+      "t0": 4.06275,
+      "t1": 4.117375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.117375,
+      "t1": 4.18275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.18275,
+      "t1": 4.357375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.357375,
+      "t1": 4.422750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.422750000000001,
+      "t1": 4.597375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.597375,
+      "t1": 4.78275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W"
+     },
+     {
+      "t0": 4.78275,
+      "t1": 4.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.837375,
+      "t1": 4.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.90275,
+      "t1": 5.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.077375,
+      "t1": 5.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.14275,
+      "t1": 5.317375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.317375,
+      "t1": 5.382750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.382750000000001,
+      "t1": 5.557375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.557375,
+      "t1": 5.622750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.622750000000001,
+      "t1": 5.797375000000001,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.797375000000001,
+      "t1": 5.98275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W1"
+     },
+     {
+      "t0": 5.98275,
+      "t1": 6.037375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.037375,
+      "t1": 6.10275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.10275,
+      "t1": 6.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.277375,
+      "t1": 6.46275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "EST DE W1A"
+     },
+     {
+      "t0": 6.46275,
+      "t1": 6.5173749999999995,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.5173749999999995,
+      "t1": 6.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.58275,
+      "t1": 6.757375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.757375,
+      "t1": 6.82275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.82275,
+      "t1": 6.997375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.997375,
+      "t1": 7.42275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ST DE W1AW"
+     },
+     {
+      "t0": 7.42275,
+      "t1": 7.477374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.477374999999999,
+      "t1": 7.54275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.54275,
+      "t1": 7.717375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 7.717375,
+      "t1": 7.78275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.78275,
+      "t1": 7.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.837375,
+      "t1": 7.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.90275,
+      "t1": 8.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 8.077375,
+      "t1": 8.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.14275,
+      "t1": 8.197375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.197375,
+      "t1": 8.62275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "W1AW <AR>"
+     },
+     {
+      "t0": 8.62275,
+      "t1": 8.677375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.677375,
+      "t1": 8.74275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.74275,
+      "t1": 8.797374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.797374999999999,
+      "t1": 8.862749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.862749999999998,
+      "t1": 8.917374999999998,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.917374999999998,
+      "t1": 8.982749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.982749999999998,
+      "t1": 9.157374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 9.157374999999998,
+      "t1": 9.222749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.222749999999998,
+      "t1": 9.277374999999997,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 9.277374999999997,
+      "t1": 9.342749999999997,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.342749999999997,
+      "t1": 9.517374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "=",
+      "pattern": "-...-",
+      "t0": 0.10275,
+      "t1": 0.877375,
+      "nBlocks": 9,
+      "leadGapKind": null
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.9027500000000002,
+      "t1": 2.1973750000000005,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.9827500000000002,
+      "t1": 3.3973750000000003,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 4.06275,
+      "t1": 4.597375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "1",
+      "pattern": ".----",
+      "t0": 4.78275,
+      "t1": 5.797375000000001,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 5.98275,
+      "t1": 6.277375,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 6.46275,
+      "t1": 6.997375,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "<AR>",
+      "pattern": ".-.-.",
+      "t0": 7.42275,
+      "t1": 8.197375,
+      "nBlocks": 9,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "<SK>",
+      "pattern": "...-.-",
+      "t0": 8.62275,
+      "t1": 9.517374999999998,
+      "nBlocks": 11,
+      "leadGapKind": "word-gap"
+     }
+    ]
+   },
+   "retargeted": 0,
+   "analysis": {
+    "tolerance": 0.3,
+    "withinTolFrac": 1.0,
+    "nPauses": 0,
+    "stats": [
+     {
+      "name": "dit",
+      "n": 21,
+      "meanUnits": 0.9104166666666667,
+      "stdUnits": 0.0,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "dah",
+      "n": 18,
+      "meanUnits": 2.9104166666666673,
+      "stdUnits": 4.440892098500626e-16,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "element-gap",
+      "n": 26,
+      "meanUnits": 1.0895833333333333,
+      "stdUnits": 0.0,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "char-gap",
+      "n": 7,
+      "meanUnits": 3.0895833333333336,
+      "stdUnits": 0.0,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "word-gap",
+      "n": 5,
+      "meanUnits": 7.0895833333333345,
+      "stdUnits": 8.881784197001252e-16,
+      "targetUnits": 7.0
+     }
+    ],
+    "deviations": []
+   }
+  },
+  "noRests": {
+   "timeline": {
+    "text": "= TEST DE W1AW <AR> <SK>",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.10275,
+      "t1": 0.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.277375,
+      "t1": 0.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.34275,
+      "t1": 0.397375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.397375,
+      "t1": 0.46275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.46275,
+      "t1": 0.517375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.517375,
+      "t1": 0.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.58275,
+      "t1": 0.637375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.637375,
+      "t1": 0.70275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.70275,
+      "t1": 0.877375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.877375,
+      "t1": 1.30275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "="
+     },
+     {
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.477375,
+      "t1": 1.6627500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= T"
+     },
+     {
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.717375,
+      "t1": 1.9027500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TE"
+     },
+     {
+      "t0": 1.9027500000000002,
+      "t1": 1.957375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.957375,
+      "t1": 2.0227500000000003,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0227500000000003,
+      "t1": 2.0773750000000004,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.0773750000000004,
+      "t1": 2.1427500000000004,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1427500000000004,
+      "t1": 2.1973750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1973750000000005,
+      "t1": 2.3827500000000006,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TES"
+     },
+     {
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.5573750000000004,
+      "t1": 2.9827500000000002,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST"
+     },
+     {
+      "t0": 2.9827500000000002,
+      "t1": 3.157375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.157375,
+      "t1": 3.22275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.22275,
+      "t1": 3.277375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.277375,
+      "t1": 3.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.34275,
+      "t1": 3.3973750000000003,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.3973750000000003,
+      "t1": 3.5827500000000003,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TEST D"
+     },
+     {
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.6373750000000005,
+      "t1": 4.06275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST DE"
+     },
+     {
+      "t0": 4.06275,
+      "t1": 4.117375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.117375,
+      "t1": 4.18275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.18275,
+      "t1": 4.357375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.357375,
+      "t1": 4.422750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.422750000000001,
+      "t1": 4.597375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.597375,
+      "t1": 4.78275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W"
+     },
+     {
+      "t0": 4.78275,
+      "t1": 4.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.837375,
+      "t1": 4.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.90275,
+      "t1": 5.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.077375,
+      "t1": 5.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.14275,
+      "t1": 5.317375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.317375,
+      "t1": 5.382750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.382750000000001,
+      "t1": 5.557375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.557375,
+      "t1": 5.622750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.622750000000001,
+      "t1": 5.797375000000001,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.797375000000001,
+      "t1": 5.98275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W1"
+     },
+     {
+      "t0": 5.98275,
+      "t1": 6.037375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.037375,
+      "t1": 6.10275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.10275,
+      "t1": 6.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.277375,
+      "t1": 6.46275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "EST DE W1A"
+     },
+     {
+      "t0": 6.46275,
+      "t1": 6.5173749999999995,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.5173749999999995,
+      "t1": 6.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.58275,
+      "t1": 6.757375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.757375,
+      "t1": 6.82275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.82275,
+      "t1": 6.997375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.997375,
+      "t1": 7.42275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ST DE W1AW"
+     },
+     {
+      "t0": 7.42275,
+      "t1": 7.477374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.477374999999999,
+      "t1": 7.54275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.54275,
+      "t1": 7.717375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 7.717375,
+      "t1": 7.78275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.78275,
+      "t1": 7.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.837375,
+      "t1": 7.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.90275,
+      "t1": 8.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 8.077375,
+      "t1": 8.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.14275,
+      "t1": 8.197375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.197375,
+      "t1": 8.62275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "W1AW <AR>"
+     },
+     {
+      "t0": 8.62275,
+      "t1": 8.677375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.677375,
+      "t1": 8.74275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.74275,
+      "t1": 8.797374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.797374999999999,
+      "t1": 8.862749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.862749999999998,
+      "t1": 8.917374999999998,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.917374999999998,
+      "t1": 8.982749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.982749999999998,
+      "t1": 9.157374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 9.157374999999998,
+      "t1": 9.222749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.222749999999998,
+      "t1": 9.277374999999997,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 9.277374999999997,
+      "t1": 9.342749999999997,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.342749999999997,
+      "t1": 9.517374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "=",
+      "pattern": "-...-",
+      "t0": 0.10275,
+      "t1": 0.877375,
+      "nBlocks": 9,
+      "leadGapKind": null
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.9027500000000002,
+      "t1": 2.1973750000000005,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.9827500000000002,
+      "t1": 3.3973750000000003,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 4.06275,
+      "t1": 4.597375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "1",
+      "pattern": ".----",
+      "t0": 4.78275,
+      "t1": 5.797375000000001,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 5.98275,
+      "t1": 6.277375,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 6.46275,
+      "t1": 6.997375,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "<AR>",
+      "pattern": ".-.-.",
+      "t0": 7.42275,
+      "t1": 8.197375,
+      "nBlocks": 9,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "<SK>",
+      "pattern": "...-.-",
+      "t0": 8.62275,
+      "t1": 9.517374999999998,
+      "nBlocks": 11,
+      "leadGapKind": "word-gap"
+     }
+    ]
+   },
+   "retargetedTimeline": {
+    "text": "= TEST DE W1AW <AR> <SK>",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.10275,
+      "t1": 0.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.277375,
+      "t1": 0.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.34275,
+      "t1": 0.397375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.397375,
+      "t1": 0.46275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.46275,
+      "t1": 0.517375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.517375,
+      "t1": 0.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.58275,
+      "t1": 0.637375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.637375,
+      "t1": 0.70275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.70275,
+      "t1": 0.877375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.877375,
+      "t1": 1.30275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "="
+     },
+     {
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.477375,
+      "t1": 1.6627500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= T"
+     },
+     {
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.717375,
+      "t1": 1.9027500000000002,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TE"
+     },
+     {
+      "t0": 1.9027500000000002,
+      "t1": 1.957375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.957375,
+      "t1": 2.0227500000000003,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0227500000000003,
+      "t1": 2.0773750000000004,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.0773750000000004,
+      "t1": 2.1427500000000004,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1427500000000004,
+      "t1": 2.1973750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1973750000000005,
+      "t1": 2.3827500000000006,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TES"
+     },
+     {
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.5573750000000004,
+      "t1": 2.9827500000000002,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST"
+     },
+     {
+      "t0": 2.9827500000000002,
+      "t1": 3.157375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.157375,
+      "t1": 3.22275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.22275,
+      "t1": 3.277375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.277375,
+      "t1": 3.34275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.34275,
+      "t1": 3.3973750000000003,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.3973750000000003,
+      "t1": 3.5827500000000003,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "= TEST D"
+     },
+     {
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.6373750000000005,
+      "t1": 4.06275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "= TEST DE"
+     },
+     {
+      "t0": 4.06275,
+      "t1": 4.117375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.117375,
+      "t1": 4.18275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.18275,
+      "t1": 4.357375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.357375,
+      "t1": 4.422750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.422750000000001,
+      "t1": 4.597375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.597375,
+      "t1": 4.78275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W"
+     },
+     {
+      "t0": 4.78275,
+      "t1": 4.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.837375,
+      "t1": 4.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.90275,
+      "t1": 5.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.077375,
+      "t1": 5.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.14275,
+      "t1": 5.317375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.317375,
+      "t1": 5.382750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.382750000000001,
+      "t1": 5.557375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.557375,
+      "t1": 5.622750000000001,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 5.622750000000001,
+      "t1": 5.797375000000001,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 5.797375000000001,
+      "t1": 5.98275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "TEST DE W1"
+     },
+     {
+      "t0": 5.98275,
+      "t1": 6.037375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.037375,
+      "t1": 6.10275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.10275,
+      "t1": 6.277375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.277375,
+      "t1": 6.46275,
+      "kind": "char-gap",
+      "units": 3.0895833333333336,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "EST DE W1A"
+     },
+     {
+      "t0": 6.46275,
+      "t1": 6.5173749999999995,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 6.5173749999999995,
+      "t1": 6.58275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.58275,
+      "t1": 6.757375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.757375,
+      "t1": 6.82275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 6.82275,
+      "t1": 6.997375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 6.997375,
+      "t1": 7.42275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ST DE W1AW"
+     },
+     {
+      "t0": 7.42275,
+      "t1": 7.477374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.477374999999999,
+      "t1": 7.54275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.54275,
+      "t1": 7.717375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 7.717375,
+      "t1": 7.78275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.78275,
+      "t1": 7.837375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 7.837375,
+      "t1": 7.90275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 7.90275,
+      "t1": 8.077375,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 8.077375,
+      "t1": 8.14275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.14275,
+      "t1": 8.197375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.197375,
+      "t1": 8.62275,
+      "kind": "word-gap",
+      "units": 7.089583333333334,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "W1AW <AR>"
+     },
+     {
+      "t0": 8.62275,
+      "t1": 8.677375,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.677375,
+      "t1": 8.74275,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.74275,
+      "t1": 8.797374999999999,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.797374999999999,
+      "t1": 8.862749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.862749999999998,
+      "t1": 8.917374999999998,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 8.917374999999998,
+      "t1": 8.982749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 8.982749999999998,
+      "t1": 9.157374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 9.157374999999998,
+      "t1": 9.222749999999998,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.222749999999998,
+      "t1": 9.277374999999997,
+      "kind": "dit",
+      "units": 0.9104166666666667,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 9.277374999999997,
+      "t1": 9.342749999999997,
+      "kind": "element-gap",
+      "units": 1.0895833333333333,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 9.342749999999997,
+      "t1": 9.517374999999998,
+      "kind": "dah",
+      "units": 2.910416666666667,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "=",
+      "pattern": "-...-",
+      "t0": 0.10275,
+      "t1": 0.877375,
+      "nBlocks": 9,
+      "leadGapKind": null
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 1.30275,
+      "t1": 1.477375,
+      "nBlocks": 1,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 1.6627500000000002,
+      "t1": 1.717375,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.9027500000000002,
+      "t1": 2.1973750000000005,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "T",
+      "pattern": "-",
+      "t0": 2.3827500000000006,
+      "t1": 2.5573750000000004,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "D",
+      "pattern": "-..",
+      "t0": 2.9827500000000002,
+      "t1": 3.3973750000000003,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "E",
+      "pattern": ".",
+      "t0": 3.5827500000000003,
+      "t1": 3.6373750000000005,
+      "nBlocks": 1,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 4.06275,
+      "t1": 4.597375,
+      "nBlocks": 5,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "1",
+      "pattern": ".----",
+      "t0": 4.78275,
+      "t1": 5.797375000000001,
+      "nBlocks": 9,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 5.98275,
+      "t1": 6.277375,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "W",
+      "pattern": ".--",
+      "t0": 6.46275,
+      "t1": 6.997375,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "<AR>",
+      "pattern": ".-.-.",
+      "t0": 7.42275,
+      "t1": 8.197375,
+      "nBlocks": 9,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "<SK>",
+      "pattern": "...-.-",
+      "t0": 8.62275,
+      "t1": 9.517374999999998,
+      "nBlocks": 11,
+      "leadGapKind": "word-gap"
+     }
+    ]
+   },
+   "retargeted": 0,
+   "analysis": {
+    "tolerance": 0.3,
+    "withinTolFrac": 1.0,
+    "nPauses": 0,
+    "stats": [
+     {
+      "name": "dit",
+      "n": 21,
+      "meanUnits": 0.9104166666666667,
+      "stdUnits": 0.0,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "dah",
+      "n": 18,
+      "meanUnits": 2.9104166666666673,
+      "stdUnits": 4.440892098500626e-16,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "element-gap",
+      "n": 26,
+      "meanUnits": 1.0895833333333333,
+      "stdUnits": 0.0,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "char-gap",
+      "n": 7,
+      "meanUnits": 3.0895833333333336,
+      "stdUnits": 0.0,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "word-gap",
+      "n": 5,
+      "meanUnits": 7.0895833333333345,
+      "stdUnits": 8.881784197001252e-16,
+      "targetUnits": 7.0
+     }
+    ],
+    "deviations": []
+   }
+  },
+  "ideal": {
+   "text": "<BT> TEST DE W1AW <AR> <SK>",
+   "duration": 9.419999999999995,
+   "blocks": [
+    {
+     "t0": 0.0,
+     "t1": 0.18,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.18,
+     "t1": 0.24,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.24,
+     "t1": 0.3,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.3,
+     "t1": 0.36,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.36,
+     "t1": 0.42,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.42,
+     "t1": 0.48,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.48,
+     "t1": 0.54,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.54,
+     "t1": 0.6000000000000001,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.6000000000000001,
+     "t1": 0.78,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.78,
+     "t1": 1.2,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.2,
+     "t1": 1.38,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 1.38,
+     "t1": 1.5599999999999998,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.5599999999999998,
+     "t1": 1.6199999999999999,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.6199999999999999,
+     "t1": 1.7999999999999998,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.7999999999999998,
+     "t1": 1.8599999999999999,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.8599999999999999,
+     "t1": 1.92,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.92,
+     "t1": 1.98,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.98,
+     "t1": 2.04,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.04,
+     "t1": 2.1,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.1,
+     "t1": 2.2800000000000002,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.2800000000000002,
+     "t1": 2.4600000000000004,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 2.4600000000000004,
+     "t1": 2.8800000000000003,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.8800000000000003,
+     "t1": 3.0600000000000005,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 3.0600000000000005,
+     "t1": 3.1200000000000006,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.1200000000000006,
+     "t1": 3.1800000000000006,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.1800000000000006,
+     "t1": 3.2400000000000007,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.2400000000000007,
+     "t1": 3.3000000000000007,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.3000000000000007,
+     "t1": 3.480000000000001,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.480000000000001,
+     "t1": 3.540000000000001,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.540000000000001,
+     "t1": 3.960000000000001,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.960000000000001,
+     "t1": 4.0200000000000005,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.0200000000000005,
+     "t1": 4.08,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.08,
+     "t1": 4.26,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.26,
+     "t1": 4.319999999999999,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.319999999999999,
+     "t1": 4.499999999999999,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.499999999999999,
+     "t1": 4.679999999999999,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.679999999999999,
+     "t1": 4.739999999999998,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.739999999999998,
+     "t1": 4.799999999999998,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.799999999999998,
+     "t1": 4.979999999999998,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.979999999999998,
+     "t1": 5.039999999999997,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.039999999999997,
+     "t1": 5.219999999999997,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 5.219999999999997,
+     "t1": 5.279999999999997,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.279999999999997,
+     "t1": 5.459999999999996,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 5.459999999999996,
+     "t1": 5.519999999999996,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.519999999999996,
+     "t1": 5.699999999999996,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 5.699999999999996,
+     "t1": 5.8799999999999955,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.8799999999999955,
+     "t1": 5.939999999999995,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 5.939999999999995,
+     "t1": 5.999999999999995,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 5.999999999999995,
+     "t1": 6.179999999999994,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 6.179999999999994,
+     "t1": 6.359999999999994,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 6.359999999999994,
+     "t1": 6.419999999999994,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 6.419999999999994,
+     "t1": 6.479999999999993,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 6.479999999999993,
+     "t1": 6.659999999999993,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 6.659999999999993,
+     "t1": 6.719999999999993,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 6.719999999999993,
+     "t1": 6.899999999999992,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 6.899999999999992,
+     "t1": 7.319999999999992,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 7.319999999999992,
+     "t1": 7.379999999999992,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 7.379999999999992,
+     "t1": 7.4399999999999915,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 7.4399999999999915,
+     "t1": 7.619999999999991,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 7.619999999999991,
+     "t1": 7.679999999999991,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 7.679999999999991,
+     "t1": 7.73999999999999,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 7.73999999999999,
+     "t1": 7.79999999999999,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 7.79999999999999,
+     "t1": 7.97999999999999,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 7.97999999999999,
+     "t1": 8.03999999999999,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 8.03999999999999,
+     "t1": 8.09999999999999,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 8.09999999999999,
+     "t1": 8.51999999999999,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 8.51999999999999,
+     "t1": 8.579999999999991,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 8.579999999999991,
+     "t1": 8.639999999999992,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 8.639999999999992,
+     "t1": 8.699999999999992,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 8.699999999999992,
+     "t1": 8.759999999999993,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 8.759999999999993,
+     "t1": 8.819999999999993,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 8.819999999999993,
+     "t1": 8.879999999999994,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 8.879999999999994,
+     "t1": 9.059999999999993,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 9.059999999999993,
+     "t1": 9.119999999999994,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 9.119999999999994,
+     "t1": 9.179999999999994,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 9.179999999999994,
+     "t1": 9.239999999999995,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 9.239999999999995,
+     "t1": 9.419999999999995,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    }
+   ],
+   "chars": [
+    {
+     "char": "<BT>",
+     "pattern": "-...-",
+     "t0": 0.0,
+     "t1": 0.78,
+     "nBlocks": 9,
+     "leadGapKind": null
+    },
+    {
+     "char": "T",
+     "pattern": "-",
+     "t0": 1.2,
+     "t1": 1.38,
+     "nBlocks": 1,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "E",
+     "pattern": ".",
+     "t0": 1.5599999999999998,
+     "t1": 1.6199999999999999,
+     "nBlocks": 1,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "S",
+     "pattern": "...",
+     "t0": 1.7999999999999998,
+     "t1": 2.1,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "T",
+     "pattern": "-",
+     "t0": 2.2800000000000002,
+     "t1": 2.4600000000000004,
+     "nBlocks": 1,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "D",
+     "pattern": "-..",
+     "t0": 2.8800000000000003,
+     "t1": 3.3000000000000007,
+     "nBlocks": 5,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "E",
+     "pattern": ".",
+     "t0": 3.480000000000001,
+     "t1": 3.540000000000001,
+     "nBlocks": 1,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "W",
+     "pattern": ".--",
+     "t0": 3.960000000000001,
+     "t1": 4.499999999999999,
+     "nBlocks": 5,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "1",
+     "pattern": ".----",
+     "t0": 4.679999999999999,
+     "t1": 5.699999999999996,
+     "nBlocks": 9,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "A",
+     "pattern": ".-",
+     "t0": 5.8799999999999955,
+     "t1": 6.179999999999994,
+     "nBlocks": 3,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "W",
+     "pattern": ".--",
+     "t0": 6.359999999999994,
+     "t1": 6.899999999999992,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "<AR>",
+     "pattern": ".-.-.",
+     "t0": 7.319999999999992,
+     "t1": 8.09999999999999,
+     "nBlocks": 9,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "<SK>",
+     "pattern": "...-.-",
+     "t0": 8.51999999999999,
+     "t1": 9.419999999999995,
+     "nBlocks": 11,
+     "leadGapKind": "word-gap"
+    }
+   ]
+  },
+  "comparison": {
+   "expected": "<BT> TEST DE W1AW <AR> <SK>",
+   "decoded": "= TEST DE W1AW <AR> <SK>",
+   "accuracy": 0.9444444444444444,
+   "nExpected": 18,
+   "substitutions": 1,
+   "insertions": 0,
+   "deletions": 0,
+   "diff": "[<BT>\u2192=] TEST DE W1AW <AR> <SK>"
+  }
+ },
+ "synth": {
+  "text": "<BT> TEST DE W1AW <AR> <SK>",
+  "wpm": 20,
+  "farnsworthWpm": 20,
+  "rate": 8000,
+  "nSamples": 76960,
+  "absSum": 21880.0859375,
+  "head": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ }
+}

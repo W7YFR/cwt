@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cw-decoder"
 version = "0.1.0"
-description = "Decode Morse code (CW) from an audio recording into text, with automatic speed detection."
+description = "Decode Morse code (CW) from audio, and hand the recording to the browser trainer for grading."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -29,6 +29,6 @@ cw-decode = "cw_decoder.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-# The --web-review page is assembled from these at runtime.
-cw_decoder = ["web/*.html", "web/*.css", "web/*.js"]
+# The review UI is no longer assembled here: `--web-review` writes a session
+# bundle and serves the browser app (see bundle.py and serve.py), so there are
+# no web assets inside the package.

@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import pathlib
 import re
 import sys
 import tempfile
+import threading
 
 from . import core
 
@@ -272,8 +272,8 @@ def _warn_dropouts(path: str, rate: int, backend: str = "") -> None:
 
     A dropped buffer clicks, shortens whatever element it lands in, and — since
     the unit estimate averages the dit with a third of the dah — reads back as
-    faster sending than was keyed. It used to be silent, discoverable only by
-    ear, so say it out loud.
+    faster sending than was keyed. Nothing else reports it and it is hard to
+    catch by ear, so say it out loud.
     """
     if not os.path.exists(path):
         return
@@ -309,41 +309,73 @@ def _warn_dropouts(path: str, rate: int, backend: str = "") -> None:
               file=sys.stderr)
 
 
-def _web_page_path(out: "str | None") -> str:
-    """Where the review page goes, with its directory created."""
-    if out:
-        path = os.path.abspath(out)
-        parent = os.path.dirname(path)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
-        return path
-    return os.path.join(_session_dir(), "review.html")
+def _wait_for_interrupt() -> None:
+    """Block until Ctrl-C. Factored out so a test can serve without hanging."""
+    threading.Event().wait()
+
+
+def _review_dir(out: "str | None") -> str:
+    """Where the session bundle goes, with its directory created."""
+    path = os.path.abspath(out) if out else _session_dir()
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def _emit_web_review(res: core.Result, source: str, expected: "str | None",
                      expected_source: "str | None", tolerance: float,
                      page_path: str, audio_path: "str | None" = None,
                      verbose: bool = True,
-                     pad_sec: float = core.TRIM_PAD) -> None:
-    """Build the self-contained review page, then open it in a browser.
+                     pad_sec: float = core.TRIM_PAD,
+                     target_wpm: "float | None" = None,
+                     target_farnsworth: "float | None" = None,
+                     app_dir: "str | None" = None,
+                     open_browser: bool = True) -> None:
+    """Write the session bundle, then serve the browser app over it.
 
-    `audio_path` is the original recording. The page embeds it at its own
-    sample rate rather than the decoder's 8 kHz working copy, so playback
-    sounds like what you recorded.
+    The CLI does its own DSP and hands over *segments*; the grading, the chart
+    and the report all live in the app. That is what keeps a session reviewed
+    from the terminal and one recorded in the browser from ever disagreeing —
+    there is one implementation of the analysis, not two kept in step by hand.
+
+    `tolerance` is deliberately not in the bundle: it is a control in the
+    review, not a property of the recording, and baking one in would make two
+    dumps of the same session incomparable for no reason.
     """
     import webbrowser
 
-    from . import review, webpage
+    from . import bundle as bundle_mod
+    from . import serve as serve_mod
 
-    payload = review.build_payload(res, source=source, expected=expected,
-                                   expected_source=expected_source,
-                                   tolerance=tolerance, audio_path=audio_path,
-                                   pad_sec=pad_sec)
-    size = webpage.write(page_path, payload)
+    session_dir = page_path
+    bundle_path = bundle_mod.write(
+        session_dir, res, source=source, audio_path=audio_path,
+        expected=expected, expected_source=expected_source,
+        pad_sec=pad_sec, target_wpm=target_wpm,
+        target_farnsworth=target_farnsworth)
+
+    app = serve_mod.find_app_dir(app_dir)
+    if app is None:
+        print(f"# session written: {bundle_path}", file=sys.stderr)
+        print("# (no built app found — run `npm install && npm run build`, "
+              "then re-run to open the review)", file=sys.stderr)
+        return
+
+    server = serve_mod.serve(session_dir, app).start()
     if verbose:
-        print(f"# web review: {page_path} ({size / 1024:.0f} KB, audio at "
-              f"{payload['audio_rate'] / 1000:g} kHz)", file=sys.stderr)
-    webbrowser.open(pathlib.Path(page_path).resolve().as_uri())
+        size = os.path.getsize(bundle_path) / 1024
+        print(f"# review: {server.url}  ({size:.0f} KB session in "
+              f"{session_dir})", file=sys.stderr)
+        print("# Ctrl-C when you are done with the page.", file=sys.stderr)
+    if open_browser:
+        webbrowser.open(server.url)
+    try:
+        # The page is useless once the server stops, so the process waits here
+        # rather than exiting and leaving a dead tab open.
+        _wait_for_interrupt()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.stop()
 
 
 # `-D` values that mean "forget what you remembered and ask me again". `?` is
@@ -561,18 +593,23 @@ def main(argv=None) -> int:
 
     web = p.add_argument_group("web review (the default output)")
     web.add_argument("--web-review", action="store_true",
-                     help="build an interactive review page — your keying "
-                          "drawn on a canvas against perfect timing, with "
-                          "spacing annotated — and open it in a browser. The "
-                          "page is one self-contained file with the recording "
-                          "embedded, so you can replay yourself, hear the "
-                          "target, and re-grade at any speed offline. This is "
-                          "what happens by default; pass it explicitly only to "
-                          "get the page as well as --json or --basic.")
-    web.add_argument("--web-out", metavar="FILE", default=None,
-                     help="write the review page here (implies --web-review). "
-                          "Default: ~/.cw-decoder/sessions/<timestamp>/"
-                          "review.html")
+                     help="open the browser trainer on this recording — your "
+                          "keying drawn against perfect timing, with spacing "
+                          "annotated, playable side by side, and re-gradable "
+                          "at any speed. This is what happens by default; "
+                          "pass it explicitly only to get the review as well "
+                          "as --json or --basic.")
+    web.add_argument("--web-out", metavar="DIR", default=None,
+                     help="write the session bundle here (implies "
+                          "--web-review). Default: "
+                          "~/.cw-decoder/sessions/<timestamp>/")
+    web.add_argument("--app-dir", metavar="DIR", default=None,
+                     help="the built browser app to serve (default: the "
+                          "dist/ directory beside this checkout). Build it "
+                          "with `npm install && npm run build`.")
+    web.add_argument("--no-open", action="store_true",
+                     help="serve the review but don't launch a browser; the "
+                          "URL is printed instead.")
 
     live = p.add_argument_group("live capture (trainer)")
     live.add_argument("--live", action="store_true",
@@ -661,7 +698,7 @@ def main(argv=None) -> int:
 
     # Resolved up front: a live capture records straight into this directory,
     # so it has to exist before recording starts.
-    page_path = _web_page_path(args.web_out) if want_page else None
+    page_path = _review_dir(args.web_out) if want_page else None
 
     def emit(res, comparison, exp_source, source):
         if args.json:
@@ -850,7 +887,11 @@ def main(argv=None) -> int:
         if want_page:
             _emit_web_review(res, "live capture", expected, expected_source,
                              tol, page_path, audio_path=out_path,
-                             verbose=verbose, pad_sec=args.trim_pad)
+                             verbose=verbose, pad_sec=args.trim_pad,
+                             target_wpm=args.target_wpm,
+                             target_farnsworth=args.target_farnsworth,
+                             app_dir=args.app_dir,
+                             open_browser=not args.no_open)
         return 0
 
     if args.demo is not None:
@@ -884,7 +925,11 @@ def main(argv=None) -> int:
             _print_result(res, report, comparison, cmp_source, pal)
         if want_page:
             _emit_web_review(res, "--demo", cmp_target, cmp_source, tol,
-                             page_path, verbose=verbose)
+                             page_path, verbose=verbose,
+                             target_wpm=args.target_wpm,
+                             target_farnsworth=args.target_farnsworth,
+                             app_dir=args.app_dir,
+                             open_browser=not args.no_open)
         return 0
 
     # Reaching here means there is an input file: no --demo, and `want_live` is
@@ -919,7 +964,11 @@ def main(argv=None) -> int:
         _emit_web_review(res, os.path.basename(args.input), expected,
                          expected_source, tol, page_path,
                          audio_path=args.input, verbose=verbose,
-                         pad_sec=args.trim_pad)
+                         pad_sec=args.trim_pad,
+                         target_wpm=args.target_wpm,
+                         target_farnsworth=args.target_farnsworth,
+                         app_dir=args.app_dir,
+                         open_browser=not args.no_open)
     return 0
 
 
