@@ -15,6 +15,7 @@ function renderLanding(overrides: Partial<React.ComponentProps<typeof Landing>> 
     expected: "",
     onExpectedChange: vi.fn(),
     onAudio: vi.fn(),
+    onFile: vi.fn(),
     onError: vi.fn(),
     deviceId: undefined,
     onDeviceChange: vi.fn(),
@@ -187,6 +188,23 @@ describe("the landing screen", () => {
     expect(onExpectedChange).toHaveBeenLastCalledWith("S");
   });
 
+  it("says a recording can be dropped anywhere, not just on the card", async () => {
+    renderLanding();
+    await settled();
+    // Aiming at a particular rectangle is work nobody should have to do; the
+    // page answers a drop wherever it lands. See test/dom/filedrop.test.tsx.
+    expect(screen.getByText(/drop one anywhere on the page/i)).toBeInTheDocument();
+  });
+
+  it("hands a file picked from the dialog up to be opened", async () => {
+    const { props } = renderLanding();
+    await settled();
+    const file = new File(["RIFF"], "take.wav", { type: "audio/wav" });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(props.onFile).toHaveBeenCalledWith(file);
+  });
+
   it("says the message is optional, because timing works without it", async () => {
     renderLanding();
     await settled();
@@ -204,34 +222,6 @@ describe("the landing screen", () => {
     await waitFor(() => expect(onError).toHaveBeenCalled());
     expect(onError.mock.calls[0]![0]).toMatch(/denied/i);
     expect(onError.mock.calls[0]![0]).toMatch(/address bar/i);
-  });
-
-  it("rejects a drop that has no audio in it", async () => {
-    const onError = vi.fn();
-    const { container } = renderLanding({ onError });
-    const drop = container.querySelector(".way.drop")!;
-
-    fireEvent.drop(drop, {
-      dataTransfer: { files: [new File(["x"], "notes.txt", { type: "text/plain" })] },
-    });
-
-    await waitFor(() => expect(onError).toHaveBeenCalled());
-    expect(onError.mock.calls[0]![0]).toMatch(/no audio/i);
-  });
-
-  it("highlights the drop target while something is over it", async () => {
-    const { container } = renderLanding();
-    await settled();
-    const drop = container.querySelector(".way.drop")!;
-    expect(drop.className).not.toContain("over");
-
-    // fireEvent wraps the dispatch in act(), so the re-render has happened by
-    // the time the assertion runs; a raw dispatchEvent leaves it pending.
-    fireEvent.dragOver(drop, { dataTransfer: { files: [] } });
-    expect(container.querySelector(".way.drop")!.className).toContain("over");
-
-    fireEvent.dragLeave(drop);
-    expect(container.querySelector(".way.drop")!.className).not.toContain("over");
   });
 
   it("offers a device picker only when there is a choice to make", async () => {

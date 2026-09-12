@@ -1,11 +1,13 @@
 /* Two screens and the state between them. */
 
 import { useCallback, useEffect, useState } from "react";
+import { loadAudioFile } from "@/capture/file";
 import { loadBundle } from "@/io/bundle";
 import { loadPrefs, recallTake, savePrefs } from "@/io/storage";
 import type { AudioClip } from "@/types";
 import { Landing } from "./Landing";
 import { ReviewScreen } from "./ReviewScreen";
+import { useFileDrop } from "./useFileDrop";
 import { useTake } from "./useTake";
 
 /** How long the boot may take before it says anything.
@@ -33,6 +35,7 @@ export function App(): React.ReactElement {
      a large recording coming back off disk. */
   const [booting, setBooting] = useState(true);
   const [slowBoot, setSlowBoot] = useState(false);
+  const [opening, setOpening] = useState(false);
 
   /* Where a session comes from, in order of precedence.
      1. A bundle beside the app: `cw-decode --serve` wrote one and opened a
@@ -121,8 +124,39 @@ export function App(): React.ReactElement {
     [intended, take],
   );
 
+  /* Opening a file lives here rather than on the landing screen, because a
+     drop is answered anywhere on the page and the review is a page too: having
+     looked at one recording, dragging the next one on is the obvious move. */
+  const openFile = useCallback(
+    async (file: File) => {
+      setOpening(true);
+      setError(null);
+      try {
+        const loaded = await loadAudioFile(file);
+        onAudio(loaded.clip, loaded.name, false, loaded.data);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setOpening(false);
+      }
+    },
+    [onAudio],
+  );
+
+  const dropping = useFileDrop({
+    onFile: (file) => void openFile(file),
+    onError: setError,
+    disabled: opening,
+  });
+
   return (
     <div className="app">
+      {dropping && (
+        <div className="dropveil" role="presentation">
+          <p>Drop a recording to open it</p>
+        </div>
+      )}
+
       {error && (
         <p className="banner error" role="alert">
           {error}{" "}
@@ -132,7 +166,11 @@ export function App(): React.ReactElement {
         </p>
       )}
 
-      {booting && !take.loaded ? (
+      {opening ? (
+        <div className="busy" role="status">
+          measuring your sending…
+        </div>
+      ) : booting && !take.loaded ? (
         /* Holds the page's height either way, so the landing screen does not
            jump up the moment it appears. */
         <div className="busy" role="status" aria-live="polite">
@@ -158,6 +196,7 @@ export function App(): React.ReactElement {
           expected={intended}
           onExpectedChange={chooseIntended}
           onAudio={onAudio}
+          onFile={(file) => void openFile(file)}
           onError={setError}
           deviceId={deviceId}
           onDeviceChange={chooseDevice}

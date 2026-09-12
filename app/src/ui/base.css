@@ -64,13 +64,24 @@ header {
   background: var(--panel);
 }
 h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
-.src { color: var(--ink-dim); font-weight: 400; font-family: var(--mono); }
+.src {
+  color: var(--ink-dim);
+  font-weight: 400;
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 0;
+  /* Its own full-width row at the foot of the header, so no length of name can
+     move anything above it. A name with no spaces still has to wrap rather
+     than widen the page. */
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
 
 /* The name in the header, which is also the way back to the start. Styled as
    a word rather than as a button so it reads as the title it is, but it is a
    real <button> underneath — a clickable <h1> that is not focusable is a
    control only a mouse can reach. */
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; }
 .brandmark {
   display: block;
   background: none;
@@ -556,6 +567,31 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 .banner.error { background: color-mix(in srgb, var(--bad) 14%, var(--panel)); color: var(--ink); }
 .banner.warn { background: color-mix(in srgb, var(--warn) 14%, var(--panel)); color: var(--ink); }
 .banner.info { background: var(--panel-2); color: var(--ink-dim); }
+
+/* Shown while a drag carrying files is anywhere over the window. Covers the
+   page rather than marking a target on it, because the whole page is the
+   target — a rectangle to aim at would be saying the opposite. Never
+   interactive: it must not eat the drop it is advertising. */
+.dropveil {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  box-shadow: inset 0 0 0 3px var(--you);
+}
+.dropveil p {
+  margin: 0;
+  padding: 14px 22px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--you);
+  color: var(--ink);
+  font-size: 15px;
+}
 
 .busy {
   flex: 1;

@@ -6,8 +6,8 @@
  * here because it is how you check a recording you already have.
  */
 
-import { useCallback, useRef, useState } from "react";
-import { ACCEPTED, audioFromDrop, loadAudioFile } from "@/capture/file";
+import { useCallback, useRef } from "react";
+import { ACCEPTED } from "@/capture/file";
 import { MIC_SOURCE } from "@/io/take";
 import type { AudioClip } from "@/types";
 import { fmtElapsed } from "./format";
@@ -25,14 +25,15 @@ export interface LandingProps {
     fromMic: boolean,
     data: ArrayBuffer | null,
   ): void;
+  /** Hand a picked file up to be opened. The drop half of this is answered
+   *  page-wide rather than by this screen — see ui/useFileDrop.ts. */
+  onFile(file: File): void;
   onError(message: string): void;
   deviceId: string | undefined;
   onDeviceChange(id: string | undefined): void;
 }
 
 export function Landing(props: LandingProps): React.ReactElement {
-  const [dragging, setDragging] = useState(false);
-  const [opening, setOpening] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const { onAudio, onError } = props;
 
@@ -45,22 +46,7 @@ export function Landing(props: LandingProps): React.ReactElement {
     onError,
   });
 
-  const openFile = useCallback(
-    async (file: File) => {
-      setOpening(true);
-      try {
-        const loaded = await loadAudioFile(file);
-        onAudio(loaded.clip, loaded.name, false, loaded.data);
-      } catch (e) {
-        onError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setOpening(false);
-      }
-    },
-    [onAudio, onError],
-  );
-
-  if (opening || rec.busy) {
+  if (rec.busy) {
     return (
       <div className="busy" role="status">
         measuring your sending…
@@ -138,21 +124,7 @@ export function Landing(props: LandingProps): React.ReactElement {
           )}
         </div>
 
-        <div
-          className={`way drop${dragging ? " over" : ""}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            const file = audioFromDrop(e.dataTransfer);
-            if (file) void openFile(file);
-            else onError("That drop had no audio file in it — try another one.");
-          }}
-        >
+        <div className="way drop">
           <h2>Or open a recording</h2>
           <button className="big" onClick={() => fileInput.current?.click()}>
             Choose a file
@@ -164,11 +136,14 @@ export function Landing(props: LandingProps): React.ReactElement {
             accept={ACCEPTED}
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void openFile(file);
+              if (file) props.onFile(file);
               e.target.value = "";
             }}
           />
-          <p>Drop one here. WAV, MP3, M4A, FLAC and OGG all work.</p>
+          <p>
+            Or drop one anywhere on the page. WAV, MP3, M4A, FLAC and OGG all
+            work.
+          </p>
         </div>
       </div>
     </div>

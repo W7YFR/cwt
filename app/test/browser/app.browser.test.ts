@@ -17,6 +17,10 @@ import { encodeWavBuffer } from "@/audio/wav";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
 import { caseNamed, takeFrom, SLOPPY } from "../fixture";
+/* The real stylesheet. Layout is part of what this file checks — which row the
+   filename lands on, whether the drop veil swallows the drop it advertises —
+   and without it those assertions pass on the unstyled defaults instead. */
+import "@/ui/base.css";
 
 const TAKE = takeFrom(caseNamed(SLOPPY));
 
@@ -64,9 +68,10 @@ beforeEach(() => {
     true;
   container = document.createElement("div");
   document.body.appendChild(container);
+  localStorage.clear();
 });
 
-afterEach(() => {
+afterEach(async () => {
   if (root) {
     const r = root;
     act(() => r.unmount());
@@ -74,6 +79,11 @@ afterEach(() => {
   }
   container.remove();
   globalThis.fetch = realFetch;
+  /* Remembering a take is fire-and-forget: it awaits IndexedDB and only then
+     notes the id in the preferences. Clearing straight away leaves that write
+     in flight, and it lands in the middle of the next test — which then opens
+     on a recording it never loaded. */
+  await new Promise((res) => setTimeout(res, 30));
   localStorage.clear();
 });
 
@@ -242,6 +252,75 @@ describe("the app", () => {
     globalThis.fetch = bundleFetch();
     await mount();
     expect(container.querySelector("header")!.textContent).toContain(TAKE.source);
+  });
+
+  it("takes a dropped recording on the review page, not just the landing one", async () => {
+    // Having looked at one take, dragging the next one on is the obvious move
+    // — and it should not mean clicking back to the landing screen first.
+    globalThis.fetch = bundleFetch();
+    await mount();
+    expect(container.querySelector("canvas")).not.toBeNull();
+
+    const drag = (type: string) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "dataTransfer", {
+        value: { types: ["Files"], files: [], dropEffect: "" },
+      });
+      window.dispatchEvent(event);
+      return event;
+    };
+
+    await act(async () => {
+      drag("dragenter");
+    });
+    // The whole page invites it, rather than a rectangle to aim at.
+    const veil = document.querySelector<HTMLElement>(".dropveil");
+    expect(veil).not.toBeNull();
+    // And the invitation must not swallow the drop it is advertising.
+    expect(getComputedStyle(veil!).pointerEvents).toBe("none");
+
+    expect(drag("dragover").defaultPrevented).toBe(true);
+
+    await act(async () => {
+      drag("dragleave");
+    });
+    expect(document.querySelector(".dropveil")).toBeNull();
+  });
+
+  it("puts a long filename on a row of its own", async () => {
+    /* Beside the brand, a name pushed the record controls along by however
+       long it happened to be. Nothing above it can move now, whatever it is
+       called. */
+    const long = "cq-de-w7-long-filename-what-do-you-do-oh-dear-oh-dear.wav";
+    globalThis.fetch = bundleFetch({ take: { ...TAKE, source: long } });
+    await mount();
+
+    const src = container.querySelector<HTMLElement>(".src")!;
+    const header = container.querySelector<HTMLElement>("header")!;
+    expect(src.textContent).toBe(long);
+
+    const brand = container.querySelector<HTMLElement>(".brand")!.getBoundingClientRect();
+    const bar = container.querySelector<HTMLElement>(".recordbar")!.getBoundingClientRect();
+    // Below everything, not beside anything.
+    expect(src.getBoundingClientRect().top).toBeGreaterThanOrEqual(brand.bottom - 1);
+    expect(src.getBoundingClientRect().top).toBeGreaterThanOrEqual(bar.bottom - 1);
+
+    // Below the brand in the document too, not merely pushed under it.
+    expect(header.lastElementChild).toBe(src);
+
+    // And the record controls sit where they would with no name at all.
+    const withName = bar.left;
+
+    act(() => root!.unmount());
+    root = null;
+    container.remove();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+
+    globalThis.fetch = bundleFetch({ take: { ...TAKE, source: "a.wav" } });
+    await mount();
+    const short = container.querySelector<HTMLElement>(".recordbar")!.getBoundingClientRect();
+    expect(short.left).toBeCloseTo(withName, 1);
   });
 
   it("offers a recording control on the review itself", async () => {

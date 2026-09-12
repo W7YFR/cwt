@@ -278,15 +278,18 @@ export function ReviewScreen({
                 the logo. */}
             <Brandmark art={visitWordmark()} />
           </button>
-          {/* A filename earns its place in the header; "microphone" does not
-              — it is the same word every time you record, and it is already
-              obvious from the fact that you just recorded. */}
-          {loaded.take.source !== MIC_SOURCE && (
-            <span className="src">{loaded.take.source}</span>
-          )}
         </h1>
         <RecordBar rec={rec} deviceId={deviceId} onDeviceChange={onDeviceChange} />
         <Scores review={review} settings={settings} take={loaded.take} />
+        {/* Last, and on a row of its own: a filename is the one thing here
+            whose width nobody controls, and beside the brand it pushed the
+            record controls around by however long it happened to be.
+
+            A filename earns the room; "microphone" does not — it is the same
+            word every time and is already implied by having just recorded. */}
+        {loaded.take.source !== MIC_SOURCE && (
+          <p className="src">{loaded.take.source}</p>
+        )}
       </header>
 
       <Controls
