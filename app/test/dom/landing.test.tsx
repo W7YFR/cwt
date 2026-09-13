@@ -158,6 +158,46 @@ describe("the landing screen", () => {
     }
   });
 
+  it("starts the take over on R, but not while you are typing one", async () => {
+    /* R is a letter, and the intended-message box is very likely focused: bound
+       the way Enter and Escape are, typing the R of "W7YFR" would throw the
+       take away. It gets the guard those two deliberately do without. */
+    const restart = vi.fn();
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue({
+      getTracks: () => [],
+    });
+    const rec = {
+      elapsed: () => 1,
+      peek: () => new Float32Array(0),
+      stop: vi.fn(),
+      cancel: vi.fn(),
+      restart,
+    };
+    vi.spyOn(mic, "startRecording").mockResolvedValue(rec);
+    renderLanding();
+    await settled();
+    await act(async () => {
+      screen.getByRole("button", { name: /Start recording/i }).click();
+    });
+
+    const field = screen.getByLabelText(/going to send/i);
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "r" });
+    });
+    expect(restart, "R in a text field").not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "r" });
+    });
+    expect(restart).toHaveBeenCalledTimes(1);
+
+    // And the browser keeps its own reload.
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "r", metaKey: true });
+    });
+    expect(restart).toHaveBeenCalledTimes(1);
+  });
+
   it("leaves those keys alone when there is nothing being recorded", async () => {
     // Otherwise Escape and Enter would be doing something invisible on a page
     // that is mostly a text field.

@@ -115,7 +115,9 @@ export function Landing(props: LandingProps): React.ReactElement {
               <button className="link" onClick={() => void rec.discard()}>
                 cancel
               </button>
-              <p className="hint">Enter finishes the take · Esc throws it away</p>
+              <p className="hint">
+                Enter finishes the take · R starts over · Esc throws it away
+              </p>
             </div>
           ) : (
             <>

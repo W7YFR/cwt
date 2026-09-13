@@ -7,6 +7,7 @@
  */
 
 import type { Review, ReviewSettings, Take } from "@/types";
+import { fmtSeconds } from "./format";
 
 function scoreClass(v: number, good: number, ok: number): string {
   return v >= good ? "ok" : v >= ok ? "warn" : "bad";
@@ -46,6 +47,22 @@ export function Scores({ review, settings, take }: ScoresProps): React.ReactElem
         <b>{m.farnsworthWpm.toFixed(1)}</b>
         <span>wpm overall (target {Math.round(settings.farnsworthWpm)})</span>
       </div>
+
+      {/* How long the message takes at the speeds now set, against how long it
+          took. Both figures move when the speed sliders do, because the target
+          is rendered from them — so this says "your sending runs eleven
+          seconds where the target runs nine", which is the same fact as the
+          speed readings above and far easier to feel. */}
+      {review.ideal.duration > 0 && (
+        <div className="score">
+          <b data-testid="take-duration">{fmtSeconds(take.durationSec)}</b>
+          <span>
+            long (target <output data-testid="target-duration">
+              {fmtSeconds(review.ideal.duration)}
+            </output>)
+          </span>
+        </div>
+      )}
 
       {/* The detected tone. Worth showing plainly: it is what the decoder
           locked onto and the frequency the target track is synthesized at, so

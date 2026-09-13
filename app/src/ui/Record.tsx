@@ -154,8 +154,12 @@ export function RecordBar({
         <button className="primary" onClick={() => void rec.finish()} disabled={rec.busy}>
           Stop and review
         </button>
+        {/* Between finishing and throwing it away, because that is where it
+            sits in the decision: you are keeping the device open and having
+            another go, which is neither of the other two. */}
+        <button onClick={rec.restart}>Restart</button>
         <button onClick={() => void rec.discard()}>Cancel</button>
-        <span className="hint">enter to finish · esc to cancel</span>
+        <span className="hint">enter to finish · r to restart · esc to cancel</span>
       </div>
     );
   }

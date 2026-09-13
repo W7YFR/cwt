@@ -147,15 +147,21 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     setElapsed(0);
   }, [recorder]);
 
-  /* Enter finishes the take, Escape throws it away — from anywhere, including
-   * a text field, which is the one place the usual "skip it if a control has
-   * focus" guard would get wrong. You type what you are about to send, then key
-   * it; your hand is on the paddle, not the mouse, and the intended-message box
-   * is very likely still focused. Making you click a button to stop would mean
-   * the last second of every recording is you reaching for the mouse.
+  /* Enter finishes the take, Escape throws it away, R starts it over — while
+   * recording, and not otherwise.
    *
-   * Bound only while recording, so neither key does anything surprising the
-   * rest of the time. */
+   * Enter and Escape fire from anywhere, including a text field, which is the
+   * one place the usual "skip it if a control has focus" guard would get
+   * wrong. You type what you are about to send, then key it; your hand is on
+   * the paddle, not the mouse, and the intended-message box is very likely
+   * still focused. Making you click a button to stop would mean the last
+   * second of every recording is you reaching for the mouse.
+   *
+   * R is different, and gets the guard those two do without. It is a letter:
+   * bound unconditionally it would throw away the take the moment somebody
+   * typed an R into the intended-message box — which is a word away in "CQ DE
+   * W7YFR". Modifiers are left alone too, or this would swallow the browser's
+   * own reload. */
   useEffect(() => {
     if (!recorder) return;
     const onKey = (ev: KeyboardEvent) => {
@@ -167,11 +173,17 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       } else if (ev.key === "Escape") {
         ev.preventDefault();
         void discard();
+      } else if (ev.key === "r" || ev.key === "R") {
+        if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+        const tag = (ev.target as HTMLElement | null)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        ev.preventDefault();
+        restart();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [discard, finish, recorder]);
+  }, [discard, finish, recorder, restart]);
 
   return {
     devices,

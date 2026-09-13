@@ -50,6 +50,16 @@ function bundleFetch(overrides: Record<string, unknown> = {}) {
   }) as unknown as typeof fetch;
 }
 
+/** Drive a range input the way React's synthetic onChange expects. */
+function setRange(el: HTMLInputElement, value: number) {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )!.set!;
+  setter.call(el, String(value));
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 let container: HTMLDivElement;
 let root: Root | null = null;
 const realFetch = globalThis.fetch;
@@ -464,6 +474,28 @@ describe("the app", () => {
     });
     expect(heights[0]).toBeCloseTo(band, 0);
     expect(heights[1]).toBeCloseTo(band, 0);
+  });
+
+  it("says how long the target runs at the speeds now set", async () => {
+    /* The same fact as the speed readings beside it, in the form somebody can
+       feel: "yours runs eleven seconds where the target runs nine". It has to
+       follow the sliders, because the target is rendered from them — a figure
+       that stayed put while the speed changed would be describing a different
+       target from the one on the chart. */
+    globalThis.fetch = bundleFetch();
+    await mount();
+
+    const shown = () =>
+      container.querySelector<HTMLElement>("[data-testid='target-duration']")!.textContent;
+    const before = shown();
+    expect(before).toMatch(/^\d+\.\d+s$/);
+
+    const wpm = container.querySelector<HTMLInputElement>("#wpm")!;
+    await act(async () => {
+      setRange(wpm, Number(wpm.value) - 5);
+    });
+    // Slower sending, a longer target.
+    expect(parseFloat(shown()!)).toBeGreaterThan(parseFloat(before!));
   });
 
   it("offers a recording control on the review itself", async () => {
