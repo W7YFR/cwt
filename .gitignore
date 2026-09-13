@@ -61,3 +61,5 @@ test-results/
 # The browser test runner creates these per test file whether or not any
 # screenshot is taken; nothing here asserts on images.
 app/test/**/__screenshots__/
+
+data

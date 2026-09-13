@@ -40,7 +40,6 @@ function Harness({
           return next;
         })
       }
-      hasExpected
       playing={null}
       canPlayYou
       clock={null}
@@ -142,7 +141,6 @@ describe("controls", () => {
     const common = {
       settings: base,
       onChange: () => {},
-      hasExpected: false,
       canPlayYou: true,
       clock: null,
       onPlayYou: () => {},
@@ -160,7 +158,6 @@ describe("controls", () => {
     const common = {
       settings: defaultSettings(take),
       onChange: () => {},
-      hasExpected: false,
       canPlayYou: true,
       clock: null,
       onPlayYou: () => {},
@@ -177,24 +174,34 @@ describe("controls", () => {
     expect(button.textContent).toContain("Your sending");
   });
 
-  it("says so when no intended message was given", () => {
+  it("says what an empty intended message means, inside the box", () => {
     const take = takeFrom(caseNamed(SLOPPY));
-    render(
-      <Controls
-        settings={defaultSettings(take)}
-        onChange={() => {}}
-        hasExpected={false}
-        playing={null}
-        canPlayYou
-        clock={null}
-        onPlayYou={() => {}}
-        onPlayTarget={() => {}}
-        onStop={() => {}}
-        />,
+    const common = {
+      onChange: () => {},
+      playing: null,
+      canPlayYou: true,
+      clock: null,
+      onPlayYou: () => {},
+      onPlayTarget: () => {},
+      onStop: () => {},
+    } as const;
+    const base = defaultSettings(take);
+    const { rerender } = render(
+      <Controls {...common} settings={{ ...base, expected: "" }} />,
     );
-    // Otherwise the accuracy figure reads as a grade rather than as a
-    // tautology, which is exactly the misunderstanding worth heading off.
-    expect(screen.getByText(/grading against your own decode/i)).toBeInTheDocument();
+    const box = screen.getByLabelText(/Intended message/i) as HTMLInputElement;
+    // Worth saying at all: with nothing here the accuracy figure is graded
+    // against the decoder's own reading and reads as a tautology.
+    expect(box.placeholder).not.toBe("");
+
+    // And worth saying *here*: it lives and dies with the box's own contents,
+    // so the label beside it is one fixed string. Text that came and went next
+    // to the label had to wrap somewhere the label did not, and dropped out of
+    // sight.
+    const label = box.labels![0]!;
+    const words = label.textContent;
+    rerender(<Controls {...common} settings={{ ...base, expected: "CQ" }} />);
+    expect(box.labels![0]!.textContent).toBe(words);
   });
 
   it("keeps what is graded apart from what is drawn", () => {

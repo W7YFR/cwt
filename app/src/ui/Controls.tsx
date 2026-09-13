@@ -37,7 +37,6 @@ import { useUpperField } from "./useUpperField";
 export interface ControlsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
-  hasExpected: boolean;
   playing: "you" | "tgt" | null;
   /** False when there is no recording to play — see `blankTake`. */
   canPlayYou: boolean;
@@ -145,22 +144,22 @@ export function Controls(props: ControlsProps): React.ReactElement {
       </div>
 
       <div className="group grow">
-        <label htmlFor="expected">
-          Intended message{" "}
-          {/* Where it came from is not worth a line. The box says what it is
-              and holds what it holds; "from what you said you'd send" only
-              restates the label. What IS worth saying is the case where the
-              box is empty, because then the grade is against the decoder's own
-              reading and the accuracy figure is a meaningless 100%. */}
-          <span className="hint">
-            {props.hasExpected ? "" : "(none given — grading against your own decode)"}
-          </span>
-        </label>
+        <label htmlFor="expected">Intended message</label>
+        {/* Says what the box is FOR, which is the thing worth knowing when it
+            is empty: with nothing here there is no source of truth, so the
+            grade falls back to the decoder's own reading of you and the
+            accuracy figure is a meaningless 100%. It belongs in the
+            placeholder rather than beside the label — it is only on screen
+            while the box is empty, which is exactly when a placeholder is, and
+            text that appears and disappears next to a label has to wrap
+            somewhere the label does not. Inside the box it has a whole row to
+            itself and clips instead of reflowing the row above it. */}
         <input
           type="text"
           id="expected"
           spellCheck={false}
           autoComplete="off"
+          placeholder="The source of truth to grade against"
           value={s.expected}
           ref={expected.ref}
           onChange={expected.onChange}

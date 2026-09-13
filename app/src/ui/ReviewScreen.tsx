@@ -480,7 +480,6 @@ export function ReviewScreen({
       <Controls
         settings={settings}
         onChange={onChange}
-        hasExpected={!!loaded.take.expected}
         playing={playing}
         clock={clock}
         canPlayYou={!blank}
