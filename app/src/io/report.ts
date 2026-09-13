@@ -62,6 +62,11 @@ export interface JsonReport {
     take_id: string;
     expected: string | null;
     collapse_rests: boolean;
+    /* Which microphone profile the timings came from, and what it corrected
+       by. Null is a real and common answer — no calibration — and is written
+       out rather than omitted, so a reader can tell "not calibrated" from "a
+       report too old to say". */
+    calibration: { profile: string; offset_ms: number } | null;
   };
 }
 
@@ -131,6 +136,12 @@ export function buildJsonReport(
       // consistency figure and the deviation list. Recording it is what keeps
       // two dumps of the same session comparable.
       collapse_rests: settings.collapseRests,
+      calibration: take.profile
+        ? {
+            profile: take.profile.nickname,
+            offset_ms: round(take.profile.releaseOffsetSec * 1000, 2),
+          }
+        : null,
     },
   };
 

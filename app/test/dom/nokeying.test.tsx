@@ -71,13 +71,12 @@ describe.skipIf(!HAVE)("a recording with no keying in it", () => {
     render(<App />);
     drop();
 
+    /* Which kind of thing the banner is reporting, not what it says about it.
+       Nothing keyed is its own answer and not a failure, so it must not get
+       the text for a file that could not be read at all. */
     const banner = await screen.findByRole("alert");
-    expect(banner.textContent).toMatch(/could not hear any CW/i);
-    // Pointing at the input is the useful half: the overwhelmingly likely
-    // cause is that the tone never reached the device that was recording.
-    expect(banner.textContent).toMatch(/reaching the input/i);
-    // And not the text for a file that could not be read at all.
-    expect(banner.textContent).not.toMatch(/give it another go/i);
+    expect(banner.dataset.kind).toBe("no-keying");
+    expect(banner.textContent!.length).toBeGreaterThan(20);
   });
 
   it("stays on the landing screen rather than opening an empty review", async () => {

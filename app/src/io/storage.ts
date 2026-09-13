@@ -202,6 +202,10 @@ const SETTINGS_KEY = "cw-trainer:prefs";
  * the playback are about you. */
 export interface Prefs {
   deviceId?: string;
+  /** The calibration profile being applied, if any — see io/profiles.ts.
+   *  Absent means none, which is the default and reads every recording exactly
+   *  as it was read before calibration existed. */
+  profileId?: string;
   /** The take the review is currently showing, so a reload comes back to it
    *  rather than to an empty landing screen. */
   currentId?: string;

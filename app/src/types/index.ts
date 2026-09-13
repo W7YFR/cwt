@@ -249,6 +249,23 @@ export interface Take {
   readonly target: { charWpm: number; farnsworthWpm: number; explicit: boolean };
   /** Silence to put either side of synthesized target audio, seconds. */
   readonly padSec: number;
+  /** The calibration profile this was decoded against, if any.
+   *
+   * Recorded on the take rather than derived at read time, because a profile
+   * can be renamed, recalibrated or deleted and this has to keep meaning what
+   * it meant. Without it a directory of reports stops being one time series
+   * the moment somebody recalibrates. Optional because takes saved before
+   * calibration existed do not have one. */
+  readonly profile?: TakeProfile | null;
+}
+
+/** Which calibration produced a take, recorded on the take itself. */
+export interface TakeProfile {
+  readonly id: string;
+  readonly nickname: string;
+  /** What it corrected by, so a report says how much was taken off and not
+   *  only that something was. */
+  readonly releaseOffsetSec: number;
 }
 
 /** Live, user-adjustable review settings. Not part of a `Take`: the same

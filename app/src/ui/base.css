@@ -123,9 +123,13 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* The landing screen stacks these; here they sit in a header row. */
 .recordbar.recording { flex-direction: row; }
 .recordbar .reclight { font-size: 14px; }
-.recordbar .reclight .dot { width: 9px; height: 9px; }
+.recordbar /* Red whatever the button around it is doing, including disabled — a record
+   button that greys its own dot stops looking like one. */
+.recdot { color: var(--bad); }
+
+.reclight .dot { width: 9px; height: 9px; }
 .recordbar .meter { width: 90px; height: 6px; }
-.recordbar select { font-size: 12px; padding: 4px 6px; }
+.recordbar select { font-size: 12px; padding: 4px 26px 4px 6px; background-position: right 9px center; }
 
 .scores { display: flex; flex-wrap: wrap; gap: 18px; margin-left: auto; }
 .score { display: flex; align-items: baseline; gap: 6px; }
@@ -202,6 +206,25 @@ input[type=text], select {
 input[type=text]:focus, select:focus {
   outline: 2px solid var(--you);
   outline-offset: -1px;
+}
+
+/* The chevron is ours rather than the platform's.
+   A native select ignores padding-right when it places its own arrow, so the
+   arrow ends up against the border however much room the box is given. Drawing
+   it means it sits where it is told, and matches the rest of the chrome. Two
+   copies because an SVG in a background image cannot inherit currentColor, so
+   the theme has to swap the whole thing. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2397a3b6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 10px 6px;
+}
+@media (prefers-color-scheme: light) {
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235a6577' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 }
 
 .transport { flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
@@ -541,6 +564,10 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
      digits themselves from shifting within it. */
   white-space: pre;
 }
+/* Red whatever the button around it is doing, including disabled — a record
+   button that greys its own dot stops looking like one. */
+.recdot { color: var(--bad); }
+
 .reclight .dot {
   width: 12px;
   height: 12px;
@@ -550,7 +577,11 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 }
 @keyframes pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) {
-  .reclight .dot { animation: none; }
+  /* Red whatever the button around it is doing, including disabled — a record
+   button that greys its own dot stops looking like one. */
+.recdot { color: var(--bad); }
+
+.reclight .dot { animation: none; }
 }
 .meter {
   width: 260px;
@@ -637,3 +668,175 @@ button.primary { border-color: var(--you); color: var(--ink); }
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ---- the calibration wizard --------------------------------------------- */
+
+/* Deliberately one thing at a time. The person doing this has a paddle in one
+   hand and is reading from across a desk, so the prompt is large, the
+   countdown is unmissable, and nothing else is on screen competing with
+   either. */
+.calibrate {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 16px;
+  padding: 32px 20px;
+  text-align: center;
+}
+.calibrate h2 { margin: 0; font-size: 20px; }
+.calibrate .lede { color: var(--ink-dim); max-width: 52ch; margin: 0; line-height: 1.6; }
+.calibrate .group { align-items: center; min-width: 220px; }
+.calibrate .group input { text-align: center; }
+.calibrate .banner { border: 1px solid var(--line); border-radius: 8px; max-width: 52ch; }
+
+.calibrate .prompt {
+  font-size: clamp(22px, 4vw, 34px);
+  line-height: 1.2;
+  max-width: 22ch;
+}
+/* A rest is not a drill, and looking different is how somebody glancing up
+   knows to take their hand off the paddle. */
+.calibrate .prompt.rest { color: var(--ink-faint); font-weight: 400; }
+
+.calibrate .countdown {
+  font-family: var(--mono);
+  font-size: 44px;
+  font-variant-numeric: tabular-nums;
+  color: var(--you);
+  line-height: 1;
+}
+/* On a rest the clock is counting toward something rather than through it, so
+   it says which. */
+.calibrate .cdlabel {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+/* What you are about to be asked to do, while nothing is being asked of you.
+   Given a panel of its own because during a rest it is the only thing on the
+   screen worth reading. */
+.calibrate .upnext {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 46ch;
+}
+.calibrate .upnext .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.calibrate .upnext strong { font-size: clamp(17px, 2.4vw, 22px); line-height: 1.25; }
+.calibrate .upnext .lede { font-size: 14px; }
+.calibrate .meter { width: min(60vw, 320px); }
+
+.calibrate .readout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 26px;
+  margin: 0;
+}
+.calibrate .readout > div { display: flex; flex-direction: column; gap: 3px; }
+.calibrate .readout dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+.calibrate .readout dd { margin: 0; font-size: 15px; }
+
+.verdict.clean, .verdict.good { color: var(--ok); }
+.verdict.marginal { color: var(--warn); }
+.verdict.unusable { color: var(--bad); }
+.verdict.unknown { color: var(--ink-faint); }
+
+/* The closing message, decoded through the profile just measured. The only
+   part of a calibration somebody can check with their own eyes. */
+.calibrate .readback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 46ch;
+}
+.calibrate .readback strong {
+  font-family: var(--mono);
+  font-size: clamp(16px, 2.6vw, 22px);
+  letter-spacing: .06em;
+  word-break: break-word;
+}
+
+/* The advice, which is the point of the screen — see dsp/quality.ts, where
+   placement outranks every number this page prints. */
+.calibrate .advice { color: var(--ink); max-width: 46ch; }
+
+/* Whether this microphone has been measured, said out loud.
+   A panel rather than a line of controls, because it is the one thing on the
+   landing screen that silently changes every number the review will report —
+   see ui/Landing.tsx. */
+.calstatus {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.calstatus .calstate {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.calstatus .calstate b { font-weight: 600; }
+.calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+/* Not the recording light: this one does not blink, and its colour is the
+   whole message. */
+.calstatus .dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ghost);
+  transform: translateY(-1px);
+}
+.calstatus.ok .dot { background: var(--ok); }
+.calstatus.warn .dot { background: var(--warn); }
+.calstatus.none .dot { background: var(--warn); }
+.calstatus .hint { margin: 0; font-size: 12px; line-height: 1.5; }
+/* The button spans the panel. It is the only thing in here to do when nothing
+   has been calibrated, and a button sized to its own text reads as an aside. */
+.calactions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.calactions select { flex: 1 1 160px; min-width: 0; }
+.calactions button { flex: 1 1 100%; justify-content: center; }
+/* Once there is a calibration the panel has two things in it, and the pair
+   share the width rather than stacking. */
+.calactions select ~ button { flex: 0 1 auto; }
+
+/* The same fact, in the room the review header has for it. */
+.calchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.calchip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.calchip.ok .dot { background: var(--ok); }

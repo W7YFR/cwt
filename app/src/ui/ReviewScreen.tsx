@@ -15,6 +15,7 @@ import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
 import { contextWindow, type Focus } from "@/render/focus";
 import { PLAY_PAD } from "@/render/geometry";
+import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
@@ -45,6 +46,8 @@ export interface ReviewScreenProps {
   ): void;
   onError(message: string): void;
   deviceId: string | undefined;
+  /** The calibration a take recorded from here would be made under. */
+  profile: Profile | null;
   onDeviceChange(id: string | undefined): void;
   onBack(): void;
 }
@@ -68,6 +71,7 @@ export function ReviewScreen({
   onAudio,
   onError,
   deviceId,
+  profile,
   onDeviceChange,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
@@ -279,7 +283,12 @@ export function ReviewScreen({
             <Brandmark art={visitWordmark()} />
           </button>
         </h1>
-        <RecordBar rec={rec} deviceId={deviceId} onDeviceChange={onDeviceChange} />
+        <RecordBar
+          rec={rec}
+          deviceId={deviceId}
+          onDeviceChange={onDeviceChange}
+          profile={profile}
+        />
         <Scores review={review} settings={settings} take={loaded.take} />
         {/* Last, and on a row of its own: a filename is the one thing here
             whose width nobody controls, and beside the brand it pushed the

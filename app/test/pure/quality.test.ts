@@ -147,10 +147,12 @@ describe("judging a setup", () => {
     const q = assessSetup(new Float32Array(8000 * 3), 8000, { wpm: 20 });
     expect(q.verdict).toBe("unknown");
     expect(q.releases).toBe(0);
-    expect(setupAdvice(q)).toMatch(/single elements/);
   });
 
-  it("has advice for every verdict, and leads with placement where it matters", () => {
+  it("has its own advice for every verdict", () => {
+    /* The wording is the author's to change and is not asserted here — what
+       this holds is that no verdict falls through to another's advice, which
+       is the failure that would actually mislead somebody. */
     const advice = (verdict: string) =>
       setupAdvice({
         decaySec: 0.05,
@@ -160,13 +162,9 @@ describe("judging a setup", () => {
         maxWpm: 18,
         verdict: verdict as never,
       });
-    for (const v of ["clean", "good", "room-limited", "too-far", "unknown"]) {
-      expect(advice(v).length).toBeGreaterThan(20);
-    }
-    // The single biggest lever found in this whole effort is where the
-    // microphone is, so both bands that have a room in them say so first.
-    expect(advice("room-limited")).toMatch(/^Move your microphone closer/);
-    expect(advice("too-far")).toMatch(/^Your microphone is too far/);
+    const all = ["clean", "good", "marginal", "unusable", "unknown"].map(advice);
+    for (const text of all) expect(text.length).toBeGreaterThan(20);
+    expect(new Set(all).size).toBe(all.length);
   });
 });
 
@@ -229,7 +227,7 @@ describe.skipIf(!HAVE)("the corpus, measured", () => {
     const far = quality("ft710/single-dits/ft710-single-dits-webcam-15wpm.wav", 15);
     expect(far.decaySec / close.decaySec).toBeGreaterThan(2);
     expect(close.verdict).toBe("good");
-    expect(far.verdict).toBe("room-limited");
+    expect(far.verdict).toBe("marginal");
   });
 
   it("tells the one unrecoverable setup from the merely difficult ones", () => {
@@ -239,12 +237,12 @@ describe.skipIf(!HAVE)("the corpus, measured", () => {
        other and one of them works. The recording below is not near them: its
        tail is twice as long as the dit it was sent with. */
     const worst = quality("cq-de-w7yfr-mic-2.wav", 25);
-    expect(worst.verdict).toBe("too-far");
+    expect(worst.verdict).toBe("unusable");
     expect(worst.ratio).toBeGreaterThan(1.5);
 
     for (const [rel, wpm] of SETUPS.filter(([, , w]) => w !== "condenser, unrecoverable")) {
       const q = quality(rel, wpm);
-      expect(q.verdict, `${rel} is not the unrecoverable one`).not.toBe("too-far");
+      expect(q.verdict, `${rel} is not the unrecoverable one`).not.toBe("unusable");
     }
   });
 

@@ -107,15 +107,23 @@ const MIN_RELEASES = 3;
 const MIN_WPM = 5;
 const MAX_WPM = 60;
 
+/** What the decay came to, relative to the dit.
+ *
+ * Named for the measurement and not for its cause. What sits between a keyer
+ * and this app is not known here — it may be a room, it may be the keyer's own
+ * shaping, it may be a virtual audio device with nothing in the path at all —
+ * and a verdict called "too far from the speaker" would be a diagnosis this
+ * has no way to make. Placement is the most common cause and the advice below
+ * says so; the verdict itself only reports what was measured. */
 export type SetupVerdict =
-  /** Nothing measurable between the key and the decoder. */
+  /** Nothing measurable added to a release. */
   | "clean"
-  /** A room, but not one that costs anything at this speed. */
+  /** Something is added, but not enough to matter at this speed. */
   | "good"
-  /** The room is a real part of the signal. Move closer, then calibrate. */
-  | "room-limited"
-  /** The tail outlasts everything. No correction recovers this. */
-  | "too-far"
+  /** Enough is added to matter at this speed. */
+  | "marginal"
+  /** So much is added that elements run into each other. */
+  | "unusable"
   /** Not enough releases to say. */
   | "unknown";
 
@@ -208,8 +216,8 @@ function verdictFor(ratio: number, releases: number): SetupVerdict {
   if (!Number.isFinite(ratio) || releases < MIN_RELEASES) return "unknown";
   if (ratio <= CLEAN_FRAC) return "clean";
   if (ratio <= GOOD_FRAC) return "good";
-  if (ratio <= LIMIT_FRAC) return "room-limited";
-  return "too-far";
+  if (ratio <= LIMIT_FRAC) return "marginal";
+  return "unusable";
 }
 
 /** Judge a setup from one recording made through it.
@@ -265,35 +273,36 @@ export function assessSetup(
 
 /** What to tell somebody about their setup, leading with what they can change.
  *
- * Placement first, deliberately. The largest single effect measured anywhere
- * in this work was moving one webcam: the same microphone in the same room
- * went from refused, to a 13 ms correction, to needing none at all, purely by
- * distance from the speaker. No amount of processing came close to that, so
- * the advice that matters is "move the microphone" and the numbers are
- * supporting detail. */
+ * Placement first where there is any placement to change, because the largest
+ * single effect measured anywhere in this work was moving one webcam: the same
+ * microphone in the same room went from refused, to a 13 ms correction, to
+ * needing none at all, purely by distance from the speaker. No amount of
+ * processing came close.
+ *
+ * Conditionally, though. Nothing here knows whether a microphone and a speaker
+ * are involved at all — a loopback has neither — so the advice offers the most
+ * likely cause rather than asserting it. */
 export function setupAdvice(q: SetupQuality): string {
   const wpm = Number.isFinite(q.maxWpm) ? q.maxWpm : 0;
   switch (q.verdict) {
     case "clean":
-      return "Nothing between your key and the decoder — this reads at any speed you can send.";
+      return "Nothing measurable between your keyer and the decoder — this reads at any speed you can send.";
     case "good":
-      return `Your room adds a little to every element, but not enough to matter up to about ${wpm} wpm.`;
-    case "room-limited":
+      return `A little is added to every element, but not enough to matter up to about ${wpm} wpm.`;
+    case "marginal":
       return (
-        "Move your microphone closer to the speaker. The room is a real part of what " +
-        `it is hearing — enough that this is worth calibrating, and worth sending at ` +
-        `${wpm} wpm or so until you do.`
+        "If a microphone is listening to a speaker, move it closer — that is the " +
+        `biggest change available. As it stands this is good to about ${wpm} wpm.`
       );
-    case "too-far":
+    case "unusable":
       return (
-        "Your microphone is too far from the speaker. The room goes on ringing for " +
-        "longer than your elements last, so they run into each other and no amount of " +
-        "correction recovers them — put the microphone within a few inches of the " +
-        "speaker and record again."
+        "If a microphone is listening to a speaker, move it within a few inches " +
+        "and record again. Elements are running into each other, and no amount of " +
+        "correction recovers that."
       );
     default:
       return (
-        "Not enough keying here to judge the setup. Send a few single elements with a " +
+        "Not enough keying here to judge. Send a few single elements with a " +
         "second or two between them."
       );
   }

@@ -1,11 +1,19 @@
-/* Two screens and the state between them. */
+/* Three screens and the state between them. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadAudioFile } from "@/capture/file";
 import { loadBundle } from "@/io/bundle";
 import { NoKeyingError } from "@/io/take";
+import {
+  activeProfile,
+  loadProfiles,
+  profileForSource,
+  selectProfile,
+  type Profile,
+} from "@/io/profiles";
 import { loadPrefs, recallTake, savePrefs } from "@/io/storage";
 import type { AudioClip } from "@/types";
+import { Calibrate } from "./Calibrate";
 import { Landing } from "./Landing";
 import { ReviewScreen } from "./ReviewScreen";
 import { useFileDrop } from "./useFileDrop";
@@ -20,6 +28,10 @@ export const BOOT_MESSAGE_DELAY_MS = 400;
 export function App(): React.ReactElement {
   const take = useTake();
   const [error, setError] = useState<string | null>(null);
+  /* What kind of thing the banner is reporting, beside the sentence itself.
+     The sentence is for a person and is expected to be reworded; this is what
+     anything else branches on or asserts against. */
+  const [errorKind, setErrorKind] = useState<string>("failed");
   const [intended, setIntended] = useState(() => loadPrefs().expected ?? "");
   const [deviceId, setDeviceId] = useState<string | undefined>(
     () => loadPrefs().deviceId,
@@ -37,6 +49,25 @@ export function App(): React.ReactElement {
   const [booting, setBooting] = useState(true);
   const [slowBoot, setSlowBoot] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
+
+  /* Which calibration is being applied, held here because it changes what the
+     decoder does to every recording that follows. `null` is the default and a
+     real answer: until somebody calibrates, audio is read exactly as it was
+     read before any of this existed. */
+  const [profiles, setProfiles] = useState<Profile[]>(() => loadProfiles());
+  const [profileId, setProfileId] = useState<string | undefined>(
+    () => activeProfile()?.id,
+  );
+  const profile = useMemo(
+    () => profiles.find((p) => p.id === profileId) ?? null,
+    [profileId, profiles],
+  );
+
+  const chooseProfile = useCallback((id: string | undefined) => {
+    selectProfile(id);
+    setProfileId(id);
+  }, []);
 
   /* Where a session comes from, in order of precedence.
      1. A bundle beside the app: `cw-decode --serve` wrote one and opened a
@@ -111,6 +142,9 @@ export function App(): React.ReactElement {
             // air while you reach for the mouse; a file is however the person
             // who made it left it, and trimming it would move their clock.
             trim: fromMic,
+            // And for much the same reason a file is never corrected — see
+            // profileForSource.
+            profile: profileForSource(profile, fromMic),
           },
           data,
         );
@@ -120,12 +154,14 @@ export function App(): React.ReactElement {
            message is that there is none, reads as though the tool did not
            understand what it just said. */
         if (e instanceof NoKeyingError) {
+          setErrorKind("no-keying");
           setError(
             `${e.message} Check that the tone is reaching the input you picked, ` +
               "and that your microphone can hear it.",
           );
           return;
         }
+        setErrorKind("failed");
         setError(
           e instanceof Error
             ? `${e.message} — make sure the recording has some CW in it, then give it another go.`
@@ -133,7 +169,7 @@ export function App(): React.ReactElement {
         );
       }
     },
-    [intended, take],
+    [intended, profile, take],
   );
 
   /* Opening a file lives here rather than on the landing screen, because a
@@ -170,7 +206,7 @@ export function App(): React.ReactElement {
       )}
 
       {error && (
-        <p className="banner error" role="alert">
+        <p className="banner error" role="alert" data-kind={errorKind}>
           {error}{" "}
           <button className="link" onClick={() => setError(null)}>
             dismiss
@@ -188,6 +224,18 @@ export function App(): React.ReactElement {
         <div className="busy" role="status" aria-live="polite">
           {slowBoot ? "looking for your last session…" : ""}
         </div>
+      ) : calibrating ? (
+        <Calibrate
+          deviceId={deviceId}
+          onDeviceChange={chooseDevice}
+          onError={setError}
+          onSaved={(saved) => {
+            setProfiles(loadProfiles());
+            setProfileId(saved.id);
+            setCalibrating(false);
+          }}
+          onClose={() => setCalibrating(false)}
+        />
       ) : take.loaded && take.review ? (
         <ReviewScreen
           loaded={take.loaded}
@@ -198,6 +246,7 @@ export function App(): React.ReactElement {
           onError={setError}
           deviceId={deviceId}
           onDeviceChange={chooseDevice}
+          profile={profile}
           onBack={() => {
             take.clear();
             setError(null);
@@ -212,6 +261,13 @@ export function App(): React.ReactElement {
           onError={setError}
           deviceId={deviceId}
           onDeviceChange={chooseDevice}
+          profiles={profiles}
+          profileId={profileId}
+          onProfileChange={chooseProfile}
+          onCalibrate={() => {
+            setError(null);
+            setCalibrating(true);
+          }}
         />
       )}
     </div>

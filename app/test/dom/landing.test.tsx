@@ -19,6 +19,10 @@ function renderLanding(overrides: Partial<React.ComponentProps<typeof Landing>> 
     onError: vi.fn(),
     deviceId: undefined,
     onDeviceChange: vi.fn(),
+    profiles: [],
+    profileId: undefined,
+    onProfileChange: vi.fn(),
+    onCalibrate: vi.fn(),
     ...overrides,
   };
   return { ...render(<Landing {...props} />), props };
@@ -253,5 +257,67 @@ describe("the landing screen", () => {
     // The browser withholds labels until permission is granted; that is not a
     // bug, but a list of blanks is useless without saying why.
     expect(await screen.findByText(/once you have allowed/i)).toBeInTheDocument();
+  });
+
+
+  /* Whether a calibration is being applied changes every number the review
+     reports, by about the size of the room. Somebody who cannot tell at a
+     glance which state they are in is one click from a measurement they will
+     misread — and the first report from real use was that the way in was hard
+     to find at all. */
+  describe("the calibration panel", () => {
+    const PROFILE = {
+      id: "p1",
+      nickname: "close to the rig",
+      deviceId: "webcam",
+      deviceLabel: "HD Pro Webcam",
+      wpm: 15,
+      releaseOffsetSec: 0.0131,
+      spreadSec: 0.0005,
+      elements: 60,
+      verdict: "good" as const,
+      decaySec: 0.03,
+      maxWpm: 30,
+      recordedAt: "2026-09-12T10:00:00+00:00",
+    };
+
+    it("says so, in a real button, when nothing has been calibrated", async () => {
+      const { props } = renderLanding();
+      expect(screen.getByTestId("calstatus").dataset.state).toBe("none");
+      // A button, not link-shaped text: the first report from real use was
+      // that the way in could not be found.
+      const buttons = screen.getAllByRole("button");
+      const calibrate = buttons.find((b) => b.textContent?.match(/calibrat/i))!;
+      await userEvent.click(calibrate);
+      expect(props.onCalibrate).toHaveBeenCalled();
+      await settled();
+    });
+
+    it("names the one in use, with what it measured", async () => {
+      // The number belongs beside the name: two positions of one microphone
+      // have equally plausible names and nothing alike in their measurements.
+      renderLanding({ profiles: [PROFILE], profileId: "p1", deviceId: "webcam" });
+      expect(screen.getByTestId("calstatus").dataset.state).toBe("active");
+      expect(screen.getByTestId("calname").textContent).toBe(PROFILE.nickname);
+      const numbers = screen.getByTestId("calnum").textContent!;
+      expect(numbers).toContain((PROFILE.releaseOffsetSec * 1000).toFixed(1));
+      expect(numbers).toContain(PROFILE.verdict);
+      await settled();
+    });
+
+    it("flags a profile in use that was measured on another input", async () => {
+      // The exact mistake named profiles exist to prevent.
+      renderLanding({ profiles: [PROFILE], profileId: "p1", deviceId: "yeti" });
+      expect(screen.getByTestId("calstatus").dataset.state).toBe("elsewhere");
+      await settled();
+    });
+
+    it("offers the saved ones, and no calibration among them", async () => {
+      const { props } = renderLanding({ profiles: [PROFILE], profileId: "p1" });
+      const select = screen.getByLabelText(/microphone calibration/i);
+      await userEvent.selectOptions(select, "");
+      expect(props.onProfileChange).toHaveBeenCalledWith(undefined);
+      await settled();
+    });
   });
 });

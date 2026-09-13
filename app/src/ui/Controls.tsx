@@ -6,10 +6,12 @@
  * not a way to cheat a score that was fixed at record time.
  */
 
+import { useCallback } from "react";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
 import { COLLAPSE_RESTS_HELP, GAIN_HELP, ZOOM_HELP } from "./copy";
 import { fmtGain, fmtPpu, fmtSeconds, fmtTolerance, fmtWpm } from "./format";
+import { useUpperField } from "./useUpperField";
 
 export interface ControlsProps {
   settings: ReviewSettings;
@@ -26,6 +28,9 @@ export interface ControlsProps {
 
 export function Controls(props: ControlsProps): React.ReactElement {
   const { settings: s, onChange } = props;
+  const expected = useUpperField(
+    useCallback((next: string) => onChange({ expected: next }), [onChange]),
+  );
 
   return (
     <section className="controls">
@@ -130,7 +135,8 @@ export function Controls(props: ControlsProps): React.ReactElement {
           spellCheck={false}
           autoComplete="off"
           value={s.expected}
-          onChange={(e) => onChange({ expected: e.target.value.toUpperCase() })}
+          ref={expected.ref}
+          onChange={expected.onChange}
         />
       </div>
 

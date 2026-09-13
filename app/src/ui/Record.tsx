@@ -8,8 +8,23 @@
  */
 
 import type { InputDevice } from "@/capture/mic";
+import type { Profile } from "@/io/profiles";
 import { fmtElapsed } from "./format";
 import type { RecorderHandle } from "./useRecorder";
+
+/** The dot on every button that starts a recording.
+ *
+ * Its own component so the three buttons that carry one cannot drift apart,
+ * and red because that is what a record button is — the bare character
+ * inherits the button's text colour and reads as a bullet. Hidden from
+ * assistive tech: the label beside it already says what it does. */
+export function RecDot(): React.ReactElement {
+  return (
+    <span className="recdot" aria-hidden="true">
+      ●
+    </span>
+  );
+}
 
 export interface DevicePickerProps {
   devices: InputDevice[];
@@ -56,6 +71,11 @@ export interface RecordBarProps {
   rec: RecorderHandle;
   deviceId: string | undefined;
   onDeviceChange(id: string | undefined): void;
+  /** The calibration the next take would be made under. Shown rather than
+   *  assumed: this bar is one click from a recording, and whether a profile is
+   *  applied moves every number on the page below it. Changing it is the
+   *  landing screen's job — this only has to stop it being a surprise. */
+  profile: Profile | null;
 }
 
 /** Record another, without leaving the review. */
@@ -63,6 +83,7 @@ export function RecordBar({
   rec,
   deviceId,
   onDeviceChange,
+  profile,
 }: RecordBarProps): React.ReactElement {
   if (rec.recorder) {
     return (
@@ -84,9 +105,17 @@ export function RecordBar({
   return (
     <div className="recordbar">
       <button onClick={() => void rec.start()} disabled={rec.busy}>
-        ● Record another
+        <RecDot /> Record another
       </button>
       <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
+      <span className={`calchip ${profile ? "ok" : "none"}`} title={
+        profile
+          ? `Recordings are corrected by "${profile.nickname}" — ${(profile.releaseOffsetSec * 1000).toFixed(1)} ms off every element`
+          : "Recordings are decoded exactly as captured"
+      }>
+        <span className="dot" aria-hidden="true" />
+        {profile ? profile.nickname : "not calibrated"}
+      </span>
     </div>
   );
 }

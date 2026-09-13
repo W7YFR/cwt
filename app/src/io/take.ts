@@ -9,7 +9,8 @@
 
 import { normalized, segmentsFrom, trimSilence, TRIM_PAD } from "@/dsp";
 import { buildTimeline, estimateTiming } from "@/timing";
-import type { AudioClip, Take } from "@/types";
+import type { AudioClip, Take, TakeProfile } from "@/types";
+import { calibrationOf, type Profile } from "./profiles";
 
 /** The `source` of a take captured through the microphone. A sentinel rather
  *  than a label: the header hides it, because it says the same thing every
@@ -49,6 +50,10 @@ export interface AnalyzeOptions {
   readonly now?: string;
   /** Id; injected for the same reason. */
   readonly id?: string;
+  /** The calibration to decode against. Absent — which is the default, and
+   *  what every recording gets until somebody calibrates — means the audio is
+   *  read exactly as it was before any of this existed. */
+  readonly profile?: Profile | null;
 }
 
 export interface AnalyzeResult {
@@ -58,6 +63,10 @@ export interface AnalyzeResult {
   readonly clip: AudioClip;
   /** How much was trimmed from the front, if any. */
   readonly leadSec: number;
+}
+
+function takeProfile(p: Profile): TakeProfile {
+  return { id: p.id, nickname: p.nickname, releaseOffsetSec: p.releaseOffsetSec };
 }
 
 function isoNow(): string {
@@ -93,10 +102,14 @@ export function analyzeClip(input: AudioClip, options: AnalyzeOptions): AnalyzeR
   // The threshold works on absolute amplitude, so the DSP gets a normalized
   // copy — and only the DSP. `clip` stays at the recorded level.
   const forAnalysis = normalized(clip);
+  const profile = options.profile ?? null;
   const { toneHz, segments, presence } = segmentsFrom(
     forAnalysis.samples,
     forAnalysis.rate,
-    { ...(options.toneHz !== undefined ? { toneHz: options.toneHz } : {}) },
+    {
+      ...(options.toneHz !== undefined ? { toneHz: options.toneHz } : {}),
+      ...(profile ? { calibration: calibrationOf(profile) } : {}),
+    },
   );
   if (!presence.keyed) throw new NoKeyingError();
 
@@ -127,6 +140,7 @@ export function analyzeClip(input: AudioClip, options: AnalyzeOptions): AnalyzeR
     measured,
     target: { charWpm, farnsworthWpm, explicit },
     padSec: TRIM_PAD,
+    profile: profile ? takeProfile(profile) : null,
   };
 
   // The decode itself comes from the timeline the review builds, but a Take
