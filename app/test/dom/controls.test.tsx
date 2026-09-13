@@ -216,6 +216,20 @@ describe("controls", () => {
     }
   });
 
+  it("offers characters as single markers, off unless asked for", async () => {
+    /* What the trainer is for is spacing and placement; a row of elements
+       invites counting them instead, which is reading Morse off a screen
+       rather than learning to send it. Off by default all the same — it hides
+       detail, and hiding detail is the user's call. */
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderView({ onChange });
+    const box = screen.getByLabelText(/character blocks/i) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledWith({ charBlocks: true });
+  });
+
   it("offers the pacing cursor, off unless asked for", async () => {
     /* A practice aid rather than a way of reading the chart, so it is opt-in —
        and it sits with the other things that change what is on screen rather

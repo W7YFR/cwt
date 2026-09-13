@@ -103,6 +103,18 @@ export function diffRuns(ops: readonly AlignOp[]): Array<{
   return runs;
 }
 
+/** How a substitution is written, wherever one is shown.
+ *
+ * Intended first, then what came out — "I→E" reads as "the I became an E".
+ * One function because the order is the whole of the meaning and it was once
+ * decided twice: the chart wrote the character it had under the arrow and the
+ * report wrote the one it wanted, so the same mistake read "E→I" in one place
+ * and "I→E" in the other. It also matches how the chart is now laid out, with
+ * the intended message above and what came out below. */
+export function subLabel(expected: string, got: string): string {
+  return `${expected}\u2192${got}`;
+}
+
 /** The inline annotated diff, e.g. `CQ DE [W7YFR→W7YFP]`. */
 export function diffText(ops: readonly AlignOp[]): string {
   return diffRuns(ops)
@@ -111,7 +123,7 @@ export function diffText(ops: readonly AlignOp[]): string {
         case "equal":
           return r.expected;
         case "sub":
-          return `[${r.expected}→${r.got}]`;
+          return `[${subLabel(r.expected, r.got)}]`;
         case "del":
           return `[-${r.expected}]`;
         case "ins":

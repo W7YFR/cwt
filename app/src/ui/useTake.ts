@@ -83,6 +83,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     collapseRests: p.collapseRests ?? base.collapseRests,
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
+    charBlocks: p.charBlocks ?? base.charBlocks,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
   };
 }
@@ -97,6 +98,7 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     collapseRests: prev.collapseRests,
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
+    charBlocks: prev.charBlocks,
     view: prev.view,
   };
 }
@@ -112,6 +114,7 @@ export function useTake(): TakeState {
       collapseRests: true,
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
+      charBlocks: false,
       gainDb: 0,
       view: "per-char",
       ppu: 12,
@@ -143,6 +146,7 @@ export function useTake(): TakeState {
         collapseRests: next.collapseRests,
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
+        charBlocks: next.charBlocks,
         view: next.view,
       });
       // The rest of the settings belong to the take, so they ride along with

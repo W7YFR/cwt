@@ -28,12 +28,26 @@ export const SLOT_GAP = 10;
 /** Height of a dit/dah block. */
 export const MARK_H = 20;
 
+/* The rows, top to bottom.
+ *
+ * The target is above your sending, with a caption band of its own, and that
+ * order is the point rather than a preference. The target row is the one thing
+ * on the chart that does not change between attempts: it is the message you
+ * meant to send, rendered at the speeds now set. Putting the reference on top
+ * and the attempt under it is how every comparison of this shape is read —
+ * and it lets each row carry its own text, the intended message above and what
+ * actually came out below, instead of one caption band trying to be both.
+ *
+ * The captions sit on the outside — target's above its row, yours below its
+ * own — so the two tracks face each other across the grade strip and can be
+ * read against each other without a line of text in between. */
 export const Y_RULER = 0;
-export const Y_LABEL = RULER_H;
-export const Y_YOU = RULER_H + LABEL_H;
-export const Y_GRADE = Y_YOU + ROW_H;
-export const Y_TGT = Y_GRADE + GRADE_H;
-export const Y_DRIFT = Y_TGT + ROW_H + 6;
+export const Y_TGT_LABEL = RULER_H;
+export const Y_TGT = Y_TGT_LABEL + LABEL_H;
+export const Y_GRADE = Y_TGT + ROW_H;
+export const Y_YOU = Y_GRADE + GRADE_H;
+export const Y_YOU_LABEL = Y_YOU + ROW_H;
+export const Y_DRIFT = Y_YOU_LABEL + LABEL_H + 6;
 export const Y_SCROLL = Y_DRIFT + DRIFT_H + 2;
 export const HEIGHT = Y_SCROLL + SCROLL_H;
 /** Where scrollable content ends. */
@@ -41,7 +55,7 @@ export const PLOT_BOTTOM = Y_DRIFT + DRIFT_H;
 
 /** Overlay superimposes the tracks, so it gets the whole band the two separate
  *  rows and the grade strip would have used. */
-export const OVER_H = Y_TGT + ROW_H - Y_YOU;
+export const OVER_H = Y_YOU + ROW_H - Y_TGT;
 export const OVER_MARK_H = OVER_H - 14;
 
 /** Pixels a collapsed rest gets, whatever its real length.

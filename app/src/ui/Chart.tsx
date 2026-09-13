@@ -44,6 +44,30 @@ interface Tip {
   y: number;
 }
 
+/** The whole character, for when the chart is drawing whole characters.
+ *
+ * Naming the element under the pointer would describe something that is not on
+ * screen — and would put the dit-and-dah count back in front of somebody who
+ * turned it off. */
+function tipForChar(hit: HitResult, unitSec: number): string {
+  let units = 0;
+  let target = 0;
+  for (const b of hit.char.blocks) {
+    units += b.units;
+    target += b.targetUnits;
+  }
+  const lines = [
+    `<b>${hit.char.char}</b>`,
+    `${(units * unitSec * 1000).toFixed(0)} ms / ${units.toFixed(2)}u`,
+  ];
+  if (target > 0 && hit.row === "you") {
+    const pct = (units / target - 1) * 100;
+    lines.push(`target ${target.toFixed(2)}u (${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%)`);
+  }
+  if (hit.row === "you") lines.push(`at ${hit.char.t0.toFixed(2)}s`);
+  return lines.join("<br>");
+}
+
 function tipFor(hit: HitResult, unitSec: number): string {
   const b = hit.block;
   const ms = b.units * unitSec * 1000;
@@ -87,6 +111,8 @@ export function ChartView({
   cb.current = { onPlayChar, onSeek, onZoom, onScroll };
   const unitRef = useRef(review.ref.unitSec);
   unitRef.current = review.ref.unitSec;
+  const blocksRef = useRef(settings.charBlocks);
+  blocksRef.current = settings.charBlocks;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -99,7 +125,12 @@ export function ChartView({
       onZoom: (...a) => cb.current.onZoom?.(...a),
       onScroll: (...a) => cb.current.onScroll?.(...a),
       onHover: (hit, x, y) => {
-        setTip(hit ? { html: tipFor(hit, unitRef.current), x, y } : null);
+        const html = hit
+          ? blocksRef.current
+            ? tipForChar(hit, unitRef.current)
+            : tipFor(hit, unitRef.current)
+          : null;
+        setTip(html ? { html, x, y } : null);
       },
     });
     chartRef.current = chart;

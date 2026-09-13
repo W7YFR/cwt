@@ -6,7 +6,7 @@
  * does.
  */
 
-import { diffRuns } from "@/timing";
+import { diffRuns, subLabel } from "@/timing";
 import { gradeOf, GRADE_MARK } from "@/render/scene";
 import { slotIndexAtTime, type Focus } from "@/render/focus";
 import type { Review } from "@/types";
@@ -176,7 +176,7 @@ export function Report({
               }
               const text =
                 run.op === "sub"
-                  ? `[${run.expected}→${run.got}]`
+                  ? `[${subLabel(run.expected, run.got)}]`
                   : run.op === "del"
                     ? `[-${run.expected}]`
                     : `[+${run.got}]`;

@@ -258,7 +258,15 @@ export function App(): React.ReactElement {
           loaded={take.loaded}
           review={take.review}
           settings={take.settings}
-          onChange={take.setSettings}
+          /* The intended message is not a property of the take being looked
+             at — it is what you are practising, and it outlives every attempt
+             at it. Edited here it used to change only this review, so the next
+             recording was graded against whatever the page had loaded with and
+             the box you had just corrected was ignored. */
+          onChange={(patch) => {
+            take.setSettings(patch);
+            if (patch.expected !== undefined) chooseIntended(patch.expected);
+          }}
           onAudio={onAudio}
           onError={setError}
           deviceId={deviceId}

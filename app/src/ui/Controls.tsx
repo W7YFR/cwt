@@ -15,6 +15,7 @@ import { useCallback, useState } from "react";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
 import {
+  CHAR_BLOCKS_HELP,
   COLLAPSE_RESTS_HELP,
   GAIN_HELP,
   PACE_CURSOR_HELP,
@@ -264,6 +265,18 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
             onChange={(e) => onChange({ collapseRests: e.target.checked })}
           />{" "}
           Collapse rests
+        </label>
+      </div>
+
+      <div className="group">
+        <label className="check" title={CHAR_BLOCKS_HELP}>
+          <input
+            type="checkbox"
+            id="char-blocks"
+            checked={s.charBlocks}
+            onChange={(e) => onChange({ charBlocks: e.target.checked })}
+          />{" "}
+          Character blocks
         </label>
       </div>
 

@@ -12,7 +12,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App, BOOT_MESSAGE_DELAY_MS } from "@/ui/App";
 import { BUNDLE_PATH, BUNDLE_VERSION, loadBundle } from "@/io/bundle";
-import { recallTake } from "@/io/storage";
+import { loadPrefs, recallTake } from "@/io/storage";
 import { encodeWavBuffer } from "@/audio/wav";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
@@ -496,6 +496,31 @@ describe("the app", () => {
     });
     // Slower sending, a longer target.
     expect(parseFloat(shown()!)).toBeGreaterThan(parseFloat(before!));
+  });
+
+  it("carries a corrected intended message into the next recording", async () => {
+    /* It is not a property of the take on screen — it is what you are
+       practising, and it outlives every attempt at it. Edited on the review it
+       used to change only that review, so the next recording was graded
+       against whatever the page had loaded with and the correction you had
+       just made was thrown away. */
+    globalThis.fetch = bundleFetch();
+    await mount();
+
+    const box = container.querySelector<HTMLInputElement>("#expected")!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    await act(async () => {
+      setter.call(box, "CQ TEST DE W7YFR");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    expect(box.value).toBe("CQ TEST DE W7YFR");
+    // Kept where the next recording reads it from, not only in this view.
+    await new Promise((res) => setTimeout(res, 20));
+    expect(loadPrefs().expected).toBe("CQ TEST DE W7YFR");
   });
 
   it("offers a recording control on the review itself", async () => {

@@ -81,6 +81,14 @@ export const PACE_CURSOR_HELP =
   "about the recording changes — the cursor is a guide, not a gate, and " +
   "falling behind it costs nothing but the drift plot showing it afterwards.";
 
+export const CHAR_BLOCKS_HELP =
+  "Draw each character as one marker instead of the dits and dahs inside it. " +
+  "What this is for is spacing and placement — where a character starts and " +
+  "how long it runs — and a row of elements invites counting them instead, " +
+  "which is reading Morse off a screen rather than learning to send it. The " +
+  "grading does not change: a block takes the worst grade of the elements it " +
+  "covers, and the report below still breaks them out.";
+
 export const PACE_LEAD_HELP =
   "How long the count-in runs before the cursor reaches the first character. " +
   "The recording starts the moment you click, whatever this is set to — the " +

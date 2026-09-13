@@ -27,12 +27,14 @@ import {
   SCROLL_H,
   Y_DRIFT,
   Y_GRADE,
-  Y_LABEL,
+  Y_TGT_LABEL,
+  Y_YOU_LABEL,
   Y_RULER,
   Y_SCROLL,
   Y_TGT,
   Y_YOU,
 } from "./geometry";
+import { subLabel } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
 import { gapWidth, isRest, timeToX, type Layout } from "./layout";
 import type { Palette } from "./theme";
@@ -91,6 +93,9 @@ export interface Viewport {
 }
 
 export interface Scene {
+  /** Draw each character as one marker rather than as its own dits and dahs.
+   *  See `drawCharBlock`. */
+  charBlocks?: boolean;
   /** Count-in reserved in front of the first character, in seconds. Absent or
    *  zero outside a paced recording — see `LayoutOptions.leadSec`. */
   leadSec?: number;
@@ -230,15 +235,18 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
 
   let top: number;
   let h: number;
+  /* A row and its own caption, and nothing else. Each track now carries its
+     text on the outside — the target's above it, yours below — so lighting a
+     row means lighting the band from its caption through its marks. */
   if (scene.view === "overlay") {
-    top = Y_LABEL;
-    h = Y_YOU + OVER_H + 4 - Y_LABEL;
+    top = Y_TGT_LABEL;
+    h = Y_YOU_LABEL + LABEL_H - Y_TGT_LABEL;
   } else if (scene.focus.side === "you") {
-    top = Y_LABEL;
-    h = Y_YOU + ROW_H + 2 - Y_LABEL;
+    top = Y_YOU - 2;
+    h = ROW_H + LABEL_H + 2;
   } else {
-    top = Y_TGT - 2;
-    h = ROW_H + 4;
+    top = Y_TGT_LABEL;
+    h = LABEL_H + ROW_H + 2;
   }
 
   const color = scene.focus.side === "you" ? scene.palette.you : scene.palette.tgt;
@@ -254,6 +262,24 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
   ctx.globalAlpha = 1;
 }
 
+/** What to write under your row for one slot.
+ *
+ * One function, used by all three views. It was per-view once and only the
+ * per-character view ever gained the annotations, so a substitution was
+ * spelled out on one axis and shown as a bare red character on another —
+ * which looks like the chart having lost track of what you meant rather than
+ * like two views disagreeing about how much to say. */
+function sentCaption(slot: Slot): { text: string; bad: boolean } {
+  if (slot.op === "sub" && slot.actual && slot.ideal) {
+    // Intended first, then what came out — the same order the accuracy panel
+    // uses, and the same order the two rows are stacked in.
+    return { text: subLabel(slot.ideal.char, slot.actual.char), bad: true };
+  }
+  if (slot.op === "del" && slot.ideal) return { text: `–${slot.ideal.char}`, bad: true };
+  if (slot.op === "ins" && slot.actual) return { text: `+${slot.actual.char}`, bad: true };
+  return { text: slot.actual ? slot.actual.char : "·", bad: false };
+}
+
 /** One slot: the lead gap, then the character's marks, on both tracks. */
 function drawPerChar(ctx: Ctx2D, scene: Scene): void {
   const C = scene.palette;
@@ -261,33 +287,34 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
     if (it.x === null || !visible(it.x, it.w, scene)) continue;
     const slot = it.slot;
 
-    // Caption: the decoded character, plus what it should have been.
-    let cap = slot.actual ? slot.actual.char : "·";
-    let capColor = C.ink;
-    if (slot.op === "sub" && slot.actual && slot.ideal) {
-      cap = `${slot.actual.char}→${slot.ideal.char}`;
-      capColor = C.bad;
-    } else if (slot.op === "del" && slot.ideal) {
-      cap = `–${slot.ideal.char}`;
-      capColor = C.bad;
-    } else if (slot.op === "ins" && slot.actual) {
-      cap = `+${slot.actual.char}`;
-      capColor = C.bad;
-    }
-    ctx.fillStyle = capColor;
-    ctx.font = `600 12px ${C.mono}`;
+    const mid = it.x + it.gapW + it.bodyW / 2;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(cap, it.x + it.gapW + it.bodyW / 2, Y_LABEL + LABEL_H / 2);
 
-    // A word-boundary error is called out above the gap that caused it.
+    /* Above the target row: the message you meant to send, and nothing else.
+       It is the reference, so it is never marked up — a character cannot be
+       wrong in the text that defines what right is. Where you sent something
+       that was not asked for there is no intended character at all, and the
+       blank says exactly that. */
+    ctx.fillStyle = C.ink;
+    ctx.font = `600 12px ${C.mono}`;
+    ctx.fillText(slot.ideal ? slot.ideal.char : "·", mid, Y_TGT_LABEL + LABEL_H / 2);
+
+    // Below your row: what came out, and how it differs from the line above.
+    const cap = sentCaption(slot);
+    ctx.fillStyle = cap.bad ? C.bad : C.ink;
+    ctx.font = `600 12px ${C.mono}`;
+    ctx.fillText(cap.text, mid, Y_YOU_LABEL + LABEL_H / 2);
+
+    // A word-boundary error is a fault in what was sent, so it is called out
+    // beside that row's caption, over the gap that caused it.
     if (slot.spaceOp === "del" || slot.spaceOp === "ins") {
       ctx.fillStyle = C.bad;
       ctx.font = `600 9px ${C.mono}`;
       ctx.fillText(
         slot.spaceOp === "del" ? "no space" : "extra space",
         it.x + it.gapW / 2,
-        Y_LABEL + 5,
+        Y_YOU_LABEL + LABEL_H - 5,
       );
     }
 
@@ -301,8 +328,8 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
       ctx.strokeStyle = C.line;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(bx - 0.5, Y_YOU + 2);
-      ctx.lineTo(bx - 0.5, Y_TGT + ROW_H - 2);
+      ctx.moveTo(bx - 0.5, Y_TGT + 2);
+      ctx.lineTo(bx - 0.5, Y_YOU + ROW_H - 2);
       ctx.stroke();
     }
 
@@ -334,11 +361,12 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
         const gw = gapWidth(g, ppu);
         if (g) drawGap(ctx, scene, g, it.x - gw, gw, Y_YOU, false);
         drawMarks(ctx, scene, slot.actual, it.x, Y_YOU, false);
-        ctx.fillStyle = slot.op === "equal" ? C["ink-dim"] : C.bad;
+        const cap = sentCaption(slot);
+        ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
         ctx.font = `600 11px ${C.mono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(slot.actual.char, it.x + w / 2, Y_LABEL + LABEL_H / 2);
+        ctx.fillText(cap.text, it.x + w / 2, Y_YOU_LABEL + LABEL_H / 2);
       }
     }
     if (slot.ideal && it.ix !== null) {
@@ -348,6 +376,15 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
         const igw = gapWidth(ig, ppu);
         if (ig) drawGap(ctx, scene, ig, it.ix - igw, igw, Y_TGT, true);
         drawMarks(ctx, scene, slot.ideal, it.ix, Y_TGT, true);
+        /* Labelled too, on this axis. The target row used to go unnamed here
+           because there was one caption band and it belonged to the decode —
+           but on a wall clock the two rows' characters sit at different x, and
+           that offset IS the drift. Naming both is what makes it readable. */
+        ctx.fillStyle = C["ink-dim"];
+        ctx.font = `600 11px ${C.mono}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(slot.ideal.char, it.ix + iw / 2, Y_TGT_LABEL + LABEL_H / 2);
       }
     }
   }
@@ -361,19 +398,28 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
   const C = scene.palette;
   const u = scene.layout.unitSec;
   const ppu = scene.layout.ppu;
-  const y = Y_YOU + (OVER_H - OVER_MARK_H) / 2;
+  const y = Y_TGT + (OVER_H - OVER_MARK_H) / 2;
 
   const band = (ch: Char, x: number, color: string, alpha: number) => {
+    const paint = (bx: number, w: number) => {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = alpha;
+      roundRect(ctx, bx, y, Math.max(w, 2), OVER_MARK_H, 3);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    };
+    if (scene.charBlocks) {
+      // One marker for the character, here too — the setting is about what a
+      // block on the chart means, not about which axis it is drawn on.
+      let w = 0;
+      for (const b of ch.blocks) w += b.units * ppu;
+      paint(x, w);
+      return;
+    }
     let bx = x;
     for (const b of ch.blocks) {
       const w = b.units * ppu;
-      if (b.kind !== "element-gap") {
-        ctx.fillStyle = color;
-        ctx.globalAlpha = alpha;
-        roundRect(ctx, bx, y, Math.max(w, 2), OVER_MARK_H, 3);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
+      if (b.kind !== "element-gap") paint(bx, w);
       bx += w;
     }
   };
@@ -384,7 +430,14 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     const slot = it.slot;
     if (slot.ideal && it.ix !== null) {
       const iw = ((slot.ideal.t1 - slot.ideal.t0) / u) * ppu;
-      if (visible(it.ix, iw, scene)) band(slot.ideal, it.ix, C.tgt, 0.55);
+      if (visible(it.ix, iw, scene)) {
+        band(slot.ideal, it.ix, C.tgt, 0.55);
+        ctx.fillStyle = C["ink-dim"];
+        ctx.font = `600 11px ${C.mono}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(slot.ideal.char, it.ix + iw / 2, Y_TGT_LABEL + LABEL_H / 2);
+      }
     }
   }
   for (const it of scene.layout.items) {
@@ -393,11 +446,12 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
     if (!visible(it.x, w, scene)) continue;
     band(slot.actual, it.x, slot.op === "equal" ? C.you : C.bad, 0.55);
-    ctx.fillStyle = slot.op === "equal" ? C["ink-dim"] : C.bad;
+    const cap = sentCaption(slot);
+    ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
     ctx.font = `600 11px ${C.mono}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(slot.actual.char, it.x + w / 2, Y_LABEL + LABEL_H / 2);
+    ctx.fillText(cap.text, it.x + w / 2, Y_YOU_LABEL + LABEL_H / 2);
   }
 
   // A leader from each character to where the target put it, so the amount of
@@ -410,7 +464,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     if (!slot.actual || !slot.ideal || it.x === null || it.ix === null) continue;
     if (Math.abs(it.x - it.ix) < 2) continue;
     if (!visible(Math.min(it.x, it.ix), Math.abs(it.x - it.ix), scene)) continue;
-    const ly = Y_YOU + OVER_H - 4;
+    const ly = Y_TGT + OVER_H - 4;
     ctx.beginPath();
     ctx.moveTo(it.ix, ly);
     ctx.lineTo(it.x, ly);
@@ -512,7 +566,8 @@ function drawLead(ctx: Ctx2D, scene: Scene): void {
   if (w < 4 || !visible(span.x0, w, scene)) return;
 
   const C = scene.palette;
-  const yTop = scene.view === "overlay" ? Y_YOU : Y_TGT;
+  // The target row is the top one in every view, overlay included.
+  const yTop = Y_TGT;
   const mid = yTop + ROW_H / 2;
 
   ctx.strokeStyle = C.you;
@@ -575,7 +630,58 @@ function drawCountIn(ctx: Ctx2D, scene: Scene): void {
      is arriving on a beat. The chart already repaints every frame while the
      cursor is running, so the precision costs nothing; monospaced figures keep
      the width from twitching as the digits change. */
-  ctx.fillText(left.toFixed(1), GUTTER + COUNT_INSET_X, Y_LABEL + COUNT_INSET_Y);
+  ctx.fillText(left.toFixed(1), GUTTER + COUNT_INSET_X, Y_TGT_LABEL + COUNT_INSET_Y);
+}
+
+/** One character as a single marker, instead of the dits and dahs inside it.
+ *
+ * What this trainer is for is spacing and placement — where a character starts
+ * and how long it runs — and a row of elements invites counting them instead,
+ * which is reading Morse off a screen rather than learning to send it. One
+ * block per character shows the thing being practised and nothing else.
+ *
+ * Graded on the whole character: the worst of its own elements, because a
+ * character with one dah 40% long is not a character that came out right, and
+ * the single block is the only place left to say so. */
+function drawCharBlock(
+  ctx: Ctx2D,
+  scene: Scene,
+  ch: Char,
+  x0: number,
+  yTop: number,
+  isTarget: boolean,
+): void {
+  const C = scene.palette;
+  const y = yTop + (ROW_H - MARK_H) / 2;
+  let w = 0;
+  let worst: Grade = "ok";
+  for (const b of ch.blocks) {
+    w += b.units * scene.layout.ppu;
+    if (isTarget) continue;
+    const g = gradeOf(b.units, b.targetUnits, scene.tolerance);
+    if (g === "bad" || (g === "warn" && worst === "ok")) worst = g;
+  }
+
+  ctx.fillStyle = isTarget
+    ? C.tgt
+    : worst === "warn"
+      ? C.warn
+      : worst === "bad"
+        ? C.bad
+        : C.you;
+  ctx.globalAlpha = isTarget ? 0.55 : 1;
+  roundRect(ctx, x0, y, Math.max(w, 2), MARK_H, 3);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Hovering any element of the character lights the whole of it, since the
+  // whole of it is what is drawn.
+  if (scene.hover && ch.blocks.includes(scene.hover)) {
+    ctx.strokeStyle = C.ink;
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, x0 + 0.5, y + 0.5, Math.max(w, 2) - 1, MARK_H - 1, 3);
+    ctx.stroke();
+  }
 }
 
 function drawMarks(
@@ -586,6 +692,10 @@ function drawMarks(
   yTop: number,
   isTarget: boolean,
 ): void {
+  if (scene.charBlocks) {
+    drawCharBlock(ctx, scene, ch, x0, yTop, isTarget);
+    return;
+  }
   const C = scene.palette;
   const y = yTop + (ROW_H - MARK_H) / 2;
   let x = x0;
@@ -745,13 +855,13 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
   const rows: Array<[number, string, string]> =
     scene.view === "overlay"
       ? [
-          [Y_YOU + OVER_H / 2 - 9, "YOU", C.you],
-          [Y_YOU + OVER_H / 2 + 9, "TGT", C.tgt],
+          [Y_TGT + OVER_H / 2 - 9, "TGT", C.tgt],
+          [Y_TGT + OVER_H / 2 + 9, "YOU", C.you],
           [Y_DRIFT + 7, "DRIFT", C["ink-dim"]],
         ]
       : [
-          [Y_YOU + ROW_H / 2, "YOU", C.you],
           [Y_TGT + ROW_H / 2, "TGT", C.tgt],
+          [Y_YOU + ROW_H / 2, "YOU", C.you],
           [Y_DRIFT + 7, "DRIFT", C["ink-dim"]],
         ];
   for (const [y, label, color] of rows) {
@@ -808,7 +918,7 @@ function drawPlayhead(ctx: Ctx2D, scene: Scene): void {
 
   // In overlay both tracks share one band, so the playhead spans all of it.
   const y0 =
-    scene.view === "overlay" ? Y_YOU : scene.playhead.side === "you" ? Y_YOU : Y_TGT;
+    scene.view === "overlay" ? Y_TGT : scene.playhead.side === "you" ? Y_YOU : Y_TGT;
   const h = scene.view === "overlay" ? OVER_H : ROW_H;
   ctx.strokeStyle = scene.playhead.side === "you" ? scene.palette.you : scene.palette.ink;
   ctx.lineWidth = 1.5;
@@ -824,10 +934,11 @@ export function trackBands(view: ViewMode): {
   tgt: [number, number];
 } {
   if (view === "overlay") {
-    // Split the shared band: the upper half picks yours, the lower the target.
+    // Split the shared band the way the separate rows are stacked: the target
+    // is the upper half, yours the lower.
     return {
-      you: [Y_YOU, Y_YOU + OVER_H / 2],
-      tgt: [Y_YOU + OVER_H / 2, Y_YOU + OVER_H],
+      tgt: [Y_TGT, Y_TGT + OVER_H / 2],
+      you: [Y_TGT + OVER_H / 2, Y_TGT + OVER_H],
     };
   }
   return {

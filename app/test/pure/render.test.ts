@@ -21,6 +21,7 @@ import {
   type Layout,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
+import { subLabel } from "@/timing";
 import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/scene";
 import { FALLBACK_PALETTE } from "@/render/theme";
 import {
@@ -28,8 +29,12 @@ import {
   PAD_R,
   PAD_X,
   REST_W,
+  LABEL_H,
   ROW_H,
   Y_TGT,
+  Y_TGT_LABEL,
+  Y_YOU,
+  Y_YOU_LABEL,
   ZOOM_MAX,
   ZOOM_MIN,
 } from "@/render/geometry";
@@ -134,6 +139,148 @@ describe("layout", () => {
     const ch = review.actual.chars[0]!;
     const sum = ch.blocks.reduce((a, b) => a + b.units, 0);
     expect(charWidth(ch, 10)).toBeCloseTo(sum * 10, 9);
+  });
+});
+
+describe("the two tracks, and the text on each", () => {
+  /* The target is the reference: the message you meant to send, rendered at
+     the speeds now set, and the one thing on the chart that does not change
+     between attempts. It goes on top, with its own caption band, and your
+     sending goes underneath with its own — so each row carries its own text
+     instead of one band trying to be both. */
+  const review = reviewFrom(caseNamed(SLOPPY)).review;
+
+  /* Deliberately not what was sent, and different in the FIRST character —
+     with the intended message left to default it is the decode, the two
+     captions say the same thing, and a test that one follows the intended text
+     while the other follows the decode would pass without either being true.
+     First rather than last because the far end of a long fixture is scrolled
+     out of the viewport and never drawn. */
+  const sent = review.actual.text;
+  const swap = sent[0] === "X" ? "Y" : "X";
+  const mismatched = reviewFrom(caseNamed(SLOPPY), {
+    expected: `${swap}${sent.slice(1)}`,
+  }).review;
+
+  const paint = (view: ViewMode, r: Review = review) => {
+    const ctx = recordingCtx();
+    draw(ctx, sceneFor(r, view, 18));
+    return ctx;
+  };
+  /* Located by the band it lands in, which is the thing under test. */
+  const textAt = (ctx: ReturnType<typeof recordingCtx>, y: number) =>
+    ctx.ofType("fillText").filter((c) => c.args[1] === y).map((c) => c.text ?? "");
+
+  const TGT_CAP = Y_TGT_LABEL + LABEL_H / 2;
+  const YOU_CAP = Y_YOU_LABEL + LABEL_H / 2;
+
+  it("puts the target above your sending, in every view", () => {
+    expect(Y_TGT).toBeLessThan(Y_YOU);
+    for (const view of VIEWS) {
+      const bands = trackBands(view);
+      expect(bands.tgt[0], view).toBeLessThan(bands.you[0]);
+    }
+  });
+
+  it("gives each row its own caption band, on the outside", () => {
+    // Target's above its row, yours below its own, so the two tracks face each
+    // other across the grade strip with no line of text between them.
+    expect(Y_TGT_LABEL + LABEL_H).toBe(Y_TGT);
+    expect(Y_YOU_LABEL).toBe(Y_YOU + ROW_H);
+  });
+
+  it("labels the target with what was meant and your row with what came out", () => {
+    const ctx = paint("per-char", mismatched);
+    // The first character is the one they disagree on.
+    expect(textAt(ctx, TGT_CAP)[0]).toBe(swap);
+    // Intended first, then what came out — the order the accuracy panel uses
+    // and the order the two rows are stacked in.
+    expect(textAt(ctx, YOU_CAP)[0]).toBe(subLabel(swap, sent[0]!));
+  });
+
+  it.each(VIEWS)("labels both rows, not just one of them (%s)", (view) => {
+    /* The target row used to go unnamed in the time-axis views: there was one
+       caption band and it belonged to the decode. On a wall clock the two
+       rows' characters sit at different x, and that offset IS the drift —
+       naming both is what makes it readable. */
+    const ctx = paint(view, mismatched);
+    expect(textAt(ctx, TGT_CAP).join("").length, `${view} target`).toBeGreaterThan(0);
+    expect(textAt(ctx, YOU_CAP).join("").length, `${view} yours`).toBeGreaterThan(0);
+  });
+
+  it("writes a substitution the same way the accuracy panel does", () => {
+    /* It was decided twice: the chart wrote the character it had under the
+       arrow and the report wrote the one it wanted, so the same mistake read
+       "E→I" on the chart and "I→E" under it. Whichever way round it goes, two
+       places disagreeing about it is the bug. */
+    const ctx = paint("per-char", mismatched);
+    const onChart = textAt(ctx, YOU_CAP).find((t) => t.includes("\u2192"))!;
+    const inDiff = mismatched.comparison!.diff;
+    expect(onChart).toBeTruthy();
+    expect(inDiff).toContain(`[${onChart}]`);
+  });
+
+  it("never marks up the target's own caption", () => {
+    /* It is the text that defines what right is, so a character in it cannot
+       be wrong. The arrows, the plusses and the minuses belong to the row
+       underneath, which is where the differences actually are. */
+    const ctx = paint("per-char", mismatched);
+    for (const t of textAt(ctx, TGT_CAP)) {
+      expect(t, `target caption "${t}"`).not.toMatch(/[\u2192+\u2013]/);
+    }
+    expect(textAt(ctx, YOU_CAP).join("")).toMatch(/[\u2192+\u2013]/);
+  });
+});
+
+describe("characters as single markers", () => {
+  /* What this trainer is for is spacing and placement — where a character
+     starts and how long it runs. A row of elements invites counting them
+     instead, which is reading Morse off a screen rather than learning to send
+     it. */
+  const review = reviewFrom(caseNamed(SLOPPY)).review;
+
+  const rects = (view: ViewMode, charBlocks: boolean) => {
+    const ctx = recordingCtx();
+    draw(ctx, { ...sceneFor(review, view, 18), charBlocks });
+    // Every filled body on the chart, however it was drawn.
+    return ctx.ofType("fill").length;
+  };
+
+  it.each(VIEWS)("draws fewer bodies than there are elements (%s)", (view) => {
+    /* The whole claim: one marker per character where there were several. Not
+       a count against a fixture's own numbers — those change — but against
+       the same chart drawn the other way. */
+    expect(rects(view, true)).toBeLessThan(rects(view, false));
+  });
+
+  it("still marks a character its elements failed", () => {
+    /* A character with one dah forty percent long is not a character that came
+       out right, and the single block is the only place left to say so. Graded
+       at a tolerance tight enough that the fixture actually has failures in
+       it — at the default it does not, and the test would be comparing two
+       charts of nothing but blue. */
+    const tight = (charBlocks: boolean) => {
+      const ctx = recordingCtx();
+      draw(ctx, { ...sceneFor(review, "per-char", 18), tolerance: 0.02, charBlocks });
+      return new Set(
+        ctx
+          .fillsFor("fill")
+          .filter((c) => c === FALLBACK_PALETTE.warn || c === FALLBACK_PALETTE.bad),
+      );
+    };
+    const elements = tight(false);
+    expect(elements.size).toBeGreaterThan(0);
+    // Aggregating must not quietly grade a bad character "ok".
+    expect(tight(true)).toEqual(elements);
+  });
+
+  it("leaves the chart exactly as it was when it is off", () => {
+    // Inert by construction, like everything else optional here.
+    const a = recordingCtx();
+    draw(a, sceneFor(review, "per-char", 18));
+    const b = recordingCtx();
+    draw(b, { ...sceneFor(review, "per-char", 18), charBlocks: false });
+    expect(b.calls).toEqual(a.calls);
   });
 });
 
@@ -441,10 +588,16 @@ describe("hit testing", () => {
   });
 
   it("splits the shared band in overlay so both tracks stay reachable", () => {
+    /* Stacked the same way the separate rows are — target above yours — or a
+       click in overlay would reach the other track from the one it does in
+       every other view. */
     const bands = trackBands("overlay");
-    expect(bands.you[1]).toBe(bands.tgt[0]);
-    expect(bands.you[0]).toBeLessThan(bands.you[1]);
+    expect(bands.tgt[1]).toBe(bands.you[0]);
     expect(bands.tgt[0]).toBeLessThan(bands.tgt[1]);
+    expect(bands.you[0]).toBeLessThan(bands.you[1]);
+
+    const rows = trackBands("per-char");
+    expect(rows.tgt[0]).toBeLessThan(rows.you[0]);
   });
 });
 

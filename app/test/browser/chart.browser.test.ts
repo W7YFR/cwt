@@ -12,6 +12,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { createChart, type Chart } from "@/render/canvas";
 import { buildLayout } from "@/render/layout";
+import { trackBands } from "@/render/scene";
 import { contextWindow } from "@/render/focus";
 import { HEIGHT, GUTTER, ZOOM_MIN } from "@/render/geometry";
 import type { BlockKind } from "@/types";
@@ -188,12 +189,16 @@ describe("the chart in a browser", () => {
     chart = createChart(host, canvas, { onPlayChar });
     chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null });
 
-    // Somewhere inside the first character's marks, on the "yours" row.
+    /* Somewhere inside the first character's marks, on the "yours" row —
+       located from the bands rather than from a pixel, so re-ordering the rows
+       moves the click with them instead of quietly aiming it at the other
+       track. */
     const rect = canvas.getBoundingClientRect();
+    const band = trackBands(settings.view).you;
     canvas.dispatchEvent(
       new MouseEvent("click", {
         clientX: rect.left + GUTTER + 30,
-        clientY: rect.top + 52,
+        clientY: rect.top + (band[0] + band[1]) / 2,
         bubbles: true,
       }),
     );
@@ -239,10 +244,11 @@ describe("the chart in a browser", () => {
       chart.update({ review, settings: { ...settings, ppu: PPU }, focus: null });
       chart.scrollTo(0);
       const rect = canvas.getBoundingClientRect();
+      const band = trackBands(settings.view).you;
       canvas.dispatchEvent(
         new MouseEvent("click", {
           clientX: rect.left + GUTTER + contentX,
-          clientY: rect.top + 52,
+          clientY: rect.top + (band[0] + band[1]) / 2,
           bubbles: true,
         }),
       );
@@ -323,6 +329,33 @@ describe("the chart in a browser", () => {
     // And it is undone, not merely covered over.
     chart.scrollTo(500);
     expect(paintedPixels()).toBe(before);
+  });
+
+  it("slides the view under a running playhead instead of throwing it forward", () => {
+    /* It used to page-jump: leave the view alone until the playhead ran off
+       the right, then move it most of a screen. Predictable on paper, and very
+       hard to follow — the thing you are watching teleports and you have to
+       find it again in a chart that has just changed underneath you. Worse
+       while pacing a recording, where losing the cursor is losing your place
+       in the message. */
+    chart.update({ review, settings: { ...settings, ppu: 40 }, focus: null });
+    chart.scrollTo(0);
+
+    // The scroll position is private, so the picture stands in for it: a view
+    // that has moved paints a different number of pixels.
+    const at = (t: number) => {
+      chart.setPlayhead({ t, side: "you" });
+      return paintedPixels();
+    };
+
+    /* Sampled closely: under a page-jump the view is identical between hops
+       and then changes all at once, so consecutive samples come back equal.
+       Sliding, every sample differs from the last. */
+    const seen: number[] = [];
+    const end = review.take.durationSec;
+    for (let i = 1; i <= 8; i++) seen.push(at((end * i) / 10));
+    const changes = seen.filter((v, i) => i === 0 || v !== seen[i - 1]!).length;
+    expect(changes, `only ${changes} of ${seen.length} samples moved`).toBe(seen.length);
   });
 
   it("seeks when the ruler is clicked", () => {

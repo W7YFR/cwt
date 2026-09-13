@@ -70,6 +70,10 @@ export interface Chart {
   destroy(): void;
 }
 
+/** Where a running playhead is held across the track, as a fraction of its
+ *  width. Left of centre: what is coming matters more than what has gone. */
+const PLAYHEAD_HOLD = 0.4;
+
 /** Marks and gaps behave differently on a click — see `onClick`. */
 function isGap(kind: Block["kind"]): boolean {
   return kind !== "dit" && kind !== "dah";
@@ -127,6 +131,7 @@ export function createChart(
       playhead,
       driftMax,
       leadSec,
+      charBlocks: input.settings.charBlocks,
     };
     return s;
   }
@@ -417,17 +422,25 @@ export function createChart(
     setPlayhead(next) {
       playhead = next;
       if (next && layout) {
-        /* Keep the playhead on screen while audio runs. Page-jump rather than
-           continuous centering: predictable, and it does not slide the whole
-           view on every frame. */
+        /* Keep the playhead on screen, by sliding the content under it.
+         *
+         * This used to page-jump — leave the view alone until the playhead ran
+         * off the right, then throw it forward by most of a screen. Predictable
+         * on paper, and very hard to follow in practice: the thing you are
+         * watching teleports, and you have to find it again in a chart that has
+         * just changed underneath you. Worse while pacing a recording, where
+         * losing the cursor for half a second is losing your place in the
+         * message.
+         *
+         * So the playhead is held at a fixed fraction of the track and the
+         * content moves. The clamps at both ends do the rest: at the start it
+         * walks out to that fraction before anything moves, and at the end the
+         * content stops while it runs on to the right edge. */
         const v = viewport();
         if (v.maxScroll) {
           const cx = timeToX(layout, next.t, next.side);
-          const lead = cx - scrollX;
-          if (lead > v.trackW * 0.8 || lead < 0) {
-            scrollX = cx - v.trackW * 0.2;
-            clampScroll(v);
-          }
+          scrollX = cx - v.trackW * PLAYHEAD_HOLD;
+          clampScroll(v);
         }
       }
       paint();
