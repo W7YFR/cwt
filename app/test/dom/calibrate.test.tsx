@@ -31,7 +31,9 @@ import { DATA_DIR } from "../oracle-fs";
 import { readWav } from "../wav";
 
 const SWEEP = `${DATA_DIR}/ft710-close/ft710-sweep-close-webcam.wav`;
-const HAVE = existsSync(SWEEP);
+/** The same sweep captured through the loopback: nothing in the path at all. */
+const LOOPBACK = `${DATA_DIR}/ft710-close/ft710-sweep-close-virtual.wav`;
+const HAVE = existsSync(SWEEP) && existsSync(LOOPBACK);
 
 const stop = vi.fn();
 const cancel = vi.fn();
@@ -72,8 +74,8 @@ vi.mock("@/capture/mic", async (importOriginal) => ({
   listInputs: () => listInputs(),
 }));
 
-function clip() {
-  const wav = readWav(SWEEP);
+function clip(path = SWEEP) {
+  const wav = readWav(path);
   let peak = 0;
   for (const v of wav.samples) peak = Math.max(peak, Math.abs(v));
   return { samples: wav.samples, rate: wav.rate, peak };
@@ -562,6 +564,49 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     expect(saved.measuredOffsetSec).not.toBe(saved.releaseOffsetSec);
   });
 
+  it("takes the correction as a typed number too", async () => {
+    /* A slider is the right control for hunting — drag it and watch the chart
+       — and the wrong one for landing on a figure you already have in mind,
+       which is what somebody comparing two calibrations is doing. */
+    const user = userEvent.setup();
+    renderWizard();
+    await begin(user);
+    await runThrough();
+    await screen.findByTestId("outcome");
+    await user.click(screen.getByRole("button", { name: /^advanced$/i }));
+
+    const box = screen.getByTestId("offset-ms") as HTMLInputElement;
+    await user.clear(box);
+    await user.type(box, "7.5");
+
+    expect(screen.getByTestId("offset-state").dataset.adjusted).toBe("true");
+    // The slider follows it: one value, two ways at it.
+    expect(Number((screen.getByTestId("offset") as HTMLInputElement).value)).toBe(75);
+    const shown = preview.mock.calls[preview.mock.calls.length - 1]![0];
+    expect(shown.run.calibration.releaseOffsetSec).toBeCloseTo(0.0075, 6);
+
+    await user.click(screen.getByRole("button", { name: /save and use it/i }));
+    expect(loadProfiles()[0]!.releaseOffsetSec).toBeCloseTo(0.0075, 6);
+  });
+
+  it("does not fight the caret while a correction is being typed", async () => {
+    /* The same trap as the keyer-speed field. A box showing "10.8" that
+       rewrote itself to "1.0" the moment "1" was typed would put the next
+       digit in the wrong place — so what is being typed stays on screen until
+       the field is left. */
+    const user = userEvent.setup();
+    renderWizard();
+    await begin(user);
+    await runThrough();
+    await screen.findByTestId("outcome");
+    await user.click(screen.getByRole("button", { name: /^advanced$/i }));
+
+    const box = screen.getByTestId("offset-ms") as HTMLInputElement;
+    await user.clear(box);
+    await user.type(box, "12.4");
+    expect(box.value).toBe("12.4");
+  });
+
   it("resets to the measurement, and saves it unmarked", async () => {
     const user = userEvent.setup();
     renderWizard();
@@ -581,6 +626,72 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     await user.click(screen.getByRole("button", { name: /save and use it/i }));
     const saved = loadProfiles()[0]!;
     expect(saved.releaseOffsetSec).toBe(saved.measuredOffsetSec);
+  });
+
+  describe("when there is nothing to correct", () => {
+    /* The loopback capture of the same sweep. Not a failure and not a small
+       correction — the answer "there is nothing here", which is what every
+       direct connection gives and what the app has to stop short of storing.
+       A profile whose offset is inside its own noise corrects nothing when
+       applied, while every report made under it claims a calibration was in
+       force. */
+    const measure = async (user: ReturnType<typeof userEvent.setup>) => {
+      stop.mockImplementation(() => Promise.resolve(clip(LOOPBACK)));
+      const rendered = renderWizard();
+      await begin(user);
+      await runThrough();
+      await screen.findByTestId("outcome");
+      return rendered;
+    };
+
+    it("says so, and does not offer to save it", async () => {
+      const user = userEvent.setup();
+      await measure(user);
+      const outcome = screen.getByTestId("outcome");
+      // Measured, not failed — the distinction the screen has to carry.
+      expect(outcome.dataset.usable).toBe("true");
+      expect(outcome.dataset.nothing).toBe("true");
+
+      expect(screen.queryByTestId("nickname")).toBeNull();
+      expect(screen.queryByRole("button", { name: /save and use it/i })).toBeNull();
+      expect(screen.getByRole("button", { name: /^skip$/i })).toBeTruthy();
+    });
+
+    it("leaves without storing anything", async () => {
+      const user = userEvent.setup();
+      const { props } = await measure(user);
+
+      await user.click(screen.getByRole("button", { name: /^skip$/i }));
+      expect(loadProfiles()).toEqual([]);
+      expect(props.onClose).toHaveBeenCalled();
+    });
+
+    it("does not report a correction it is not making", async () => {
+      const user = userEvent.setup();
+      await measure(user);
+      // A "0.0 ms" row is a claim that something was measured and applied.
+      expect(screen.queryByText(/moves from the mark to the gap/i)).toBeNull();
+    });
+
+    it("still lets one be dialed in deliberately", async () => {
+      /* Refusing to store a measurement of nothing is not the same as
+         refusing to let somebody set a correction on purpose. The Advanced
+         panel is the one place the app's own answer can be overruled, and
+         overruling it has to bring saving back. */
+      const user = userEvent.setup();
+      await measure(user);
+      await user.click(screen.getByRole("button", { name: /^advanced$/i }));
+
+      const box = screen.getByTestId("offset-ms") as HTMLInputElement;
+      await user.clear(box);
+      await user.type(box, "6");
+
+      expect(screen.getByTestId("outcome").dataset.nothing).toBe("false");
+      expect(screen.getByTestId("nickname")).toBeTruthy();
+
+      await user.click(screen.getByRole("button", { name: /save and use it/i }));
+      expect(loadProfiles()[0]!.releaseOffsetSec).toBeCloseTo(0.006, 6);
+    });
   });
 
   it("throws the recording away when cancelled", async () => {

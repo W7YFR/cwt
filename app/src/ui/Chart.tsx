@@ -32,6 +32,8 @@ export interface ChartProps {
   onPlayChar?: ChartCallbacks["onPlayChar"];
   onSeek?: ChartCallbacks["onSeek"];
   onZoom?: ChartCallbacks["onZoom"];
+  /** The view moved. Used to keep more than one chart in step. */
+  onScroll?: ChartCallbacks["onScroll"];
   /** Given the live chart so the parent can fit, export, or scroll it. */
   handle: ChartHandle;
 }
@@ -70,6 +72,7 @@ export function ChartView({
   onPlayChar,
   onSeek,
   onZoom,
+  onScroll,
   handle,
 }: ChartProps): React.ReactElement {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -80,8 +83,8 @@ export function ChartView({
   // Callbacks are held in a ref so the chart is created exactly once. Passing
   // them straight through would tear the canvas down and rebuild it on every
   // parent render, losing the scroll position each time.
-  const cb = useRef({ onPlayChar, onSeek, onZoom });
-  cb.current = { onPlayChar, onSeek, onZoom };
+  const cb = useRef({ onPlayChar, onSeek, onZoom, onScroll });
+  cb.current = { onPlayChar, onSeek, onZoom, onScroll };
   const unitRef = useRef(review.ref.unitSec);
   unitRef.current = review.ref.unitSec;
 
@@ -94,6 +97,7 @@ export function ChartView({
       onPlayChar: (...a) => cb.current.onPlayChar?.(...a),
       onSeek: (...a) => cb.current.onSeek?.(...a),
       onZoom: (...a) => cb.current.onZoom?.(...a),
+      onScroll: (...a) => cb.current.onScroll?.(...a),
       onHover: (hit, x, y) => {
         setTip(hit ? { html: tipFor(hit, unitRef.current), x, y } : null);
       },

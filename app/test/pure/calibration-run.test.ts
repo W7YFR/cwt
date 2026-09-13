@@ -18,6 +18,7 @@ import { existsSync } from "node:fs";
 import { DATA_DIR } from "../oracle-fs";
 import { normalizePeak, readWav } from "../wav";
 import { DRILLS, analyzeCalibration, playablesOf } from "@/io/calibration";
+import { correctsNothing } from "@/dsp";
 import {
   PROBE,
   assessSetup,
@@ -140,6 +141,62 @@ describe.skipIf(!HAVE)("a calibration recording", () => {
       expect(got.readback).not.toBeNull();
       expect(got.readback!.text).toBe("CQ DE W7YFR");
       expect(Math.abs(got.readback!.charWpm - WPM)).toBeLessThan(1);
+    });
+  });
+
+  describe("a path with nothing in it", () => {
+    /* The loopback capture of the same sweep. It is not a failure and it is
+       not a small correction — it is the answer "there is nothing here", and
+       it has to be told apart from a real measurement or the app stores a
+       profile that corrects nothing while every report made under it claims a
+       calibration was in force.
+
+       The criterion is the measurement's own resolution: an offset smaller
+       than the disagreement between the drills it came from is noise. The
+       corpus separates on it cleanly in both directions. */
+    it("measures the loopback as nothing to correct", () => {
+      const wav = load(`${DATA_DIR}/ft710-close/ft710-sweep-close-virtual.wav`);
+      const run = analyzeCalibration(wav.samples, wav.rate, WPM);
+      // Measurable — this is not a refusal.
+      expect(run.usable).toBe(true);
+      expect(run.reason).toBeNull();
+      expect(run.nothingToCorrect).toBe(true);
+      // And the offset really is inside the drills' own disagreement.
+      expect(run.calibration!.releaseOffsetSec).toBeLessThanOrEqual(
+        run.calibration!.spreadSec,
+      );
+    });
+
+    it("still finds something to correct through a microphone", () => {
+      // The same sweep, same room, same afternoon — through a webcam a few
+      // inches away, which is the closest a real microphone gets.
+      const wav = load(CLOSE);
+      const run = analyzeCalibration(wav.samples, wav.rate, WPM);
+      expect(run.nothingToCorrect).toBe(false);
+      expect(run.calibration!.releaseOffsetSec).toBeGreaterThan(
+        run.calibration!.spreadSec,
+      );
+    });
+
+    it("says so in its advice rather than describing a correction", () => {
+      const wav = load(`${DATA_DIR}/ft710-close/ft710-sweep-close-virtual.wav`);
+      const run = analyzeCalibration(wav.samples, wav.rate, WPM);
+      // Not the wording — that its advice is its own, and not the one a
+      // measured correction gets.
+      const mic = load(CLOSE);
+      expect(run.advice).not.toBe(
+        analyzeCalibration(mic.samples, mic.rate, WPM).advice,
+      );
+    });
+
+    it("treats an offset inside the noise as nothing, whatever its size", () => {
+      /* The rule scales itself, which is the point of tying it to the spread
+         rather than to a fixed number of milliseconds: a noisier measurement
+         has to find a larger offset before that offset means anything. */
+      const base = { wpm: 15, elements: 100 };
+      expect(correctsNothing({ ...base, releaseOffsetSec: 0.004, spreadSec: 0.006 })).toBe(true);
+      expect(correctsNothing({ ...base, releaseOffsetSec: 0.004, spreadSec: 0.002 })).toBe(false);
+      expect(correctsNothing({ ...base, releaseOffsetSec: 0, spreadSec: 0 })).toBe(true);
     });
   });
 

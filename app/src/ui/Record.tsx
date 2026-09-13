@@ -8,7 +8,7 @@
  */
 
 import type { InputDevice } from "@/capture/mic";
-import { orderProfiles, type Profile } from "@/io/profiles";
+import { profilesFor, type Profile } from "@/io/profiles";
 import { fmtElapsed } from "./format";
 import type { RecorderHandle } from "./useRecorder";
 
@@ -23,6 +23,27 @@ export function RecDot(): React.ReactElement {
     <span className="recdot" aria-hidden="true">
       ●
     </span>
+  );
+}
+
+/** The way to the configuration screen.
+ *
+ * Shared and identically placed on both screens, because a control that moves
+ * between screens is one somebody has to look for twice. Nothing behind it is
+ * needed to use the app — it is where things get tidied up, not where they get
+ * decided — so it sits out of the way and stays out of the tab order's path.
+ */
+export function Cog({ onClick }: { onClick(): void }): React.ReactElement {
+  return (
+    <button
+      className="cog"
+      onClick={onClick}
+      title="Configuration"
+      aria-label="Configuration"
+      data-testid="cog"
+    >
+      ⚙
+    </button>
   );
 }
 
@@ -151,7 +172,7 @@ export function RecordBar({
             onChange={(e) => onProfileChange(e.target.value || undefined)}
           >
             <option value="">No calibration</option>
-            {orderProfiles(profiles, deviceId).map((p) => (
+            {profilesFor(profiles, deviceId, profileId).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
               </option>

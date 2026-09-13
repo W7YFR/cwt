@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { Controls } from "@/ui/Controls";
+import { Controls, ViewControls } from "@/ui/Controls";
 import { defaultSettings } from "@/timing";
 import type { ReviewSettings } from "@/types";
 import { caseNamed, SLOPPY } from "../fixture";
@@ -39,14 +39,12 @@ function Harness({
           return next;
         })
       }
-      expectedSource="the oracle fixture"
       hasExpected
       playing={null}
       clock={null}
       onPlayYou={() => {}}
       onPlayTarget={() => {}}
       onStop={() => {}}
-      onFit={() => {}}
     />
   );
 }
@@ -57,14 +55,12 @@ describe("controls", () => {
     // and the intended-message field absorbs the slack, so a reading that
     // gains a digit drags the row and wraps the caption beside it. Dragging a
     // slider made that twitch once; zooming with the wheel made it constant.
-    const READOUTS = ["wpm-out", "farns-out", "tol-out", "gain-out", "zoom-out"];
+    const READOUTS = ["wpm-out", "farns-out", "tol-out", "gain-out"];
     const widthsFor = (container: HTMLElement) =>
       READOUTS.map((id) => container.querySelector(`#${id}`)!.textContent!.length);
 
     const narrow = render(
-      <Harness
-        initial={{ charWpm: 9, farnsworthWpm: 9, tolerance: 0.05, gainDb: 0, ppu: 4 }}
-      />,
+      <Harness initial={{ charWpm: 9, farnsworthWpm: 9, tolerance: 0.05, gainDb: 0 }} />,
     );
     const narrowWidths = widthsFor(narrow.container);
     // Checked before unmounting: the padding is real padding, not a
@@ -114,13 +110,11 @@ describe("controls", () => {
     const common = {
       settings: base,
       onChange: () => {},
-      expectedSource: null,
-      hasExpected: false,
+        hasExpected: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
       onStop: () => {},
-      onFit: () => {},
     };
     const { rerender } = render(<Controls {...common} playing={null} />);
     expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
@@ -133,13 +127,11 @@ describe("controls", () => {
     const common = {
       settings: defaultSettings(take),
       onChange: () => {},
-      expectedSource: null,
-      hasExpected: false,
+        hasExpected: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
       onStop: () => {},
-      onFit: () => {},
     };
     const { rerender } = render(<Controls {...common} playing={null} />);
     const button = screen.getByRole("button", { name: /Your sending/ });
@@ -157,19 +149,40 @@ describe("controls", () => {
       <Controls
         settings={defaultSettings(take)}
         onChange={() => {}}
-        expectedSource={null}
         hasExpected={false}
         playing={null}
         clock={null}
         onPlayYou={() => {}}
         onPlayTarget={() => {}}
         onStop={() => {}}
-        onFit={() => {}}
-      />,
+        />,
     );
     // Otherwise the accuracy figure reads as a grade rather than as a
     // tautology, which is exactly the misunderstanding worth heading off.
     expect(screen.getByText(/grading against your own decode/i)).toBeInTheDocument();
+  });
+
+  it("keeps what is graded apart from what is drawn", () => {
+    /* The row used to hold nine controls, four of which changed the grade and
+       three of which only changed the picture — indistinguishable from each
+       other, and a zoom slider beside a tolerance slider implies they are the
+       same sort of thing. The drawing controls live beside the drawing now. */
+    const take = takeFrom(caseNamed(SLOPPY));
+    const { container } = render(<Harness />);
+    for (const id of ["view", "zoom", "zoom-fit"]) {
+      expect(container.querySelector(`#${id}`)).toBeNull();
+    }
+
+    render(
+      <ViewControls
+        settings={defaultSettings(take)}
+        onChange={() => {}}
+        onFit={() => {}}
+      />,
+    );
+    for (const id of ["view", "zoom", "zoom-fit"]) {
+      expect(document.querySelector(`#${id}`)).not.toBeNull();
+    }
   });
 
   it("calls fit when the Fit button is pressed", async () => {
@@ -177,18 +190,7 @@ describe("controls", () => {
     const onFit = vi.fn();
     const take = takeFrom(caseNamed(SLOPPY));
     render(
-      <Controls
-        settings={defaultSettings(take)}
-        onChange={() => {}}
-        expectedSource={null}
-        hasExpected={false}
-        playing={null}
-        clock={null}
-        onPlayYou={() => {}}
-        onPlayTarget={() => {}}
-        onStop={() => {}}
-        onFit={onFit}
-      />,
+      <ViewControls settings={defaultSettings(take)} onChange={() => {}} onFit={onFit} />,
     );
     await user.click(screen.getByRole("button", { name: "Fit" }));
     expect(onFit).toHaveBeenCalledOnce();

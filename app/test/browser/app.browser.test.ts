@@ -323,6 +323,73 @@ describe("the app", () => {
     expect(short.left).toBeCloseTo(withName, 1);
   });
 
+  it("puts the scores on a row of their own, left-aligned", async () => {
+    /* They used to be pushed to the right of the top row, which worked when
+       that row held a brand and a record button. It now also holds a device
+       picker, a calibration picker and a cog, and the numbers landed wherever
+       those left room — a different place on every screen, which is the one
+       thing a row of figures read at a glance must not do. */
+    globalThis.fetch = bundleFetch();
+    await mount();
+
+    const band = container.querySelector<HTMLElement>(".scoresrow")!;
+    const scores = container.querySelector<HTMLElement>(".scores")!;
+    const bar = container.querySelector<HTMLElement>(".recordbar")!;
+
+    // Below the controls, not beside them.
+    expect(band.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      bar.getBoundingClientRect().bottom - 1,
+    );
+    // And starting at the same left edge as everything else above it.
+    const brand = container.querySelector<HTMLElement>(".brand")!.getBoundingClientRect();
+    expect(scores.getBoundingClientRect().left).toBeCloseTo(brand.left, 0);
+
+    /* Centred in its own band. In the header they were not: the line above
+       set the padding and the figures took whatever was left, which put them
+       a few pixels high. */
+    const outer = band.getBoundingClientRect();
+    const inner = scores.getBoundingClientRect();
+    // Against the interior: the rule under the band is part of its border box
+    // and would count as a pixel of space that is not space.
+    const rule = parseFloat(getComputedStyle(band).borderBottomWidth) || 0;
+    expect(inner.top - outer.top).toBeCloseTo(outer.bottom - rule - inner.bottom, 0);
+  });
+
+  it("has the same way into configuration from either screen", async () => {
+    /* A control that moves between screens is one somebody has to look for
+       twice, so it is the same component in the same place on both. */
+    globalThis.fetch = bundleFetch();
+    await mount();
+    const onReview = container
+      .querySelector<HTMLElement>("[data-testid='cog']")!
+      .getBoundingClientRect();
+
+    act(() => root!.unmount());
+    root = null;
+    container.remove();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+
+    globalThis.fetch = bundleFetch({ take: null });
+    await mount();
+    const onLanding = container
+      .querySelector<HTMLElement>("[data-testid='cog']")!
+      .getBoundingClientRect();
+
+    expect(onLanding.top).toBeCloseTo(onReview.top, 0);
+    expect(onLanding.right).toBeCloseTo(onReview.right, 0);
+  });
+
+  it("signs every screen", async () => {
+    // Read at render, not baked in at build time, so a page left open over
+    // New Year does not claim last year's copyright.
+    globalThis.fetch = bundleFetch();
+    await mount();
+    const foot = container.querySelector<HTMLElement>(".colophon")!;
+    expect(foot.textContent).toContain(String(new Date().getFullYear()));
+    expect(foot.textContent).toContain("W7YFR");
+  });
+
   it("offers a recording control on the review itself", async () => {
     // Having just seen where the spacing drifted, the next thing you want is
     // another go — without losing the speeds and tolerance you just set.

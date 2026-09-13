@@ -35,6 +35,13 @@ export interface ChartCallbacks {
   onHover?: (hit: HitResult | null, clientX: number, clientY: number) => void;
   /** The zoom changed from a wheel gesture, so the slider can follow. */
   onZoom?: (ppu: number) => void;
+  /** The view moved because of something the user did — a drag, a shift-wheel,
+   *  the scrollbar, or the anchoring that follows a zoom.
+   *
+   * Deliberately NOT fired by `scrollTo`, which is how one chart is driven
+   * from outside. Two charts kept in step would otherwise notify each other
+   * forever. */
+  onScroll?: (x: number) => void;
 }
 
 export interface ChartInput {
@@ -170,10 +177,11 @@ export function createChart(
 
   const contentXOf = (sx: number) => sx - GUTTER + scrollX;
 
-  function doScrollTo(x: number): void {
+  function doScrollTo(x: number, notify = true): void {
     const v = viewport();
     scrollX = x;
     clampScroll(v);
+    if (notify) callbacks.onScroll?.(scrollX);
     paint();
   }
 
@@ -203,6 +211,10 @@ export function createChart(
     scrollX = timeToX(layout!, t, "you") - at;
     clampScroll(viewport());
     callbacks.onZoom?.(v);
+    // Zooming moves the view as well as scaling it — it holds one moment still
+    // and everything else slides past. Anything following this chart has to
+    // hear about that or it drifts out of step on the first wheel gesture.
+    callbacks.onScroll?.(scrollX);
     paint();
   }
 
@@ -392,7 +404,7 @@ export function createChart(
       );
     },
 
-    scrollTo: doScrollTo,
+    scrollTo: (x: number) => doScrollTo(x, false),
 
     refreshTheme() {
       palette = readPalette(document.body);

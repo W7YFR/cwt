@@ -1,9 +1,14 @@
-/* The control row: transport, speeds, tolerance, level, intended text, view.
+/* The control row: transport, speeds, tolerance, level, intended text.
  *
  * Every one of these re-grades the recording rather than filtering a stored
  * result, which is why the intended-message box can be edited freely: typing a
  * different message is a legitimate question ("what if I had meant *this*"),
  * not a way to cheat a score that was fixed at record time.
+ *
+ * What is NOT here is anything that only changes how the chart is drawn — the
+ * axis, the zoom, whether rests are collapsed. Those answer "what am I looking
+ * at", not "what is being graded", and they live beside the thing they affect.
+ * See `ViewControls` below.
  */
 
 import { useCallback } from "react";
@@ -16,14 +21,12 @@ import { useUpperField } from "./useUpperField";
 export interface ControlsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
-  expectedSource: string | null;
   hasExpected: boolean;
   playing: "you" | "tgt" | null;
   clock: number | null;
   onPlayYou(): void;
   onPlayTarget(): void;
   onStop(): void;
-  onFit(): void;
 }
 
 export function Controls(props: ControlsProps): React.ReactElement {
@@ -121,12 +124,13 @@ export function Controls(props: ControlsProps): React.ReactElement {
       <div className="group grow">
         <label htmlFor="expected">
           Intended message{" "}
+          {/* Where it came from is not worth a line. The box says what it is
+              and holds what it holds; "from what you said you'd send" only
+              restates the label. What IS worth saying is the case where the
+              box is empty, because then the grade is against the decoder's own
+              reading and the accuracy figure is a meaningless 100%. */}
           <span className="hint">
-            {props.expectedSource
-              ? `from ${props.expectedSource}`
-              : props.hasExpected
-                ? ""
-                : "(none given — grading against your own decode)"}
+            {props.hasExpected ? "" : "(none given — grading against your own decode)"}
           </span>
         </label>
         <input
@@ -140,6 +144,28 @@ export function Controls(props: ControlsProps): React.ReactElement {
         />
       </div>
 
+    </section>
+  );
+}
+
+export interface ViewControlsProps {
+  settings: ReviewSettings;
+  onChange(patch: Partial<ReviewSettings>): void;
+  onFit(): void;
+}
+
+/** How the chart is drawn, next to the chart.
+ *
+ * Separated from the controls above because they answer a different question.
+ * Everything up there changes the grade; nothing down here does — the axis,
+ * the zoom and the rest policy change what is on screen and leave every number
+ * exactly where it was. Mixed into one row of nine controls, the two kinds
+ * were indistinguishable, and a zoom slider sitting beside a tolerance slider
+ * implies they are the same sort of thing. */
+export function ViewControls(props: ViewControlsProps): React.ReactElement {
+  const { settings: s, onChange } = props;
+  return (
+    <section className="viewcontrols">
       <div className="group">
         <label htmlFor="view">View</label>
         <select

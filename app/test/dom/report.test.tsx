@@ -141,6 +141,24 @@ describe("the report", () => {
     expect(screen.queryByText(/Accuracy vs intended text/)).not.toBeInTheDocument();
   });
 
+  it("shows both texts whole, not only where they parted company", () => {
+    /* The diff marks up the differences and never shows either text entire,
+       and "3 sub · 1 extra" means very little until you can see what was asked
+       for and what came back. */
+    const { review } = reviewFrom(caseNamed(SLOPPY));
+    render(
+      <Report
+        review={review}
+        tolerance={0.3}
+        onPlayDeviation={() => {}}
+        onFocus={() => {}}
+      />,
+    );
+    const c = review.comparison!;
+    expect(screen.getByTestId("intended-text").textContent).toBe(c.expected);
+    expect(screen.getByTestId("decoded-text").textContent).toBe(c.decoded);
+  });
+
   it("counts the rests it left out of the grade", () => {
     const { review: rested } = reviewFrom(caseNamed(SLOPPY), { collapseRests: true });
     if (rested.analysis.nPauses === 0) return;

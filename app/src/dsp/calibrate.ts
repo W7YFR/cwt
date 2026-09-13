@@ -159,3 +159,29 @@ export function calibrationIsUsable(c: Calibration): boolean {
   const ditSec = 1.2 / c.wpm;
   return c.spreadSec <= 0.25 * ditSec;
 }
+
+/** Is there anything here to correct?
+ *
+ * A calibration whose offset is smaller than the disagreement between the
+ * drills it came from has not measured a correction; it has measured its own
+ * noise. Saving one would record a profile that changes nothing — the apply
+ * step already returns early on a zero offset — while every report made under
+ * it claims a calibration was in force.
+ *
+ * The criterion is the measurement's own resolution rather than a number
+ * chosen to look reasonable, and the corpus separates cleanly on it:
+ *
+ * | setup                          | offset  | drills disagree by |
+ * |--------------------------------|---------|--------------------|
+ * | loopback, ft710 sweep          | 0.44 ms | 0.63 ms            |
+ * | loopback, k3ng drills          | 0.38 ms | 0.50 ms            |
+ * | webcam a few inches away       | 2.75 ms | 1.00 ms            |
+ * | webcam at four feet            | 13.3 ms | 0.38 ms            |
+ *
+ * Both paths with nothing in them fall below their own spread; both real
+ * microphones clear it, the far one by thirty-five times. It also scales
+ * itself: a noisy measurement has to find a larger offset before that offset
+ * means anything, which is the behavior wanted. */
+export function correctsNothing(c: Calibration): boolean {
+  return !(c.releaseOffsetSec > c.spreadSec);
+}

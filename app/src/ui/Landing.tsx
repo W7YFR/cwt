@@ -12,7 +12,7 @@ import { MIC_SOURCE } from "@/io/take";
 import { orderProfiles, type Profile } from "@/io/profiles";
 import type { AudioClip } from "@/types";
 import { fmtElapsed } from "./format";
-import { DevicePicker, LevelMeter, RecDot } from "./Record";
+import { Cog, DevicePicker, LevelMeter, RecDot } from "./Record";
 import { Wordmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 import { useRecorder } from "./useRecorder";
@@ -65,18 +65,7 @@ export function Landing(props: LandingProps): React.ReactElement {
 
   return (
     <div className="landing">
-      {/* Top right and small. Nothing behind it is needed to use the app —
-          it is where things get tidied up, not where they get decided. */}
-      <button
-        className="cog"
-        onClick={props.onConfigure}
-        title="Configuration"
-        aria-label="Configuration"
-        data-testid="cog"
-      >
-        ⚙
-      </button>
-
+      <Cog onClick={props.onConfigure} />
       <Wordmark art={visitWordmark()} />
 
       <p className="lede">

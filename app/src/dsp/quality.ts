@@ -288,7 +288,12 @@ export function setupAdvice(q: SetupQuality): string {
     case "clean":
       return "Nothing measurable between your keyer and the decoder — this reads at any speed you can send.";
     case "good":
-      return `A little is added to every element, but not enough to matter up to about ${wpm} wpm.`;
+      /* Named subject, not the passive. "A little is added to every element"
+         sits a few lines under "0.8 ms off every element" and reads as a
+         contradiction, because nothing says the two sentences are about
+         different actors: the setup lengthens the elements, and the
+         correction takes that back off. Say which is which. */
+      return `Your setup adds a little to every element, but not enough to matter up to about ${wpm} wpm.`;
     case "marginal":
       return (
         "If you're using a physical microphone to listen to your sidetone, try " +

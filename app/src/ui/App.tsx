@@ -268,6 +268,10 @@ export function App(): React.ReactElement {
           /* One control, two effects, both wanted: it is the calibration the
              next recording will be made under, and the recording on screen is
              read again through it. */
+          onConfigure={() => {
+            setError(null);
+            setConfiguring(true);
+          }}
           onProfileChange={async (id) => {
             chooseProfile(id);
             await take.recalibrate(profiles.find((p) => p.id === id) ?? null);
@@ -299,6 +303,18 @@ export function App(): React.ReactElement {
           }}
         />
       )}
+
+      <Footer />
     </div>
+  );
+}
+
+/** Read at render rather than baked in at build time, so a page left open over
+ *  New Year does not claim last year's copyright. */
+function Footer(): React.ReactElement {
+  return (
+    <footer className="colophon">
+      © {new Date().getFullYear()} W7YFR
+    </footer>
   );
 }

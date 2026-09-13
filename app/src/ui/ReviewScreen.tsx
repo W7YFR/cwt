@@ -19,8 +19,8 @@ import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
-import { Controls } from "./Controls";
-import { RecordBar } from "./Record";
+import { Controls, ViewControls } from "./Controls";
+import { Cog, RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
@@ -55,6 +55,7 @@ export interface ReviewScreenProps {
   profileId: string | undefined;
   onProfileChange(id: string | undefined): Promise<void> | void;
   onDeviceChange(id: string | undefined): void;
+  onConfigure(): void;
   onBack(): void;
 }
 
@@ -81,6 +82,7 @@ export function ReviewScreen({
   profileId,
   onProfileChange,
   onDeviceChange,
+  onConfigure,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
   const rec = useRecorder({
@@ -286,6 +288,7 @@ export function ReviewScreen({
 
   return (
     <>
+      <Cog onClick={onConfigure} />
       <header>
         <h1 className="brand">
           {/* The name is the way home. Nothing else on this screen is a
@@ -315,7 +318,6 @@ export function ReviewScreen({
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
         />
-        <Scores review={review} settings={settings} take={loaded.take} />
         {/* Last, and on a row of its own: a filename is the one thing here
             whose width nobody controls, and beside the brand it pushed the
             record controls around by however long it happened to be.
@@ -327,23 +329,36 @@ export function ReviewScreen({
         )}
       </header>
 
+      {/* A band of its own rather than a line of the header. In the header the
+          figures were vertically off-centre — the row above them sets the
+          padding and they got whatever was left — and they are the one thing
+          on this screen read at a glance. */}
+      <section className="scoresrow">
+        <Scores review={review} settings={settings} take={loaded.take} />
+      </section>
+
       <Controls
         settings={settings}
         onChange={onChange}
-        expectedSource={loaded.take.expectedSource}
         hasExpected={!!loaded.take.expected}
         playing={playing}
         clock={clock}
         onPlayYou={() => void playYou()}
         onPlayTarget={() => playTarget()}
         onStop={stop}
-        onFit={() => {
-          const ppu = handle.chart?.fit();
-          if (ppu !== undefined) onChange({ ppu });
-        }}
       />
 
       <section className="canvas-wrap">
+        {/* Right above the thing they affect. None of these changes a number
+            on the page — they change what is on screen. */}
+        <ViewControls
+          settings={settings}
+          onChange={onChange}
+          onFit={() => {
+            const ppu = handle.chart?.fit();
+            if (ppu !== undefined) onChange({ ppu });
+          }}
+        />
         <ChartView
           review={review}
           settings={settings}

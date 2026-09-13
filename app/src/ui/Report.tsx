@@ -140,6 +140,20 @@ export function Report({
       {c && (
         <div className="card">
           <h2>Accuracy vs intended text</h2>
+          {/* The two texts, before the arithmetic about them. The diff below
+              shows where they parted company but never shows either one whole,
+              and "3 sub · 1 extra" means very little until you can see what
+              was asked for and what came back. */}
+          <dl className="texts">
+            <div>
+              <dt>Intended</dt>
+              <dd data-testid="intended-text">{c.expected}</dd>
+            </div>
+            <div>
+              <dt>Decoded</dt>
+              <dd data-testid="decoded-text">{c.decoded}</dd>
+            </div>
+          </dl>
           <p className="note">
             {c.nExpected} symbols · {c.substitutions} sub · {c.insertions} extra ·{" "}
             {c.deletions} missed

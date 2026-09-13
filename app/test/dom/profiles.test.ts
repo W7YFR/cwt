@@ -14,6 +14,7 @@ import {
   loadProfiles,
   orderProfiles,
   profileForSource,
+  profilesFor,
   saveProfile,
   selectProfile,
   suggestedName,
@@ -131,5 +132,40 @@ describe("keeping calibrations", () => {
     expect(suggestedName(undefined, "2026-09-12T10:00:00+00:00")).toBe(
       "Calibration 2026-09-12",
     );
+  });
+});
+
+describe("which calibrations may be applied to a recording", () => {
+  /* `orderProfiles` sorts the likely ones up and keeps the rest, which is
+     right where a calibration is being chosen — you may be about to switch
+     inputs. It is wrong where one is being applied to a recording already
+     made: a profile measured on another microphone describes another setup,
+     and correcting by it is the exact mistake named profiles exist to
+     prevent. */
+  const webcam = profile({ id: "w1", deviceId: "webcam" });
+  const yeti = profile({ id: "y1", deviceId: "yeti", nickname: "yeti" });
+  const dflt = profile({ id: "d1", deviceId: undefined, nickname: "default in" });
+  const all = [webcam, yeti, dflt];
+
+  it("offers only the ones measured on that input", () => {
+    expect(profilesFor(all, "webcam").map((p) => p.id)).toEqual(["w1"]);
+    expect(profilesFor(all, "yeti").map((p) => p.id)).toEqual(["y1"]);
+  });
+
+  it("treats the default input as an input of its own", () => {
+    // Not a wildcard: a profile made on whatever the default happened to be
+    // describes that device, not every device.
+    expect(profilesFor(all, undefined).map((p) => p.id)).toEqual(["d1"]);
+  });
+
+  it("keeps the one in use even when it does not belong", () => {
+    /* It may not belong, but it is what is being applied. A picker that
+       silently omits its own value shows a blank and tells the operator
+       nothing about why. */
+    expect(profilesFor(all, "webcam", "y1").map((p) => p.id).sort()).toEqual(["w1", "y1"]);
+  });
+
+  it("offers nothing when nothing was measured on that input", () => {
+    expect(profilesFor(all, "someone-elses-mic")).toEqual([]);
   });
 });

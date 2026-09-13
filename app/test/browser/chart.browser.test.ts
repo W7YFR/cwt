@@ -130,6 +130,55 @@ describe("the chart in a browser", () => {
     expect(onPlayChar).not.toHaveBeenCalled();
   });
 
+  it("reports a pan, so a second chart can follow it", () => {
+    /* What makes two charts of the same recording comparable: they move
+       together. The contract is narrow and one half of it is the important
+       half — see the test below. */
+    const onScroll = vi.fn();
+    chart.destroy();
+    chart = createChart(host, canvas, { onScroll });
+    chart.update({ review, settings: { ...settings, ppu: 40 }, focus: null });
+
+    const at = (type: string, x: number, target: EventTarget) =>
+      target.dispatchEvent(
+        new MouseEvent(type, { clientX: x, clientY: 80, bubbles: true }),
+      );
+    at("mousedown", 400, canvas);
+    at("mousemove", 300, window);
+    at("mouseup", 300, window);
+
+    expect(onScroll).toHaveBeenCalled();
+    expect(onScroll.mock.calls.at(-1)![0]).toBeGreaterThan(0);
+  });
+
+  it("stays quiet when it is scrolled from outside", () => {
+    /* The half that matters. `scrollTo` is how one chart is driven by another,
+       so reporting it would have each telling the other about a move the other
+       just asked for — forever, on the first drag. */
+    const onScroll = vi.fn();
+    chart.destroy();
+    chart = createChart(host, canvas, { onScroll });
+    chart.update({ review, settings: { ...settings, ppu: 40 }, focus: null });
+
+    chart.scrollTo(120);
+    expect(onScroll).not.toHaveBeenCalled();
+  });
+
+  it("reports the view moving when a wheel zoom slides it", () => {
+    /* Zooming is not only a scale change: it holds one moment under the
+       pointer still and everything else slides past. A follower told only
+       about the new zoom would land somewhere else entirely. */
+    const onScroll = vi.fn();
+    chart.destroy();
+    chart = createChart(host, canvas, { onScroll });
+    chart.update({ review, settings: { ...settings, ppu: 40 }, focus: null });
+
+    canvas.dispatchEvent(
+      new WheelEvent("wheel", { deltaY: -240, clientX: 600, clientY: 60, bubbles: true }),
+    );
+    expect(onScroll).toHaveBeenCalled();
+  });
+
   it("plays a character when one is clicked without dragging", () => {
     const onPlayChar = vi.fn();
     chart.destroy();

@@ -32,7 +32,7 @@ import {
   type CalibrationRun,
 } from "@/io/calibration";
 import { keepCalibration, linkCalibration, loadPrefs, savePrefs } from "@/io/storage";
-import { normalized } from "@/dsp";
+import { correctsNothing, normalized } from "@/dsp";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { createPlayer, type Player } from "@/audio/player";
 import { CAL_CORRECTION_HELP, CAL_MAXWPM_HELP, CAL_TAIL_HELP } from "./copy";
@@ -320,6 +320,7 @@ export function Calibrate(props: CalibrateProps): React.ReactElement {
         clip={clip}
         expected={expected}
         onExpected={setExpected}
+        wpm={wpm}
         offsetSec={offsetSec}
         onOffsetSec={setOffsetSec}
         nickname={nickname}
@@ -482,6 +483,13 @@ export function Calibrate(props: CalibrateProps): React.ReactElement {
  * through the second of drill that follows it. */
 const CALL_SEC = 0.7;
 
+/** Steps per millisecond on the correction control.
+ *
+ * Tenths. The drills resolve to about a tenth of a millisecond on a good
+ * recording and nothing downstream can tell finer apart, so a finer control
+ * would only offer precision that is not there. */
+const STEPS_PER_MS = 10;
+
 export function Cue({
   drill,
   into,
@@ -521,6 +529,8 @@ interface ResultProps {
   clip: AudioClip | null;
   expected: string;
   onExpected(text: string): void;
+  /** The speed the keyer was stated to be set to — the preview's yardstick. */
+  wpm: number;
   /** A correction set by hand, or null for the measured one. */
   offsetSec: number | null;
   onOffsetSec(v: number | null): void;
@@ -626,11 +636,19 @@ function Advanced({
   onChange(v: number | null): void;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
+  /* What is in the number box while it is being typed in, or null when it is
+     simply showing the value. Without it, typing "1" into a box reading "10.8"
+     rewrites it to "1.0" under the caret and the next digit lands in the wrong
+     place — the same trap as the keyer-speed field. */
+  const [typed, setTyped] = useState<string | null>(null);
+
   const current = value ?? measuredSec;
   // Two dits at the speed it was calibrated at. Past that the guard in the DSP
   // is doing all the work anyway.
   const max = Math.max(2 * (1.2 / (wpm || 15)), measuredSec * 2);
   const changed = value !== null && value !== measuredSec;
+  const steps = Math.round(current * 1000 * STEPS_PER_MS);
+  const shown = typed ?? (steps / STEPS_PER_MS).toFixed(1);
 
   return (
     <div className="advanced" data-testid="advanced" data-open={String(open)}>
@@ -639,23 +657,44 @@ function Advanced({
       </button>
       {open && (
         <div className="advbody">
-          <label htmlFor="cal-offset">
-            Correction{" "}
-            <output id="cal-offset-out" data-testid="offset-out">
-              {(current * 1000).toFixed(1)} ms
-            </output>
-          </label>
+          <label htmlFor="cal-offset">Correction</label>
           <div className="sliderow">
             <input
               type="range"
               id="cal-offset"
               min={0}
-              max={Math.round(max * 10000)}
+              max={STEPS_PER_MS * max * 1000}
               step={1}
-              value={Math.round(current * 10000)}
+              value={steps}
               data-testid="offset"
-              onChange={(e) => onChange(Number(e.target.value) / 10000)}
+              onChange={(e) => onChange(Number(e.target.value) / STEPS_PER_MS / 1000)}
             />
+            {/* The same number, typed. A slider is the right control for
+                hunting — drag it and watch the chart — and the wrong one for
+                landing on a figure you already have in mind, which is what
+                somebody comparing two calibrations is doing. */}
+            <span className="numfield">
+              <input
+                type="number"
+                min={0}
+                max={(max * 1000).toFixed(1)}
+                step={1 / STEPS_PER_MS}
+                value={shown}
+                aria-label="Correction in milliseconds"
+                data-testid="offset-ms"
+                onChange={(e) => {
+                  setTyped(e.target.value);
+                  const v = Number(e.target.value);
+                  // An empty or half-typed box is not a value to apply; it is
+                  // somebody mid-keystroke. The last good one stays in force.
+                  if (e.target.value.trim() !== "" && Number.isFinite(v)) {
+                    onChange(Math.min(Math.max(v, 0), max * 1000) / 1000);
+                  }
+                }}
+                onBlur={() => setTyped(null)}
+              />
+              <span className="unit">ms</span>
+            </span>
             <button onClick={() => onChange(null)} disabled={!changed}>
               Reset
             </button>
@@ -688,11 +727,33 @@ function Result(props: ResultProps): React.ReactElement {
      a finding and is not one, and on a screen already reporting that something
      went wrong it is one more thing to take in for no gain. */
   const told = run.quality.verdict !== "unknown";
+  /* Computed from the offset in force rather than from the measurement, so
+     that deliberately dialing one in on the Advanced panel turns saving back
+     on — and dialing it back to nothing turns it off again. */
+  const nothing = !run.calibration || correctsNothing(run.calibration);
+  const canSave = run.usable && !nothing;
+  /* "Great" rather than "Good" when the drills found nothing to correct: the
+     tail verdict describes what the setup does to a release, and this says
+     the elements are arriving at the length they were sent, which is more
+     than the tail alone can tell you. Only where the tail agrees — a setup
+     the decay calls marginal is not great whatever the drills say. */
+  const verdictLabel =
+    nothing && (run.quality.verdict === "clean" || run.quality.verdict === "good")
+      ? "Great"
+      : (VERDICT_LABEL[run.quality.verdict] ?? run.quality.verdict);
 
   return (
     <div className="calibrate result">
-      <h2 data-testid="outcome" data-usable={String(run.usable)}>
-        {run.usable ? "Measured" : "Something's not working"}
+      <h2
+        data-testid="outcome"
+        data-usable={String(run.usable)}
+        data-nothing={String(nothing && run.usable)}
+      >
+        {!run.usable
+          ? "Something's not working"
+          : nothing
+            ? "Nothing to correct"
+            : "Measured"}
       </h2>
 
       {run.problem && (
@@ -710,7 +771,7 @@ function Result(props: ResultProps): React.ReactElement {
               data-testid="verdict"
               data-verdict={run.quality.verdict}
             >
-              {VERDICT_LABEL[run.quality.verdict] ?? run.quality.verdict}
+              {verdictLabel}
             </dd>
           </div>
         )}
@@ -726,10 +787,15 @@ function Result(props: ResultProps): React.ReactElement {
             <dd>{run.quality.maxWpm} wpm</dd>
           </div>
         )}
-        {run.calibration && (
+        {run.calibration && !nothing && (
           <div>
             <dt title={CAL_CORRECTION_HELP}>Correction</dt>
-            <dd>{ms(run.calibration.releaseOffsetSec)} off every element</dd>
+            {/* Says what happens, rather than naming a direction and leaving
+                the reader to work out whose. The offset is not removed from
+                the recording — it is moved across the boundary between a mark
+                and the silence after it, which is exactly where a tail put it
+                in the first place. */}
+            <dd>{ms(run.calibration.releaseOffsetSec)} moves from the mark to the gap</dd>
           </div>
         )}
       </dl>
@@ -764,7 +830,12 @@ function Result(props: ResultProps): React.ReactElement {
               data-testid="cal-expected"
             />
           </label>
-          <CalPreview clip={props.clip} run={run} expected={props.expected} />
+          <CalPreview
+            clip={props.clip}
+            run={run}
+            expected={props.expected}
+            wpm={props.wpm}
+          />
         </>
       )}
 
@@ -779,7 +850,7 @@ function Result(props: ResultProps): React.ReactElement {
 
       <p className="lede advice">{run.advice}</p>
 
-      {run.usable ? (
+      {canSave ? (
         <>
           <label className="group">
             Name this calibration to reuse it later
@@ -799,6 +870,17 @@ function Result(props: ResultProps): React.ReactElement {
             <button onClick={props.onRetry}>Record again</button>
           </div>
         </>
+      ) : nothing && run.usable ? (
+        /* Nothing measured means nothing to store. A profile whose offset is
+           inside its own noise corrects nothing when applied — the apply step
+           returns early on it — while every report made under it would claim a
+           calibration was in force. So the way out is to leave without one. */
+        <div className="rowbuttons">
+          <button className="big" onClick={props.onClose}>
+            Skip
+          </button>
+          <button onClick={props.onRetry}>Record again</button>
+        </div>
       ) : (
         <div className="rowbuttons">
           <button className="big" onClick={props.onRetry}>

@@ -149,6 +149,31 @@ export function orderProfiles(
   ];
 }
 
+/** Only the profiles that belong to this input.
+ *
+ * `orderProfiles` sorts the likely ones to the top and keeps the rest, which
+ * is right where a calibration is being *chosen* — you may be about to switch
+ * inputs, and a list that hides everything else looks broken. It is wrong
+ * where a calibration is being *applied* to a recording already made: a
+ * profile measured on another microphone describes another setup, and
+ * correcting by it is the exact mistake named profiles exist to prevent.
+ *
+ * `undefined` is a real device id here and means the default input, so it
+ * matches only other profiles made on the default input.
+ *
+ * The one in use is always kept, even when it does not match. It may not
+ * belong, but it is what is being applied, and a picker that silently omits
+ * its own value shows a blank and tells the operator nothing. */
+export function profilesFor(
+  profiles: readonly Profile[],
+  deviceId: string | undefined,
+  keep?: string | undefined,
+): Profile[] {
+  return orderProfiles(profiles, deviceId).filter(
+    (p) => p.deviceId === deviceId || p.id === keep,
+  );
+}
+
 /* ---- which one is in use ------------------------------------------------- */
 
 /** The profile the decoder is applying, or null for none.

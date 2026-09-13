@@ -131,13 +131,47 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .recordbar .meter { width: 90px; height: 6px; }
 .recordbar select { font-size: 12px; padding: 4px 26px 4px 6px; background-position: right 9px center; }
 
-.scores { display: flex; flex-wrap: wrap; gap: 18px; margin-left: auto; }
+/* A band of its own, left-aligned, always.
+ *
+ * These used to be pushed to the right of the header with `margin-left:auto`,
+ * which worked when that row held a brand and a record button. It now also
+ * holds a device picker, a calibration picker and a cog, and the numbers were
+ * landing wherever those left room — a different place on every screen, which
+ * is the one thing a row of figures read at a glance must not do.
+ *
+ * A band rather than another line of the header, because inside it they were
+ * also vertically off-centre: the line above set the padding and the figures
+ * took what was left. Their own section has its own symmetric padding and
+ * nothing else in it to negotiate with. */
+.scoresrow {
+  display: flex;
+  align-items: center;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.scores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
 .score { display: flex; align-items: baseline; gap: 6px; }
 .score b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .score span { color: var(--ink-dim); font-size: 12px; }
 .score.ok b { color: var(--ok); }
 .score.warn b { color: var(--warn); }
 .score.bad b { color: var(--bad); }
+
+/* The chart's own controls, in a strip above it. Not styled as the panel the
+   grading controls are: they belong to the picture, not to the numbers. */
+.viewcontrols {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 22px;
+  padding: 0 0 10px;
+}
 
 /* ---- controls ---------------------------------------------------------- */
 .controls {
@@ -400,7 +434,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
    own styling, carried over unchanged so the chart looks the same as it did. */
 
 #root { min-height: 100vh; display: flex; flex-direction: column; }
-.app { display: flex; flex-direction: column; min-height: 100vh; }
+.app { position: relative; display: flex; flex-direction: column; min-height: 100vh; }
 
 /* ---- landing ------------------------------------------------------------ */
 .landing {
@@ -854,20 +888,54 @@ button.primary { border-color: var(--you); color: var(--ink); }
    placement outranks every number this page prints. */
 .privacy { font-size: 12px; color: var(--ink-faint); margin: 4px 0 0; }
 
-/* Configuration, and the way in to it. */
+/* Last line on every screen. Pushed to the bottom by the app's own column, so
+   it sits under short pages rather than floating in the middle of them. */
+.colophon {
+  margin-top: auto;
+  padding: 16px 20px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* What was asked for and what came back, above the arithmetic about them.
+   Monospaced and on their own lines: these are call signs and the point is
+   comparing them character by character. */
+.texts { margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
+.texts > div { display: flex; gap: 10px; align-items: baseline; }
+.texts dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+  min-width: 7ch;
+}
+.texts dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  word-break: break-word;
+}
+
+/* Configuration, and the way in to it.
+ *
+ * Positioned against the app rather than against either screen, so it lands in
+ * the same place on both — a control that moves between screens is one
+ * somebody has to look for twice. Above the header's own stacking so it stays
+ * clickable over it. */
 .cog {
   position: absolute;
-  top: 14px;
+  top: 10px;
   right: 16px;
-  font-size: 18px;
+  z-index: 5;
+  font-size: 27px;
   line-height: 1;
-  padding: 6px 9px;
+  padding: 4px 8px;
   background: none;
   border: 1px solid transparent;
   color: var(--ink-dim);
 }
 .cog:hover { color: var(--ink); border-color: var(--line); }
-.landing { position: relative; }
 
 .settings {
   flex: 1;
@@ -914,8 +982,13 @@ button.danger { border-color: var(--bad); color: var(--bad); }
   background: var(--panel);
   max-width: 46ch;
 }
-.advanced .advbody input[type="range"] { width: 220px; }
-.advanced .sliderow { display: flex; align-items: center; gap: 10px; }
+.advanced .advbody input[type="range"] { width: 180px; }
+.advanced .sliderow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+/* The typed value and its unit read as one control, so the unit sits inside
+   the field's frame rather than floating beside it. */
+.numfield { display: inline-flex; align-items: baseline; gap: 4px; }
+.numfield input { width: 5.5em; text-align: right; }
+.numfield .unit { font-size: 12px; color: var(--ink-dim); }
 .advanced .hint { margin: 0; }
 
 /* The two charts, one above the other and the same width, because the whole

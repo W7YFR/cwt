@@ -94,7 +94,8 @@ export const CAL_MAXWPM_HELP =
   "correctly at. Send faster than this and elements start running together.";
 
 export const CAL_CORRECTION_HELP =
-  "How much longer every mark reads than it was keyed. It gets taken off each " +
-  "mark and given back to the gap after it, so the total length never changes. " +
+  "How much longer every mark reads than it was keyed. That much time is moved " +
+  "from the end of each mark into the silence that follows it, so the total " +
+  "length of the recording never changes — only the boundary between them. " +
   "Measured by holding a paddle at a speed you state: the keyer supplies the " +
   "true element length, so the difference is what your setup is adding.";

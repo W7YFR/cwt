@@ -22,6 +22,7 @@ import {
   PROBE,
   assessSetup,
   calibrationIsUsable,
+  correctsNothing,
   measureCalibration,
   pairDrills,
   segmentsFrom,
@@ -160,6 +161,14 @@ export interface CalibrationRun {
   readonly quality: SetupQuality;
   /** Whether the profile is worth storing and applying. */
   readonly usable: boolean;
+  /** The recording was measurable and the answer was "nothing".
+   *
+   * Not a failure — it is the best outcome there is, and the one every
+   * loopback path gives. It is kept apart from `usable` because the two lead
+   * somewhere different: a usable profile is worth naming and saving, and a
+   * profile that corrects nothing is worth knowing about and not worth
+   * storing. See `correctsNothing`. */
+  readonly nothingToCorrect: boolean;
   /** What went wrong, as a code. Null when nothing did. */
   readonly reason: CalibrationProblem | null;
   /** The same thing in the operator's terms. */
@@ -315,6 +324,7 @@ export function analyzeCalibration(
     calibration: null,
     quality,
     usable: false,
+    nothingToCorrect: false,
     reason,
     problem,
     advice,
@@ -380,14 +390,20 @@ export function analyzeCalibration(
     );
   }
 
+  const nothing = correctsNothing(calibration);
   return {
     sections,
     calibration,
     quality,
     usable: true,
+    nothingToCorrect: nothing,
     reason: null,
     problem: null,
-    advice: setupAdvice(quality),
+    advice: nothing
+      ? "Your keying is arriving at the length it was sent — nothing is being " +
+        "added to your elements, so there is nothing to take back off. Record " +
+        "as you are."
+      : setupAdvice(quality),
     readback: readbackOf(samples, rate, sections, calibration),
   };
 }
