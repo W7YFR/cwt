@@ -10,6 +10,8 @@ import type { Segment } from "@/types";
 import { envelope, DEFAULT_BANDWIDTH } from "./envelope";
 import { thresholdCurve } from "./level";
 import { fillRippleGaps } from "./ripple";
+import { correctionWeight, edgeTransitionSec, refineEdges } from "./edges";
+import { localPeak, LEVEL_WINDOW_SEC } from "./level";
 import { keyingThreshold } from "./threshold";
 import { detectTone } from "./tone";
 import { runLengths, debounce, percentile } from "./segments";
@@ -18,6 +20,7 @@ export * from "./envelope";
 export * from "./filters";
 export * from "./level";
 export * from "./ripple";
+export * from "./edges";
 export * from "./segments";
 export * from "./threshold";
 export * from "./tone";
@@ -115,7 +118,16 @@ export function segmentsFrom(
   // rather than by how long it lasted — see ripple.ts.
   const binary = fillRippleGaps(crossed, env, curve);
 
-  const raw = runLengths(binary, rate);
+  // Detection is done; measurement is a separate question. Where the edges
+  // are slower than the envelope's own resolution — a room, not a keyer — the
+  // threshold no longer sits at an unbiased height on them, so the boundaries
+  // are re-placed at half the local steady level. Weighted by how slow they
+  // actually are, which is zero for a recording that never needed it.
+  const peak = localPeak(env, rate, LEVEL_WINDOW_SEC);
+  const weight = correctionWeight(edgeTransitionSec(binary, env, peak, rate));
+  const raw = weight > 0
+    ? refineEdges(binary, env, peak, rate, weight)
+    : runLengths(binary, rate);
   const segments = deglitch(raw);
 
   return { toneHz, segments, threshold };

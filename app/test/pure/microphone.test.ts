@@ -28,17 +28,24 @@ const MARKS = 31;
 function decode(file: string) {
   const wav = readWav(`${DATA_DIR}/${file}`);
   const got = segmentsFrom(normalizePeak(wav.samples), wav.rate);
-  const marks = got.segments.filter((s) => s[0] === 1).length;
+  const all = got.segments.filter((s) => s[0] === 1).map((s) => s[1]).sort((a, b) => a - b);
+  const marks = all.length;
+  // "CQ DE W7YFR" is 16 dits and 15 dahs, so the split sits just past halfway.
+  const cut = Math.round(marks * 0.52);
+  const avg = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0);
+  const ditDah = avg(all.slice(cut)) / (avg(all.slice(0, cut)) || 1);
   let text = "";
   let unitMs = 0;
+  let wpmOf = 0;
   try {
     const timing = estimateTiming(got.segments, SENT);
     unitMs = timing.unitSec * 1000;
+    wpmOf = timing.charWpm;
     text = buildTimeline(got.segments, timing).text;
   } catch {
     text = "";
   }
-  return { marks, text, unitMs, toneHz: got.toneHz };
+  return { marks, text, unitMs, ditDah, wpm: wpmOf, toneHz: got.toneHz };
 }
 
 describe("the same sending down three different capture paths", () => {
@@ -74,6 +81,22 @@ describe("the same sending down three different capture paths", () => {
     const got = decode("cq-de-w7yfr-mic-1.wav");
     expect(got.marks).toBe(MARKS);
     expect(got.text).toBe(SENT);
+  });
+
+  it("measures the webcam recording at the speed it was actually sent", () => {
+    // The assertion that matters for a tool that grades keying, and the one
+    // that reading the text correctly does not imply. The same performance
+    // down both paths has to come back as the same performance — otherwise the
+    // app tells someone they send at 31 wpm with clipped dits when they send
+    // at 25 with good ones, and they would go and "fix" their keying.
+    const clean = decode("cq-de-w7yfr-virtual.wav");
+    const mic = decode("cq-de-w7yfr-mic-1.wav");
+    expect(Math.abs(mic.wpm - clean.wpm), `${mic.wpm.toFixed(2)} vs ${clean.wpm.toFixed(2)} wpm`)
+      .toBeLessThan(1.5);
+    // And the shape of the elements, not just their rate. Three to one is the
+    // standard; the threshold used to read this recording at 3.87.
+    expect(mic.ditDah, `dit:dah ${mic.ditDah.toFixed(2)}`).toBeGreaterThan(2.7);
+    expect(mic.ditDah, `dit:dah ${mic.ditDah.toFixed(2)}`).toBeLessThan(3.4);
   });
 
   it("no longer shatters the condenser recording, though it still misreads it", () => {
