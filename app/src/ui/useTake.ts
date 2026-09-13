@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeWav } from "@/audio/wav";
 import { decodeAudioFile } from "@/dsp";
+import { PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
 import { MIC_SOURCE, analyzeClip, type AnalyzeOptions } from "@/io/take";
 import { profileForSource, type Profile } from "@/io/profiles";
 import {
@@ -80,6 +81,8 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     tolerance: p.tolerance ?? base.tolerance,
     gainDb: p.gainDb ?? base.gainDb,
     collapseRests: p.collapseRests ?? base.collapseRests,
+    paceCursor: p.paceCursor ?? base.paceCursor,
+    paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
   };
 }
@@ -92,6 +95,8 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     tolerance: prev.tolerance,
     gainDb: prev.gainDb,
     collapseRests: prev.collapseRests,
+    paceCursor: prev.paceCursor,
+    paceLeadSec: prev.paceLeadSec,
     view: prev.view,
   };
 }
@@ -105,6 +110,8 @@ export function useTake(): TakeState {
       tolerance: 0.3,
       expected: "",
       collapseRests: true,
+      paceCursor: false,
+      paceLeadSec: PACE_LEAD_DEFAULT_SEC,
       gainDb: 0,
       view: "per-char",
       ppu: 12,
@@ -134,6 +141,8 @@ export function useTake(): TakeState {
         tolerance: next.tolerance,
         gainDb: next.gainDb,
         collapseRests: next.collapseRests,
+        paceCursor: next.paceCursor,
+        paceLeadSec: next.paceLeadSec,
         view: next.view,
       });
       // The rest of the settings belong to the take, so they ride along with

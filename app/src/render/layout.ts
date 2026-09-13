@@ -75,6 +75,47 @@ export interface LayoutOptions {
   readonly ppu: number;
   /** The recording's full length, so the axis can carry past the last mark. */
   readonly durationSec: number;
+  /** Room to reserve before the first character, in seconds.
+   *
+   * For the pacing cursor's count-in, and nothing else. The axis stops at the
+   * first character — `timeToX` clamps anything earlier to it — so without
+   * this there is nowhere for a cursor to approach from, and a count-in you
+   * cannot watch approach is not a count-in. Zero, and everything below is
+   * exactly as it was. */
+  readonly leadSec?: number;
+}
+
+/** Reserve `leadSec` of empty axis in front of everything.
+ *
+ * A post-pass rather than a branch inside the two builders: the change is the
+ * same shift whichever way the chart is laid out, and threading it through
+ * both would mean two chances to get it subtly different.
+ *
+ * The prepended breakpoint sits at the first one's *unshifted* x, which is
+ * exactly `leadPx` to the left of where that point has moved to — so the
+ * count-in runs at the same pixels-per-second as everything after it. A
+ * count-in at some other tempo would be worse than none. */
+function withLead(layout: Layout, leadSec: number): Layout {
+  if (!(leadSec > 0)) return layout;
+  const leadPx = (leadSec / layout.unitSec) * layout.ppu;
+  const shift = (m: AxisMap): AxisMap => {
+    const first = m[0];
+    if (!first) return m;
+    return [
+      [first[0] - leadSec, first[1]],
+      ...m.map(([t, x]) => [t, x + leadPx] as const),
+    ];
+  };
+  return {
+    ...layout,
+    items: layout.items.map((it) => ({
+      ...it,
+      x: it.x === null ? null : it.x + leadPx,
+      ix: it.ix === null ? null : it.ix + leadPx,
+    })),
+    maps: { you: shift(layout.maps.you), tgt: shift(layout.maps.tgt) },
+    width: layout.width + leadPx,
+  };
 }
 
 export function buildLayout(review: Review, options: LayoutOptions): Layout {
@@ -128,7 +169,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       }
       x += gapW + bodyW + SLOT_GAP;
     }
-    return {
+    return withLead({
       view,
       items,
       width: x + PAD_X,
@@ -137,7 +178,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       breaks: [],
       ppu,
       unitSec,
-    };
+    }, options.leadSec ?? 0);
   }
 
   // Absolute time (and overlay, the same axis with the tracks superimposed):
@@ -199,7 +240,10 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       toX(review.ideal.duration, 0) - offTgt,
     ) + PAD_X;
 
-  return { view, items, width, maps, origin, breaks, ppu, unitSec };
+  return withLead(
+    { view, items, width, maps, origin, breaks, ppu, unitSec },
+    options.leadSec ?? 0,
+  );
 }
 
 /** Content x for a moment on one track. The map is piecewise, so this

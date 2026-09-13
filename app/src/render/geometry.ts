@@ -66,3 +66,14 @@ export const DRAG_SLOP = 4;
 /** Silence either side of a played span, so a clip doesn't start hard on the
  *  first edge. */
 export const PLAY_PAD = 0.08;
+
+/** Quiet after the record button before the pacing cursor sets off, seconds.
+ *
+ * A starting point, not a rule — it is settable, because how long somebody
+ * needs to get a hand back to the paddle is about them and not about the
+ * chart. The recording itself starts at once either way: the lead-in is a
+ * count, not a delay, and a microphone take is trimmed at both ends anyway, so
+ * the silence costs nothing. */
+export const PACE_LEAD_DEFAULT_SEC = 3;
+export const PACE_LEAD_MIN_SEC = 1;
+export const PACE_LEAD_MAX_SEC = 10;

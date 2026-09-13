@@ -72,6 +72,21 @@ export const COLLAPSE_RESTS_HELP =
   "and the drift plot restarts after it. Off, every silence is graded and " +
   "drawn to scale.";
 
+export const PACE_CURSOR_HELP =
+  "While you record another take, a cursor runs along the target track at the " +
+  "speed now set, after a count-in you can watch it come in on. It is a " +
+  "metronome you can see: spacing is the hardest thing to feel and the easiest " +
+  "thing to watch. It paces the message already on screen, so it is for " +
+  "another attempt at the same text rather than for something new. Nothing " +
+  "about the recording changes — the cursor is a guide, not a gate, and " +
+  "falling behind it costs nothing but the drift plot showing it afterwards.";
+
+export const PACE_LEAD_HELP =
+  "How long the count-in runs before the cursor reaches the first character. " +
+  "The recording starts the moment you click, whatever this is set to — the " +
+  "count is time to get a hand back to the paddle, not a delay, and the dead " +
+  "air at the front is trimmed off anyway.";
+
 export const GAIN_HELP =
   "Applied at playback only — the recording and any download stay at the level " +
   "you recorded.";

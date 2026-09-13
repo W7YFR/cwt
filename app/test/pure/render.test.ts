@@ -23,7 +23,16 @@ import {
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
 import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/scene";
 import { FALLBACK_PALETTE } from "@/render/theme";
-import { GUTTER, PAD_R, PAD_X, REST_W, ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
+import {
+  GUTTER,
+  PAD_R,
+  PAD_X,
+  REST_W,
+  ROW_H,
+  Y_TGT,
+  ZOOM_MAX,
+  ZOOM_MIN,
+} from "@/render/geometry";
 import type { Review, ViewMode } from "@/types";
 
 const VIEWS: ViewMode[] = ["per-char", "absolute", "overlay"];
@@ -125,6 +134,146 @@ describe("layout", () => {
     const ch = review.actual.chars[0]!;
     const sum = ch.blocks.reduce((a, b) => a + b.units, 0);
     expect(charWidth(ch, 10)).toBeCloseTo(sum * 10, 9);
+  });
+});
+
+describe("the pacing cursor's count-in", () => {
+  /* Room reserved in front of the first character so a cursor has somewhere to
+     come in from. Without it there is nowhere: the axis stops at the first
+     character and `timeToX` clamps anything earlier to it, so the cursor would
+     simply appear on the beat — which is a count-in you cannot count along
+     with. */
+  const LEAD = 2;
+  const review = reviewFrom(caseNamed(SLOPPY)).review;
+
+  const withLead = (view: ViewMode, ppu: number) =>
+    buildLayout(review, {
+      view,
+      ppu,
+      durationSec: review.take.durationSec,
+      leadSec: LEAD,
+    });
+
+  it.each(VIEWS)("changes nothing at all when there is none (%s)", (view) => {
+    /* The rule the rest of this codebase is built on: a correction that is not
+       needed is not applied, rather than applied and cancelled out. Compared
+       structurally, because a lead-in that shifted the axis by a rounding
+       error would be invisible here and visible on screen. */
+    const plain = layoutFor(review, view, 18);
+    const zero = buildLayout(review, {
+      view,
+      ppu: 18,
+      durationSec: review.take.durationSec,
+      leadSec: 0,
+    });
+    expect(zero).toEqual(plain);
+  });
+
+  it.each(VIEWS)("puts the first character a count-in further along (%s)", (view) => {
+    const plain = layoutFor(review, view, 18);
+    const led = withLead(view, 18);
+    const leadPx = (LEAD / plain.unitSec) * 18;
+
+    expect(led.width).toBeCloseTo(plain.width + leadPx, 6);
+    for (let i = 0; i < plain.items.length; i++) {
+      const a = plain.items[i]!;
+      const b = led.items[i]!;
+      if (a.x !== null) expect(b.x!).toBeCloseTo(a.x + leadPx, 6);
+      if (a.ix !== null) expect(b.ix!).toBeCloseTo(a.ix + leadPx, 6);
+    }
+  });
+
+  it.each(VIEWS)("runs the count-in at the chart's own tempo (%s)", (view) => {
+    /* The point of doing this on the time axis rather than as a flourish over
+       it. A count-in at some other tempo is worse than none — you would read
+       the wrong speed off it and come in wrong. */
+    const ppu = 18;
+    const led = withLead(view, ppu);
+    const first = led.maps.tgt[1] ?? led.maps.tgt[0]!;
+    const start = led.maps.tgt[0]!;
+
+    const seconds = first[0] - start[0];
+    const pixels = first[1] - start[1];
+    expect(seconds).toBeCloseTo(LEAD, 6);
+    // Same pixels per second as the body of the chart.
+    expect(pixels / seconds).toBeCloseTo(ppu / led.unitSec, 4);
+  });
+
+  /* Located by where it lands, not by its words. The ruler draws "3s" too —
+     on the ruler — and a test that could not tell the two apart would pass on
+     the tick and call the bracket drawn. */
+  const textAt = (ctx: ReturnType<typeof recordingCtx>, y: number) =>
+    ctx.ofType("fillText").filter((c) => c.args[1] === y).map((c) => c.text);
+
+  const LEAD_ROW_Y = Y_TGT + ROW_H / 2;
+  /* The count sits at the far left of the caption band, where the captions
+     cannot reach while the count-in is holding them to the right of it. Picked
+     out by its weight — nothing else on the chart is drawn bold — rather than
+     by its size or its exact position, neither of which it is the job of this
+     test to pin. */
+  const countdowns = (ctx: ReturnType<typeof recordingCtx>) =>
+    ctx
+      .ofType("fillText")
+      .filter((c) => c.font.startsWith("700 "))
+      .map((c) => c.text);
+
+  function paint(ppu: number, over: Partial<Scene> = {}) {
+    const ctx = recordingCtx();
+    draw(ctx, {
+      ...sceneFor(review, "per-char", ppu),
+      layout: withLead("per-char", ppu),
+      leadSec: LEAD,
+      ...over,
+    });
+    return ctx;
+  }
+
+  it("draws the count-in as a measured silence, not as empty space", () => {
+    /* Empty space says nothing — it reads as the chart starting late rather
+       than as time you are meant to be counting through. Bracketed and
+       labelled it is the same object as the gaps below it, and the cursor
+       crossing it means something. */
+    expect(textAt(paint(18), LEAD_ROW_Y)).toContain(`${LEAD}s`);
+  });
+
+  it("says how long is left, where it cannot scroll away", () => {
+    /* The cursor shows where it has got to and the bracket shows how far it
+       has to come; neither answers "how long have I got" at a glance, which is
+       the one thing somebody with a hand on a paddle is asking. Drawn outside
+       the scrolled group for that reason. */
+    const arrival = withLead("per-char", 18).maps.tgt[1]![0];
+    const at = (t: number) => countdowns(paint(18, { playhead: { t, side: "tgt" } }));
+
+    expect(at(arrival - 1.9)).toEqual(["1.9"]);
+    expect(at(arrival - 0.5)).toEqual(["0.5"]);
+    /* Tenths, and really tenths: a count that ticks whole seconds tells you
+       which second you are in and nothing about where in it, which is the
+       only thing being asked of it. */
+    expect(at(arrival - 0.4)).toEqual(["0.4"]);
+    // Gone the moment the cursor is past the first character.
+    expect(at(arrival + 0.5)).toEqual([]);
+  });
+
+  it("shows neither when no count-in was asked for", () => {
+    // Inert by construction, like every other correction here.
+    const ctx = recordingCtx();
+    draw(ctx, {
+      ...sceneFor(review, "per-char", 18),
+      playhead: { t: 0, side: "tgt" as const },
+    });
+    expect(textAt(ctx, LEAD_ROW_Y)).not.toContain(`${LEAD}s`);
+    expect(countdowns(ctx)).toEqual([]);
+  });
+
+  it("gives the cursor somewhere to be before the first character", () => {
+    /* The symptom this exists to prevent: every instant of the count-in
+       mapping to the same x, so the cursor sits still and then jumps. */
+    const led = withLead("per-char", 18);
+    const firstT = led.maps.tgt[1]![0];
+    const xs = [0, 0.5, 1, 1.5].map((f) => timeToX(led, firstT - LEAD + f * LEAD, "tgt"));
+    for (let i = 1; i < xs.length; i++) expect(xs[i]!).toBeGreaterThan(xs[i - 1]!);
+    // And it arrives exactly on the first character, not near it.
+    expect(timeToX(led, firstT, "tgt")).toBeCloseTo(led.maps.tgt[1]![1], 6);
   });
 });
 

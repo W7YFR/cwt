@@ -91,6 +91,9 @@ export interface Viewport {
 }
 
 export interface Scene {
+  /** Count-in reserved in front of the first character, in seconds. Absent or
+   *  zero outside a paced recording — see `LayoutOptions.leadSec`. */
+  leadSec?: number;
   layout: Layout;
   slots: readonly Slot[];
   analysis: Analysis;
@@ -156,6 +159,7 @@ export function draw(ctx: Ctx2D, scene: Scene): void {
   if (scene.view === "per-char") drawPerChar(ctx, scene);
   else if (scene.view === "overlay") drawOverlay(ctx, scene);
   else drawAbsolute(ctx, scene);
+  drawLead(ctx, scene);
   drawDrift(ctx, scene);
 
   ctx.restore();
@@ -163,6 +167,7 @@ export function draw(ctx: Ctx2D, scene: Scene): void {
   drawGutter(ctx, scene);
   drawScrollbar(ctx, scene);
   drawPlayhead(ctx, scene);
+  drawCountIn(ctx, scene);
 }
 
 /** Structural rules, in screen coordinates so they span the visible track. */
@@ -477,6 +482,100 @@ function drawGap(
   ctx.fillRect(x + w / 2 - tw / 2, mid - 6, tw, 12);
   ctx.fillStyle = color;
   ctx.fillText(label, x + w / 2, mid);
+}
+
+/** Where the count-in runs from and to, in content coordinates.
+ *
+ * The layout reserved it by prepending one breakpoint to each axis map, so the
+ * span is simply the first two — no second copy of the arithmetic that put it
+ * there. */
+function leadSpan(scene: Scene): { x0: number; x1: number; seconds: number } | null {
+  const lead = scene.leadSec ?? 0;
+  if (!(lead > 0)) return null;
+  const m = scene.layout.maps.tgt.length >= 2 ? scene.layout.maps.tgt : scene.layout.maps.you;
+  if (m.length < 2) return null;
+  const a = m[0]!;
+  const b = m[1]!;
+  return { x0: a[1], x1: b[1], seconds: b[0] - a[0] };
+}
+
+/** The count-in, drawn the way every other stretch of silence is drawn.
+ *
+ * Empty space says nothing: it reads as the chart starting late rather than as
+ * time you are meant to be counting through. Bracketed and labelled, it is the
+ * same object as the gaps below it — a measured silence with its length on it
+ * — and the cursor crossing it means something. */
+function drawLead(ctx: Ctx2D, scene: Scene): void {
+  const span = leadSpan(scene);
+  if (!span) return;
+  const w = span.x1 - span.x0;
+  if (w < 4 || !visible(span.x0, w, scene)) return;
+
+  const C = scene.palette;
+  const yTop = scene.view === "overlay" ? Y_YOU : Y_TGT;
+  const mid = yTop + ROW_H / 2;
+
+  ctx.strokeStyle = C.you;
+  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(span.x0 + 1, mid - 5);
+  ctx.lineTo(span.x0 + 1, mid + 5);
+  ctx.moveTo(span.x1 - 1, mid - 5);
+  ctx.lineTo(span.x1 - 1, mid + 5);
+  ctx.moveTo(span.x0 + 1, mid);
+  ctx.lineTo(span.x1 - 1, mid);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  if (w < 30) return;
+  const label = `${Math.round(span.seconds)}s`;
+  ctx.font = `600 10px ${C.mono}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const tw = ctx.measureText(label).width + 8;
+  ctx.fillStyle = C.panel;
+  ctx.fillRect(span.x0 + w / 2 - tw / 2, mid - 6, tw, 12);
+  ctx.fillStyle = C.you;
+  ctx.fillText(label, span.x0 + w / 2, mid);
+}
+
+/** How far the count-in's number sits in from the gutter and down from the
+ *  rule above it. */
+const COUNT_INSET_X = 14;
+const COUNT_INSET_Y = 8;
+
+/** Seconds still to go, in the corner where they cannot scroll away.
+ *
+ * The cursor shows where it has got to and the bracket shows how far it has to
+ * come, but neither answers "how long have I got" at a glance — and that is
+ * the one thing somebody with a hand on a paddle is asking. Screen
+ * coordinates, outside the scrolled group, for exactly that reason. */
+function drawCountIn(ctx: Ctx2D, scene: Scene): void {
+  const lead = scene.leadSec ?? 0;
+  const ph = scene.playhead;
+  if (!(lead > 0) || !ph) return;
+  const m = scene.layout.maps[ph.side];
+  const arrival = m[1]?.[0];
+  if (arrival === undefined) return;
+  const left = arrival - ph.t;
+  if (left <= 0) return;
+
+  /* Inset from both edges rather than tucked into the corner. Measured from
+     the gutter and from the rule under the ruler, the two things it would
+     otherwise sit hard against — the caption band is only as tall as a caption
+     and a number set to fill it has no air above it at all. */
+  const C = scene.palette;
+  ctx.font = `700 18px ${C.mono}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = C.you;
+  /* Tenths, not whole seconds. A count that ticks 3, 2, 1 tells you which
+     second you are in and nothing about where in it — and the whole job here
+     is arriving on a beat. The chart already repaints every frame while the
+     cursor is running, so the precision costs nothing; monospaced figures keep
+     the width from twitching as the digits change. */
+  ctx.fillText(left.toFixed(1), GUTTER + COUNT_INSET_X, Y_LABEL + COUNT_INSET_Y);
 }
 
 function drawMarks(

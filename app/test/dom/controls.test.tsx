@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { Controls, ViewControls } from "@/ui/Controls";
 import { defaultSettings } from "@/timing";
+import { PACE_LEAD_MAX_SEC } from "@/render/geometry";
 import type { ReviewSettings } from "@/types";
 import { caseNamed, SLOPPY } from "../fixture";
 import { takeFrom } from "../fixture";
@@ -47,6 +48,36 @@ function Harness({
       onStop={() => {}}
     />
   );
+}
+
+const defaults = () => defaultSettings(takeFrom(caseNamed(SLOPPY)));
+
+function view(over: Partial<ReviewSettings>, onChange: (p: Partial<ReviewSettings>) => void) {
+  return <ViewControls settings={{ ...defaults(), ...over }} onChange={onChange} onFit={() => {}} />;
+}
+
+function renderView({
+  over = {},
+  onChange = () => {},
+}: { over?: Partial<ReviewSettings>; onChange?: (p: Partial<ReviewSettings>) => void } = {}) {
+  return render(view(over, onChange));
+}
+
+/** The view controls wired to real state, for the boxes whose behavior is in
+ *  the round trip rather than in a single render. */
+function renderStateful() {
+  function Harnessed() {
+    const [s, set] = useState<ReviewSettings>({ ...defaults(), paceCursor: true });
+    return (
+      <ViewControls
+        settings={s}
+        onChange={(patch) => set((prev) => ({ ...prev, ...patch }))}
+        onFit={() => {}}
+      />
+    );
+  }
+  render(<Harnessed />);
+  return () => screen.getByLabelText(/delay start/i) as HTMLInputElement;
 }
 
 describe("controls", () => {
@@ -183,6 +214,70 @@ describe("controls", () => {
     for (const id of ["view", "zoom", "zoom-fit"]) {
       expect(document.querySelector(`#${id}`)).not.toBeNull();
     }
+  });
+
+  it("offers the pacing cursor, off unless asked for", async () => {
+    /* A practice aid rather than a way of reading the chart, so it is opt-in —
+       and it sits with the other things that change what is on screen rather
+       than with the things that change the grade. */
+    const user = userEvent.setup();
+    const take = takeFrom(caseNamed(SLOPPY));
+    const onChange = vi.fn();
+    render(
+      <ViewControls
+        settings={defaultSettings(take)}
+        onChange={onChange}
+        onFit={() => {}}
+      />,
+    );
+    const box = screen.getByLabelText(/pacing cursor/i) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledWith({ paceCursor: true });
+  });
+
+  it("asks how long the count-in should be, only once there is one", async () => {
+    /* A count-in for a cursor that is not running is a setting for nothing,
+       and one more control in a row that is already busy. */
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderView({ onChange });
+    expect(screen.queryByLabelText(/delay start/i)).toBeNull();
+
+    rerender(view({ paceCursor: true }, onChange));
+    const box = screen.getByLabelText(/delay start/i) as HTMLInputElement;
+    expect(box.value).toBe(String(defaults().paceLeadSec));
+
+    await user.clear(box);
+    await user.type(box, "5");
+    expect(onChange).toHaveBeenLastCalledWith({ paceLeadSec: 5 });
+  });
+
+  it("does not fight the caret while the count-in is being typed", async () => {
+    /* The trap every number box here has fallen into: emptying "3" to type "5"
+       hands back an empty string, the old value goes straight back under the
+       caret, and you end up with 35 — which then clamps to the maximum and
+       looks like the control ignoring you. */
+    const user = userEvent.setup();
+    const box = renderStateful();
+    await user.clear(box());
+    await user.type(box(), "5");
+    expect(box().value).toBe("5");
+  });
+
+  it("keeps the count-in inside what the chart can draw", async () => {
+    /* Typed, not dragged, so there is nothing stopping somebody entering 400.
+       The chart would reserve four hundred seconds of empty axis and the
+       recording would look like it never started. */
+    const user = userEvent.setup();
+    const box = renderStateful();
+    await user.clear(box());
+    await user.type(box(), "400");
+    // What is committed is clamped even while the field still reads 400 —
+    // and leaving the field shows what was actually kept.
+    await user.tab();
+    expect(Number(box().value)).toBe(PACE_LEAD_MAX_SEC);
   });
 
   it("calls fit when the Fit button is pressed", async () => {

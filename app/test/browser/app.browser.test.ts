@@ -390,6 +390,82 @@ describe("the app", () => {
     expect(foot.textContent).toContain("W7YFR");
   });
 
+  it("lines up every control in the settings rows", async () => {
+    /* A select, a slider, a checkbox, a text box and a row of buttons all have
+       different natural heights, and a row that mixes them ends up with
+       everything at a slightly different level and nothing to blame it on.
+       Two bands per group — caption above, control below — is what puts them
+       on one centre line.
+
+       Checked per wrapped line rather than across the whole row: these rows
+       wrap, and two groups that have wrapped onto different lines are supposed
+       to be at different heights. */
+    globalThis.fetch = bundleFetch();
+    await mount();
+
+    /** The middle of a group's control band — its last child, which is the
+     *  control itself, or the label when the label IS the control. */
+    const controlMid = (group: HTMLElement) => {
+      const el = (group.querySelector<HTMLElement>(":scope > label.check, :scope > label.field") ??
+        group.lastElementChild) as HTMLElement;
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2;
+    };
+
+    for (const row of [".controls", ".viewcontrols"]) {
+      const groups = [...container.querySelectorAll<HTMLElement>(`${row} > .group`)];
+      expect(groups.length, row).toBeGreaterThan(2);
+
+      const lines = new Map<number, number[]>();
+      for (const g of groups) {
+        const line = Math.round(g.getBoundingClientRect().top);
+        const mids = lines.get(line) ?? [];
+        mids.push(controlMid(g));
+        lines.set(line, mids);
+      }
+      for (const [line, mids] of lines) {
+        const spread = Math.max(...mids) - Math.min(...mids);
+        expect(spread, `${row} line ${line} spread ${spread.toFixed(1)}px`).toBeLessThanOrEqual(1);
+      }
+    }
+
+    // The header's own row, where the controls are smaller but the rule is the
+    // same one.
+    const bar = [...container.querySelectorAll<HTMLElement>(".recordbar > *")].map((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2;
+    });
+    expect(bar.length).toBeGreaterThan(1);
+    expect(Math.max(...bar) - Math.min(...bar)).toBeLessThanOrEqual(1);
+  });
+
+  it("gives a banner a band of its own height, not of its words", async () => {
+    /* A strip that arrives without warning over a page somebody is already
+       reading. Sized to its own words it is a different height every time, so
+       the page jumps by some unpredictable amount as it lands — and by a
+       different amount for a short message than for a long one. It is the same
+       band the header is built from. */
+    globalThis.fetch = bundleFetch();
+    await mount();
+
+    const band = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("--band-h"),
+    );
+    expect(band).toBeGreaterThan(0);
+
+    const heights = ["ok", "I could not hear any CW in this recording."].map((text) => {
+      const el = document.createElement("p");
+      el.className = "banner error";
+      el.textContent = text;
+      container.prepend(el);
+      const h = el.getBoundingClientRect().height;
+      el.remove();
+      return h;
+    });
+    expect(heights[0]).toBeCloseTo(band, 0);
+    expect(heights[1]).toBeCloseTo(band, 0);
+  });
+
   it("offers a recording control on the review itself", async () => {
     // Having just seen where the spacing drifted, the next thing you want is
     // another go — without losing the speeds and tolerance you just set.

@@ -11,10 +11,17 @@
  * See `ViewControls` below.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
-import { COLLAPSE_RESTS_HELP, GAIN_HELP, ZOOM_HELP } from "./copy";
+import {
+  COLLAPSE_RESTS_HELP,
+  GAIN_HELP,
+  PACE_CURSOR_HELP,
+  PACE_LEAD_HELP,
+  ZOOM_HELP,
+} from "./copy";
+import { PACE_LEAD_MAX_SEC, PACE_LEAD_MIN_SEC } from "@/render/geometry";
 import { fmtGain, fmtPpu, fmtSeconds, fmtTolerance, fmtWpm } from "./format";
 import { useUpperField } from "./useUpperField";
 
@@ -148,6 +155,50 @@ export function Controls(props: ControlsProps): React.ReactElement {
   );
 }
 
+/** How long the count-in runs, in seconds.
+ *
+ * Held as text while it is being edited, for the reason every other number box
+ * in this app is: clearing the field to type a new figure hands `onChange` an
+ * empty string, and a control that falls back to the committed value on
+ * anything unparseable puts the old number straight back under the caret — so
+ * emptying "3" and typing "5" leaves you with 35, which then clamps to the
+ * maximum. The clamp belongs to what gets committed, not to what is on screen
+ * being typed. */
+function LeadField({
+  seconds,
+  onChange,
+}: {
+  seconds: number;
+  onChange(v: number): void;
+}): React.ReactElement {
+  const [text, setText] = useState<string | null>(null);
+  return (
+    <label className="field row" title={PACE_LEAD_HELP}>
+      <span className="fieldname">Delay start</span>
+      <input
+        type="number"
+        id="pace-lead"
+        min={PACE_LEAD_MIN_SEC}
+        max={PACE_LEAD_MAX_SEC}
+        step={1}
+        value={text ?? String(seconds)}
+        aria-label="Delay start in seconds"
+        onChange={(e) => {
+          setText(e.target.value);
+          const v = Number(e.target.value);
+          if (e.target.value.trim() === "" || !Number.isFinite(v)) return;
+          onChange(
+            Math.min(Math.max(Math.round(v), PACE_LEAD_MIN_SEC), PACE_LEAD_MAX_SEC),
+          );
+        }}
+        // Back to showing what was actually committed, clamp included.
+        onBlur={() => setText(null)}
+      />
+      <span className="unit">s</span>
+    </label>
+  );
+}
+
 export interface ViewControlsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
@@ -215,6 +266,30 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
           Collapse rests
         </label>
       </div>
+
+      <div className="group">
+        <label className="check" title={PACE_CURSOR_HELP}>
+          <input
+            type="checkbox"
+            id="pace-cursor"
+            checked={s.paceCursor}
+            onChange={(e) => onChange({ paceCursor: e.target.checked })}
+          />{" "}
+          Pacing cursor
+        </label>
+      </div>
+
+      {/* Only with the cursor on. A count-in for a cursor that is not running
+          is a setting for nothing, and it would be one more control in a row
+          that is already busy. */}
+      {s.paceCursor && (
+        <div className="group">
+          <LeadField
+            seconds={s.paceLeadSec}
+            onChange={(v) => onChange({ paceLeadSec: v })}
+          />
+        </div>
+      )}
     </section>
   );
 }

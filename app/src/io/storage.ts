@@ -367,6 +367,8 @@ export interface Prefs {
   expected?: string;
   view?: string;
   collapseRests?: boolean;
+  paceCursor?: boolean;
+  paceLeadSec?: number;
 }
 
 export function loadPrefs(): Prefs {

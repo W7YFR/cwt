@@ -6,6 +6,7 @@
  * review re-derivable from a saved file with no audio present.
  */
 
+import { PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
 import type { Review, ReviewSettings, Segment, Take, Timeline, Timing } from "@/types";
 import { compareText } from "./align";
 import { grade } from "./grade";
@@ -98,6 +99,8 @@ export function defaultSettings(take: Take): ReviewSettings {
     tolerance: 0.3,
     expected: take.expected ?? take.decoded,
     collapseRests: true,
+    paceCursor: false,
+    paceLeadSec: PACE_LEAD_DEFAULT_SEC,
     gainDb: 0,
     view: "per-char",
     ppu: 12,

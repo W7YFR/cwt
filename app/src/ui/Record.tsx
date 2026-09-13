@@ -117,6 +117,9 @@ export interface RecordBarProps {
   appliesToTake: boolean;
   /** True while the recording is being read again. */
   rereading: boolean;
+  /** Seconds left of the pacing cursor's lead-in; 0 once it is running, null
+   *  when there is no cursor. */
+  leadLeft: number | null;
 }
 
 /** Record another, without leaving the review. */
@@ -129,13 +132,23 @@ export function RecordBar({
   onProfileChange,
   appliesToTake,
   rereading,
+  leadLeft,
 }: RecordBarProps): React.ReactElement {
   if (rec.recorder) {
     return (
       <div className="recordbar recording">
-        <span className="reclight">
+        {/* Counting down to the cursor setting off, then the ordinary clock.
+            Blue while you are waiting and green once it is your turn — the
+            same two signals the calibration wizard uses, for the same reason:
+            it has to be readable out of the corner of an eye by somebody
+            looking at a paddle. */}
+        <span
+          className="reclight"
+          data-testid="reclight"
+          data-state={leadLeft ? "waiting" : "sending"}
+        >
           <span className="dot" />
-          {fmtElapsed(rec.elapsed)}
+          {leadLeft ? `in ${leadLeft}` : fmtElapsed(rec.elapsed)}
         </span>
         <LevelMeter level={rec.level} />
         <button className="primary" onClick={() => void rec.finish()} disabled={rec.busy}>

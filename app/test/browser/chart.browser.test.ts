@@ -305,6 +305,26 @@ describe("the chart in a browser", () => {
     });
   });
 
+  it("makes room for a count-in and puts it back", () => {
+    /* The chart is told about the count-in imperatively, like the playhead and
+       for the same reason: it belongs to a recording in progress, not to the
+       settings the review is being read at, and it must not go through a
+       re-render of the page. */
+    chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null });
+    chart.scrollTo(500);
+    const before = paintedPixels();
+
+    chart.setLead(2);
+    // Back to the start, because the room was reserved for something to come
+    // in from the left and it cannot do that from halfway along.
+    expect(paintedPixels()).not.toBe(before);
+
+    chart.setLead(0);
+    // And it is undone, not merely covered over.
+    chart.scrollTo(500);
+    expect(paintedPixels()).toBe(before);
+  });
+
   it("seeks when the ruler is clicked", () => {
     const onSeek = vi.fn();
     chart.destroy();

@@ -57,6 +57,9 @@ export interface Chart {
   setPlayhead(playhead: { t: number; side: "you" | "tgt" } | null): void;
   /** The zoom at which the whole session fills the width. */
   fit(): number;
+  /** Reserve room in front of the first character for a count-in, in seconds.
+   *  Zero puts it back. See `LayoutOptions.leadSec`. */
+  setLead(seconds: number): void;
   scrollTo(x: number): void;
   /** Re-read the palette (theme changed) and redraw. */
   refreshTheme(): void;
@@ -93,6 +96,7 @@ export function createChart(
   let playhead: { t: number; side: "you" | "tgt" } | null = null;
   let driftMax = 1;
   let destroyed = false;
+  let leadSec = 0;
 
   function viewport(): Viewport {
     const viewW = Math.max(host.clientWidth, GUTTER + 40);
@@ -122,6 +126,7 @@ export function createChart(
       focus: input.focus,
       playhead,
       driftMax,
+      leadSec,
     };
     return s;
   }
@@ -142,6 +147,7 @@ export function createChart(
       view: input.settings.view,
       ppu: input.settings.ppu,
       durationSec: input.review.take.durationSec,
+      leadSec,
     });
   }
 
@@ -395,6 +401,17 @@ export function createChart(
       // position meaningless — it would land somewhere unrelated.
       if (viewChanged || restsChanged) scrollX = 0;
       resize();
+    },
+
+    setLead(seconds) {
+      const next = Math.max(0, seconds);
+      if (next === leadSec) return;
+      leadSec = next;
+      relayout();
+      // Back to the start: the room was reserved so a cursor could come in
+      // from the left, and it cannot do that from halfway along.
+      scrollX = 0;
+      paint();
     },
 
     setPlayhead(next) {

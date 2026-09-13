@@ -99,6 +99,10 @@ export function ReviewScreen({
   const [clock, setClock] = useState<number | null>(null);
   const [status, setStatus] = useState("");
   const [rereading, setRereading] = useState(false);
+  /* Seconds left of the lead-in, or null when no cursor is running. Whole
+     numbers only: this is state, and updating it every frame would re-render
+     the page sixty times a second to redraw the same digit. */
+  const [leadLeft, setLeadLeft] = useState<number | null>(null);
 
   /* Re-reading is DSP over the samples, not a re-grade of the segments, so it
      costs what the pause after a recording costs rather than what a slider
@@ -136,6 +140,72 @@ export function ReviewScreen({
   const player = playerRef.current;
 
   useEffect(() => () => player.destroy(), [player]);
+
+  /* The pacing cursor.
+   *
+   * A metronome you can watch, running along the TARGET track — the row that
+   * shows what the message should look like — while you send another attempt
+   * at it. Spacing is the hardest part of sending to feel and the easiest to
+   * see, and the chart is already right there showing where every gap ought
+   * to fall.
+   *
+   * Driven straight into the chart rather than through React state. It moves
+   * every frame, and routing that through a re-render would repaint the
+   * controls, the report and both tables sixty times a second to move one
+   * line. The chart owns its playhead for exactly this reason.
+   *
+   * The clock is the recorder's own — `elapsed()` counts captured samples, so
+   * the cursor cannot drift from the recording it is pacing, which a wall
+   * clock eventually would. */
+  /** Where the target's first character begins.
+   *
+   * The count-in is measured backwards from here, not from zero: what the
+   * cursor has to arrive at on the beat is the first character, and on an
+   * absolute axis that is not necessarily the origin. */
+  const paceFrom = useMemo(() => {
+    const first = review.ideal.chars[0];
+    if (!first) return 0;
+    return first.leadGap ? first.leadGap.t0 : first.t0;
+  }, [review.ideal]);
+
+  useEffect(() => {
+    const recorder = rec.recorder;
+    const chart = handle.chart;
+    const lead = settings.paceLeadSec;
+    if (!recorder || !settings.paceCursor || !chart) {
+      setLeadLeft(null);
+      handle.chart?.setLead(0);
+      handle.chart?.setPlayhead(null);
+      return;
+    }
+    /* Room for the count-in, in the chart's own time axis rather than as a
+       flourish on top of it. The axis stops at the first character — anything
+       earlier clamps to it — so without this the cursor would have nowhere to
+       come in from and would simply appear on the beat, which is a count-in
+       you cannot count along with. */
+    chart.setLead(lead);
+
+    let raf = 0;
+    let shownLead = -1;
+    const tick = () => {
+      const into = recorder.elapsed();
+      // Reaches the first character exactly as the lead-in runs out.
+      chart.setPlayhead({ t: paceFrom - lead + into, side: "tgt" });
+      const left = into >= lead ? 0 : Math.max(1, Math.ceil(lead - into));
+      if (left !== shownLead) {
+        shownLead = left;
+        setLeadLeft(left);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      setLeadLeft(null);
+      chart.setLead(0);
+      chart.setPlayhead(null);
+    };
+  }, [handle, paceFrom, rec.recorder, settings.paceCursor, settings.paceLeadSec]);
   useEffect(() => player.setGainDb(settings.gainDb), [player, settings.gainDb]);
 
   /* The recording as bytes. A file keeps its own, so playback is the file
@@ -317,6 +387,7 @@ export function ReviewScreen({
           onProfileChange={chooseProfile}
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
+          leadLeft={leadLeft}
         />
         {/* Last, and on a row of its own: a filename is the one thing here
             whose width nobody controls, and beside the brand it pushed the

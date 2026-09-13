@@ -280,6 +280,11 @@ export interface ReviewSettings {
   tolerance: number;
   expected: string;
   collapseRests: boolean;
+  /** Run a pacing cursor along the target track while recording. Off by
+   *  default: it is a practice aid, not a way of reading the chart. */
+  paceCursor: boolean;
+  /** Seconds of count-in before that cursor sets off. */
+  paceLeadSec: number;
   gainDb: number;
   view: ViewMode;
   ppu: number;
