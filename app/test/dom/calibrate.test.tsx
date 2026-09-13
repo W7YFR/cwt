@@ -439,6 +439,33 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
+  it("says whether it is your turn, by the same signal throughout", async () => {
+    /* Two states, one pair of colours, read out of the corner of an eye by
+       somebody looking at a paddle: counting toward a drill is holding off,
+       counting through one is sending. The cued drill alternates between the
+       same two on every beat rather than inventing a third thing. */
+    const user = userEvent.setup();
+    renderWizard();
+    await begin(user);
+
+    const state = () =>
+      (screen.queryByTestId("countdown") ?? screen.getByTestId("cue")).dataset.state;
+
+    for (let i = 0; i < STEPS.length; i++) {
+      const step = STEPS[i]!;
+      /* A rest is always "hold off". An uncued drill is always "send". The
+         cued one opens on "hold off" too — there is a cue to wait for — and
+         flips on the beat, which is the whole reason it exists. */
+      const want = step.rest || step.cueSec ? "waiting" : "sending";
+      expect(state(), step.key).toBe(want);
+      if (step.cueSec) {
+        await clockTo(BOUNDS[i - 1]! + step.cueSec);
+        expect(state(), `${step.key} on the beat`).toBe("sending");
+      }
+      if (i < STEPS.length - 1) await clockTo(BOUNDS[i]!);
+    }
+  });
+
   it("calls each dit in the isolated drill instead of leaving you to count", async () => {
     /* The drill the setup verdict is measured from. Asking somebody to keep
        two seconds in their head against a single number counting down gets

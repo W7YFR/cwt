@@ -786,14 +786,16 @@ button.primary { border-color: var(--you); color: var(--ink); }
   color: var(--you);
   line-height: 1;
 }
-/* The called cue. Bigger and brighter on the beat than the wait before it,
-   because it has to be readable out of the corner of an eye by somebody
-   looking at a paddle. */
+/* Blue means hold off, green means send — read out of the corner of an eye by
+   somebody looking at a paddle rather than at the screen. The rest's countdown
+   is counting toward something and stays blue; a drill's is counting through
+   it, and the cued drill alternates between the two on every beat. */
+.calibrate .countdown[data-state="sending"] { color: var(--ok); }
+/* The called cue, bigger on the beat than the wait before it. */
 .calibrate .countdown.cue.now {
   font-size: 60px;
   text-transform: uppercase;
   letter-spacing: .04em;
-  color: var(--ok);
 }
 /* On a rest the clock is counting toward something rather than through it, so
    it says which. */
@@ -901,14 +903,23 @@ button.primary { border-color: var(--you); color: var(--ink); }
 /* What was asked for and what came back, above the arithmetic about them.
    Monospaced and on their own lines: these are call signs and the point is
    comparing them character by character. */
-.texts { margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
-.texts > div { display: flex; gap: 10px; align-items: baseline; }
+/* A grid, not a stack of flex rows: the values have to start at the same x or
+   two call signs meant to be compared character by character do not line up,
+   and the column would be set by whichever label happened to be longest. */
+.texts {
+  margin: 0 0 8px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 5px 12px;
+  align-items: baseline;
+}
+/* The wrappers exist for the markup's sake; the grid wants the dt and dd. */
+.texts > div { display: contents; }
 .texts dt {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--ink-dim);
-  min-width: 7ch;
 }
 .texts dd {
   margin: 0;
@@ -916,6 +927,8 @@ button.primary { border-color: var(--you); color: var(--ink); }
   font-size: 13px;
   word-break: break-word;
 }
+/* The tally is prose, not a message to be compared character by character. */
+.texts dd.plain { font-family: inherit; font-size: 12px; color: var(--ink-dim); }
 
 /* Configuration, and the way in to it.
  *

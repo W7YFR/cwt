@@ -153,11 +153,18 @@ export function Report({
               <dt>Decoded</dt>
               <dd data-testid="decoded-text">{c.decoded}</dd>
             </div>
+            {/* In the same list as the two texts, so it is labelled like them
+                and lines up under them. An unlabelled row of counts reads as a
+                footnote to the diff below rather than as the summary of the
+                two lines above. */}
+            <div>
+              <dt>Differences</dt>
+              <dd className="plain" data-testid="difference-counts">
+                {c.substitutions} sub · {c.insertions} extra · {c.deletions} missed,
+                out of {c.nExpected} symbols
+              </dd>
+            </div>
           </dl>
-          <p className="note">
-            {c.nExpected} symbols · {c.substitutions} sub · {c.insertions} extra ·{" "}
-            {c.deletions} missed
-          </p>
           <p className="diff">
             {diffRuns(c.ops).map((run, i) => {
               if (run.op === "equal") {
