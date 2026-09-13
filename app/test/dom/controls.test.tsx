@@ -42,6 +42,7 @@ function Harness({
       }
       hasExpected
       playing={null}
+      canPlayYou
       clock={null}
       onPlayYou={() => {}}
       onPlayTarget={() => {}}
@@ -141,7 +142,8 @@ describe("controls", () => {
     const common = {
       settings: base,
       onChange: () => {},
-        hasExpected: false,
+      hasExpected: false,
+      canPlayYou: true,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
@@ -158,7 +160,8 @@ describe("controls", () => {
     const common = {
       settings: defaultSettings(take),
       onChange: () => {},
-        hasExpected: false,
+      hasExpected: false,
+      canPlayYou: true,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
@@ -182,6 +185,7 @@ describe("controls", () => {
         onChange={() => {}}
         hasExpected={false}
         playing={null}
+        canPlayYou
         clock={null}
         onPlayYou={() => {}}
         onPlayTarget={() => {}}
@@ -216,7 +220,7 @@ describe("controls", () => {
     }
   });
 
-  it("offers characters as single markers, off unless asked for", async () => {
+  it("offers characters as start markers, off unless asked for", async () => {
     /* What the trainer is for is spacing and placement; a row of elements
        invites counting them instead, which is reading Morse off a screen
        rather than learning to send it. Off by default all the same — it hides
@@ -224,10 +228,10 @@ describe("controls", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderView({ onChange });
-    const box = screen.getByLabelText(/character blocks/i) as HTMLInputElement;
+    const box = screen.getByLabelText(/character markers/i) as HTMLInputElement;
     expect(box.checked).toBe(false);
     await user.click(box);
-    expect(onChange).toHaveBeenCalledWith({ charBlocks: true });
+    expect(onChange).toHaveBeenCalledWith({ charMarkers: true });
   });
 
   it("offers the pacing cursor, off unless asked for", async () => {

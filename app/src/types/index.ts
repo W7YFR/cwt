@@ -286,7 +286,7 @@ export interface ReviewSettings {
   /** Seconds of count-in before that cursor sets off. */
   paceLeadSec: number;
   /** Draw each character as one marker rather than as its dits and dahs. */
-  charBlocks: boolean;
+  charMarkers: boolean;
   gainDb: number;
   view: ViewMode;
   ppu: number;

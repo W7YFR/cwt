@@ -7,6 +7,7 @@
  */
 
 import { diffRuns, subLabel } from "@/timing";
+import { isBlankTake } from "@/io/take";
 import { gradeOf, GRADE_MARK } from "@/render/scene";
 import { slotIndexAtTime, type Focus } from "@/render/focus";
 import type { Review } from "@/types";
@@ -43,6 +44,25 @@ export function Report({
 }: ReportProps): React.ReactElement {
   const g = review.analysis;
   const c = review.comparison;
+
+  /* Nothing to report on yet. Three cards of empty tables would say the same
+     thing at far greater length, and an "every element landed inside
+     tolerance" note over a grade with no elements in it would say something
+     untrue. */
+  if (isBlankTake(review.take)) {
+    return (
+      <section className="report">
+        <div className="card">
+          <h2>Nothing recorded yet</h2>
+          <p className="note empty" data-testid="report-blank">
+            The target above is what you are about to send. Hear it with{" "}
+            <b>Target</b>, set the speeds and the tolerance you want to be held
+            to, then record — the grading appears here.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="report">

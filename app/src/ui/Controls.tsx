@@ -15,7 +15,7 @@ import { useCallback, useState } from "react";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
 import {
-  CHAR_BLOCKS_HELP,
+  CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
   GAIN_HELP,
   PACE_CURSOR_HELP,
@@ -31,6 +31,8 @@ export interface ControlsProps {
   onChange(patch: Partial<ReviewSettings>): void;
   hasExpected: boolean;
   playing: "you" | "tgt" | null;
+  /** False when there is no recording to play — see `blankTake`. */
+  canPlayYou: boolean;
   clock: number | null;
   onPlayYou(): void;
   onPlayTarget(): void;
@@ -48,7 +50,12 @@ export function Controls(props: ControlsProps): React.ReactElement {
       <div className="group transport">
         {/* The icon lives in its own fixed-width span so swapping play/stop
             cannot change the button's width and shift the row. */}
-        <button className="play" onClick={props.onPlayYou} aria-pressed={props.playing === "you"}>
+        <button
+          className="play"
+          onClick={props.onPlayYou}
+          disabled={!props.canPlayYou}
+          aria-pressed={props.playing === "you"}
+        >
           <i className="ico">{props.playing === "you" ? "■" : "▶"}</i>
           Your sending
         </button>
@@ -269,14 +276,14 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
       </div>
 
       <div className="group">
-        <label className="check" title={CHAR_BLOCKS_HELP}>
+        <label className="check" title={CHAR_MARKERS_HELP}>
           <input
             type="checkbox"
-            id="char-blocks"
-            checked={s.charBlocks}
-            onChange={(e) => onChange({ charBlocks: e.target.checked })}
+            id="char-markers"
+            checked={s.charMarkers}
+            onChange={(e) => onChange({ charMarkers: e.target.checked })}
           />{" "}
-          Character blocks
+          Character markers
         </label>
       </div>
 

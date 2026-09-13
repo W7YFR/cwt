@@ -26,6 +26,8 @@ import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/
 import { FALLBACK_PALETTE } from "@/render/theme";
 import {
   GUTTER,
+  MARK_H,
+  MARKER_W,
   PAD_R,
   PAD_X,
   REST_W,
@@ -276,55 +278,112 @@ describe("a gap that reaches in from off screen", () => {
   });
 });
 
-describe("characters as single markers", () => {
-  /* What this trainer is for is spacing and placement — where a character
-     starts and how long it runs. A row of elements invites counting them
-     instead, which is reading Morse off a screen rather than learning to send
-     it. */
+describe("characters as start markers", () => {
+  /* A fixed-width tick at the moment a character begins, instead of the dits
+     and dahs in it. What is being practised is the rhythm — when the next
+     character starts — and a block whose length tracked the character puts its
+     duration back on screen, which is what pulls attention into counting
+     elements rather than keeping time. */
   const review = reviewFrom(caseNamed(SLOPPY)).review;
+  const PPU = 18;
+  const ROW_Y = Y_YOU + (ROW_H - MARK_H) / 2;
 
-  const rects = (view: ViewMode, charBlocks: boolean) => {
+  /* Wide enough that nothing is culled: these are claims about every
+     character, and a viewport that dropped half of them would make them
+     claims about whichever half happened to be on screen. */
+  const paint = (over: Partial<Scene> = {}) => {
     const ctx = recordingCtx();
-    draw(ctx, { ...sceneFor(review, view, 18), charBlocks });
-    // Every filled body on the chart, however it was drawn.
-    return ctx.ofType("fill").length;
+    draw(ctx, { ...sceneFor(review, "per-char", PPU, 4000), ...over });
+    return ctx;
   };
 
-  it.each(VIEWS)("draws fewer bodies than there are elements (%s)", (view) => {
-    /* The whole claim: one marker per character where there were several. Not
-       a count against a fixture's own numbers — those change — but against
-       the same chart drawn the other way. */
-    expect(rects(view, true)).toBeLessThan(rects(view, false));
+  /** Every filled rounded rect on the "yours" row, as [x, width, color].
+   *
+   * Reconstructed from the path: `roundRect` opens with a moveTo at x+r and
+   * its first arcTo carries x+w, so the two together give both ends back. */
+  function bodies(ctx: ReturnType<typeof recordingCtx>) {
+    const out: Array<{ x: number; w: number; fill: string }> = [];
+    const { calls } = ctx;
+    for (let i = 0; i < calls.length; i++) {
+      const m = calls[i]!;
+      if (m.op !== "moveTo" || m.args[1] !== ROW_Y) continue;
+      const arc = calls[i + 1];
+      if (!arc || arc.op !== "arcTo") continue;
+      const fill = calls.slice(i, i + 8).find((c) => c.op === "fill");
+      if (!fill) continue;
+      /* `roundRect` clamps its radius to half the box, so the distance between
+         those two x's is `w - min(3, w/2)` — which inverts differently for a
+         tick a couple of pixels wide than for a block. */
+      const d = arc.args[0]! - m.args[0]!;
+      const w = d < 3 ? d * 2 : d + 3;
+      out.push({ x: m.args[0]! - (w - d), w, fill: fill.fill });
+    }
+    return out;
+  }
+
+  it("gives every character the same width, whatever is in it", () => {
+    /* The whole point. The fixture has characters of several different
+       lengths, so a width that tracked the character would come back with
+       several different numbers here. */
+    const lengths = new Set(
+      review.slots.filter((s) => s.actual).map((s) => s.actual!.blocks.length),
+    );
+    expect(lengths.size, "fixture has only one shape of character").toBeGreaterThan(1);
+
+    const widths = new Set(bodies(paint({ charMarkers: true })).map((b) => b.w));
+    expect(widths).toEqual(new Set([MARKER_W]));
   });
 
-  it("still marks a character its elements failed", () => {
-    /* A character with one dah forty percent long is not a character that came
-       out right, and the single block is the only place left to say so. Graded
-       at a tolerance tight enough that the fixture actually has failures in
-       it — at the default it does not, and the test would be comparing two
-       charts of nothing but blue. */
-    const tight = (charBlocks: boolean) => {
-      const ctx = recordingCtx();
-      draw(ctx, { ...sceneFor(review, "per-char", 18), tolerance: 0.02, charBlocks });
-      return new Set(
-        ctx
-          .fillsFor("fill")
-          .filter((c) => c === FALLBACK_PALETTE.warn || c === FALLBACK_PALETTE.bad),
-      );
+  it("puts the marker where the character starts", () => {
+    // It is a mark on the clock: its position is the whole of its meaning, and
+    // that position is where the character's first element begins.
+    const markers = bodies(paint({ charMarkers: true }));
+    expect(markers.length).toBeGreaterThan(2);
+
+    const layout = buildLayout(review, {
+      view: "per-char",
+      ppu: PPU,
+      durationSec: review.take.durationSec,
+    });
+    const starts = layout.items
+      .filter((it) => it.slot.actual && it.x !== null)
+      .map((it) => it.x! + it.gapW);
+    expect(markers.map((m) => Math.round(m.x))).toEqual(starts.map((x) => Math.round(x)));
+  });
+
+  it("takes the worst grade of its elements and the gap that led into it", () => {
+    /* Arriving late is exactly the fault this view exists to show, so the gap
+       before a character counts toward its marker — and a character whose own
+       elements are ragged must not come back clean just because it is drawn as
+       one tick now. */
+    const tolerance = 0.02;
+    const drawn = bodies(paint({ charMarkers: true, tolerance }));
+    const chars = review.slots.map((s) => s.actual).filter((c) => c !== null);
+    expect(drawn.length).toBe(chars.length);
+
+    const colorOf: Record<string, string> = {
+      ok: FALLBACK_PALETTE.you,
+      warn: FALLBACK_PALETTE.warn,
+      bad: FALLBACK_PALETTE.bad,
     };
-    const elements = tight(false);
-    expect(elements.size).toBeGreaterThan(0);
-    // Aggregating must not quietly grade a bad character "ok".
-    expect(tight(true)).toEqual(elements);
+    let sawFault = false;
+    chars.forEach((ch, i) => {
+      let worst: "ok" | "warn" | "bad" = "ok";
+      for (const b of ch!.leadGap ? [...ch!.blocks, ch!.leadGap] : ch!.blocks) {
+        if (b.targetUnits <= 0) continue;
+        const g = gradeOf(b.units, b.targetUnits, tolerance);
+        if (g === "bad" || (g === "warn" && worst === "ok")) worst = g;
+      }
+      if (worst !== "ok") sawFault = true;
+      expect(drawn[i]!.fill, `${ch!.char} at ${i}`).toBe(colorOf[worst]);
+    });
+    // A fixture with nothing wrong in it would prove nothing above.
+    expect(sawFault).toBe(true);
   });
 
   it("leaves the chart exactly as it was when it is off", () => {
     // Inert by construction, like everything else optional here.
-    const a = recordingCtx();
-    draw(a, sceneFor(review, "per-char", 18));
-    const b = recordingCtx();
-    draw(b, { ...sceneFor(review, "per-char", 18), charBlocks: false });
-    expect(b.calls).toEqual(a.calls);
+    expect(paint({ charMarkers: false }).calls).toEqual(paint().calls);
   });
 });
 

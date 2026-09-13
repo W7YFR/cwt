@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeWav } from "@/audio/wav";
 import { decodeAudioFile } from "@/dsp";
 import { PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
-import { MIC_SOURCE, analyzeClip, type AnalyzeOptions } from "@/io/take";
+import { MIC_SOURCE, analyzeClip, blankTake, type AnalyzeOptions } from "@/io/take";
 import { profileForSource, type Profile } from "@/io/profiles";
 import {
   forgetCurrentTake,
@@ -65,6 +65,13 @@ export interface TakeState {
    * the operator's fist free to vary; switching the profile under one
    * recording holds all three fixed by construction. */
   recalibrate(profile: Profile | null): Promise<void>;
+  /** Throw the recording away and stay here, ready to make another.
+   *
+   * Not the same as `clear`, which leaves the review entirely. This keeps the
+   * session — the message you are practising, the speeds, the pacing cursor —
+   * and drops only what was recorded into it, which is the loop: set it up,
+   * hear the target, send it, look at it, wipe it, send it again. */
+  reset(): void;
   clear(): void;
 }
 
@@ -83,7 +90,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     collapseRests: p.collapseRests ?? base.collapseRests,
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
-    charBlocks: p.charBlocks ?? base.charBlocks,
+    charMarkers: p.charMarkers ?? base.charMarkers,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
   };
 }
@@ -98,7 +105,7 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     collapseRests: prev.collapseRests,
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
-    charBlocks: prev.charBlocks,
+    charMarkers: prev.charMarkers,
     view: prev.view,
   };
 }
@@ -114,7 +121,7 @@ export function useTake(): TakeState {
       collapseRests: true,
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
-      charBlocks: false,
+      charMarkers: false,
       gainDb: 0,
       view: "per-char",
       ppu: 12,
@@ -146,7 +153,7 @@ export function useTake(): TakeState {
         collapseRests: next.collapseRests,
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
-        charBlocks: next.charBlocks,
+        charMarkers: next.charMarkers,
         view: next.view,
       });
       // The rest of the settings belong to the take, so they ride along with
@@ -266,6 +273,29 @@ export function useTake(): TakeState {
     void rememberTake({ take: next, audio, settings: kept });
   }, []);
 
+  const reset = useCallback(() => {
+    const s = settingsRef.current;
+    const take = blankTake({
+      expected: s.expected || null,
+      expectedSource: s.expected ? "what you said you'd send" : null,
+      charWpm: s.charWpm,
+      farnsworthWpm: s.farnsworthWpm,
+      ...(loadedRef.current ? { toneHz: loadedRef.current.take.toneHz } : {}),
+    });
+    const entry: LoadedTake = {
+      take,
+      clip: { samples: new Float32Array(0), rate: take.rate, peak: 0 },
+      data: null,
+    };
+    setLoaded(entry);
+    loadedRef.current = entry;
+    takeIdRef.current = null;
+    /* Deliberately not remembered. There is nothing in it to come back to, and
+       a reload should land on the landing screen rather than on an empty
+       review somebody has to work out how to leave. */
+    forgetCurrentTake();
+  }, []);
+
   const clear = useCallback(() => {
     setLoaded(null);
     takeIdRef.current = null;
@@ -280,5 +310,5 @@ export function useTake(): TakeState {
     [loaded, settings],
   );
 
-  return { loaded, settings, review, setSettings, load, adopt, recalibrate, clear };
+  return { loaded, settings, review, setSettings, load, adopt, recalibrate, reset, clear };
 }

@@ -8,7 +8,7 @@
  */
 
 import { normalized, segmentsFrom, trimSilence, TRIM_PAD } from "@/dsp";
-import { buildTimeline, estimateTiming } from "@/timing";
+import { buildTimeline, estimateTiming, targetTiming } from "@/timing";
 import type { AudioClip, Take, TakeProfile } from "@/types";
 import { calibrationOf, isAdjusted, type Profile } from "./profiles";
 
@@ -54,6 +54,65 @@ export interface AnalyzeOptions {
    *  what every recording gets until somebody calibrates — means the audio is
    *  read exactly as it was before any of this existed. */
   readonly profile?: Profile | null;
+}
+
+/** A session with nothing recorded in it yet.
+ *
+ * Everything the review draws is derived from the take plus the settings, and
+ * the target half of it needs no audio at all: the intended message and a pair
+ * of speeds are enough to render what you are about to send. So a session that
+ * has not been recorded yet is a Take with no segments in it, and the whole
+ * review — the target row, the chart, the target audio — works on it unchanged.
+ *
+ * The alternative was making every consumer handle a null take, which would
+ * have put a branch in each of them for a state none of them is really about.
+ *
+ * A real recording can never come back empty — `analyzeClip` refuses audio
+ * with no keying in it — so "no segments" is an unambiguous marker, and
+ * `isBlankTake` is how the few places that must know tell the difference. */
+export function blankTake(options: {
+  readonly expected: string | null;
+  readonly expectedSource?: string | null;
+  readonly charWpm: number;
+  readonly farnsworthWpm: number;
+  readonly toneHz?: number;
+  readonly rate?: number;
+  readonly id?: string;
+  readonly now?: string;
+}): Take {
+  const charWpm = options.charWpm;
+  const farnsworthWpm = Math.min(options.farnsworthWpm, charWpm);
+  return {
+    id: options.id ?? BLANK_ID,
+    recordedAt: options.now ?? isoNow(),
+    source: MIC_SOURCE,
+    toneHz: options.toneHz ?? 600,
+    rate: options.rate ?? 8000,
+    durationSec: 0,
+    peak: 0,
+    segments: [],
+    decoded: "",
+    expected: options.expected,
+    expectedSource: options.expectedSource ?? null,
+    /* The speeds asked for, not measured — there is nothing to measure. Every
+       reader of this has to check `isBlankTake` before quoting it as a
+       reading, which is what the zero states on the review are for. */
+    measured: targetTiming(charWpm, farnsworthWpm),
+    target: { charWpm, farnsworthWpm, explicit: true },
+    padSec: TRIM_PAD,
+    profile: null,
+  };
+}
+
+/** The id every blank take carries.
+ *
+ * Fixed rather than fresh: it is the same "nothing yet", and a new id each
+ * time would have the chart treat it as a new session and re-fit. */
+export const BLANK_ID = "blank";
+
+/** Nothing has been recorded into this session yet — see `blankTake`. */
+export function isBlankTake(take: Take): boolean {
+  return take.segments.length === 0;
 }
 
 export interface AnalyzeResult {

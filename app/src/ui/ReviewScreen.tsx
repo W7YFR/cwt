@@ -25,7 +25,7 @@ import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
-import { MIC_SOURCE } from "@/io/take";
+import { MIC_SOURCE, isBlankTake } from "@/io/take";
 import { baseName } from "./format";
 import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
@@ -56,6 +56,8 @@ export interface ReviewScreenProps {
   onProfileChange(id: string | undefined): Promise<void> | void;
   onDeviceChange(id: string | undefined): void;
   onConfigure(): void;
+  /** Drop the recording and stay here — see useTake.reset. */
+  onClear(): void;
   onBack(): void;
 }
 
@@ -83,6 +85,7 @@ export function ReviewScreen({
   onProfileChange,
   onDeviceChange,
   onConfigure,
+  onClear,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
   const rec = useRecorder({
@@ -98,6 +101,10 @@ export function ReviewScreen({
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [clock, setClock] = useState<number | null>(null);
   const [status, setStatus] = useState("");
+  /* Nothing recorded into this session yet. The target half of the review
+     works without one — that is the point of it — but everything that reads
+     the recording has to say so rather than act on an empty one. */
+  const blank = isBlankTake(loaded.take);
   const [rereading, setRereading] = useState(false);
   /* Seconds left of the lead-in, or null when no cursor is running. Whole
      numbers only: this is state, and updating it every frame would re-render
@@ -388,6 +395,7 @@ export function ReviewScreen({
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
           leadLeft={leadLeft}
+          onClear={blank ? undefined : onClear}
         />
         {/* Last, and on a row of its own: a filename is the one thing here
             whose width nobody controls, and beside the brand it pushed the
@@ -414,6 +422,7 @@ export function ReviewScreen({
         hasExpected={!!loaded.take.expected}
         playing={playing}
         clock={clock}
+        canPlayYou={!blank}
         onPlayYou={() => void playYou()}
         onPlayTarget={() => playTarget()}
         onStop={stop}
@@ -457,7 +466,14 @@ export function ReviewScreen({
             (the view follows playback)
           </p>
           <div className="downloads">
-            <button onClick={() => void downloadYou()} title="The recording, as made">
+            {/* The three that describe a recording are only offered when
+                there is one. The target's audio and the chart are both
+                renderable from the message and the speeds alone. */}
+            <button
+              onClick={() => void downloadYou()}
+              disabled={blank}
+              title="The recording, as made"
+            >
               ↓ Your audio
             </button>
             <button
@@ -474,6 +490,7 @@ export function ReviewScreen({
             </button>
             <button
               onClick={downloadJson}
+              disabled={blank}
               title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
             >
               ↓ JSON report

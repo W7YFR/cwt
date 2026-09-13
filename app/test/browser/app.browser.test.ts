@@ -523,6 +523,66 @@ describe("the app", () => {
     expect(loadPrefs().expected).toBe("CQ TEST DE W7YFR");
   });
 
+  describe("clearing the recording", () => {
+    /* The loop this is for: set the message and the speeds, hear the target,
+       send it, look at how it went, wipe it, send it again. Wiping keeps the
+       session — what you are practising — and drops only what was recorded
+       into it. */
+    const clear = () =>
+      container.querySelector<HTMLElement>("[data-testid='clear-take']")!;
+
+    it("keeps the target and drops the grading", async () => {
+      globalThis.fetch = bundleFetch();
+      await mount();
+      const before = container.querySelector<HTMLInputElement>("#expected")!.value;
+      expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"))
+        .toBe("false");
+
+      await act(async () => clear().click());
+
+      // Still here, still set up, with nothing recorded in it.
+      expect(container.querySelector("header")).not.toBeNull();
+      expect(container.querySelector<HTMLInputElement>("#expected")!.value).toBe(before);
+      expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"))
+        .toBe("true");
+      expect(container.querySelector("[data-testid='report-blank']")).not.toBeNull();
+    });
+
+    it("still draws the target, which is the point of staying", async () => {
+      /* The target half needs no recording — a message and a pair of speeds
+         are enough to render what you are about to send. If it went blank too
+         there would be nothing to practise against. */
+      globalThis.fetch = bundleFetch();
+      await mount();
+      await act(async () => clear().click());
+
+      const canvas = container.querySelector<HTMLCanvasElement>("canvas")!;
+      const ctx = canvas.getContext("2d")!;
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let lit = 0;
+      for (let i = 3; i < data.length; i += 4) if (data[i]! > 0) lit++;
+      expect(lit).toBeGreaterThan(100);
+    });
+
+    it("offers nothing that would act on a recording that is not there", async () => {
+      globalThis.fetch = bundleFetch();
+      await mount();
+      await act(async () => clear().click());
+
+      const named = (re: RegExp) =>
+        [...container.querySelectorAll("button")].find((b) => re.test(b.textContent ?? ""))!;
+      expect(named(/your sending/i).disabled, "play yours").toBe(true);
+      expect(named(/your audio/i).disabled, "download yours").toBe(true);
+      expect(named(/json report/i).disabled, "json").toBe(true);
+      // And nothing left to clear.
+      expect(container.querySelector("[data-testid='clear-take']")).toBeNull();
+
+      // What still works is everything about the target.
+      expect(named(/target$/i).disabled, "play target").toBe(false);
+      expect(named(/record another/i).disabled, "record").toBe(false);
+    });
+  });
+
   it("offers a recording control on the review itself", async () => {
     // Having just seen where the spacing drifted, the next thing you want is
     // another go — without losing the speeds and tolerance you just set.

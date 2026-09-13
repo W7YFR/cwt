@@ -131,7 +131,8 @@ export function createChart(
       playhead,
       driftMax,
       leadSec,
-      charBlocks: input.settings.charBlocks,
+      charMarkers: input.settings.charMarkers,
+      blank: input.review.take.segments.length === 0,
     };
     return s;
   }

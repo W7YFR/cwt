@@ -18,6 +18,8 @@ import {
   HEIGHT,
   LABEL_H,
   MARK_H,
+  MARKER_W,
+  PLAYHEAD_W,
   OVER_H,
   OVER_MARK_H,
   PAD_R,
@@ -93,9 +95,12 @@ export interface Viewport {
 }
 
 export interface Scene {
-  /** Draw each character as one marker rather than as its own dits and dahs.
-   *  See `drawCharBlock`. */
-  charBlocks?: boolean;
+  /** Nothing has been recorded into this session yet, so the "yours" row is
+   *  ghosts and none of them is a mistake. */
+  blank?: boolean;
+  /** Draw each character as a fixed-width marker at the moment it starts,
+   *  rather than as its own dits and dahs. See `drawCharMarker`. */
+  charMarkers?: boolean;
   /** Count-in reserved in front of the first character, in seconds. Absent or
    *  zero outside a paced recording — see `LayoutOptions.leadSec`. */
   leadSec?: number;
@@ -269,7 +274,12 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
  * spelled out on one axis and shown as a bare red character on another —
  * which looks like the chart having lost track of what you meant rather than
  * like two views disagreeing about how much to say. */
-function sentCaption(slot: Slot): { text: string; bad: boolean } {
+function sentCaption(slot: Slot, blank: boolean): { text: string; bad: boolean } {
+  /* With nothing recorded, every slot is a "deletion" — the target has a
+     character and your side does not — and marking them all as missed would
+     be an accusation about sending that has not happened yet. The row is
+     ghosts, and ghosts need no caption. */
+  if (blank) return { text: "", bad: false };
   if (slot.op === "sub" && slot.actual && slot.ideal) {
     // Intended first, then what came out — the same order the accuracy panel
     // uses, and the same order the two rows are stacked in.
@@ -301,7 +311,7 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
     ctx.fillText(slot.ideal ? slot.ideal.char : "·", mid, Y_TGT_LABEL + LABEL_H / 2);
 
     // Below your row: what came out, and how it differs from the line above.
-    const cap = sentCaption(slot);
+    const cap = sentCaption(slot, scene.blank === true);
     ctx.fillStyle = cap.bad ? C.bad : C.ink;
     ctx.font = `600 12px ${C.mono}`;
     ctx.fillText(cap.text, mid, Y_YOU_LABEL + LABEL_H / 2);
@@ -370,7 +380,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       if (visible(it.x - gw, gw + w, scene)) {
         if (g) drawGap(ctx, scene, g, it.x - gw, gw, Y_YOU, false);
         drawMarks(ctx, scene, slot.actual, it.x, Y_YOU, false);
-        const cap = sentCaption(slot);
+        const cap = sentCaption(slot, scene.blank === true);
         ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
         ctx.font = `600 11px ${C.mono}`;
         ctx.textAlign = "center";
@@ -417,12 +427,10 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
       ctx.fill();
       ctx.globalAlpha = 1;
     };
-    if (scene.charBlocks) {
-      // One marker for the character, here too — the setting is about what a
+    if (scene.charMarkers) {
+      // One tick for the character here too — the setting is about what a
       // block on the chart means, not about which axis it is drawn on.
-      let w = 0;
-      for (const b of ch.blocks) w += b.units * ppu;
-      paint(x, w);
+      paint(x, MARKER_W);
       return;
     }
     let bx = x;
@@ -455,7 +463,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
     if (!visible(it.x, w, scene)) continue;
     band(slot.actual, it.x, slot.op === "equal" ? C.you : C.bad, 0.55);
-    const cap = sentCaption(slot);
+    const cap = sentCaption(slot, scene.blank === true);
     ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
     ctx.font = `600 11px ${C.mono}`;
     ctx.textAlign = "center";
@@ -642,17 +650,19 @@ function drawCountIn(ctx: Ctx2D, scene: Scene): void {
   ctx.fillText(left.toFixed(1), GUTTER + COUNT_INSET_X, Y_TGT_LABEL + COUNT_INSET_Y);
 }
 
-/** One character as a single marker, instead of the dits and dahs inside it.
+/** One character as a mark on the clock, instead of the dits and dahs in it.
  *
- * What this trainer is for is spacing and placement — where a character starts
- * and how long it runs — and a row of elements invites counting them instead,
- * which is reading Morse off a screen rather than learning to send it. One
- * block per character shows the thing being practised and nothing else.
+ * A fixed-width tick at the moment the character begins. The width carries no
+ * information on purpose: what is being practised is the rhythm — when the
+ * next character starts — and a block whose length tracked the character would
+ * put its duration back on screen, which is the thing that pulls attention
+ * into counting elements instead of keeping time.
  *
- * Graded on the whole character: the worst of its own elements, because a
- * character with one dah 40% long is not a character that came out right, and
- * the single block is the only place left to say so. */
-function drawCharBlock(
+ * What the markers say is in the space between them. What the colour says is
+ * whether that character landed where it should have: the same verdict the
+ * grade strip carries, its own elements and the gap that led into it, because
+ * arriving late is exactly the fault this view exists to show. */
+function drawCharMarker(
   ctx: Ctx2D,
   scene: Scene,
   ch: Char,
@@ -662,13 +672,15 @@ function drawCharBlock(
 ): void {
   const C = scene.palette;
   const y = yTop + (ROW_H - MARK_H) / 2;
-  let w = 0;
+
   let worst: Grade = "ok";
-  for (const b of ch.blocks) {
-    w += b.units * scene.layout.ppu;
-    if (isTarget) continue;
-    const g = gradeOf(b.units, b.targetUnits, scene.tolerance);
-    if (g === "bad" || (g === "warn" && worst === "ok")) worst = g;
+  if (!isTarget) {
+    const blocks = ch.leadGap ? [...ch.blocks, ch.leadGap] : ch.blocks;
+    for (const b of blocks) {
+      if (b.targetUnits <= 0) continue;
+      const g = gradeOf(b.units, b.targetUnits, scene.tolerance);
+      if (g === "bad" || (g === "warn" && worst === "ok")) worst = g;
+    }
   }
 
   ctx.fillStyle = isTarget
@@ -679,16 +691,18 @@ function drawCharBlock(
         ? C.bad
         : C.you;
   ctx.globalAlpha = isTarget ? 0.55 : 1;
-  roundRect(ctx, x0, y, Math.max(w, 2), MARK_H, 3);
+  roundRect(ctx, x0, y, MARKER_W, MARK_H, 3);
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Hovering any element of the character lights the whole of it, since the
-  // whole of it is what is drawn.
+  /* Hovering anywhere in the character lights its marker, since the marker is
+     all there is of it — as a halo around the tick rather than an outline on
+     it. At this width an outline would simply cover the thing it is meant to
+     be pointing at. */
   if (scene.hover && ch.blocks.includes(scene.hover)) {
     ctx.strokeStyle = C.ink;
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, x0 + 0.5, y + 0.5, Math.max(w, 2) - 1, MARK_H - 1, 3);
+    ctx.lineWidth = 1;
+    roundRect(ctx, x0 - 2.5, y - 2.5, MARKER_W + 5, MARK_H + 5, 3);
     ctx.stroke();
   }
 }
@@ -701,8 +715,8 @@ function drawMarks(
   yTop: number,
   isTarget: boolean,
 ): void {
-  if (scene.charBlocks) {
-    drawCharBlock(ctx, scene, ch, x0, yTop, isTarget);
+  if (scene.charMarkers) {
+    drawCharMarker(ctx, scene, ch, x0, yTop, isTarget);
     return;
   }
   const C = scene.palette;
@@ -751,9 +765,12 @@ function drawGhost(
   ctx: Ctx2D,
   scene: Scene,
   x: number,
-  w: number,
+  width: number,
   yTop: number,
 ): void {
+  // A hole where a character should have been, the same size as the thing it
+  // is standing in for.
+  const w = scene.charMarkers ? MARKER_W : width;
   const y = yTop + (ROW_H - MARK_H) / 2;
   ctx.strokeStyle = scene.palette.ghost;
   ctx.setLineDash([3, 3]);
@@ -930,7 +947,7 @@ function drawPlayhead(ctx: Ctx2D, scene: Scene): void {
     scene.view === "overlay" ? Y_TGT : scene.playhead.side === "you" ? Y_YOU : Y_TGT;
   const h = scene.view === "overlay" ? OVER_H : ROW_H;
   ctx.strokeStyle = scene.playhead.side === "you" ? scene.palette.you : scene.palette.ink;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = PLAYHEAD_W;
   ctx.beginPath();
   ctx.moveTo(x, y0 - 4);
   ctx.lineTo(x, y0 + h + 2);

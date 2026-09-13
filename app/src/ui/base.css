@@ -173,6 +173,8 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .score.ok b { color: var(--ok); }
 .score.warn b { color: var(--warn); }
 .score.bad b { color: var(--bad); }
+/* Nothing recorded yet. Dashed rather than zeroed: a zero is a reading. */
+.score.none b { color: var(--ink-faint); }
 
 /* The chart's own controls, in a strip above it. Not styled as the panel the
    grading controls are: they belong to the picture, not to the numbers. */

@@ -120,6 +120,9 @@ export interface RecordBarProps {
   /** Seconds left of the pacing cursor's lead-in; 0 once it is running, null
    *  when there is no cursor. */
   leadLeft: number | null;
+  /** Throw the recording away and stay here. Absent when there is nothing to
+   *  throw away. */
+  onClear?: (() => void) | undefined;
 }
 
 /** Record another, without leaving the review. */
@@ -133,6 +136,7 @@ export function RecordBar({
   appliesToTake,
   rereading,
   leadLeft,
+  onClear,
 }: RecordBarProps): React.ReactElement {
   if (rec.recorder) {
     return (
@@ -171,6 +175,19 @@ export function RecordBar({
       <button onClick={() => void rec.start()} disabled={rec.busy}>
         <RecDot /> Record another
       </button>
+      {/* Not "back": this keeps the session — the message, the speeds, the
+          pacing cursor — and drops only what was recorded into it, which is
+          the loop. Set it up, hear the target, send it, look at it, wipe it,
+          send it again. */}
+      {onClear && (
+        <button
+          onClick={onClear}
+          data-testid="clear-take"
+          title="Drop this recording and keep the message, the speeds and the settings"
+        >
+          Clear
+        </button>
+      )}
       <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
 
       {appliesToTake ? (

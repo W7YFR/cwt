@@ -8,6 +8,7 @@
 
 import type { Review, ReviewSettings, Take } from "@/types";
 import { fmtSeconds } from "./format";
+import { isBlankTake } from "@/io/take";
 
 function scoreClass(v: number, good: number, ok: number): string {
   return v >= good ? "ok" : v >= ok ? "warn" : "bad";
@@ -24,8 +25,49 @@ export function Scores({ review, settings, take }: ScoresProps): React.ReactElem
   const c = review.comparison;
   const m = take.measured;
 
+  /* Nothing recorded yet.
+   *
+   * Every figure here is a reading off a recording, and with no recording they
+   * would all be lies of the most convincing kind — "100% consistent" out of
+   * an empty grade, a speed that is really just the target read back. So the
+   * readings are dashed and only the two facts that are genuinely known
+   * without sending anything are given: what the target is set to, and how
+   * long it runs. */
+  if (isBlankTake(take)) {
+    return (
+      <div className="scores" data-testid="scores" data-blank="true">
+        <div className="score none">
+          <b>—</b>
+          <span>consistent</span>
+        </div>
+        <div className="score none">
+          <b>—</b>
+          <span>accurate</span>
+        </div>
+        <div className="score none">
+          <b>—</b>
+          <span>wpm sent (target {Math.round(settings.charWpm)})</span>
+        </div>
+        <div className="score none">
+          <b>—</b>
+          <span>wpm overall (target {Math.round(settings.farnsworthWpm)})</span>
+        </div>
+        {review.ideal.duration > 0 && (
+          <div className="score none">
+            <b>—</b>
+            <span>
+              duration (target <output data-testid="target-duration">
+                {fmtSeconds(review.ideal.duration)}
+              </output>)
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="scores">
+    <div className="scores" data-testid="scores" data-blank="false">
       <div className={`score ${scoreClass(g.withinTolFrac, 0.9, 0.75)}`}>
         <b>{Math.round(g.withinTolFrac * 100)}%</b>
         <span>consistent</span>
@@ -57,7 +99,7 @@ export function Scores({ review, settings, take }: ScoresProps): React.ReactElem
         <div className="score">
           <b data-testid="take-duration">{fmtSeconds(take.durationSec)}</b>
           <span>
-            long (target <output data-testid="target-duration">
+            duration (target <output data-testid="target-duration">
               {fmtSeconds(review.ideal.duration)}
             </output>)
           </span>

@@ -280,6 +280,10 @@ export function App(): React.ReactElement {
             setError(null);
             setConfiguring(true);
           }}
+          onClear={() => {
+            setError(null);
+            take.reset();
+          }}
           onProfileChange={async (id) => {
             chooseProfile(id);
             await take.recalibrate(profiles.find((p) => p.id === id) ?? null);

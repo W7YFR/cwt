@@ -16,12 +16,13 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { existsSync } from "node:fs";
 import { act, renderHook } from "@testing-library/react";
 import { useTake } from "@/ui/useTake";
-import { MIC_SOURCE } from "@/io/take";
+import { MIC_SOURCE, isBlankTake } from "@/io/take";
 import type { Profile } from "@/io/profiles";
 import { DATA_DIR } from "../oracle-fs";
 import { readWav } from "../wav";
 
 const MESSAGE = `${DATA_DIR}/k3ng/cq-de-w7yfr/k3ng-webcam-cq-de-w7yfr-15wpm.wav`;
+const SENT = "CQ DE W7YFR";
 const HAVE = existsSync(MESSAGE);
 
 /* A plausible profile. The number is not what is under test — it only has to
@@ -118,6 +119,43 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
 
     expect(result.current.loaded!.take.profile ?? null).toBeNull();
     expect(result.current.loaded!.take.measured.charWpm).toBe(raw);
+  });
+
+  it("resets to a session with the target still in it", async () => {
+    /* The loop: set it up, send it, look at it, wipe it, send it again. What
+       is wiped is the recording; what survives is what you are practising. */
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
+    act(() => result.current.setSettings({ charWpm: 18, tolerance: 0.1 }));
+
+    act(() => result.current.reset());
+
+    const take = result.current.loaded!.take;
+    expect(isBlankTake(take)).toBe(true);
+    expect(take.decoded).toBe("");
+    expect(take.durationSec).toBe(0);
+    // The settings and the message are the session, not the recording.
+    expect(result.current.settings.charWpm).toBe(18);
+    expect(result.current.settings.tolerance).toBe(0.1);
+    expect(result.current.settings.expected).toBe(SENT);
+    // And the target is still a real timeline to practise against.
+    expect(result.current.review!.ideal.text.trim()).toBe(SENT);
+    expect(result.current.review!.ideal.duration).toBeGreaterThan(0);
+  });
+
+  it("reports nothing rather than reporting zeroes", async () => {
+    /* Every figure on the review is a reading off a recording. With no
+       recording an empty grade comes out "100% consistent", which is the most
+       convincing kind of wrong. */
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
+    act(() => result.current.reset());
+
+    const r = result.current.review!;
+    expect(r.analysis.stats).toEqual([]);
+    expect(r.analysis.deviations).toEqual([]);
+    // Present, but not a grade anybody earned — the UI dashes it.
+    expect(isBlankTake(r.take)).toBe(true);
   });
 
   it("never corrects a file, wherever the request came from", async () => {

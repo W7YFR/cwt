@@ -28,6 +28,23 @@ export const SLOT_GAP = 10;
 /** Height of a dit/dah block. */
 export const MARK_H = 20;
 
+/** Stroke width of the playhead, and of the pacing cursor that rides on it. */
+export const PLAYHEAD_W = 1.5;
+
+/** Width of a character marker, in pixels and deliberately not in units.
+ *
+ * The marker says WHEN a character starts and nothing else. Giving it a width
+ * that tracked the character's length would put the length back on screen —
+ * and the whole reason for drawing one is to practise the rhythm without
+ * thinking about how long a character ought to take. Fixed pixels, so it does
+ * not grow with the zoom either.
+ *
+ * The same width as the cursor, and tied to it rather than merely set to the
+ * same number: the two are meant to line up. What you are watching for is the
+ * cursor arriving on a tick, and a cursor fatter or thinner than the thing it
+ * is arriving at makes that moment harder to judge than it needs to be. */
+export const MARKER_W = PLAYHEAD_W;
+
 /* The rows, top to bottom.
  *
  * The target is above your sending, with a caption band of its own, and that

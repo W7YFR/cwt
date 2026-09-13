@@ -369,7 +369,7 @@ export interface Prefs {
   collapseRests?: boolean;
   paceCursor?: boolean;
   paceLeadSec?: number;
-  charBlocks?: boolean;
+  charMarkers?: boolean;
 }
 
 export function loadPrefs(): Prefs {
