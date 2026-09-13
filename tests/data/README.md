@@ -14,6 +14,33 @@ well under ~200 KB. Content uses the example callsign `AB1CD` (no real stations)
 | `cq-ab1cd-20wpm-k3ng.wav` | `CQ CQ DE AB1CD K` | 20 wpm, standard spacing; k3ng keyer, programmatically sent (clean, machine-timed) |
 | `cq-de-w7yfr.wav` | `CQ DE W7YFR` | 25 wpm; keyer captured via Audacity, words run together (no word gaps) |
 
+## Calibration corpora
+
+Multi-file sets used by the TypeScript calibration tests. These **are**
+committed, despite the blanket `*.wav` rule in `.gitignore` — there is a
+matching exception for this directory, because without them the calibration
+tests do not run at all and they cannot be regenerated: each is a particular
+room on a particular afternoon.
+
+They are stored at **8 kHz mono**, downsampled from the 44.1 kHz originals. That
+costs nothing measurable — the whole corpus moves a room offset by about 0.3 ms
+against effects of 13 to 34 ms, and the section split comes out identical — and
+takes the set from 47 MB to under 10 MB. The tests still skip cleanly if a
+corpus is missing, so a partial checkout is green rather than broken.
+
+| Directory | What it is |
+|---|---|
+| `k3ng/` | The full sequence — silence, held dits, held dahs, iambic, isolated dits, a message — at 15 wpm, captured **simultaneously** through a loopback from the keyer and a webcam microphone four feet from the speaker. The loopback file is not a reference decode, it is the answer. Measured room offset: 13 ms. |
+| `ft710/` | The same sequence with the keyer driving an FT-710, its sidetone reaching the microphone from 56 inches and off-axis. Roughly twice as reverberant; the message shatters and calibration correctly **refuses**. Kept as the negative case. |
+| `ft710-close/` | The same again in one continuous take with the microphone a few inches from the radio's speaker. Room offset 2.5 ms, and the message reads correctly with no calibration at all. Also the recording whose section separators overlap with its own isolated-dit spacing, which is why sections cannot be split on a fixed amount of silence. |
+
+Each set was keyed by a machine, so element lengths are known rather than
+estimated — and each was captured through the loopback and the microphone
+**simultaneously**, so the loopback file is not a second opinion, it is the
+answer. That is what makes them usable for measuring what a room does.
+`cq-de-w7yfr-mic-1.wav` and `-mic-2.wav` beside this file are the same idea in
+miniature and *are* committed, being small.
+
 ## How to (re)generate
 
 Produce a mono WAV of the message at the stated speed with any CW-audio tool

@@ -11,6 +11,7 @@ import { envelope, DEFAULT_BANDWIDTH } from "./envelope";
 import { thresholdCurve } from "./level";
 import { fillRippleGaps } from "./ripple";
 import { correctionWeight, edgeTransitionSec, refineEdges } from "./edges";
+import { applyReleaseOffset, type Calibration } from "./calibrate";
 import { localPeak, LEVEL_WINDOW_SEC } from "./level";
 import { keyingThreshold } from "./threshold";
 import { detectTone } from "./tone";
@@ -21,6 +22,8 @@ export * from "./filters";
 export * from "./level";
 export * from "./ripple";
 export * from "./edges";
+export * from "./calibrate";
+export * from "./sections";
 export * from "./segments";
 export * from "./threshold";
 export * from "./tone";
@@ -104,6 +107,15 @@ export interface SegmentOptions {
   /** Skip tone detection and use this frequency. */
   readonly toneHz?: number;
   readonly bandwidth?: number;
+  /** A measured profile for this microphone and room.
+   *
+   * Its presence changes two things. The edge correction runs at full strength
+   * rather than in proportion to how slow the edges look, because a measured
+   * profile is better evidence than that estimate; and the profile's release
+   * offset comes off every mark. Absent — which is the default, and what every
+   * recording gets until somebody runs a calibration — none of this happens
+   * and the pipeline behaves exactly as it did. */
+  readonly calibration?: Calibration;
 }
 
 /** Detect the tone, find the keying, and return it as timed runs.
@@ -140,11 +152,17 @@ export function segmentsFrom(
   // are re-placed at half the local steady level. Weighted by how slow they
   // actually are, which is zero for a recording that never needed it.
   const peak = localPeak(env, rate, LEVEL_WINDOW_SEC);
-  const weight = correctionWeight(edgeTransitionSec(binary, env, peak, rate));
+  const cal = options.calibration;
+  // A measured profile outranks the estimate: correct fully, then take off the
+  // offset the room was measured to add. Without one, the correction is scaled
+  // by how slow the edges look, which is zero on a recording that never needed
+  // it — see edges.ts.
+  const weight = cal ? 1 : correctionWeight(edgeTransitionSec(binary, env, peak, rate));
   const raw = weight > 0
     ? refineEdges(binary, env, peak, rate, weight)
     : runLengths(binary, rate);
-  const segments = deglitch(raw);
+  const corrected = cal ? applyReleaseOffset(raw, cal.releaseOffsetSec) : raw;
+  const segments = deglitch(corrected);
 
   return { toneHz, segments, threshold };
 }
