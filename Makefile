@@ -15,8 +15,9 @@ LOCALBIN := $(HOME)/.local/bin
 
 .PHONY: help
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_\\:-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN{FS="## "}{t=$$1; sub(/:[ \t].*$$/,"",t); gsub(/\\/,"",t); \
+			printf "  \033[36m%-14s\033[0m %s\n", t, $$2}'
 
 # ---- the browser app ------------------------------------------------------ #
 
@@ -31,6 +32,19 @@ dev: node_modules ## Run the app with hot reload at localhost:5173
 .PHONY: build
 build: node_modules ## Build the app into dist/
 	npm run build
+
+# Two ways to look at it, and the difference is whether it moves under you.
+# `serve` is a snapshot: dist/ as it was last built, unaffected by edits to the
+# source until you ask for a new one. `dev` is the opposite and `serve:latest`
+# is the bridge — rebuild, then serve the result.
+.PHONY: serve
+serve: ## Serve the last build at localhost:4173
+	@test -f dist/index.html || { echo "No build in dist/ — run 'make serve:latest'"; exit 1; }
+	npm run preview
+
+.PHONY: serve\:latest
+serve\:latest: build ## Build, then serve it at localhost:4173
+	npm run preview
 
 .PHONY: browsers
 browsers: node_modules ## Download the browser the third test tier needs (once)
