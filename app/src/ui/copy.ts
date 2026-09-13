@@ -84,7 +84,7 @@ export const PACE_CURSOR_HELP =
 export const CHAR_MARKERS_HELP =
   "Draw each character as a fixed-width tick at the moment it starts, instead " +
   "of the dits and dahs inside it. The width carries nothing: what is being " +
-  "practised is the rhythm — when the next character begins — and a block " +
+  "practiced is the rhythm — when the next character begins — and a block " +
   "whose length tracked the character would put its duration back on screen, " +
   "which is what pulls attention into counting elements rather than keeping " +
   "time. The grading does not change: a marker takes the worst grade of its " +

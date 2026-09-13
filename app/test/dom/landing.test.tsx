@@ -24,6 +24,7 @@ function renderLanding(overrides: Partial<React.ComponentProps<typeof Landing>> 
     onProfileChange: vi.fn(),
     onCalibrate: vi.fn(),
     onConfigure: vi.fn(),
+    onPractice: vi.fn(),
     ...overrides,
   };
   return { ...render(<Landing {...props} />), props };
@@ -346,7 +347,34 @@ describe("the landing screen", () => {
       await settled();
     });
 
-    it("opens the configuration screen from the cog", async () => {
+    describe("starting a practice", () => {
+    /* Recording without hearing the target first, and without a cursor to keep
+       time against, is keying blind — and everything that fixes that lives one
+       screen in. This is the door to it. */
+    it("needs to know what you are going to send", async () => {
+      /* The target is rendered from the intended message. Without one there is
+         no row to read, no audio to hear and no cursor to follow, so there is
+         nothing to practice against. */
+      const user = userEvent.setup();
+      const { props } = renderLanding({ expected: "" });
+      const go = screen.getByRole("button", { name: /^let's go$/i });
+      expect(go).toBeDisabled();
+      expect(screen.getByTestId("practice-blocked")).toBeTruthy();
+
+      await user.click(go);
+      expect(props.onPractice).not.toHaveBeenCalled();
+    });
+
+    it("opens once there is one", async () => {
+      const user = userEvent.setup();
+      const { props } = renderLanding({ expected: "CQ DE W7YFR" });
+      expect(screen.queryByTestId("practice-blocked")).toBeNull();
+      await user.click(screen.getByRole("button", { name: /^let's go$/i }));
+      expect(props.onPractice).toHaveBeenCalled();
+    });
+  });
+
+  it("opens the configuration screen from the cog", async () => {
       const user = userEvent.setup();
       const { props } = renderLanding();
       await user.click(screen.getByTestId("cog"));

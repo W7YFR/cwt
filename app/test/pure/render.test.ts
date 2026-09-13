@@ -280,7 +280,7 @@ describe("a gap that reaches in from off screen", () => {
 
 describe("characters as start markers", () => {
   /* A fixed-width tick at the moment a character begins, instead of the dits
-     and dahs in it. What is being practised is the rhythm — when the next
+     and dahs in it. What is being practiced is the rhythm — when the next
      character starts — and a block whose length tracked the character puts its
      duration back on screen, which is what pulls attention into counting
      elements rather than keeping time. */
@@ -406,7 +406,7 @@ describe("the pacing cursor's count-in", () => {
 
   it.each(VIEWS)("changes nothing at all when there is none (%s)", (view) => {
     /* The rule the rest of this codebase is built on: a correction that is not
-       needed is not applied, rather than applied and cancelled out. Compared
+       needed is not applied, rather than applied and canceled out. Compared
        structurally, because a lead-in that shifted the axis by a rounding
        error would be invisible here and visible on screen. */
     const plain = layoutFor(review, view, 18);
@@ -481,7 +481,7 @@ describe("the pacing cursor's count-in", () => {
   it("draws the count-in as a measured silence, not as empty space", () => {
     /* Empty space says nothing — it reads as the chart starting late rather
        than as time you are meant to be counting through. Bracketed and
-       labelled it is the same object as the gaps below it, and the cursor
+       labeled it is the same object as the gaps below it, and the cursor
        crossing it means something. */
     expect(textAt(paint(18), LEAD_ROW_Y)).toContain(`${LEAD}s`);
   });

@@ -4,7 +4,7 @@
  * from slashes and underscores assumes a terminal cell that a glyph fills edge
  * to edge; in a browser's monospace face those glyphs do not touch, and the
  * letters render as a field of disconnected strokes while every check for a
- * labelled element still passes.
+ * labeled element still passes.
  *
  * So these check the properties the picture actually depends on, for every
  * drawing rather than for one. Most of them are CSS, which is why this runs in
@@ -123,7 +123,7 @@ describe("a wordmark on the page", () => {
   });
 
   it("keeps the keyed line with the drawing, not at the foot of the reserve", async () => {
-    // The drawing and the keyed line centre together inside the reserve. As
+    // The drawing and the keyed line center together inside the reserve. As
     // siblings the line sat at the bottom of the box, a long way adrift from a
     // short drawing.
     for (const i of [0, WORDMARKS.length - 1]) {

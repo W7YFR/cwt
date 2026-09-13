@@ -35,7 +35,7 @@ export const PLAYHEAD_W = 1.5;
  *
  * The marker says WHEN a character starts and nothing else. Giving it a width
  * that tracked the character's length would put the length back on screen —
- * and the whole reason for drawing one is to practise the rhythm without
+ * and the whole reason for drawing one is to practice the rhythm without
  * thinking about how long a character ought to take. Fixed pixels, so it does
  * not grow with the zoom either.
  *

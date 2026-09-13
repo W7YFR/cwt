@@ -234,7 +234,7 @@ describe("the app", () => {
     expect(brand.tagName).toBe("BUTTON"); // reachable from a keyboard, not just a mouse
     // The header draws the name rather than spelling it, and at 26 pixels tall
     // some of the drawings are not readable as letters at all — so the button
-    // has to carry the name itself or it is an unlabelled control.
+    // has to carry the name itself or it is an unlabeled control.
     expect(brand.getAttribute("aria-label")).toBe("CWT");
     expect(brand.querySelector(".art")).not.toBeNull();
     await act(async () => {
@@ -354,7 +354,7 @@ describe("the app", () => {
     const brand = container.querySelector<HTMLElement>(".brand")!.getBoundingClientRect();
     expect(scores.getBoundingClientRect().left).toBeCloseTo(brand.left, 0);
 
-    /* Centred in its own band. In the header they were not: the line above
+    /* Centered in its own band. In the header they were not: the line above
        set the padding and the figures took whatever was left, which put them
        a few pixels high. */
     const outer = band.getBoundingClientRect();
@@ -405,7 +405,7 @@ describe("the app", () => {
        different natural heights, and a row that mixes them ends up with
        everything at a slightly different level and nothing to blame it on.
        Two bands per group — caption above, control below — is what puts them
-       on one centre line.
+       on one center line.
 
        Checked per wrapped line rather than across the whole row: these rows
        wrap, and two groups that have wrapped onto different lines are supposed
@@ -500,7 +500,7 @@ describe("the app", () => {
 
   it("carries a corrected intended message into the next recording", async () => {
     /* It is not a property of the take on screen — it is what you are
-       practising, and it outlives every attempt at it. Edited on the review it
+       practicing, and it outlives every attempt at it. Edited on the review it
        used to change only that review, so the next recording was graded
        against whatever the page had loaded with and the correction you had
        just made was thrown away. */
@@ -526,7 +526,7 @@ describe("the app", () => {
   describe("clearing the recording", () => {
     /* The loop this is for: set the message and the speeds, hear the target,
        send it, look at how it went, wipe it, send it again. Wiping keeps the
-       session — what you are practising — and drops only what was recorded
+       session — what you are practicing — and drops only what was recorded
        into it. */
     const clear = () =>
       container.querySelector<HTMLElement>("[data-testid='clear-take']")!;
@@ -551,7 +551,7 @@ describe("the app", () => {
     it("still draws the target, which is the point of staying", async () => {
       /* The target half needs no recording — a message and a pair of speeds
          are enough to render what you are about to send. If it went blank too
-         there would be nothing to practise against. */
+         there would be nothing to practice against. */
       globalThis.fetch = bundleFetch();
       await mount();
       await act(async () => clear().click());
@@ -581,6 +581,39 @@ describe("the app", () => {
       expect(named(/target$/i).disabled, "play target").toBe(false);
       expect(named(/record another/i).disabled, "record").toBe(false);
     });
+  });
+
+  it("starts a practice from a cold start, with the message it was given", async () => {
+    /* The loop begins before there is any recording: say what you are going to
+       send, hear the target, set the pace, then key it. Reachable only through
+       Clear, that first step would have required recording something blind in
+       order to get to the screen that stops you recording blind. */
+    globalThis.fetch = bundleFetch({ take: null });
+    localStorage.setItem(
+      "cw-trainer:prefs",
+      JSON.stringify({ expected: "CQ DE W7YFR" }),
+    );
+    await mount();
+
+    const go = [...container.querySelectorAll("button")].find((b) =>
+      /^let's go$/i.test(b.textContent ?? ""),
+    )!;
+    expect(go.disabled).toBe(false);
+    await act(async () => go.click());
+
+    // On the review, set up, with nothing recorded in it.
+    expect(container.querySelector("header")).not.toBeNull();
+    expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"))
+      .toBe("true");
+    expect(container.querySelector<HTMLInputElement>("#expected")!.value).toBe(
+      "CQ DE W7YFR",
+    );
+    // And a real target to practice against, not an empty one.
+    expect(
+      parseFloat(
+        container.querySelector("[data-testid='target-duration']")!.textContent!,
+      ),
+    ).toBeGreaterThan(0);
   });
 
   it("offers a recording control on the review itself", async () => {

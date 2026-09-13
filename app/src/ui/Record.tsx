@@ -16,7 +16,7 @@ import type { RecorderHandle } from "./useRecorder";
  *
  * Its own component so the three buttons that carry one cannot drift apart,
  * and red because that is what a record button is — the bare character
- * inherits the button's text colour and reads as a bullet. Hidden from
+ * inherits the button's text color and reads as a bullet. Hidden from
  * assistive tech: the label beside it already says what it does. */
 export function RecDot(): React.ReactElement {
   return (

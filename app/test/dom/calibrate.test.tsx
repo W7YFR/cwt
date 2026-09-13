@@ -440,7 +440,7 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
   });
 
   it("says whether it is your turn, by the same signal throughout", async () => {
-    /* Two states, one pair of colours, read out of the corner of an eye by
+    /* Two states, one pair of colors, read out of the corner of an eye by
        somebody looking at a paddle: counting toward a drill is holding off,
        counting through one is sending. The cued drill alternates between the
        same two on every beat rather than inventing a third thing. */
@@ -721,7 +721,7 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     });
   });
 
-  it("throws the recording away when cancelled", async () => {
+  it("throws the recording away when canceled", async () => {
     const user = userEvent.setup();
     renderWizard();
     await begin(user);

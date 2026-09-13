@@ -68,10 +68,10 @@ export interface TakeState {
   /** Throw the recording away and stay here, ready to make another.
    *
    * Not the same as `clear`, which leaves the review entirely. This keeps the
-   * session — the message you are practising, the speeds, the pacing cursor —
+   * session — the message you are practicing, the speeds, the pacing cursor —
    * and drops only what was recorded into it, which is the loop: set it up,
    * hear the target, send it, look at it, wipe it, send it again. */
-  reset(): void;
+  reset(overrides?: Partial<ReviewSettings>): void;
   clear(): void;
 }
 
@@ -273,8 +273,13 @@ export function useTake(): TakeState {
     void rememberTake({ take: next, audio, settings: kept });
   }, []);
 
-  const reset = useCallback(() => {
-    const s = settingsRef.current;
+  const reset = useCallback((overrides: Partial<ReviewSettings> = {}) => {
+    /* Overrides, because this is reached from two places that know different
+       things. From the review it keeps the session exactly as it is; from the
+       landing screen there is no session yet and the message being practiced
+       lives up in the app, not in settings that have never been used. */
+    const s = { ...settingsRef.current, ...overrides };
+    if (s.farnsworthWpm > s.charWpm) s.farnsworthWpm = s.charWpm;
     const take = blankTake({
       expected: s.expected || null,
       expectedSource: s.expected ? "what you said you'd send" : null,
@@ -290,6 +295,8 @@ export function useTake(): TakeState {
     setLoaded(entry);
     loadedRef.current = entry;
     takeIdRef.current = null;
+    settingsRef.current = s;
+    setSettingsRaw(s);
     /* Deliberately not remembered. There is nothing in it to come back to, and
        a reload should land on the landing screen rather than on an empty
        review somebody has to work out how to leave. */

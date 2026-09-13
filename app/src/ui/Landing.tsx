@@ -39,12 +39,18 @@ export interface LandingProps {
   onProfileChange(id: string | undefined): void;
   onCalibrate(): void;
   onConfigure(): void;
+  /** Open the review with nothing recorded in it — see useTake.reset. */
+  onPractice(): void;
 }
 
 export function Landing(props: LandingProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   const { onAudio, onError } = props;
   const expected = useUpperField(props.onExpectedChange);
+  /* The target is rendered from the intended message, so without one there is
+     nothing on the practice screen to send against — no row to read, no audio
+     to hear, no cursor to follow. */
+  const ready = props.expected.trim().length > 0;
 
   const rec = useRecorder({
     deviceId: props.deviceId,
@@ -167,6 +173,24 @@ export function Landing(props: LandingProps): React.ReactElement {
             work. Files are read exactly as recorded — no calibration is applied
             to them.
           </p>
+        </div>
+
+        {/* Across both, because it is not a third way in — it is what the
+            other two are for. Recording without hearing the target first, and
+            without a cursor to keep time against, is keying blind; this is the
+            door to the room where those live. */}
+        <div className="way practice">
+          <h2>Start Practicing</h2>
+          <p>Enter the review area to practice drills and improve your timing.</p>
+          <button className="big" onClick={props.onPractice} disabled={!ready}>
+            Let's go!
+          </button>
+          {!ready && (
+            <p className="hint" data-testid="practice-blocked">
+              Say what you are going to send first — the target is built from
+              it, and there is nothing to practice against without one.
+            </p>
+          )}
         </div>
       </div>
 

@@ -409,7 +409,7 @@ export function ReviewScreen({
       </header>
 
       {/* A band of its own rather than a line of the header. In the header the
-          figures were vertically off-centre — the row above them sets the
+          figures were vertically off-center — the row above them sets the
           padding and they got whatever was left — and they are the one thing
           on this screen read at a glance. */}
       <section className="scoresrow">

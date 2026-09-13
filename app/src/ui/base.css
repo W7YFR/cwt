@@ -19,7 +19,7 @@
   --rest: #a371f7;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   /* Height of a control: a button, a select, a text box, a slider. One number,
-     so unlike controls sitting beside each other share a centre line. */
+     so unlike controls sitting beside each other share a center line. */
   --control-h: 31px;
   /* Height of a full-width band — the header, and anything that appears in
      place of it or above it. */
@@ -58,7 +58,7 @@ header {
   min-height: var(--band-h);
   display: flex;
   flex-wrap: wrap;
-  /* Centred, not baseline-aligned. Baseline alignment drops the scores a
+  /* Centered, not baseline-aligned. Baseline alignment drops the scores a
      pixel the moment a recording starts, because the running clock's first
      baseline sits differently from a button's — a one-pixel twitch under
      numbers you are trying to read. Nothing in this row shares a baseline
@@ -97,7 +97,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   color: var(--you);
   cursor: pointer;
   /* The header row lines its contents up on the baseline; a drawing has no
-     baseline worth aligning to, so it centres on the row instead. */
+     baseline worth aligning to, so it centers on the row instead. */
   align-self: center;
 }
 .brandmark:hover, .brandmark:focus-visible { color: var(--ink); border-color: transparent; }
@@ -130,11 +130,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* The landing screen stacks these; here they sit in a header row. */
 .recordbar.recording { flex-direction: row; }
 .recordbar .reclight { font-size: 14px; }
-.recordbar /* Red whatever the button around it is doing, including disabled — a record
-   button that greys its own dot stops looking like one. */
-.recdot { color: var(--bad); }
-
-.reclight .dot { width: 9px; height: 9px; }
+.recordbar .reclight .dot { width: 9px; height: 9px; }
 /* The lead-in count. Blue while you wait, green once the cursor is moving —
    the same pair the calibration wizard uses, and for the same reason. */
 .recordbar .reclight[data-state="waiting"] { color: var(--you); }
@@ -151,7 +147,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
  * is the one thing a row of figures read at a glance must not do.
  *
  * A band rather than another line of the header, because inside it they were
- * also vertically off-centre: the line above set the padding and the figures
+ * also vertically off-center: the line above set the padding and the figures
  * took what was left. Their own section has its own symmetric padding and
  * nothing else in it to negotiate with. */
 .scoresrow {
@@ -199,7 +195,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
  *
  * A caption of fixed height on top, a control band of fixed height below, and
  * every group built the same way — so a select, a slider, a checkbox, a text
- * box and a row of buttons all sit on one centre line however tall each one
+ * box and a row of buttons all sit on one center line however tall each one
  * naturally is. Left to their own heights they do not: a text input is half
  * again the height of a slider, and a row that mixes them ends up with
  * everything at a slightly different level and no single thing to blame. */
@@ -222,7 +218,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 }
 /* The control band. `margin-top: auto` is what drops a group with no caption —
    the transport, a bare checkbox — onto the same line as the ones that have
-   one, rather than centring it across both bands. */
+   one, rather than centering it across both bands. */
 .group > :not(label),
 .group > label.check,
 .group > label.field {
@@ -264,7 +260,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .group label.check input { accent-color: var(--you); margin: 0; }
 .hint { text-transform: none; letter-spacing: 0; color: var(--ink-faint); }
 
-/* Sized to the control band rather than to its own track, so its centre line
+/* Sized to the control band rather than to its own track, so its center line
    is the same one a text box's is. */
 input[type=range] { width: 100%; accent-color: var(--you); margin: 0; height: var(--control-h); }
 /* A slider with a button beside it. The slider takes the slack; `min-width: 0`
@@ -491,7 +487,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Centred when it fits, top-aligned when it does not — `center` on its own
+  /* Centered when it fits, top-aligned when it does not — `center` on its own
      would push the top of an over-tall page off the screen, out of reach. */
   justify-content: safe center;
   gap: 22px;
@@ -510,7 +506,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
    that they all land at about the same width, and all of them shrink with the
    viewport rather than overflowing it. */
 /* The reserve: tall enough for whichever drawing turns up, so reloading the
-   page does not move everything below it. Centred within, so a short drawing
+   page does not move everything below it. Centered within, so a short drawing
    sits where a tall one would rather than clinging to the top of the box. */
 .landing .wordmark {
   margin: 0;
@@ -525,7 +521,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   --wm-morse-line: 20px;
 }
 
-/* A box of a fixed height, holding the drawing and the keyed line centred
+/* A box of a fixed height, holding the drawing and the keyed line centered
    together. Fixed because the drawings are 4 to 11 rows tall and every reload
    brings a different one: a box that hugged its contents would move the whole
    page up and down as the roll changed. A min-height on the heading is not
@@ -566,7 +562,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   /* Pinned, because the reserve arithmetic counts on it. */
   line-height: var(--wm-morse-line);
   letter-spacing: .3em;
-  /* The trailing letter-space would otherwise push the line off-centre. */
+  /* The trailing letter-space would otherwise push the line off-center. */
   text-indent: .3em;
   color: var(--ink-dim);
 }
@@ -585,6 +581,11 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   width: 100%;
   max-width: 780px;
 }
+/* Across both of the other two, because it is not a third way in — it is what
+   the other two are for. */
+.way.practice { flex: 1 1 100%; }
+.way.practice button { max-width: 382px }
+
 .way {
   flex: 1 1 320px;
   background: var(--panel);
@@ -652,7 +653,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   white-space: pre;
 }
 /* Red whatever the button around it is doing, including disabled — a record
-   button that greys its own dot stops looking like one. */
+   button that grays its own dot stops looking like one. */
 .recdot { color: var(--bad); }
 
 .reclight .dot {
@@ -664,11 +665,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 }
 @keyframes pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) {
-  /* Red whatever the button around it is doing, including disabled — a record
-   button that greys its own dot stops looking like one. */
-.recdot { color: var(--bad); }
-
-.reclight .dot { animation: none; }
+  .reclight .dot { animation: none; }
 }
 .meter {
   width: 260px;
@@ -693,7 +690,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
  * A banner is a strip that appears without warning, above a page somebody is
  * already reading. Sized to its own words it is a different height every time
  * and a different height from everything else on screen, so the page jumps by
- * some unpredictable amount as it arrives. One band height, centred, and the
+ * some unpredictable amount as it arrives. One band height, centered, and the
  * jump is at least the same one every time — and looks like a row of the
  * chrome rather than something wedged into it. */
 .banner {
@@ -1113,7 +1110,7 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 }
 .calstatus .calstate b { font-weight: 600; }
 .calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
-/* Not the recording light: this one does not blink, and its colour is the
+/* Not the recording light: this one does not blink, and its color is the
    whole message. */
 .calstatus .dot {
   flex: none;

@@ -42,7 +42,7 @@ import { SMOOTH_SEC } from "./envelope";
  *
  * Deliberately well inside the mark. Measuring 10% to 90% would be the usual
  * convention, but the 10% point of a reverberant mark lies out in the previous
- * element's tail, so the measurement would be of the neighbourhood rather than
+ * element's tail, so the measurement would be of the neighborhood rather than
  * of the edge. */
 const EDGE_LO = 0.3;
 const EDGE_HI = 0.7;

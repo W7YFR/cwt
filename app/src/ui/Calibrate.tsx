@@ -380,7 +380,7 @@ export function Calibrate(props: CalibrateProps): React.ReactElement {
                 <Cue drill={current} into={rec.elapsed - stepStart} />
               ) : (
                 /* Green while a drill is running, against the blue of a rest's
-                   countdown. One colour for "hold off" and another for "send
+                   countdown. One color for "hold off" and another for "send
                    now", read out of the corner of an eye by somebody looking
                    at a paddle — the same pair the cued drill already uses for
                    its wait and its call. */
@@ -519,7 +519,7 @@ export function Cue({
       className={`countdown cue ${now ? "now" : ""}`}
       aria-live="polite"
       data-testid="cue"
-      // The same pair the uncued drills use, so one rule colours both.
+      // The same pair the uncued drills use, so one rule colors both.
       data-state={now ? "sending" : "waiting"}
       data-cue={now ? "now" : "wait"}
       data-fired={Math.min(fired, total)}

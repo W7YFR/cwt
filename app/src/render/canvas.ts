@@ -71,7 +71,7 @@ export interface Chart {
 }
 
 /** Where a running playhead is held across the track, as a fraction of its
- *  width. Left of centre: what is coming matters more than what has gone. */
+ *  width. Left of center: what is coming matters more than what has gone. */
 const PLAYHEAD_HOLD = 0.4;
 
 /** Marks and gaps behave differently on a click — see `onClick`. */

@@ -123,7 +123,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
 
   it("resets to a session with the target still in it", async () => {
     /* The loop: set it up, send it, look at it, wipe it, send it again. What
-       is wiped is the recording; what survives is what you are practising. */
+       is wiped is the recording; what survives is what you are practicing. */
     const { result } = renderHook(() => useTake());
     act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
     act(() => result.current.setSettings({ charWpm: 18, tolerance: 0.1 }));
@@ -138,7 +138,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
     expect(result.current.settings.charWpm).toBe(18);
     expect(result.current.settings.tolerance).toBe(0.1);
     expect(result.current.settings.expected).toBe(SENT);
-    // And the target is still a real timeline to practise against.
+    // And the target is still a real timeline to practice against.
     expect(result.current.review!.ideal.text.trim()).toBe(SENT);
     expect(result.current.review!.ideal.duration).toBeGreaterThan(0);
   });

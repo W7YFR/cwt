@@ -14,7 +14,7 @@
  * So the assertion is that calibration REFUSES. A profile built from drills
  * that disagree by thirty milliseconds would be applied to every later
  * recording from that setup and would be confidently wrong. Declining to
- * produce one, and saying so, is the correct behaviour and the thing most
+ * produce one, and saying so, is the correct behavior and the thing most
  * likely to regress quietly.
  */
 

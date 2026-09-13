@@ -395,7 +395,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       if (visible(it.ix - igw, igw + iw, scene)) {
         if (ig) drawGap(ctx, scene, ig, it.ix - igw, igw, Y_TGT, true);
         drawMarks(ctx, scene, slot.ideal, it.ix, Y_TGT, true);
-        /* Labelled too, on this axis. The target row used to go unnamed here
+        /* Labeled too, on this axis. The target row used to go unnamed here
            because there was one caption band and it belonged to the decode —
            but on a wall clock the two rows' characters sit at different x, and
            that offset IS the drift. Naming both is what makes it readable. */
@@ -573,7 +573,7 @@ function leadSpan(scene: Scene): { x0: number; x1: number; seconds: number } | n
 /** The count-in, drawn the way every other stretch of silence is drawn.
  *
  * Empty space says nothing: it reads as the chart starting late rather than as
- * time you are meant to be counting through. Bracketed and labelled, it is the
+ * time you are meant to be counting through. Bracketed and labeled, it is the
  * same object as the gaps below it — a measured silence with its length on it
  * — and the cursor crossing it means something. */
 function drawLead(ctx: Ctx2D, scene: Scene): void {
@@ -653,12 +653,12 @@ function drawCountIn(ctx: Ctx2D, scene: Scene): void {
 /** One character as a mark on the clock, instead of the dits and dahs in it.
  *
  * A fixed-width tick at the moment the character begins. The width carries no
- * information on purpose: what is being practised is the rhythm — when the
+ * information on purpose: what is being practiced is the rhythm — when the
  * next character starts — and a block whose length tracked the character would
  * put its duration back on screen, which is the thing that pulls attention
  * into counting elements instead of keeping time.
  *
- * What the markers say is in the space between them. What the colour says is
+ * What the markers say is in the space between them. What the color says is
  * whether that character landed where it should have: the same verdict the
  * grade strip carries, its own elements and the gap that led into it, because
  * arriving late is exactly the fault this view exists to show. */

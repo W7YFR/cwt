@@ -259,7 +259,7 @@ export function App(): React.ReactElement {
           review={take.review}
           settings={take.settings}
           /* The intended message is not a property of the take being looked
-             at — it is what you are practising, and it outlives every attempt
+             at — it is what you are practicing, and it outlives every attempt
              at it. Edited here it used to change only this review, so the next
              recording was graded against whatever the page had loaded with and
              the box you had just corrected was ignored. */
@@ -312,6 +312,10 @@ export function App(): React.ReactElement {
           onConfigure={() => {
             setError(null);
             setConfiguring(true);
+          }}
+          onPractice={() => {
+            setError(null);
+            take.reset({ expected: intended });
           }}
         />
       )}

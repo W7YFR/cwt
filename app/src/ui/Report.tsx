@@ -173,8 +173,8 @@ export function Report({
               <dt>Decoded</dt>
               <dd data-testid="decoded-text">{c.decoded}</dd>
             </div>
-            {/* In the same list as the two texts, so it is labelled like them
-                and lines up under them. An unlabelled row of counts reads as a
+            {/* In the same list as the two texts, so it is labeled like them
+                and lines up under them. An unlabeled row of counts reads as a
                 footnote to the diff below rather than as the summary of the
                 two lines above. */}
             <div>

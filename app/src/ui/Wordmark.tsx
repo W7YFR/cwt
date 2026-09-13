@@ -54,7 +54,7 @@ export function Wordmark({ art }: { art: WordmarkArt }): React.ReactElement {
         >
           {wordmarkText(art)}
         </span>
-        {/* Inside the box with the drawing, so the two centre as one unit. As
+        {/* Inside the box with the drawing, so the two center as one unit. As
             a sibling it would sit at the foot of the reserve instead, a
             hundred pixels adrift from a short drawing. */}
         <span className="morse" aria-hidden="true">
