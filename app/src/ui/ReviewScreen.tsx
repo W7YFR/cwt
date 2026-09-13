@@ -380,9 +380,10 @@ export function ReviewScreen({
             <span className="sw bad" /> worse
             <span className="sw ghost" /> missing
             <span className="sw rest" /> rest (not graded)
-            &nbsp;·&nbsp; click a character to hear it &nbsp;·&nbsp; click the ruler
-            to seek &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll to
-            pan (the view follows playback)
+            &nbsp;·&nbsp; click a character to hear it, a gap to hear it between
+            what it separates &nbsp;·&nbsp; click the ruler to seek
+            &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll to pan
+            (the view follows playback)
           </p>
           <div className="downloads">
             <button onClick={() => void downloadYou()} title="The recording, as made">

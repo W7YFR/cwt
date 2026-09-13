@@ -160,6 +160,13 @@ export interface HitResult {
   char: Char;
   row: Side;
   slot: Slot;
+  /** Where that slot sits in `review.slots`.
+   *
+   * Layout items are built one per slot, in order, so the two indices are the
+   * same — `slotSpan` already relies on it. Carried on the hit so a click can
+   * ask `contextWindow` what a gap is actually about without searching for the
+   * slot it just had in its hand. */
+  index: number;
 }
 
 /** What is under a point, in content coordinates. Pure — no canvas needed. */
@@ -177,7 +184,8 @@ export function hitTest(
       : null;
   if (!row) return null;
 
-  for (const it of layout.items) {
+  for (let index = 0; index < layout.items.length; index++) {
+    const it = layout.items[index]!;
     const ch = row === "you" ? it.slot.actual : it.slot.ideal;
     if (!ch) continue;
     const gap = ch.leadGap;
@@ -187,7 +195,7 @@ export function hitTest(
       bx = it.x! + it.gapW;
       const gw = row === "you" ? it.youGapW : it.tgtGapW;
       if (gap && contentX >= it.x! && contentX < it.x! + gw) {
-        return { block: gap, char: ch, row, slot: it.slot };
+        return { block: gap, char: ch, row, slot: it.slot, index };
       }
     } else {
       const start = row === "you" ? it.x : it.ix;
@@ -197,14 +205,14 @@ export function hitTest(
       bx = start;
       const gw = gapWidth(gap, layout.ppu);
       if (gap && contentX >= bx - gw && contentX < bx) {
-        return { block: gap, char: ch, row, slot: it.slot };
+        return { block: gap, char: ch, row, slot: it.slot, index };
       }
     }
 
     for (const b of ch.blocks) {
       const w = b.units * layout.ppu;
       if (contentX >= bx && contentX < bx + w) {
-        return { block: b, char: ch, row, slot: it.slot };
+        return { block: b, char: ch, row, slot: it.slot, index };
       }
       bx += w;
     }

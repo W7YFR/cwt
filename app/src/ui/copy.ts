@@ -46,11 +46,14 @@ export const CLASS_HELP: Record<BlockKind, string> = {
   "char-gap":
     "The silence BETWEEN two letters of the same word. Should be 3.00u, and " +
     "wider than that when you send Farnsworth — the target column has the " +
-    "figure for the speeds now set.",
+    "figure for the speeds now set. Clicking one on the chart plays the letter " +
+    "before it, the gap, and the letter after: a silence on its own is silence, " +
+    "and spacing is only audible against what it separates.",
   "word-gap":
     "The silence between two words. Should be 7.00u, and wider under " +
     "Farnsworth. Long enough and it stops being a gap at all and becomes a " +
-    "rest, which is not graded.",
+    "rest, which is not graded. Clicking one on the chart plays the whole word " +
+    "either side, because half a word does not read as one.",
   pause:
     "A silence long enough to be you stopping rather than spacing. Not graded, " +
     "and drawn at a fixed width with its real length on the label.",

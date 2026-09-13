@@ -11,7 +11,10 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { createChart, type Chart } from "@/render/canvas";
+import { buildLayout } from "@/render/layout";
+import { contextWindow } from "@/render/focus";
 import { HEIGHT, GUTTER, ZOOM_MIN } from "@/render/geometry";
+import type { BlockKind } from "@/types";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
 
 const { review, settings } = reviewFrom(caseNamed(SLOPPY));
@@ -198,6 +201,108 @@ describe("the chart in a browser", () => {
     const [side, from, to] = onPlayChar.mock.calls[0]!;
     expect(side).toBe("you");
     expect(to).toBeGreaterThan(from);
+  });
+
+  describe("clicking a gap", () => {
+    /* A mark is its own context; a gap is not. A silence played on its own is
+       silence, and what a spacing fault sounds like is only audible against
+       what sits either side of it.
+       
+       What these hold is that the chart and the deviation table answer with
+       the SAME window, from the same function — two paths to the same audio
+       that disagree is a bug nobody would ever notice. */
+    const PPU = 30;
+
+    /** Where the lead gap of slot `i` sits, in screen coordinates. Read off a
+     *  layout built the same way the chart builds its own, rather than guessed
+     *  at in pixels. */
+    function gapAt(i: number) {
+      const layout = buildLayout(review, {
+        view: settings.view,
+        ppu: PPU,
+        durationSec: review.take.durationSec,
+      });
+      const it = layout.items[i]!;
+      return it.x! + it.youGapW / 2;
+    }
+
+    /** The first slot whose lead gap is graded as `kind`. */
+    function slotWithGap(kind: BlockKind): number {
+      return review.slots.findIndex(
+        (s) => s.actual?.leadGap?.targetKind === kind,
+      );
+    }
+
+    function clickAt(contentX: number, onPlayChar: ReturnType<typeof vi.fn>) {
+      chart.destroy();
+      chart = createChart(host, canvas, { onPlayChar });
+      chart.update({ review, settings: { ...settings, ppu: PPU }, focus: null });
+      chart.scrollTo(0);
+      const rect = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(
+        new MouseEvent("click", {
+          clientX: rect.left + GUTTER + contentX,
+          clientY: rect.top + 52,
+          bubbles: true,
+        }),
+      );
+    }
+
+    it.each(["char-gap", "word-gap"] as const)(
+      "plays a %s with what it separates",
+      (kind) => {
+        const i = slotWithGap(kind);
+        expect(i, `no ${kind} in the fixture`).toBeGreaterThan(0);
+
+        const onPlayChar = vi.fn();
+        clickAt(gapAt(i), onPlayChar);
+
+        expect(onPlayChar).toHaveBeenCalled();
+        const [side, from, to] = onPlayChar.mock.calls[0]!;
+        const want = contextWindow(review.slots, "you", i, kind)!;
+        expect(side).toBe("you");
+        expect(from).toBeCloseTo(want[0], 6);
+        expect(to).toBeCloseTo(want[1], 6);
+
+        // And it really does reach past the gap itself, or none of this
+        // would have been worth doing.
+        const gap = review.slots[i]!.actual!.leadGap!;
+        expect(from).toBeLessThan(gap.t0);
+        expect(to).toBeGreaterThan(gap.t1);
+      },
+    );
+
+    it("gives a word gap more room than a letter gap", () => {
+      /* A letter gap takes the character either side; a word gap takes the
+         whole word, because half a word does not read as one. */
+      const ci = slotWithGap("char-gap");
+      const wi = slotWithGap("word-gap");
+      const span = (i: number, kind: BlockKind) => {
+        const w = contextWindow(review.slots, "you", i, kind)!;
+        return w[1] - w[0];
+      };
+      expect(span(wi, "word-gap")).toBeGreaterThan(span(ci, "char-gap"));
+    });
+
+    it("still plays just the character when a mark is clicked", () => {
+      /* The other half of the rule. A dit's length means something on its own
+         and the elements around it are already in the same character; opening
+         the window would bury a 23 ms fault in a second and a half of audio. */
+      const i = review.slots.findIndex((s) => (s.actual?.blocks.length ?? 0) > 0);
+      const layout = buildLayout(review, {
+        view: settings.view,
+        ppu: PPU,
+        durationSec: review.take.durationSec,
+      });
+      const it = layout.items[i]!;
+      const onPlayChar = vi.fn();
+      clickAt(it.x! + it.gapW + 2, onPlayChar);
+
+      const [, from, to] = onPlayChar.mock.calls[0]!;
+      const ch = review.slots[i]!.actual!;
+      expect(from).toBeCloseTo(Math.max(ch.t0 - 0.08, 0), 6);
+      expect(to).toBeCloseTo(ch.t1 + 0.08, 6);
+    });
   });
 
   it("seeks when the ruler is clicked", () => {

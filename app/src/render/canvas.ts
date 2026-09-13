@@ -21,7 +21,7 @@ import {
   ZOOM_MIN,
   ZOOM_RATE,
 } from "./geometry";
-import { hitTest, type Focus, type HitResult } from "./focus";
+import { contextWindow, hitTest, type Focus, type HitResult } from "./focus";
 import { buildLayout, fitZoom, timeToX, xToTime, type Layout } from "./layout";
 import { draw, scrollbarThumb, trackBands, type Scene, type Viewport } from "./scene";
 import { readPalette, type Palette } from "./theme";
@@ -65,6 +65,11 @@ export interface Chart {
   /** Render the WHOLE analysis to an offscreen canvas, for export. */
   exportImage(): { canvas: HTMLCanvasElement; note: string };
   destroy(): void;
+}
+
+/** Marks and gaps behave differently on a click — see `onClick`. */
+function isGap(kind: Block["kind"]): boolean {
+  return kind !== "dit" && kind !== "dah";
 }
 
 /** Cap on the *device* pixel width of an export: browsers limit canvas
@@ -314,7 +319,28 @@ export function createChart(
       return;
     }
     const h = hitAt(p);
-    if (!h) return;
+    if (!h || !input) return;
+
+    /* A mark is its own context; a gap is not.
+     *
+     * Clicking a dit or a dah plays that character, and the elements it is
+     * made of are right there. Clicking a *gap* used to do the same thing,
+     * which was no use at all: a silence played on its own is silence, and
+     * what a spacing fault sounds like is only audible against what sits
+     * either side of it. So a gap plays what the class is about — the same
+     * window the deviation table plays for its rows, from the same function,
+     * because the two answering differently is a bug nobody would notice.
+     *
+     * Scoped by what it is GRADED as, not by what the decoder read it as:
+     * an overlong letter gap is still a letter gap, and playing it with a
+     * whole word either side would bury the fault it is being blamed for. */
+    if (isGap(h.block.kind)) {
+      const w = contextWindow(input.review.slots, h.row, h.index, h.block.targetKind);
+      if (w) {
+        callbacks.onPlayChar?.(h.row, w[0], w[1]);
+        return;
+      }
+    }
     // Click a character to hear just that character, on whichever track.
     const pad = 0.08;
     callbacks.onPlayChar?.(h.row, Math.max(h.char.t0 - pad, 0), h.char.t1 + pad);
