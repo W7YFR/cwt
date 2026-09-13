@@ -16,7 +16,8 @@
     "test:dom": "vitest run --project dom",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
-    "oracle": "python3 tools/oracle.py app/test/oracle"
+    "oracle": "python3 tools/oracle.py app/test/oracle",
+    "lock": "LOCK_RECORD=1 vitest run --project pure clean-path"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

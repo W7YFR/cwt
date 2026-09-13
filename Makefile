@@ -64,6 +64,12 @@ verify: dev-py node_modules ## Re-derive the oracle from Python and hold the por
 	npx vitest run --project pure
 	@echo "✓ the port still agrees with the reference implementation"
 
+.PHONY: lock
+lock: node_modules ## Re-record what the DSP says about clean audio (deliberate!)
+	@echo "→ re-recording app/test/lock/clean-path.json"
+	npm run lock --silent
+	@echo "✓ recorded. Review the diff: it is a diff in what users get."
+
 .PHONY: typecheck
 typecheck: node_modules ## Typecheck without emitting
 	npm run typecheck
