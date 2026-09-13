@@ -352,13 +352,22 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
   const u = scene.layout.unitSec;
   const ppu = scene.layout.ppu;
 
+  /* Culled over the gap as well as the character.
+   *
+   * On this axis a gap is drawn to the LEFT of the character it leads into, so
+   * a character just off the right edge can have a gap reaching a long way
+   * back into view. Testing the character alone dropped that whole line until
+   * the character itself was nearly on screen, and then it appeared all at
+   * once — so the chart looked like it simply stopped, and the connection to
+   * what came next snapped into existence out of nowhere. The span that gets
+   * drawn is the span that decides. */
   for (const it of scene.layout.items) {
     const slot = it.slot;
     if (slot.actual && it.x !== null) {
       const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
-      if (visible(it.x, w, scene)) {
-        const g = slot.actual.leadGap;
-        const gw = gapWidth(g, ppu);
+      const g = slot.actual.leadGap;
+      const gw = gapWidth(g, ppu);
+      if (visible(it.x - gw, gw + w, scene)) {
         if (g) drawGap(ctx, scene, g, it.x - gw, gw, Y_YOU, false);
         drawMarks(ctx, scene, slot.actual, it.x, Y_YOU, false);
         const cap = sentCaption(slot);
@@ -371,9 +380,9 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
     }
     if (slot.ideal && it.ix !== null) {
       const iw = ((slot.ideal.t1 - slot.ideal.t0) / u) * ppu;
-      if (visible(it.ix, iw, scene)) {
-        const ig = slot.ideal.leadGap;
-        const igw = gapWidth(ig, ppu);
+      const ig = slot.ideal.leadGap;
+      const igw = gapWidth(ig, ppu);
+      if (visible(it.ix - igw, igw + iw, scene)) {
         if (ig) drawGap(ctx, scene, ig, it.ix - igw, igw, Y_TGT, true);
         drawMarks(ctx, scene, slot.ideal, it.ix, Y_TGT, true);
         /* Labelled too, on this axis. The target row used to go unnamed here

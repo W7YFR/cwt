@@ -42,6 +42,9 @@ import type { Review, ViewMode } from "@/types";
 
 const VIEWS: ViewMode[] = ["per-char", "absolute", "overlay"];
 
+/** How the renderer writes a gap's length on its bracket. */
+const fmtUnits = (u: number) => `${u.toFixed(1)}u`;
+
 function layoutFor(review: Review, view: ViewMode, ppu: number): Layout {
   return buildLayout(review, { view, ppu, durationSec: review.take.durationSec });
 }
@@ -229,6 +232,47 @@ describe("the two tracks, and the text on each", () => {
       expect(t, `target caption "${t}"`).not.toMatch(/[\u2192+\u2013]/);
     }
     expect(textAt(ctx, YOU_CAP).join("")).toMatch(/[\u2192+\u2013]/);
+  });
+});
+
+describe("a gap that reaches in from off screen", () => {
+  /* On a time axis a gap is drawn to the LEFT of the character it leads into.
+     So a character just past the right edge can have a gap reaching a long way
+     back into view — and culling on the character alone dropped that whole
+     line until the character itself was nearly on screen, at which point it
+     appeared all at once. The chart looked like it simply stopped, and the
+     connection to what came next snapped into existence out of nowhere. */
+  const { review } = reviewFrom(caseNamed(SLOPPY));
+  const PPU = 18;
+  const TRACK = 846;
+
+  /** A slot whose lead gap is wide enough to be worth seeing, positioned so
+   *  the gap is in view while the character it leads to is not. */
+  function offRight() {
+    const layout = buildLayout(review, {
+      view: "absolute",
+      ppu: PPU,
+      durationSec: review.take.durationSec,
+    });
+    for (const it of layout.items) {
+      const g = it.slot.actual?.leadGap;
+      if (!g || it.x === null) continue;
+      const gw = gapWidth(g, PPU);
+      if (gw < 80) continue;
+      // Put the right edge between the gap's midpoint and the character, well
+      // clear of the margin either side.
+      const right = it.x - 42;
+      if (it.x - gw / 2 > right - 10) continue;
+      return { label: fmtUnits(g.units), scrollX: right - TRACK };
+    }
+    throw new Error("no wide gap in the fixture to test with");
+  }
+
+  it("draws the gap, not only the character it leads to", () => {
+    const { label, scrollX } = offRight();
+    const ctx = recordingCtx();
+    draw(ctx, { ...sceneFor(review, "absolute", PPU, TRACK), scrollX });
+    expect(ctx.texts()).toContain(label);
   });
 });
 
