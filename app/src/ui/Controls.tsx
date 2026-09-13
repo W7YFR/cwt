@@ -17,12 +17,20 @@ import type { ReviewSettings, ViewMode } from "@/types";
 import {
   CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
+  FLASH_CARD_HELP,
+  FLASH_CUE_HELP,
+  FLASH_LEAD_HELP,
   GAIN_HELP,
   PACE_CURSOR_HELP,
   PACE_LEAD_HELP,
   ZOOM_HELP,
 } from "./copy";
-import { PACE_LEAD_MAX_SEC, PACE_LEAD_MIN_SEC } from "@/render/geometry";
+import {
+  FLASH_LEAD_MAX_MS,
+  FLASH_LEAD_MIN_MS,
+  PACE_LEAD_MAX_SEC,
+  PACE_LEAD_MIN_SEC,
+} from "@/render/geometry";
 import { fmtGain, fmtPpu, fmtSeconds, fmtTolerance, fmtWpm } from "./format";
 import { useUpperField } from "./useUpperField";
 
@@ -163,46 +171,58 @@ export function Controls(props: ControlsProps): React.ReactElement {
   );
 }
 
-/** How long the count-in runs, in seconds.
+/** A small number box with its name beside it and its unit after it.
  *
- * Held as text while it is being edited, for the reason every other number box
- * in this app is: clearing the field to type a new figure hands `onChange` an
- * empty string, and a control that falls back to the committed value on
- * anything unparseable puts the old number straight back under the caret — so
- * emptying "3" and typing "5" leaves you with 35, which then clamps to the
- * maximum. The clamp belongs to what gets committed, not to what is on screen
- * being typed. */
-function LeadField({
-  seconds,
+ * Held as text while it is being edited, which is the whole reason this is a
+ * component rather than three inputs. Clearing the field to type a new figure
+ * hands `onChange` an empty string, and a control that falls back to the
+ * committed value on anything unparseable puts the old number straight back
+ * under the caret — so emptying "3" and typing "5" leaves you with 35, which
+ * then clamps to the maximum and reads as the control ignoring you. The clamp
+ * belongs to what gets committed, not to what is on screen being typed. */
+function NumberField({
+  id,
+  name,
+  unit,
+  help,
+  value,
+  min,
+  max,
+  step,
   onChange,
 }: {
-  seconds: number;
+  id: string;
+  name: string;
+  unit: string;
+  help: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
   onChange(v: number): void;
 }): React.ReactElement {
   const [text, setText] = useState<string | null>(null);
   return (
-    <label className="field row" title={PACE_LEAD_HELP}>
-      <span className="fieldname">Delay start</span>
+    <label className="field row" title={help}>
+      <span className="fieldname">{name}</span>
       <input
         type="number"
-        id="pace-lead"
-        min={PACE_LEAD_MIN_SEC}
-        max={PACE_LEAD_MAX_SEC}
-        step={1}
-        value={text ?? String(seconds)}
-        aria-label="Delay start in seconds"
+        id={id}
+        min={min}
+        max={max}
+        step={step}
+        value={text ?? String(value)}
+        aria-label={`${name} in ${unit === "s" ? "seconds" : "milliseconds"}`}
         onChange={(e) => {
           setText(e.target.value);
           const v = Number(e.target.value);
           if (e.target.value.trim() === "" || !Number.isFinite(v)) return;
-          onChange(
-            Math.min(Math.max(Math.round(v), PACE_LEAD_MIN_SEC), PACE_LEAD_MAX_SEC),
-          );
+          onChange(Math.min(Math.max(Math.round(v / step) * step, min), max));
         }}
         // Back to showing what was actually committed, clamp included.
         onBlur={() => setText(null)}
       />
-      <span className="unit">s</span>
+      <span className="unit">{unit}</span>
     </label>
   );
 }
@@ -304,9 +324,60 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
           that is already busy. */}
       {s.paceCursor && (
         <div className="group">
-          <LeadField
-            seconds={s.paceLeadSec}
+          <NumberField
+            id="pace-lead"
+            name="Delay start"
+            unit="s"
+            help={PACE_LEAD_HELP}
+            value={s.paceLeadSec}
+            min={PACE_LEAD_MIN_SEC}
+            max={PACE_LEAD_MAX_SEC}
+            step={1}
             onChange={(v) => onChange({ paceLeadSec: v })}
+          />
+        </div>
+      )}
+
+      <div className="group">
+        <label className="check" title={FLASH_CARD_HELP}>
+          <input
+            type="checkbox"
+            id="flash-card"
+            checked={s.flashCard}
+            onChange={(e) => onChange({ flashCard: e.target.checked })}
+          />{" "}
+          Flash card
+        </label>
+      </div>
+
+      {/* Both only with the card up — a cue for something not on screen, and a
+          lead on a cue that never fires, are settings for nothing. */}
+      {s.flashCard && (
+        <div className="group">
+          <label className="check" title={FLASH_CUE_HELP}>
+            <input
+              type="checkbox"
+              id="flash-cue"
+              checked={s.flashCue}
+              onChange={(e) => onChange({ flashCue: e.target.checked })}
+            />{" "}
+            Flash cue
+          </label>
+        </div>
+      )}
+
+      {s.flashCard && s.flashCue && (
+        <div className="group">
+          <NumberField
+            id="flash-lead"
+            name="Flash lead"
+            unit="ms"
+            help={FLASH_LEAD_HELP}
+            value={s.flashLeadMs}
+            min={FLASH_LEAD_MIN_MS}
+            max={FLASH_LEAD_MAX_MS}
+            step={10}
+            onChange={(v) => onChange({ flashLeadMs: v })}
           />
         </div>
       )}

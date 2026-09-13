@@ -6,7 +6,7 @@
  * review re-derivable from a saved file with no audio present.
  */
 
-import { PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
+import { FLASH_LEAD_DEFAULT_MS, PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
 import type { Review, ReviewSettings, Segment, Take, Timeline, Timing } from "@/types";
 import { compareText } from "./align";
 import { grade } from "./grade";
@@ -102,6 +102,9 @@ export function defaultSettings(take: Take): ReviewSettings {
     paceCursor: false,
     paceLeadSec: PACE_LEAD_DEFAULT_SEC,
     charMarkers: false,
+    flashCard: false,
+    flashCue: true,
+    flashLeadMs: FLASH_LEAD_DEFAULT_MS,
     gainDb: 0,
     view: "per-char",
     ppu: 12,

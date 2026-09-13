@@ -14,12 +14,14 @@ import { createPlayer, type PlaySide, type Player } from "@/audio/player";
 import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
 import { contextWindow, type Focus } from "@/render/focus";
-import { PLAY_PAD } from "@/render/geometry";
+import { PACED_STOP_AFTER_SEC, PLAY_PAD } from "@/render/geometry";
 import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
 import { Controls, ViewControls } from "./Controls";
+import { FlashCard } from "./FlashCard";
+import { beatsFor, pacedEnd, pacedStart } from "./pacing";
 import { Cog, RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
@@ -169,17 +171,17 @@ export function ReviewScreen({
    * The count-in is measured backwards from here, not from zero: what the
    * cursor has to arrive at on the beat is the first character, and on an
    * absolute axis that is not necessarily the origin. */
-  const paceFrom = useMemo(() => {
-    const first = review.ideal.chars[0];
-    if (!first) return 0;
-    return first.leadGap ? first.leadGap.t0 : first.t0;
-  }, [review.ideal]);
+  const paceFrom = useMemo(() => pacedStart(review.ideal), [review.ideal]);
 
   useEffect(() => {
     const recorder = rec.recorder;
     const chart = handle.chart;
     const lead = settings.paceLeadSec;
-    if (!recorder || !settings.paceCursor || !chart) {
+    /* Either aid arms the count-in: they are two readings of one schedule, and
+       making the card depend on the cursor would have turned two toggles into
+       three. Only the cursor touches the chart. */
+    const paced = settings.paceCursor || settings.flashCard;
+    if (!recorder || !paced || !chart) {
       setLeadLeft(null);
       handle.chart?.setLead(0);
       handle.chart?.setPlayhead(null);
@@ -190,18 +192,33 @@ export function ReviewScreen({
        earlier clamps to it — so without this the cursor would have nowhere to
        come in from and would simply appear on the beat, which is a count-in
        you cannot count along with. */
-    chart.setLead(lead);
+    if (settings.paceCursor) chart.setLead(lead);
+
+    /* Where the schedule runs out: a moment after the target's last element,
+       not after its last character's start. */
+    const endsAt = pacedEnd(review.ideal, lead, PACED_STOP_AFTER_SEC);
+    let stopped = false;
 
     let raf = 0;
     let shownLead = -1;
     const tick = () => {
       const into = recorder.elapsed();
       // Reaches the first character exactly as the lead-in runs out.
-      chart.setPlayhead({ t: paceFrom - lead + into, side: "tgt" });
+      if (settings.paceCursor) chart.setPlayhead({ t: paceFrom - lead + into, side: "tgt" });
       const left = into >= lead ? 0 : Math.max(1, Math.ceil(lead - into));
       if (left !== shownLead) {
         shownLead = left;
         setLeadLeft(left);
+      }
+      /* Stop itself at the end of the message. The take's length was decided
+         when the message and the speeds were, so making somebody reach for the
+         mouse to say so costs a second of dead air and a hand off the paddle.
+         Guarded, because this runs every frame and the recorder takes a moment
+         to report that it has closed. */
+      if (!stopped && endsAt !== null && into >= endsAt) {
+        stopped = true;
+        void rec.finish();
+        return;
       }
       raf = requestAnimationFrame(tick);
     };
@@ -212,7 +229,42 @@ export function ReviewScreen({
       chart.setLead(0);
       chart.setPlayhead(null);
     };
-  }, [handle, paceFrom, rec.recorder, settings.paceCursor, settings.paceLeadSec]);
+    /* `rec` is left out on purpose, and it is the only thing left out.
+       `useRecorder` returns a fresh object every render, so listing it would
+       tear this loop down and rebuild it on every frame the level meter moves
+       — losing the count-in's place and the guard that stops the recorder
+       exactly once. What the loop actually needs from it is the recorder
+       identity, which IS a dependency, and `finish` at the moment it fires,
+       which is stable for a given recorder. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    handle,
+    paceFrom,
+    rec.recorder,
+    review.ideal,
+    settings.flashCard,
+    settings.paceCursor,
+    settings.paceLeadSec,
+  ]);
+
+  /* When each character should be keyed, on the recorder's own clock.
+   *
+   * The cursor reaches the first character exactly as the count-in runs out,
+   * so every later one is that moment plus however far into the target it
+   * falls. Derived once per message rather than per frame — the schedule does
+   * not change while a recording runs. */
+  const beats = useMemo(
+    () => beatsFor(review.ideal, settings.paceLeadSec),
+    [review.ideal, settings.paceLeadSec],
+  );
+
+  /* Handed as a getter rather than as a number: the card reads the clock on
+     its own frames and writes straight to the DOM, so nothing here re-renders
+     ten times a second to move one digit. */
+  const liveClock = useMemo(() => {
+    const recorder = rec.recorder;
+    return recorder ? () => recorder.elapsed() : null;
+  }, [rec.recorder]);
   useEffect(() => player.setGainDb(settings.gainDb), [player, settings.gainDb]);
 
   /* The recording as bytes. A file keeps its own, so playback is the file
@@ -427,6 +479,15 @@ export function ReviewScreen({
         onPlayTarget={() => playTarget()}
         onStop={stop}
       />
+
+      {settings.flashCard && (
+        <FlashCard
+          beats={beats}
+          cue={settings.flashCue}
+          leadSec={settings.flashLeadMs / 1000}
+          elapsed={liveClock}
+        />
+      )}
 
       <section className="canvas-wrap">
         {/* Right above the thing they affect. None of these changes a number

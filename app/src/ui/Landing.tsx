@@ -182,8 +182,13 @@ export function Landing(props: LandingProps): React.ReactElement {
         <div className="way practice">
           <h2>Start Practicing</h2>
           <p>Enter the review area to practice drills and improve your timing.</p>
-          <button className="big" onClick={props.onPractice} disabled={!ready}>
-            Let's go!
+          <button
+            className="big"
+            data-testid="practice"
+            onClick={props.onPractice}
+            disabled={!ready}
+          >
+            Let&rsquo;s go!
           </button>
           {!ready && (
             <p className="hint" data-testid="practice-blocked">

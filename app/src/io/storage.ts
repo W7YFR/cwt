@@ -370,6 +370,9 @@ export interface Prefs {
   paceCursor?: boolean;
   paceLeadSec?: number;
   charMarkers?: boolean;
+  flashCard?: boolean;
+  flashCue?: boolean;
+  flashLeadMs?: number;
 }
 
 export function loadPrefs(): Prefs {

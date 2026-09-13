@@ -595,9 +595,7 @@ describe("the app", () => {
     );
     await mount();
 
-    const go = [...container.querySelectorAll("button")].find((b) =>
-      /^let's go$/i.test(b.textContent ?? ""),
-    )!;
+    const go = container.querySelector<HTMLButtonElement>("[data-testid='practice']")!;
     expect(go.disabled).toBe(false);
     await act(async () => go.click());
 

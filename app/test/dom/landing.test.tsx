@@ -357,7 +357,7 @@ describe("the landing screen", () => {
          nothing to practice against. */
       const user = userEvent.setup();
       const { props } = renderLanding({ expected: "" });
-      const go = screen.getByRole("button", { name: /^let's go$/i });
+      const go = screen.getByTestId("practice");
       expect(go).toBeDisabled();
       expect(screen.getByTestId("practice-blocked")).toBeTruthy();
 
@@ -369,7 +369,7 @@ describe("the landing screen", () => {
       const user = userEvent.setup();
       const { props } = renderLanding({ expected: "CQ DE W7YFR" });
       expect(screen.queryByTestId("practice-blocked")).toBeNull();
-      await user.click(screen.getByRole("button", { name: /^let's go$/i }));
+      await user.click(screen.getByTestId("practice"));
       expect(props.onPractice).toHaveBeenCalled();
     });
   });

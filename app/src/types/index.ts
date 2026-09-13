@@ -287,6 +287,14 @@ export interface ReviewSettings {
   paceLeadSec: number;
   /** Draw each character as one marker rather than as its dits and dahs. */
   charMarkers: boolean;
+  /** Show the next character to send, large, with a countdown to it. */
+  flashCard: boolean;
+  /** Flash that card on the beat. Separate from showing it: the card is a
+   *  reference you glance at, the flash is a cue you react to. */
+  flashCue: boolean;
+  /** How far ahead of the beat the flash fires, milliseconds — your reaction
+   *  time, which is yours. */
+  flashLeadMs: number;
   gainDb: number;
   view: ViewMode;
   ppu: number;

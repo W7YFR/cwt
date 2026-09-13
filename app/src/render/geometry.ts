@@ -1,8 +1,11 @@
-/* Fixed geometry of the review chart.
+/* The review's fixed numbers: its geometry, and the handful of durations that
+ * go with it.
  *
  * Kept apart from the drawing so the layout math, the hit testing and the
  * renderer all read the same numbers, and so a test can assert against them by
- * name instead of hard-coding pixel values that go stale.
+ * name instead of hard-coding values that go stale. The times live here for
+ * the same reason — a count-in quoted in help text and used by a clock is one
+ * number, not two.
  */
 
 /** Left band for track labels. Content never enters it — it is clipped out,
@@ -108,3 +111,30 @@ export const PLAY_PAD = 0.08;
 export const PACE_LEAD_DEFAULT_SEC = 3;
 export const PACE_LEAD_MIN_SEC = 1;
 export const PACE_LEAD_MAX_SEC = 10;
+
+/** How long the flash card stays lit, seconds. Long enough to catch out of the
+ *  corner of an eye, short enough to be over before the next character. */
+export const FLASH_SEC = 0.12;
+
+/** How far ahead of the beat the card flashes, milliseconds.
+ *
+ * Not zero, which is the honest default and the useless one: a cue that fires
+ * exactly on the beat leaves you late by your own reaction time on every
+ * character, and that reads as the cue being wrong rather than as something to
+ * dial in. Two hundred milliseconds is roughly a visual reaction — a guess,
+ * and the control exists because the guess is wrong for somebody. */
+export const FLASH_LEAD_DEFAULT_MS = 200;
+
+/** How long after the target's last character a paced recording stops itself.
+ *
+ * You declared the message and the pace, so where the take ends is already
+ * known and reaching for the mouse to say so is a second of dead air and a
+ * hand off the paddle. Long enough to let the last element ring out; short
+ * enough that it does not feel like a hang.
+ *
+ * It ends on the SCHEDULE, not on what you sent — so falling far enough behind
+ * the cursor will cut the take short. That is the honest behavior for a clock
+ * you asked to be held to, and Restart is one key away. */
+export const PACED_STOP_AFTER_SEC = 1;
+export const FLASH_LEAD_MIN_MS = 0;
+export const FLASH_LEAD_MAX_MS = 1000;

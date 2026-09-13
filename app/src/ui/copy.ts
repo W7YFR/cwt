@@ -91,6 +91,26 @@ export const CHAR_MARKERS_HELP =
   "own elements and the gap that led into it, and the report below still " +
   "breaks every element out.";
 
+export const FLASH_CARD_HELP =
+  "The next character you are due to send, large, with a countdown to it. At " +
+  "speed the chart's captions are small, moving, and exactly where you cannot " +
+  "look — your eyes are on a paddle. It shows what the target says comes next, " +
+  "never what you just sent, and it runs on the same count-in the pacing " +
+  "cursor does.";
+
+export const FLASH_CUE_HELP =
+  "Light the card on the beat as well as showing it. Showing it and flashing " +
+  "it are different things: the card is a reference you glance at, the flash " +
+  "is a cue you react to — and reacting to a cue is a different skill from " +
+  "keeping time, which is why neither is on by default.";
+
+export const FLASH_LEAD_HELP =
+  "How far ahead of the beat the card lights. Reacting to something you see " +
+  "takes time, so a cue that fires exactly on the beat leaves you late by that " +
+  "much on every character. How much is yours, which is why this is a dial and " +
+  "not a constant. The countdown is not moved by it — the clock stays true and " +
+  "only the flash runs early.";
+
 export const PACE_LEAD_HELP =
   "How long the count-in runs before the cursor reaches the first character. " +
   "The recording starts the moment you click, whatever this is set to — the " +

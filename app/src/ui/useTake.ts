@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeWav } from "@/audio/wav";
 import { decodeAudioFile } from "@/dsp";
-import { PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
+import { FLASH_LEAD_DEFAULT_MS, PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
 import { MIC_SOURCE, analyzeClip, blankTake, type AnalyzeOptions } from "@/io/take";
 import { profileForSource, type Profile } from "@/io/profiles";
 import {
@@ -91,6 +91,9 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
     charMarkers: p.charMarkers ?? base.charMarkers,
+    flashCard: p.flashCard ?? base.flashCard,
+    flashCue: p.flashCue ?? base.flashCue,
+    flashLeadMs: p.flashLeadMs ?? base.flashLeadMs,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
   };
 }
@@ -106,6 +109,9 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
     charMarkers: prev.charMarkers,
+    flashCard: prev.flashCard,
+    flashCue: prev.flashCue,
+    flashLeadMs: prev.flashLeadMs,
     view: prev.view,
   };
 }
@@ -122,6 +128,9 @@ export function useTake(): TakeState {
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
       charMarkers: false,
+      flashCard: false,
+      flashCue: true,
+      flashLeadMs: FLASH_LEAD_DEFAULT_MS,
       gainDb: 0,
       view: "per-char",
       ppu: 12,
@@ -154,6 +163,9 @@ export function useTake(): TakeState {
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
         charMarkers: next.charMarkers,
+        flashCard: next.flashCard,
+        flashCue: next.flashCue,
+        flashLeadMs: next.flashLeadMs,
         view: next.view,
       });
       // The rest of the settings belong to the take, so they ride along with

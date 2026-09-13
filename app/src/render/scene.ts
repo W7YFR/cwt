@@ -310,15 +310,21 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
     ctx.font = `600 12px ${C.mono}`;
     ctx.fillText(slot.ideal ? slot.ideal.char : "·", mid, Y_TGT_LABEL + LABEL_H / 2);
 
-    // Below your row: what came out, and how it differs from the line above.
-    const cap = sentCaption(slot, scene.blank === true);
+    /* Below your row: what came out, and how it differs from the line above.
+     *
+     * All of it suppressed when nothing has been recorded. Against an empty
+     * decode the alignment quite correctly calls every character a deletion
+     * and every word boundary a missing space — and drawing that reads as a
+     * page of faults in sending that has not happened yet. */
+    const blank = scene.blank === true;
+    const cap = sentCaption(slot, blank);
     ctx.fillStyle = cap.bad ? C.bad : C.ink;
     ctx.font = `600 12px ${C.mono}`;
     ctx.fillText(cap.text, mid, Y_YOU_LABEL + LABEL_H / 2);
 
     // A word-boundary error is a fault in what was sent, so it is called out
     // beside that row's caption, over the gap that caused it.
-    if (slot.spaceOp === "del" || slot.spaceOp === "ins") {
+    if (!blank && (slot.spaceOp === "del" || slot.spaceOp === "ins")) {
       ctx.fillStyle = C.bad;
       ctx.font = `600 9px ${C.mono}`;
       ctx.fillText(

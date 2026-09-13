@@ -21,7 +21,8 @@ import {
   type Layout,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
-import { subLabel } from "@/timing";
+import { defaultSettings, reviewTake, subLabel } from "@/timing";
+import { blankTake } from "@/io/take";
 import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/scene";
 import { FALLBACK_PALETTE } from "@/render/theme";
 import {
@@ -234,6 +235,56 @@ describe("the two tracks, and the text on each", () => {
       expect(t, `target caption "${t}"`).not.toMatch(/[\u2192+\u2013]/);
     }
     expect(textAt(ctx, YOU_CAP).join("")).toMatch(/[\u2192+\u2013]/);
+  });
+});
+
+describe("a chart with nothing recorded into it", () => {
+  /* Against an empty decode the alignment quite correctly calls every
+     character a deletion and every word boundary a missing space. Drawn, that
+     is a page of faults in sending that has not happened — so the target row
+     stands and the "yours" row is ghosts with nothing written on it. */
+  const take = blankTake({
+    expected: "CQ DE W7YFR",
+    charWpm: 15,
+    farnsworthWpm: 12,
+  });
+  const review = reviewTake(take, defaultSettings(take));
+
+  const paint = () => {
+    const ctx = recordingCtx();
+    draw(ctx, { ...sceneFor(review, "per-char", 18, 4000), blank: true });
+    return ctx;
+  };
+
+  it("says the alignment would have plenty to complain about", () => {
+    // Without this the rest of the block could pass on a review that simply
+    // had no faults in it to draw.
+    expect(review.slots.some((s) => s.op === "del")).toBe(true);
+    expect(review.slots.some((s) => s.spaceOp === "del")).toBe(true);
+  });
+
+  it("writes nothing under your row", () => {
+    const under = paint()
+      .ofType("fillText")
+      .filter((c) => c.args[1] === Y_YOU_LABEL + LABEL_H / 2)
+      .map((c) => c.text ?? "")
+      .join("");
+    expect(under).toBe("");
+  });
+
+  it("does not accuse you of missing a space you never sent", () => {
+    const texts = paint().texts();
+    expect(texts).not.toContain("no space");
+    expect(texts).not.toContain("extra space");
+  });
+
+  it("still draws the target, which is the whole point of staying", () => {
+    const above = paint()
+      .ofType("fillText")
+      .filter((c) => c.args[1] === Y_TGT_LABEL + LABEL_H / 2)
+      .map((c) => c.text ?? "")
+      .join("");
+    expect(above.length).toBeGreaterThan(3);
   });
 });
 

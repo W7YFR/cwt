@@ -172,6 +172,74 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* Nothing recorded yet. Dashed rather than zeroed: a zero is a reading. */
 .score.none b { color: var(--ink-faint); }
 
+/* The next character, in type you can read without looking at it.
+ *
+ * A band of its own above the chart rather than a corner of it: at speed the
+ * chart is small, moving type in exactly the place you cannot look, and the
+ * point of this is that a glance is enough. */
+/* Three rows: what is coming, then the character, then the time to it. Side by
+   side the letter and the countdown competed for the same glance; stacked, the
+   letter is what you see and the number is what you check. */
+.flashcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 20px 20px 10px;
+  padding: 10px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  transition: background-color 90ms linear, border-color 90ms linear;
+}
+.fcletter {
+  font-family: var(--mono);
+  font-size: 54px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  min-width: 2ch;
+  text-align: center;
+}
+.fcclock {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--you);
+  min-width: 5ch;
+  text-align: center;
+}
+.fclabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+/* On the beat. Bright, brief, and where your eye already is — the whole
+   argument against flashing the page instead. */
+.flashcard.now {
+  background: var(--you);
+  border-color: var(--you);
+}
+.flashcard.now .fcletter,
+.flashcard.now .fcclock,
+.flashcard.now .fclabel { color: #fff; }
+
+/* A strobe is not the only way to say "now". Same information, held rather
+   than flashed, for anyone who has asked the system not to animate. */
+@media (prefers-reduced-motion: reduce) {
+  .flashcard { transition: none; }
+  .flashcard.now {
+    background: var(--panel);
+    border-color: var(--you);
+    box-shadow: inset 0 0 0 2px var(--you);
+  }
+  .flashcard.now .fcletter,
+  .flashcard.now .fcclock { color: var(--you); }
+  .flashcard.now .fclabel { color: var(--ink-dim); }
+}
+
 /* The chart's own controls, in a strip above it. Not styled as the panel the
    grading controls are: they belong to the picture, not to the numbers. */
 .viewcontrols {

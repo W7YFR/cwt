@@ -234,6 +234,27 @@ describe("controls", () => {
     expect(onChange).toHaveBeenCalledWith({ charMarkers: true });
   });
 
+  it("keeps the flash card and its cue as two separate choices", async () => {
+    /* A reference you glance at and a cue you react to are different things,
+       and the cue's lead is a setting for nothing with no cue to lead. */
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderView({ onChange });
+    expect(screen.queryByLabelText(/flash cue/i)).toBeNull();
+    expect(screen.queryByLabelText(/flash lead/i)).toBeNull();
+
+    await user.click(screen.getByLabelText(/flash card/i));
+    expect(onChange).toHaveBeenCalledWith({ flashCard: true });
+
+    rerender(view({ flashCard: true, flashCue: false }, onChange));
+    expect(screen.getByLabelText(/flash cue/i)).toBeTruthy();
+    // No lead without a flash to lead.
+    expect(screen.queryByLabelText(/flash lead/i)).toBeNull();
+
+    rerender(view({ flashCard: true, flashCue: true }, onChange));
+    expect(screen.getByLabelText(/flash lead/i)).toBeTruthy();
+  });
+
   it("offers the pacing cursor, off unless asked for", async () => {
     /* A practice aid rather than a way of reading the chart, so it is opt-in —
        and it sits with the other things that change what is on screen rather
