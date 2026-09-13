@@ -57,9 +57,25 @@ const DEGLITCH_PASSES = 6;
  * the second estimate equals the first and it stops immediately, having done
  * exactly what it did before. */
 function deglitch(segments: readonly Segment[]): Segment[] {
+  // Estimated from the marks AND the gaps, taking whichever is shorter.
+  //
+  // Marks alone are wrong for a drill with no dits in it. Hold the dah paddle
+  // and every mark is three units, so the percentile lands on a dah, and 0.35
+  // of three units is longer than the one-unit gaps between them — the floor
+  // then condemns every gap in the recording and merges the whole thing into a
+  // single eleven-second mark. Gaps are one unit there, so including them puts
+  // the estimate back on the unit. For ordinary text both come out at one unit
+  // and nothing changes.
   const unitOf = (segs: readonly Segment[]): number => {
     const marks = segs.filter((s) => s[0] === 1).map((s) => s[1]);
-    return marks.length > 0 ? percentile(marks, ROUGH_UNIT_PERCENTILE) : 0;
+    // The first and last runs are the silence the recording opens and closes
+    // with, which are not gaps between anything.
+    const gaps = segs.slice(1, -1).filter((s) => s[0] === 0).map((s) => s[1]);
+    const fromMarks = marks.length > 0 ? percentile(marks, ROUGH_UNIT_PERCENTILE) : 0;
+    const fromGaps = gaps.length > 0 ? percentile(gaps, ROUGH_UNIT_PERCENTILE) : 0;
+    if (!(fromMarks > 0)) return fromGaps;
+    if (!(fromGaps > 0)) return fromMarks;
+    return Math.min(fromMarks, fromGaps);
   };
 
   let unit = unitOf(segments);
