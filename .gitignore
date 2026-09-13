@@ -43,6 +43,15 @@ htmlcov/
 *.m4a
 *.aup3
 
+# ...except the test corpus, which is the point. These are machine-keyed
+# recordings of known messages at known speeds, captured through a loopback
+# and a microphone simultaneously, so the loopback file is the answer rather
+# than a second opinion. They cannot be regenerated — they are a particular
+# room on a particular afternoon — and without them the calibration tests do
+# not run at all. Downsampled to 8 kHz mono, which costs nothing measurable
+# and keeps the whole corpus under 10 MB. See tests/data/README.md.
+!tests/data/**/*.wav
+
 # ...but DO commit the small real-audio test fixtures
 !tests/data/*.wav
 
