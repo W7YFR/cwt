@@ -123,7 +123,7 @@ export const FLASH_SEC = 0.12;
  * character, and that reads as the cue being wrong rather than as something to
  * dial in. Two hundred milliseconds is roughly a visual reaction — a guess,
  * and the control exists because the guess is wrong for somebody. */
-export const FLASH_LEAD_DEFAULT_MS = 200;
+export const FLASH_LEAD_DEFAULT_MS = 25;
 
 /** How long after the target's last character a paced recording stops itself.
  *

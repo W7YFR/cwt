@@ -83,28 +83,39 @@ export interface LayoutOptions {
    * cannot watch approach is not a count-in. Zero, and everything below is
    * exactly as it was. */
   readonly leadSec?: number;
+  /** The same, after the last character.
+   *
+   * The axis stops at the last mark as surely as it starts at the first, so a
+   * cursor held at the middle of the screen would freeze there while the last
+   * character sat off to the left — the content stops moving exactly when you
+   * are still sending the end of it. This is the runway it rolls out on. */
+  readonly tailSec?: number;
 }
 
-/** Reserve `leadSec` of empty axis in front of everything.
+/** Reserve empty axis in front of everything, and behind it.
  *
  * A post-pass rather than a branch inside the two builders: the change is the
  * same shift whichever way the chart is laid out, and threading it through
  * both would mean two chances to get it subtly different.
  *
- * The prepended breakpoint sits at the first one's *unshifted* x, which is
- * exactly `leadPx` to the left of where that point has moved to — so the
- * count-in runs at the same pixels-per-second as everything after it. A
- * count-in at some other tempo would be worse than none. */
-function withLead(layout: Layout, leadSec: number): Layout {
-  if (!(leadSec > 0)) return layout;
-  const leadPx = (leadSec / layout.unitSec) * layout.ppu;
-  const shift = (m: AxisMap): AxisMap => {
+ * The added breakpoints sit exactly `leadPx` and `tailPx` from the ends, so
+ * the runway at either end runs at the same pixels-per-second as everything
+ * between them. A count-in at some other tempo would be worse than none, and
+ * a run-out at some other tempo would make the last character look like it
+ * sped up. */
+function withRunway(layout: Layout, leadSec: number, tailSec: number): Layout {
+  if (!(leadSec > 0) && !(tailSec > 0)) return layout;
+  const perSec = layout.ppu / layout.unitSec;
+  const leadPx = Math.max(leadSec, 0) * perSec;
+  const tailPx = Math.max(tailSec, 0) * perSec;
+  const pad = (m: AxisMap): AxisMap => {
     const first = m[0];
-    if (!first) return m;
-    return [
-      [first[0] - leadSec, first[1]],
-      ...m.map(([t, x]) => [t, x + leadPx] as const),
-    ];
+    const last = m[m.length - 1];
+    if (!first || !last) return m;
+    const moved = m.map(([t, x]) => [t, x + leadPx] as const);
+    const out: AxisMap = leadPx > 0 ? [[first[0] - leadSec, first[1]], ...moved] : [...moved];
+    if (tailPx > 0) out.push([last[0] + tailSec, last[1] + leadPx + tailPx]);
+    return out;
   };
   return {
     ...layout,
@@ -113,8 +124,8 @@ function withLead(layout: Layout, leadSec: number): Layout {
       x: it.x === null ? null : it.x + leadPx,
       ix: it.ix === null ? null : it.ix + leadPx,
     })),
-    maps: { you: shift(layout.maps.you), tgt: shift(layout.maps.tgt) },
-    width: layout.width + leadPx,
+    maps: { you: pad(layout.maps.you), tgt: pad(layout.maps.tgt) },
+    width: layout.width + leadPx + tailPx,
   };
 }
 
@@ -169,7 +180,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       }
       x += gapW + bodyW + SLOT_GAP;
     }
-    return withLead({
+    return withRunway({
       view,
       items,
       width: x + PAD_X,
@@ -178,7 +189,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       breaks: [],
       ppu,
       unitSec,
-    }, options.leadSec ?? 0);
+    }, options.leadSec ?? 0, options.tailSec ?? 0);
   }
 
   // Absolute time (and overlay, the same axis with the tracks superimposed):
@@ -240,9 +251,10 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       toX(review.ideal.duration, 0) - offTgt,
     ) + PAD_X;
 
-  return withLead(
+  return withRunway(
     { view, items, width, maps, origin, breaks, ppu, unitSec },
     options.leadSec ?? 0,
+    options.tailSec ?? 0,
   );
 }
 

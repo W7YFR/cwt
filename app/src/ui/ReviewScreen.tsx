@@ -183,6 +183,7 @@ export function ReviewScreen({
     const paced = settings.paceCursor || settings.flashCard;
     if (!recorder || !paced || !chart) {
       setLeadLeft(null);
+      handle.chart?.setFollow("clamped");
       handle.chart?.setLead(0);
       handle.chart?.setPlayhead(null);
       return;
@@ -192,7 +193,14 @@ export function ReviewScreen({
        earlier clamps to it — so without this the cursor would have nowhere to
        come in from and would simply appear on the beat, which is a count-in
        you cannot count along with. */
-    if (settings.paceCursor) chart.setLead(lead);
+    if (settings.paceCursor) {
+      chart.setLead(lead);
+      /* Locked to the middle while pacing. The card above holds your eye
+         there, so the mark you are about to make has to be in the same place
+         every time — which means the content moves and the cursor does not,
+         from before the first character to after the last. */
+      chart.setFollow("centered");
+    }
 
     /* Where the schedule runs out: a moment after the target's last element,
        not after its last character's start. */
@@ -226,6 +234,7 @@ export function ReviewScreen({
     return () => {
       cancelAnimationFrame(raf);
       setLeadLeft(null);
+      chart.setFollow("clamped");
       chart.setLead(0);
       chart.setPlayhead(null);
     };

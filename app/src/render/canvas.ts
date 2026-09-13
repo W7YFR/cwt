@@ -57,10 +57,24 @@ export interface Chart {
   setPlayhead(playhead: { t: number; side: "you" | "tgt" } | null): void;
   /** The zoom at which the whole session fills the width. */
   fit(): number;
-  /** Reserve room in front of the first character for a count-in, in seconds.
-   *  Zero puts it back. See `LayoutOptions.leadSec`. */
+  /** Reserve room at both ends of the axis, in seconds: a count-in to come in
+   *  on and a run-out to carry on into. Zero puts it back. */
   setLead(seconds: number): void;
+  /** How the view follows a running playhead.
+   *
+   * `clamped` keeps the content within the frame and lets the playhead travel
+   * across it — right for playback, where the ends of the recording are worth
+   * seeing properly. `centered` pins the playhead to the middle of the track
+   * and slides the content under it, overscrolling past both ends so that the
+   * moment you are meant to act on is always in the same place. */
+  setFollow(mode: "clamped" | "centered"): void;
   scrollTo(x: number): void;
+  /** Where the view currently sits, in content pixels.
+   *
+   * Read-only and purely diagnostic: the scroll is owned here because it moves
+   * with the pointer and with a running playhead, and this is the one way to
+   * see what it did without inferring it from the picture. */
+  scrollAt(): number;
   /** Re-read the palette (theme changed) and redraw. */
   refreshTheme(): void;
   /** Redraw at the current device pixel ratio and container width. */
@@ -101,6 +115,7 @@ export function createChart(
   let driftMax = 1;
   let destroyed = false;
   let leadSec = 0;
+  let follow: "clamped" | "centered" = "clamped";
 
   function viewport(): Viewport {
     const viewW = Math.max(host.clientWidth, GUTTER + 40);
@@ -110,6 +125,10 @@ export function createChart(
   }
 
   function clampScroll(v: Viewport): void {
+    // Overscrolling both ends is the whole of `centered`: at the start the
+    // content has to sit off to the right of the middle, and at the end it has
+    // to keep going past it.
+    if (follow === "centered") return;
     scrollX = Math.min(Math.max(scrollX, 0), v.maxScroll);
   }
 
@@ -154,6 +173,9 @@ export function createChart(
       ppu: input.settings.ppu,
       durationSec: input.review.take.durationSec,
       leadSec,
+      // The same runway either side: it is the room a centred playhead needs
+      // to keep moving at both ends, and one number is one thing to get wrong.
+      tailSec: leadSec,
     });
   }
 
@@ -420,6 +442,14 @@ export function createChart(
       paint();
     },
 
+    setFollow(mode) {
+      if (mode === follow) return;
+      follow = mode;
+      // Leaving `centered` has to put the view back inside its frame, which
+      // the clamp will not do while the mode is still on.
+      paint();
+    },
+
     setPlayhead(next) {
       playhead = next;
       if (next && layout) {
@@ -438,8 +468,15 @@ export function createChart(
          * walks out to that fraction before anything moves, and at the end the
          * content stops while it runs on to the right edge. */
         const v = viewport();
-        if (v.maxScroll) {
-          const cx = timeToX(layout, next.t, next.side);
+        const cx = timeToX(layout, next.t, next.side);
+        if (follow === "centered") {
+          /* Dead centre, always — including before the first character and
+             after the last, where the clamp would otherwise park the view and
+             let the playhead drift across it. With the card above holding your
+             eye at the middle of the screen, the mark you are about to make
+             has to be in the same place every single time. */
+          scrollX = cx - v.trackW / 2;
+        } else if (v.maxScroll) {
           scrollX = cx - v.trackW * PLAYHEAD_HOLD;
           clampScroll(v);
         }
@@ -462,6 +499,7 @@ export function createChart(
     },
 
     scrollTo: (x: number) => doScrollTo(x, false),
+    scrollAt: () => scrollX,
 
     refreshTheme() {
       palette = readPalette(document.body);

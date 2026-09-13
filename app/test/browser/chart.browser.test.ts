@@ -11,10 +11,10 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { createChart, type Chart } from "@/render/canvas";
-import { buildLayout } from "@/render/layout";
+import { buildLayout, timeToX } from "@/render/layout";
 import { trackBands } from "@/render/scene";
 import { contextWindow } from "@/render/focus";
-import { HEIGHT, GUTTER, ZOOM_MIN } from "@/render/geometry";
+import { HEIGHT, GUTTER, PAD_R, ZOOM_MIN } from "@/render/geometry";
 import type { BlockKind } from "@/types";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
 
@@ -356,6 +356,75 @@ describe("the chart in a browser", () => {
     for (let i = 1; i <= 8; i++) seen.push(at((end * i) / 10));
     const changes = seen.filter((v, i) => i === 0 || v !== seen[i - 1]!).length;
     expect(changes, `only ${changes} of ${seen.length} samples moved`).toBe(seen.length);
+  });
+
+  describe("following a playhead", () => {
+    /* Two modes, and the difference is what the view is for. Playing back, the
+       ends of the recording are worth seeing properly. Pacing a recording, the
+       card above holds your eye at the middle of the screen and the mark you
+       are about to make has to be in the same place every time — so the
+       content moves and the cursor does not. */
+    const PPU = 40;
+    const AT = [0, 0.25, 0.5, 0.75, 1];
+
+    function set(mode: "clamped" | "centered") {
+      chart.destroy();
+      chart = createChart(host, canvas);
+      chart.update({ review, settings: { ...settings, ppu: PPU }, focus: null });
+      chart.setFollow(mode);
+      const layout = buildLayout(review, {
+        view: settings.view,
+        ppu: PPU,
+        durationSec: review.take.durationSec,
+      });
+      const trackW = host.clientWidth - GUTTER - PAD_R;
+      return { layout, trackW, maxScroll: Math.max(0, layout.width - trackW) };
+    }
+
+    it("holds the playhead at the middle of the track, at both ends too", () => {
+      const { layout, trackW, maxScroll } = set("centered");
+      const end = review.take.durationSec;
+
+      for (const f of AT) {
+        const t = end * f;
+        chart.setPlayhead({ t, side: "you" });
+        expect(chart.scrollAt(), `at ${(f * 100).toFixed(0)}%`).toBeCloseTo(
+          timeToX(layout, t, "you") - trackW / 2,
+          1,
+        );
+      }
+
+      /* Which means overscrolling both ends — the content sitting off to the
+         right before the first mark, and carrying on past the left after the
+         last. A clamp would park the view and let the cursor drift across it,
+         which is the behavior this replaced. */
+      chart.setPlayhead({ t: 0, side: "you" });
+      expect(chart.scrollAt(), "start").toBeLessThan(0);
+      chart.setPlayhead({ t: end, side: "you" });
+      expect(chart.scrollAt(), "end").toBeGreaterThan(maxScroll);
+    });
+
+    it("keeps the recording in frame when clamped, and moves the line instead", () => {
+      const { maxScroll } = set("clamped");
+      const end = review.take.durationSec;
+      for (const f of AT) {
+        chart.setPlayhead({ t: end * f, side: "you" });
+        expect(chart.scrollAt()).toBeGreaterThanOrEqual(0);
+        expect(chart.scrollAt()).toBeLessThanOrEqual(maxScroll);
+      }
+    });
+
+    it("puts the view back inside its frame on the way out", () => {
+      // Leaving `centered` has to undo the overscroll; the clamp will not run
+      // while the mode is still on.
+      const { maxScroll } = set("centered");
+      chart.setPlayhead({ t: 0, side: "you" });
+      expect(chart.scrollAt()).toBeLessThan(0);
+
+      chart.setFollow("clamped");
+      expect(chart.scrollAt()).toBeGreaterThanOrEqual(0);
+      expect(chart.scrollAt()).toBeLessThanOrEqual(maxScroll);
+    });
   });
 
   it("seeks when the ruler is clicked", () => {

@@ -566,6 +566,31 @@ describe("the pacing cursor's count-in", () => {
     expect(countdowns(ctx)).toEqual([]);
   });
 
+  it("gives it somewhere to go after the last one too", () => {
+    /* The axis stops at the last mark as surely as it starts at the first, so
+       a cursor held at the middle of the screen would freeze there while the
+       last character sat off to the left — the content stops moving exactly
+       when you are still sending the end of it. */
+    const ppu = 18;
+    const plain = layoutFor(review, "per-char", ppu);
+    const led = buildLayout(review, {
+      view: "per-char",
+      ppu,
+      durationSec: review.take.durationSec,
+      leadSec: LEAD,
+      tailSec: LEAD,
+    });
+    const perSec = ppu / plain.unitSec;
+    expect(led.width).toBeCloseTo(plain.width + 2 * LEAD * perSec, 4);
+
+    const m = led.maps.tgt;
+    const end = m[m.length - 1]!;
+    const lastReal = m[m.length - 2]!;
+    expect(end[0] - lastReal[0]).toBeCloseTo(LEAD, 6);
+    // And at the same tempo as the rest, like the count-in.
+    expect((end[1] - lastReal[1]) / (end[0] - lastReal[0])).toBeCloseTo(perSec, 3);
+  });
+
   it("gives the cursor somewhere to be before the first character", () => {
     /* The symptom this exists to prevent: every instant of the count-in
        mapping to the same x, so the cursor sits still and then jumps. */

@@ -186,12 +186,14 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   align-items: center;
   justify-content: center;
   gap: 2px;
-  margin: 20px 20px 10px;
+  margin: 20px auto 10px;
   padding: 10px 20px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
   transition: background-color 90ms linear, border-color 90ms linear;
+  height: 150px;
+  width: 150px;
 }
 .fcletter {
   font-family: var(--mono);
