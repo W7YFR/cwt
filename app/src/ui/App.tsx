@@ -15,6 +15,7 @@ import { loadPrefs, recallTake, savePrefs } from "@/io/storage";
 import type { AudioClip } from "@/types";
 import { Calibrate } from "./Calibrate";
 import { Landing } from "./Landing";
+import { Settings } from "./Settings";
 import { ReviewScreen } from "./ReviewScreen";
 import { useFileDrop } from "./useFileDrop";
 import { useTake } from "./useTake";
@@ -50,6 +51,7 @@ export function App(): React.ReactElement {
   const [slowBoot, setSlowBoot] = useState(false);
   const [opening, setOpening] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
+  const [configuring, setConfiguring] = useState(false);
 
   /* Which calibration is being applied, held here because it changes what the
      decoder does to every recording that follows. `null` is the default and a
@@ -224,8 +226,23 @@ export function App(): React.ReactElement {
         <div className="busy" role="status" aria-live="polite">
           {slowBoot ? "looking for your last session…" : ""}
         </div>
+      ) : configuring ? (
+        <Settings
+          profileId={profileId}
+          onProfilesChanged={() => {
+            const next = loadProfiles();
+            setProfiles(next);
+            // A profile can be deleted while it is the one in use, in which
+            // case the store clears the selection — and an id that outlives
+            // its profile would leave the app believing it is calibrated while
+            // correcting by nothing.
+            setProfileId(activeProfile()?.id);
+          }}
+          onClose={() => setConfiguring(false)}
+        />
       ) : calibrating ? (
         <Calibrate
+          current={profile}
           deviceId={deviceId}
           onDeviceChange={chooseDevice}
           onError={setError}
@@ -246,7 +263,15 @@ export function App(): React.ReactElement {
           onError={setError}
           deviceId={deviceId}
           onDeviceChange={chooseDevice}
-          profile={profile}
+          profiles={profiles}
+          profileId={profileId}
+          /* One control, two effects, both wanted: it is the calibration the
+             next recording will be made under, and the recording on screen is
+             read again through it. */
+          onProfileChange={async (id) => {
+            chooseProfile(id);
+            await take.recalibrate(profiles.find((p) => p.id === id) ?? null);
+          }}
           onBack={() => {
             take.clear();
             setError(null);
@@ -267,6 +292,10 @@ export function App(): React.ReactElement {
           onCalibrate={() => {
             setError(null);
             setCalibrating(true);
+          }}
+          onConfigure={() => {
+            setError(null);
+            setConfiguring(true);
           }}
         />
       )}

@@ -16,8 +16,11 @@
 import type { ReviewSettings, Take } from "@/types";
 
 const DB_NAME = "cw-trainer";
-const DB_VERSION = 1;
+/** Bumped to 2 to add the calibration store. Additive only — the upgrade
+ *  creates what is missing and touches nothing that already exists. */
+const DB_VERSION = 2;
 const TAKES = "takes";
+const CALIBRATIONS = "calibrations";
 
 export interface StoredTake {
   take: Take;
@@ -69,9 +72,27 @@ function openDb(): Promise<IDBDatabase> {
         // without loading everything to sort it.
         store.createIndex("recordedAt", "recordedAt");
       }
+      if (!db.objectStoreNames.contains(CALIBRATIONS)) {
+        const store = db.createObjectStore(CALIBRATIONS, { keyPath: "id" });
+        store.createIndex("recordedAt", "recordedAt");
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error("could not open the database"));
+  });
+}
+
+function txIn<T>(
+  db: IDBDatabase,
+  name: string,
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(name, mode);
+    const req = run(t.objectStore(name));
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("database request failed"));
   });
 }
 
@@ -80,12 +101,7 @@ function tx<T>(
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const t = db.transaction(TAKES, mode);
-    const req = run(t.objectStore(TAKES));
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error("database request failed"));
-  });
+  return txIn(db, TAKES, mode, run);
 }
 
 /** Row as stored. `summary` is duplicated out of `take` so a list can be built
@@ -191,6 +207,138 @@ async function prune(db: IDBDatabase): Promise<void> {
   }
 }
 
+/* ---- calibration recordings ---------------------------------------------- */
+
+/* Every calibration attempt keeps its audio, and the failures are the ones
+ * worth having.
+ *
+ * A calibration that refuses in somebody's room used to leave nothing behind
+ * at all: the recording was thrown away the moment the answer appeared, so the
+ * one artifact that could explain the answer was the one thing not kept. This
+ * is the fix, and it is deliberately not conditional on the attempt having
+ * worked — a successful calibration is self-evidently fine, and it is the
+ * confusing session that needs a file to send somebody.
+ *
+ * Forty-odd seconds of mono is a few megabytes, so the count is small and hard.
+ */
+
+/** How many attempts to keep. Four is a session's worth of trying. */
+export const KEEP_CALIBRATIONS = 4;
+
+export interface StoredCalibration {
+  readonly id: string;
+  readonly recordedAt: string;
+  /** The recording as captured, encoded. */
+  readonly audio: Blob;
+  readonly durationSec: number;
+  /** Speed the drills were keyed at. */
+  readonly wpm: number;
+  /** What came of it: the problem code, or null when it succeeded. */
+  readonly reason: string | null;
+  readonly verdict: string;
+  /** The offset measured, when one was. */
+  readonly offsetSec: number | null;
+  /** The profile it was saved as, once it has been. Null while it has not. */
+  readonly profileId: string | null;
+  readonly deviceLabel: string | null;
+}
+
+/** Everything but the audio — enough to render a row without pulling megabytes
+ *  off disk for each one. */
+export type CalibrationSummary = Omit<StoredCalibration, "audio">;
+
+export async function keepCalibration(entry: StoredCalibration): Promise<void> {
+  try {
+    const db = await openDb();
+    await txIn(db, CALIBRATIONS, "readwrite", (s) => s.put(entry));
+    const ids = await txIn<string[]>(db, CALIBRATIONS, "readonly", (s) =>
+      s.index("recordedAt").getAllKeys() as IDBRequest<string[]>,
+    );
+    for (const id of ids.slice(0, Math.max(0, ids.length - KEEP_CALIBRATIONS))) {
+      await txIn(db, CALIBRATIONS, "readwrite", (s) => s.delete(id));
+    }
+    db.close();
+  } catch {
+    /* as everywhere else here: forgetting is survivable, failing is not */
+  }
+}
+
+/** Note which profile an attempt was saved as, once it has been. */
+export async function linkCalibration(id: string, profileId: string): Promise<void> {
+  try {
+    const db = await openDb();
+    const row = await txIn<StoredCalibration | undefined>(
+      db,
+      CALIBRATIONS,
+      "readonly",
+      (s) => s.get(id),
+    );
+    if (row) {
+      await txIn(db, CALIBRATIONS, "readwrite", (s) => s.put({ ...row, profileId }));
+    }
+    db.close();
+  } catch {
+    /* as above */
+  }
+}
+
+export async function listCalibrations(): Promise<CalibrationSummary[]> {
+  try {
+    const db = await openDb();
+    const rows = await txIn<StoredCalibration[]>(db, CALIBRATIONS, "readonly", (s) =>
+      s.getAll(),
+    );
+    db.close();
+    return rows
+      .map(({ audio: _audio, ...rest }) => rest)
+      .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+  } catch {
+    return [];
+  }
+}
+
+export async function getCalibrationAudio(id: string): Promise<Blob | null> {
+  try {
+    const db = await openDb();
+    const row = await txIn<StoredCalibration | undefined>(
+      db,
+      CALIBRATIONS,
+      "readonly",
+      (s) => s.get(id),
+    );
+    db.close();
+    return row?.audio ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function forgetCalibration(id: string): Promise<void> {
+  try {
+    const db = await openDb();
+    await txIn(db, CALIBRATIONS, "readwrite", (s) => s.delete(id));
+    db.close();
+  } catch {
+    /* as above */
+  }
+}
+
+/** Drop the recordings belonging to a profile that has been deleted. */
+export async function forgetCalibrationsFor(profileId: string): Promise<void> {
+  try {
+    const db = await openDb();
+    const rows = await txIn<StoredCalibration[]>(db, CALIBRATIONS, "readonly", (s) =>
+      s.getAll(),
+    );
+    for (const row of rows.filter((r) => r.profileId === profileId)) {
+      await txIn(db, CALIBRATIONS, "readwrite", (s) => s.delete(row.id));
+    }
+    db.close();
+  } catch {
+    /* as above */
+  }
+}
+
 /* ---- settings ----------------------------------------------------------- */
 
 const SETTINGS_KEY = "cw-trainer:prefs";
@@ -209,6 +357,9 @@ export interface Prefs {
   /** The take the review is currently showing, so a reload comes back to it
    *  rather than to an empty landing screen. */
   currentId?: string;
+  /** The speed the keyer is set to, for the calibration wizard. A property of
+   *  the equipment rather than of a session, so it outlives both. */
+  keyerWpm?: number;
   gainDb?: number;
   tolerance?: number;
   charWpm?: number;

@@ -140,6 +140,57 @@ Two things are worth knowing about how gaps get classified:
 
 ---
 
+## What calibration does
+
+If your keyer's sidetone reaches the computer directly, skip this — there is
+nothing in the path to correct. Calibration is for when a microphone is
+listening to a speaker.
+
+**A room delays every release.** Let up the paddle and the direct sound stops,
+but the reflections don't: the envelope stays above the threshold for a few
+more milliseconds. Every mark reads long and every gap reads short, by the same
+amount. It is a systematic bias, not noise — one webcam four feet from a
+speaker adds about twelve milliseconds to dits, dahs, iambic, isolated elements
+and ordinary text alike.
+
+That constant is worth removing because everything here is **ratios**. A dit is
+1 unit, a dah 3, the gap inside a character 1, between characters 3, between
+words 7. A constant added to every mark and taken from every gap skews all of
+them at once, and skews the two halves in opposite directions, so the error
+doubles in every ratio it touches:
+
+| | uncorrected | corrected | keyed |
+|---|---|---|---|
+| dit | 87.55 ms | 79.63 ms | 80 ms |
+| speed | 14.30 wpm | 15.00 wpm | 15 wpm |
+| dit : dah | 2.88 | 3.04 | 3.00 |
+
+That is the difference between being told your dahs are short and being told
+nothing is wrong.
+
+**Which is why the wizard asks you to hold a paddle.** Nothing in a single
+recording reveals the offset, because nothing in it says what the element
+lengths were *meant* to be. A keyer holding a dit is a machine: the elements
+are exactly one unit whatever your skill, because the keyer supplies the timing
+and you supply only the intent. Send a few seconds of that at a stated speed
+and the difference between what came back and what must have been sent is the
+number.
+
+**What it is not.** One number, applied by moving it from each mark into the
+gap that follows — the recording's total length never changes. It cannot
+rescue marks a room has broken into pieces, or undo AGC, or anything else that
+isn't a constant. So when the two drills disagree, calibration **refuses**
+rather than storing a number that would be confidently wrong on every later
+recording. A profile also carries how much the drills disagreed and how many
+elements stood behind the answer, which is what that refusal is decided on.
+
+Everything else the decoder does to cope with a room — following the signal
+level, closing dips that aren't key-ups, placing edges on slow transitions —
+needs no calibration and runs on every recording. The release offset is the
+one thing that cannot be inferred without being told what was sent.
+
+---
+
 ## Development
 
 ```

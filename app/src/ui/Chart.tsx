@@ -26,9 +26,12 @@ export interface ChartProps {
   settings: ReviewSettings;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
-  onPlayChar: ChartCallbacks["onPlayChar"];
-  onSeek: ChartCallbacks["onSeek"];
-  onZoom: ChartCallbacks["onZoom"];
+  /* Optional: a chart can be shown purely to be looked at. The calibration
+     preview is one — it has no transport of its own, so a click that seeks
+     nothing would be a control that lies. */
+  onPlayChar?: ChartCallbacks["onPlayChar"];
+  onSeek?: ChartCallbacks["onSeek"];
+  onZoom?: ChartCallbacks["onZoom"];
   /** Given the live chart so the parent can fit, export, or scroll it. */
   handle: ChartHandle;
 }

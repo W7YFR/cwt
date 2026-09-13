@@ -41,6 +41,9 @@ export interface RecorderHandle {
   /** True while a finished recording is being analyzed. */
   busy: boolean;
   start(): Promise<void>;
+  /** Throw away what has been captured and keep recording on the same open
+   *  device — no second permission prompt, no gap. */
+  restart(): void;
   finish(): Promise<void>;
   discard(): Promise<void>;
 }
@@ -78,6 +81,18 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
   }, [refreshDevices]);
 
   const start = useCallback(async () => {
+    /* Cleared before the device is opened, not after.
+     *
+     * `elapsed` is only ever written by the level callback, so after a
+     * recording ends it keeps the length of that recording until the next one
+     * reports. Anything that reads the clock in between sees the old take's
+     * duration — and a screen that schedules itself against it, as the
+     * calibration wizard does, runs its whole sequence in one render and lands
+     * on the last step with the clock reading forty seconds. Resetting after
+     * the await leaves that window open for as long as opening a device takes,
+     * which is exactly when the stale value is on screen. */
+    setElapsed(0);
+    setLevel(0);
     try {
       const rec = await startRecording({
         deviceId,
@@ -87,8 +102,6 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
         },
       });
       setRecorder(rec);
-      setElapsed(0);
-      setLevel(0);
       // Labels arrive once permission is granted, so the picker is worth
       // re-reading the moment a recording starts.
       void refreshDevices();
@@ -101,6 +114,15 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       );
     }
   }, [deviceId, onError, refreshDevices]);
+
+  /* The same reset, for the same reason: `restart()` zeroes the recorder's own
+     counter, but nothing reports that until the next level callback. */
+  const restart = useCallback(() => {
+    if (!recorder) return;
+    recorder.restart();
+    setElapsed(0);
+    setLevel(0);
+  }, [recorder]);
 
   const finish = useCallback(async () => {
     if (!recorder) return;
@@ -151,5 +173,16 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     return () => document.removeEventListener("keydown", onKey);
   }, [discard, finish, recorder]);
 
-  return { devices, needPermission, recorder, elapsed, level, busy, start, finish, discard };
+  return {
+    devices,
+    needPermission,
+    recorder,
+    elapsed,
+    level,
+    busy,
+    start,
+    restart,
+    finish,
+    discard,
+  };
 }

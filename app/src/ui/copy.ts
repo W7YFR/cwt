@@ -80,3 +80,21 @@ export const DEVIATION_SCOPE_NOTE =
   "target. Either way you get just what the class covers: the character itself " +
   "for a dit, dah or intra-char gap, the characters either side of a letter " +
   "gap, the words either side of a word gap.";
+
+/* ---- what the calibration result is reporting ---------------------------- */
+
+export const CAL_TAIL_HELP =
+  "How long a note keeps sounding after the key comes up, measured as the time " +
+  "it spends within 20 dB of full level. A room is the usual cause. Compared " +
+  "against the dit at the speed you calibrated, this is what the verdict is.";
+
+export const CAL_MAXWPM_HELP =
+  "The speed at which that tail is still a small part of a dit — three quarters " +
+  "of one, which is the widest margin every recording measured so far has read " +
+  "correctly at. Send faster than this and elements start running together.";
+
+export const CAL_CORRECTION_HELP =
+  "How much longer every mark reads than it was keyed. It gets taken off each " +
+  "mark and given back to the gap after it, so the total length never changes. " +
+  "Measured by holding a paddle at a speed you state: the keyer supplies the " +
+  "true element length, so the difference is what your setup is adding.";

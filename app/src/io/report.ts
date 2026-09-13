@@ -66,7 +66,12 @@ export interface JsonReport {
        by. Null is a real and common answer — no calibration — and is written
        out rather than omitted, so a reader can tell "not calibrated" from "a
        report too old to say". */
-    calibration: { profile: string; offset_ms: number } | null;
+    calibration: {
+      profile: string;
+      offset_ms: number;
+      /** True when that offset was set by hand rather than measured. */
+      adjusted: boolean;
+    } | null;
   };
 }
 
@@ -140,6 +145,7 @@ export function buildJsonReport(
         ? {
             profile: take.profile.nickname,
             offset_ms: round(take.profile.releaseOffsetSec * 1000, 2),
+            adjusted: take.profile.adjusted === true,
           }
         : null,
     },

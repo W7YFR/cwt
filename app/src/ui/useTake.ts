@@ -13,7 +13,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeWav } from "@/audio/wav";
-import { analyzeClip, type AnalyzeOptions } from "@/io/take";
+import { decodeAudioFile } from "@/dsp";
+import { MIC_SOURCE, analyzeClip, type AnalyzeOptions } from "@/io/take";
+import { profileForSource, type Profile } from "@/io/profiles";
 import {
   forgetCurrentTake,
   loadPrefs,
@@ -50,6 +52,18 @@ export interface TakeState {
   /** Adopt a Take somebody else already analyzed — see io/bundle.ts, and the
    *  restore path in ui/App.tsx. */
   adopt(take: Take, audio: ArrayBuffer, options?: AdoptOptions): void;
+  /** Read the loaded recording again under a different calibration.
+   *
+   * The same computation that ran when it was recorded, on the same audio,
+   * with one input changed — so it is a re-analysis and not a re-grading.
+   * Everything downstream of the segments already re-grades on every settings
+   * change; this is the one input that lives upstream of them.
+   *
+   * It is also the most useful measuring tool in the app. Recording the same
+   * message twice to compare calibrations leaves the room, the placement and
+   * the operator's fist free to vary; switching the profile under one
+   * recording holds all three fixed by construction. */
+  recalibrate(profile: Profile | null): Promise<void>;
   clear(): void;
 }
 
@@ -103,8 +117,10 @@ export function useTake(): TakeState {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const takeIdRef = useRef<string | null>(null);
+  const loadedRef = useRef<LoadedTake | null>(null);
   useEffect(() => {
     takeIdRef.current = loaded?.take.id ?? null;
+    loadedRef.current = loaded;
   }, [loaded]);
 
   // Persisting on every slider frame would write to localStorage sixty times a
@@ -145,6 +161,7 @@ export function useTake(): TakeState {
     (clip: AudioClip, options: AnalyzeOptions, data: ArrayBuffer | null = null) => {
       const { take, clip: analyzed } = analyzeClip(clip, options);
       setLoaded({ take, clip: analyzed, data });
+      loadedRef.current = { take, clip: analyzed, data };
       takeIdRef.current = take.id;
       // A new recording resets the speed and the intended message — those
       // belong to it — but keeps the preferences restored above.
@@ -169,11 +186,13 @@ export function useTake(): TakeState {
       // No DSP here: the segments arrived already measured. Everything from the
       // grading onward is the same code path a browser recording takes, which is
       // the point of shipping the take raw rather than pre-graded.
-      setLoaded({
+      const entry: LoadedTake = {
         take,
         clip: { samples: new Float32Array(0), rate: take.rate, peak: take.peak },
         data: audio,
-      });
+      };
+      setLoaded(entry);
+      loadedRef.current = entry;
       takeIdRef.current = take.id;
       const next = options.settings ?? openingSettings(take, settingsRef.current);
       setSettingsRaw(next);
@@ -183,6 +202,56 @@ export function useTake(): TakeState {
     },
     [],
   );
+
+  const recalibrate = useCallback(async (profile: Profile | null) => {
+    const current = loadedRef.current;
+    if (!current) return;
+    const take = current.take;
+    /* A file is never corrected, wherever the request came from. It was made
+       somewhere else — possibly by somebody else, possibly through a loopback
+       with nothing in the path at all — and applying this machine's
+       calibration to it would quietly alter numbers that were already
+       measured. */
+    const applied = profileForSource(profile, take.source === MIC_SOURCE);
+
+    /* Coming back from a reload there are no samples in memory, only the wav
+       that was stored. It decodes to the same audio the take was measured
+       from, because what gets stored is the trimmed clip. */
+    const clip: AudioClip = current.clip.samples.length
+      ? current.clip
+      : await decodeAudioFile(current.data!.slice(0));
+
+    const { take: next } = analyzeClip(clip, {
+      source: take.source,
+      expected: take.expected,
+      expectedSource: take.expectedSource,
+      // Not re-detected: the tone did not change, and letting it wander would
+      // make this a different measurement rather than the same one under a
+      // different calibration.
+      toneHz: take.toneHz,
+      ...(take.target.explicit
+        ? { targetWpm: take.target.charWpm, targetFarnsworth: take.target.farnsworthWpm }
+        : {}),
+      // Already trimmed when it was first analyzed; trimming again would move
+      // every time in the take by whatever it found.
+      trim: false,
+      now: take.recordedAt,
+      id: take.id,
+      profile: applied,
+    });
+
+    // Same recording, same identity — not a new entry in the history each
+    // time somebody tries a different profile.
+    setLoaded({ take: next, clip: current.clip, data: current.data });
+    /* And the same settings. Zoom, tolerance, speeds and intended text belong
+       to the person looking, not to the analysis, and resetting them here
+       would punish exactly the comparison this exists for. */
+    const kept = settingsRef.current;
+    const audio = current.data
+      ? new Blob([current.data])
+      : encodeWav(clip.samples, clip.rate);
+    void rememberTake({ take: next, audio, settings: kept });
+  }, []);
 
   const clear = useCallback(() => {
     setLoaded(null);
@@ -198,5 +267,5 @@ export function useTake(): TakeState {
     [loaded, settings],
   );
 
-  return { loaded, settings, review, setSettings, load, adopt, clear };
+  return { loaded, settings, review, setSettings, load, adopt, recalibrate, clear };
 }

@@ -525,6 +525,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   font-size: 15px;
   padding: 11px 22px;
   border-radius: 8px;
+  width: 100%;
 }
 .way.drop.over { border-color: var(--you); background: var(--panel-2); }
 
@@ -536,14 +537,17 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   max-width: 520px;
   text-align: left;
 }
+/* A question, not a field label. Set as small uppercase tracking it read as
+   one more caption on a screen full of them and got skipped — and without it
+   the grading has only the decode to compare against, which is a meaningless
+   100% for accuracy. */
 .intended-field label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--ink-dim);
+  font-size: 16px;
+  color: var(--ink);
+  text-align: center;
 }
 .intended-field input { width: 100%; }
-.intended-field .hint { text-transform: none; letter-spacing: 0; }
+.intended-field .hint { text-transform: none; letter-spacing: 0; font-size: 12px; }
 
 /* ---- recording ---------------------------------------------------------- */
 .recording {
@@ -689,6 +693,31 @@ button.primary { border-color: var(--you); color: var(--ink); }
 .calibrate .lede { color: var(--ink-dim); max-width: 52ch; margin: 0; line-height: 1.6; }
 .calibrate .group { align-items: center; min-width: 220px; }
 .calibrate .group input { text-align: center; }
+
+/* A labeled control. `row` puts the name beside the input rather than above
+   it, which is what a single short field wants — "Keyer speed" stacked over a
+   two-character box is three lines of screen for one number. */
+.field { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.field.row { flex-direction: row; align-items: center; gap: 10px; }
+.field .fieldname { font-size: 13px; color: var(--ink-dim); }
+.field.row input { width: 5em; text-align: center; }
+
+
+/* What the sequence is, before any of it is asked for. Left-aligned inside a
+   centered column: a numbered list you read down wants a straight left edge,
+   and centering the items makes the order hard to follow. */
+.calibrate .preamble { display: flex; flex-direction: column; gap: 12px; }
+.calibrate .preamble p { margin: 0; }
+.calibrate .drilllist {
+  margin: 0;
+  padding-left: 22px;
+  text-align: left;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.calibrate .drilllist .hint { display: block; }
 .calibrate .banner { border: 1px solid var(--line); border-radius: 8px; max-width: 52ch; }
 
 .calibrate .prompt {
@@ -700,12 +729,37 @@ button.primary { border-color: var(--you); color: var(--ink); }
    knows to take their hand off the paddle. */
 .calibrate .prompt.rest { color: var(--ink-faint); font-weight: 400; }
 
+/* The prompt area, on fixed rows.
+ *
+ * Each step says a different amount, and letting the column find its own
+ * height meant the clock moved up and down the screen every few seconds while
+ * somebody was trying to read it. The rows are sized for the tallest thing
+ * each one holds, so the countdown lands in the same place all the way
+ * through and only the words inside change. */
+.calibrate .stage {
+  width: 100%;
+  display: grid;
+  grid-template-rows: minmax(86px, auto) minmax(148px, auto) minmax(62px, auto);
+  align-items: center;
+  justify-items: center;
+  gap: 12px;
+}
+
 .calibrate .countdown {
   font-family: var(--mono);
   font-size: 44px;
   font-variant-numeric: tabular-nums;
   color: var(--you);
   line-height: 1;
+}
+/* The called cue. Bigger and brighter on the beat than the wait before it,
+   because it has to be readable out of the corner of an eye by somebody
+   looking at a paddle. */
+.calibrate .countdown.cue.now {
+  font-size: 60px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--ok);
 }
 /* On a rest the clock is counting toward something rather than through it, so
    it says which. */
@@ -762,6 +816,22 @@ button.primary { border-color: var(--you); color: var(--ink); }
 
 /* The closing message, decoded through the profile just measured. The only
    part of a calibration somebody can check with their own eyes. */
+/* Hearing each drill back. Worth having on a refusal above all: "the drills
+   disagree" becomes obvious the moment the dah drill plays somebody's dits. */
+.calibrate .sections {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.calibrate .sections .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.calibrate .sections .ico { margin-right: 6px; font-style: normal; }
+
 .calibrate .readback {
   display: flex;
   flex-direction: column;
@@ -782,6 +852,91 @@ button.primary { border-color: var(--you); color: var(--ink); }
 
 /* The advice, which is the point of the screen — see dsp/quality.ts, where
    placement outranks every number this page prints. */
+.privacy { font-size: 12px; color: var(--ink-faint); margin: 4px 0 0; }
+
+/* Configuration, and the way in to it. */
+.cog {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 9px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--ink-dim);
+}
+.cog:hover { color: var(--ink); border-color: var(--line); }
+.landing { position: relative; }
+
+.settings {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 28px 20px;
+  max-width: 780px;
+  margin: 0 auto;
+  width: 100%;
+}
+.setshead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings h2 { margin: 0; font-size: 20px; }
+.settings h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-dim); }
+.settings .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
+.callist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.callist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.calmeta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.calmeta .hint { font-size: 12px; }
+.confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.confirm .hint { max-width: 30ch; text-align: right; }
+button.danger { border-color: var(--bad); color: var(--bad); }
+
+/* Overriding the measurement. Below the preview, because a slider whose
+   effect you cannot see is guesswork with extra steps. */
+.advanced { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.advanced .advbody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 46ch;
+}
+.advanced .advbody input[type="range"] { width: 220px; }
+.advanced .sliderow { display: flex; align-items: center; gap: 10px; }
+.advanced .hint { margin: 0; }
+
+/* The two charts, one above the other and the same width, because the whole
+   point is reading one against the other. */
+.calpreview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 900px;
+}
+.calchart { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.calchart .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.calchart .plot { overflow-x: auto; }
+.calibrate .field input { min-width: 2ch; text-align: center; }
+
 .calibrate .advice { color: var(--ink); max-width: 46ch; }
 
 /* Whether this microphone has been measured, said out loud.
@@ -840,3 +995,19 @@ button.primary { border-color: var(--you); color: var(--ink); }
 }
 .calchip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
 .calchip.ok .dot { background: var(--ok); }
+
+/* The same fact, but changeable: on the review the audio is in hand, so
+   choosing a calibration re-reads the recording rather than only setting what
+   the next one will use. */
+.calpick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.calpick .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.calpick.ok .dot { background: var(--ok); }
+.calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
+.calpick .hint { font-size: 11px; }

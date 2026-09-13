@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { DATA_DIR } from "../oracle-fs";
 import { normalizePeak, readWav } from "../wav";
-import { DRILLS, analyzeCalibration } from "@/io/calibration";
+import { DRILLS, analyzeCalibration, playablesOf } from "@/io/calibration";
 import {
   PROBE,
   assessSetup,
@@ -101,6 +101,35 @@ describe.skipIf(!HAVE)("a calibration recording", () => {
 
     it("finds all five drills in the one recording", () => {
       expect(run().sections.filter((s) => s.kind !== "silence")).toHaveLength(5);
+    });
+
+    it("hands back every keyed stretch, named by what it was taken to be", () => {
+      /* So a refusal can be listened to. "The two drills disagree by 31 ms"
+         is a fact about numbers; hearing the dah drill play back somebody's
+         dits is the same fact in a form anyone can act on.
+
+         Named from the splitter's own view of the recording rather than from
+         the schedule the wizard asked for, because when those two differ the
+         splitter's view is the one that explains the answer. */
+      const parts = playablesOf(run());
+      expect(parts.map((p) => p.label)).toEqual([
+        "Held dits",
+        "Held dahs",
+        "Other keying",
+        "Single dits",
+        "Your message",
+      ]);
+      // Real windows into the recording, in order, none of them empty.
+      let last = -1;
+      for (const p of parts) {
+        expect(p.toSec).toBeGreaterThan(p.fromSec);
+        expect(p.fromSec).toBeGreaterThan(last);
+        last = p.fromSec;
+      }
+      // Silence is left out: there is nothing in it to check.
+      expect(parts).toHaveLength(
+        run().sections.filter((x) => x.kind !== "silence").length,
+      );
     });
 
     it("reads the closing message back, through the profile it just measured", () => {

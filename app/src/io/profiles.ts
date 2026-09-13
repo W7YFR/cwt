@@ -40,7 +40,18 @@ export interface Profile {
   readonly deviceLabel?: string | undefined;
   /** Speed the drills were keyed at. */
   readonly wpm: number;
+  /** The correction actually applied. Usually the measured one, but it can be
+   *  adjusted by hand — see `measuredOffsetSec`. */
   readonly releaseOffsetSec: number;
+  /** What the drills measured, kept even when the offset above has been
+   *  changed by hand.
+   *
+   * Two reasons, and neither is bookkeeping. It is what "reset" resets to. And
+   * a number somebody dragged is a different kind of fact from a number the
+   * drills produced, so a report that leans on this profile has to be able to
+   * say which it was. Absent on profiles saved before adjusting was possible,
+   * which is the same as "never adjusted". */
+  readonly measuredOffsetSec?: number;
   readonly spreadSec: number;
   readonly elements: number;
   /** What the room measured, kept so the picker can show it — "13 ms, good"
@@ -51,6 +62,14 @@ export interface Profile {
   readonly maxWpm: number;
   /** ISO 8601, seconds precision. */
   readonly recordedAt: string;
+}
+
+/** Whether the correction in use is the one that was measured.
+ *
+ * A profile with no `measuredOffsetSec` was saved before adjusting existed and
+ * has therefore never been adjusted. */
+export function isAdjusted(p: Profile): boolean {
+  return p.measuredOffsetSec !== undefined && p.measuredOffsetSec !== p.releaseOffsetSec;
 }
 
 /** The part of a profile the decoder actually uses. */

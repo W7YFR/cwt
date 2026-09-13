@@ -266,6 +266,10 @@ export interface TakeProfile {
   /** What it corrected by, so a report says how much was taken off and not
    *  only that something was. */
   readonly releaseOffsetSec: number;
+  /** True when that number was adjusted by hand rather than measured. A
+   *  directory of reports is meant to be one time series, and the two are not
+   *  the same kind of fact. */
+  readonly adjusted?: boolean;
 }
 
 /** Live, user-adjustable review settings. Not part of a `Take`: the same

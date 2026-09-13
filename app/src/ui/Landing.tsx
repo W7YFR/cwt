@@ -38,6 +38,7 @@ export interface LandingProps {
   profileId: string | undefined;
   onProfileChange(id: string | undefined): void;
   onCalibrate(): void;
+  onConfigure(): void;
 }
 
 export function Landing(props: LandingProps): React.ReactElement {
@@ -64,22 +65,35 @@ export function Landing(props: LandingProps): React.ReactElement {
 
   return (
     <div className="landing">
+      {/* Top right and small. Nothing behind it is needed to use the app —
+          it is where things get tidied up, not where they get decided. */}
+      <button
+        className="cog"
+        onClick={props.onConfigure}
+        title="Configuration"
+        aria-label="Configuration"
+        data-testid="cog"
+      >
+        ⚙
+      </button>
+
       <Wordmark art={visitWordmark()} />
 
       <p className="lede">
         Key into your microphone and every dit, dah and gap gets measured against
-        a perfect sender, so you can become the perfect sender!
-        <br />
-        <br />
-        Nothing is uploaded; the whole analysis runs right here in this tab.
+        a perfect sender, <em>so you can become the perfect sender!</em>
       </p>
 
       <div className="intended-field">
+        {/* The one question on this screen, asked like one. Skipped, the
+            grading has only the decode to compare against — which is a
+            meaningless 100% for accuracy — so it is worth a moment's
+            attention rather than a line of small print. */}
         <label htmlFor="landing-expected">
-          What are you going to send?{" "}
-          <span className="hint">
+          What are you going to send?
+          <div className="hint">
             optional — but with it you get accuracy as well as timing
-          </span>
+          </div>
         </label>
         <input
           id="landing-expected"
@@ -107,7 +121,7 @@ export function Landing(props: LandingProps): React.ReactElement {
                 <button className="big" onClick={() => void rec.finish()}>
                   Stop and review
                 </button>
-                <button onClick={() => rec.recorder?.restart()}>Start over</button>
+                <button onClick={rec.restart}>Start over</button>
               </div>
               <button className="link" onClick={() => void rec.discard()}>
                 cancel
@@ -160,10 +174,17 @@ export function Landing(props: LandingProps): React.ReactElement {
           <p>
             Or drop one anywhere on the page. WAV, MP3, M4A, FLAC and OGG all
             work. Files are read exactly as recorded — no calibration is applied
-            to them, because it would describe a different microphone.
+            to them.
           </p>
         </div>
       </div>
+
+      {/* Underneath, and small. It is a reassurance about how the thing works,
+          not a reason to use it, and above the fold it was competing with the
+          one sentence that says what the tool is for. */}
+      <p className="privacy">
+        Private by design. All analysis is performed right here in the browser.
+      </p>
     </div>
   );
 }

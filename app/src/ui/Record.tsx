@@ -8,7 +8,7 @@
  */
 
 import type { InputDevice } from "@/capture/mic";
-import type { Profile } from "@/io/profiles";
+import { orderProfiles, type Profile } from "@/io/profiles";
 import { fmtElapsed } from "./format";
 import type { RecorderHandle } from "./useRecorder";
 
@@ -30,6 +30,11 @@ export interface DevicePickerProps {
   devices: InputDevice[];
   value: string | undefined;
   onChange(id: string | undefined): void;
+  /** Shown above the control. Worth giving wherever another select is in
+   *  reach: two unlabeled dropdowns in the same place read as one control that
+   *  has changed its mind, which is exactly how the wizard's microphone picker
+   *  read against the landing screen's calibration picker. */
+  label?: string;
 }
 
 /** Only rendered when there is a choice to make: one input is not a decision,
@@ -38,9 +43,10 @@ export function DevicePicker({
   devices,
   value,
   onChange,
+  label,
 }: DevicePickerProps): React.ReactElement | null {
   if (devices.length <= 1) return null;
-  return (
+  const select = (
     <select
       aria-label="Input device"
       value={value ?? ""}
@@ -53,6 +59,13 @@ export function DevicePicker({
         </option>
       ))}
     </select>
+  );
+  if (!label) return select;
+  return (
+    <label className="field">
+      <span className="fieldname">{label}</span>
+      {select}
+    </label>
   );
 }
 
@@ -71,11 +84,18 @@ export interface RecordBarProps {
   rec: RecorderHandle;
   deviceId: string | undefined;
   onDeviceChange(id: string | undefined): void;
-  /** The calibration the next take would be made under. Shown rather than
-   *  assumed: this bar is one click from a recording, and whether a profile is
-   *  applied moves every number on the page below it. Changing it is the
-   *  landing screen's job — this only has to stop it being a surprise. */
-  profile: Profile | null;
+  /** Saved calibrations, and which one is in use. */
+  profiles: readonly Profile[];
+  profileId: string | undefined;
+  onProfileChange(id: string | undefined): void;
+  /** Whether changing it re-reads the recording on screen.
+   *
+   * True for a microphone take, false for an opened file — a file came from
+   * somewhere else and is never corrected, so the picker would be claiming an
+   * effect it is not allowed to have. */
+  appliesToTake: boolean;
+  /** True while the recording is being read again. */
+  rereading: boolean;
 }
 
 /** Record another, without leaving the review. */
@@ -83,7 +103,11 @@ export function RecordBar({
   rec,
   deviceId,
   onDeviceChange,
-  profile,
+  profiles,
+  profileId,
+  onProfileChange,
+  appliesToTake,
+  rereading,
 }: RecordBarProps): React.ReactElement {
   if (rec.recorder) {
     return (
@@ -102,20 +126,47 @@ export function RecordBar({
     );
   }
 
+  const active = profiles.find((p) => p.id === profileId) ?? null;
+
   return (
     <div className="recordbar">
       <button onClick={() => void rec.start()} disabled={rec.busy}>
         <RecDot /> Record another
       </button>
       <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
-      <span className={`calchip ${profile ? "ok" : "none"}`} title={
-        profile
-          ? `Recordings are corrected by "${profile.nickname}" — ${(profile.releaseOffsetSec * 1000).toFixed(1)} ms off every element`
-          : "Recordings are decoded exactly as captured"
-      }>
-        <span className="dot" aria-hidden="true" />
-        {profile ? profile.nickname : "not calibrated"}
-      </span>
+
+      {appliesToTake ? (
+        /* A picker rather than a label, because the audio is right here and
+           reading it again under a different calibration is the same
+           computation that ran when it was recorded. Holding the recording
+           fixed and changing only the correction is the cleanest comparison
+           available anywhere in the app — the room, the placement and the fist
+           cannot vary, because it is one recording. */
+        <span className={`calpick ${active ? "ok" : "none"}`} data-testid="calpick">
+          <span className="dot" aria-hidden="true" />
+          <select
+            aria-label="Calibration"
+            value={profileId ?? ""}
+            disabled={rereading}
+            onChange={(e) => onProfileChange(e.target.value || undefined)}
+          >
+            <option value="">No calibration</option>
+            {orderProfiles(profiles, deviceId).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
+              </option>
+            ))}
+          </select>
+          <span className="hint" aria-live="polite">
+            {rereading ? "reading it again…" : "applies to this recording"}
+          </span>
+        </span>
+      ) : (
+        <span className="calchip none" data-testid="calchip">
+          <span className="dot" aria-hidden="true" />
+          read exactly as recorded
+        </span>
+      )}
     </div>
   );
 }

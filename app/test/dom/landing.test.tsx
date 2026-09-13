@@ -23,6 +23,7 @@ function renderLanding(overrides: Partial<React.ComponentProps<typeof Landing>> 
     profileId: undefined,
     onProfileChange: vi.fn(),
     onCalibrate: vi.fn(),
+    onConfigure: vi.fn(),
     ...overrides,
   };
   return { ...render(<Landing {...props} />), props };
@@ -303,6 +304,13 @@ describe("the landing screen", () => {
       expect(numbers).toContain((PROFILE.releaseOffsetSec * 1000).toFixed(1));
       expect(numbers).toContain(PROFILE.verdict);
       await settled();
+    });
+
+    it("opens the configuration screen from the cog", async () => {
+      const user = userEvent.setup();
+      const { props } = renderLanding();
+      await user.click(screen.getByTestId("cog"));
+      expect(props.onConfigure).toHaveBeenCalled();
     });
 
     it("flags a profile in use that was measured on another input", async () => {

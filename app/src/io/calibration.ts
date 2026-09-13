@@ -39,6 +39,31 @@ export interface Drill {
   readonly seconds: number;
   readonly title: string;
   readonly body: string;
+  /** How this drill reads in the list on the preamble, where the whole
+   *  sequence is described before any of it is asked for. Separate from
+   *  `title`, which is what the screen says while you are doing it: "hold the
+   *  dit paddle" is an instruction, "a constant stream of dits" is an item in
+   *  a list of what you are about to be asked for. */
+  readonly summary: string;
+  /** An aside on the summary, for the one drill that has one. */
+  readonly note?: string;
+  /** Seconds between cues, for a drill that is called rather than held.
+   *
+   * A held paddle needs no cue — you squeeze and the keyer does the rest. A
+   * drill of isolated elements does: "one dit every two seconds" asks somebody
+   * to keep time in their head for the length of the drill, against a single
+   * number counting down from eight, and what comes back is whatever their
+   * sense of two seconds happens to be. Calling each one removes the guesswork
+   * from the part of the recording the setup verdict is measured from. */
+  readonly cueSec?: number;
+}
+
+/** When a drill is cued, how many cues it gets.
+ *
+ * The first lands one interval in, so there is something to wait for rather
+ * than a cue you have already missed by the time you have read it. */
+export function cueCount(drill: Drill): number {
+  return drill.cueSec ? Math.floor(drill.seconds / drill.cueSec) : 0;
 }
 
 /** Quiet between drills. Not dead time: it is what the splitter finds the
@@ -57,7 +82,10 @@ export const REST_SEC = 4;
  *     from 2 seconds up is within 0.15 ms — a fifth of a percent of a dit.
  *     Four seconds is generous.
  *   - The isolated drill needs three releases to be judged at all, which at
- *     two seconds apart is five seconds of recording. Eight gives four.
+ *     two seconds apart is five seconds of recording. Four cues two seconds
+ *     apart gives four releases, and the drill runs a second past the last one
+ *     so the cue is still on screen when the dit is sent rather than vanishing
+ *     as the rest begins.
  *
  * There is deliberately no silence drill. One was asked for and nothing ever
  * read it: the noise floor is not an input to any measurement here, and the
@@ -66,32 +94,41 @@ export const REST_SEC = 4;
  *
  * The message at the end feeds no measurement either — but unlike silence it
  * is the one part where the operator watches the thing work, which is worth
- * eight seconds.
+ * ten seconds. The preamble promises ten and the constant is where that
+ * promise is kept, so the two cannot drift.
  */
+const MESSAGE_SEC = 12;
+
 export const DRILLS: readonly Drill[] = [
   {
     key: "dits",
     seconds: 4,
     title: "Hold the dit paddle",
     body: "Squeeze and hold it, and let the keyer run.",
+    summary: "a constant stream of dits",
   },
   {
     key: "dahs",
     seconds: 4,
     title: "Hold the dah paddle",
     body: "The same again on the other side.",
+    summary: "a constant stream of dahs",
   },
   {
     key: "isolated",
-    seconds: 8,
-    title: "Single dits, about two seconds apart",
-    body: "One dit, wait, one dit. The silence after each one is what gets measured.",
+    seconds: 9,
+    cueSec: 2,
+    title: "One dit on each cue",
+    body: "Wait for the cue, then send a single dit. The silence after each one is what gets measured.",
+    summary: "one dit every two seconds",
   },
   {
     key: "message",
-    seconds: 8,
+    seconds: MESSAGE_SEC,
     title: "Send anything you like",
     body: "A call sign, CQ, your name — whatever you like. It gets read back to you.",
+    summary: `a ${MESSAGE_SEC} second message of your choosing`,
+    note: "Ideally send it from a macro, so the spacing is perfect.",
   },
 ];
 
@@ -141,6 +178,52 @@ export interface CalibrationRun {
 export interface Readback {
   readonly text: string;
   readonly charWpm: number;
+}
+
+/** One stretch of the recording, named by what it was taken to be.
+ *
+ * The sections as the splitter found them, not as the wizard asked for them,
+ * and that is the point: when a calibration comes back wrong the most useful
+ * thing available is hearing what it thought each drill was. A refusal that
+ * says "the drills disagree" becomes obvious the moment the dah drill plays
+ * back somebody's dits. */
+export interface Playable {
+  readonly key: string;
+  readonly label: string;
+  readonly fromSec: number;
+  readonly toSec: number;
+}
+
+/** The keyed parts of a calibration recording, in order, each named.
+ *
+ * Silence is left out — there is nothing to hear in it, and the pauses are the
+ * one part of the recording nobody needs to check. */
+export function playablesOf(run: CalibrationRun): Playable[] {
+  const { dits, dahs } = pairDrills(run.sections);
+  const mixed = run.sections.filter((s) => s.kind === "mixed");
+  const message = mixed.length > 0 ? mixed[mixed.length - 1] : null;
+
+  const named = (s: Section): { key: string; label: string } => {
+    if (s === dits) return { key: "dits", label: "Held dits" };
+    if (s === dahs) return { key: "dahs", label: "Held dahs" };
+    if (s.kind === "isolated") return { key: "isolated", label: "Single dits" };
+    if (s === message) return { key: "message", label: "Your message" };
+    // Something the splitter found that no measurement asked for. Worth
+    // hearing precisely because it was not expected.
+    return { key: "other", label: "Other keying" };
+  };
+
+  return run.sections
+    .filter((s) => s.kind !== "silence")
+    .map((s, i) => {
+      const { key, label } = named(s);
+      return {
+        key: `${key}-${i}`,
+        label,
+        fromSec: s.startSec,
+        toSec: s.startSec + s.durationSec,
+      };
+    });
 }
 
 /** Which part of the recording the setup verdict should be measured from.

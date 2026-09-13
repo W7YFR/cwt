@@ -291,14 +291,15 @@ export function setupAdvice(q: SetupQuality): string {
       return `A little is added to every element, but not enough to matter up to about ${wpm} wpm.`;
     case "marginal":
       return (
-        "If a microphone is listening to a speaker, move it closer — that is the " +
-        `biggest change available. As it stands this is good to about ${wpm} wpm.`
+        "If you're using a physical microphone to listen to your sidetone, try " +
+        "moving the microphone closer to the speaker — that is the biggest " +
+        `change available. As it stands this is good to about ${wpm} wpm.`
       );
     case "unusable":
       return (
-        "If a microphone is listening to a speaker, move it within a few inches " +
-        "and record again. Elements are running into each other, and no amount of " +
-        "correction recovers that."
+        "If you're using a physical microphone to listen to your sidetone, try " +
+        "moving the microphone closer to the speaker, and record again. Elements " +
+        "are running into each other, and no amount of correction recovers that."
       );
     default:
       return (

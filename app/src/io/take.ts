@@ -10,7 +10,7 @@
 import { normalized, segmentsFrom, trimSilence, TRIM_PAD } from "@/dsp";
 import { buildTimeline, estimateTiming } from "@/timing";
 import type { AudioClip, Take, TakeProfile } from "@/types";
-import { calibrationOf, type Profile } from "./profiles";
+import { calibrationOf, isAdjusted, type Profile } from "./profiles";
 
 /** The `source` of a take captured through the microphone. A sentinel rather
  *  than a label: the header hides it, because it says the same thing every
@@ -66,7 +66,12 @@ export interface AnalyzeResult {
 }
 
 function takeProfile(p: Profile): TakeProfile {
-  return { id: p.id, nickname: p.nickname, releaseOffsetSec: p.releaseOffsetSec };
+  return {
+    id: p.id,
+    nickname: p.nickname,
+    releaseOffsetSec: p.releaseOffsetSec,
+    ...(isAdjusted(p) ? { adjusted: true } : {}),
+  };
 }
 
 function isoNow(): string {

@@ -46,8 +46,14 @@ export interface ReviewScreenProps {
   ): void;
   onError(message: string): void;
   deviceId: string | undefined;
-  /** The calibration a take recorded from here would be made under. */
-  profile: Profile | null;
+  /** Saved calibrations, which one is in use, and how to change it.
+   *
+   * Changing it does two things and both are wanted: it becomes the
+   * calibration the next recording is made under, and the recording on screen
+   * is read again through it. */
+  profiles: readonly Profile[];
+  profileId: string | undefined;
+  onProfileChange(id: string | undefined): Promise<void> | void;
   onDeviceChange(id: string | undefined): void;
   onBack(): void;
 }
@@ -71,7 +77,9 @@ export function ReviewScreen({
   onAudio,
   onError,
   deviceId,
-  profile,
+  profiles,
+  profileId,
+  onProfileChange,
   onDeviceChange,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
@@ -88,6 +96,20 @@ export function ReviewScreen({
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [clock, setClock] = useState<number | null>(null);
   const [status, setStatus] = useState("");
+  const [rereading, setRereading] = useState(false);
+
+  /* Re-reading is DSP over the samples, not a re-grade of the segments, so it
+     costs what the pause after a recording costs rather than what a slider
+     costs. Said on screen while it happens. */
+  const chooseProfile = useCallback(
+    (id: string | undefined) => {
+      setRereading(true);
+      void Promise.resolve(onProfileChange(id))
+        .catch((e: unknown) => onError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setRereading(false));
+    },
+    [onError, onProfileChange],
+  );
   const handle = useRef<ChartHandle>({ chart: null }).current;
 
   // The playhead moves every frame. Routing it through state would re-render
@@ -287,7 +309,11 @@ export function ReviewScreen({
           rec={rec}
           deviceId={deviceId}
           onDeviceChange={onDeviceChange}
-          profile={profile}
+          profiles={profiles}
+          profileId={profileId}
+          onProfileChange={chooseProfile}
+          appliesToTake={loaded.take.source === MIC_SOURCE}
+          rereading={rereading}
         />
         <Scores review={review} settings={settings} take={loaded.take} />
         {/* Last, and on a row of its own: a filename is the one thing here
