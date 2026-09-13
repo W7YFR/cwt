@@ -10,7 +10,7 @@
  */
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { createChart, type Chart } from "@/render/canvas";
+import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
 import { buildLayout, timeToX } from "@/render/layout";
 import { trackBands } from "@/render/scene";
 import { contextWindow } from "@/render/focus";
@@ -238,7 +238,12 @@ describe("the chart in a browser", () => {
       );
     }
 
-    function clickAt(contentX: number, onPlayChar: ReturnType<typeof vi.fn>) {
+    // The callback's own type, not the mock's. A spy is assignable to it, so
+    // callers still pass a vi.fn() and keep their `.mock` on it.
+    function clickAt(
+      contentX: number,
+      onPlayChar: NonNullable<ChartCallbacks["onPlayChar"]>,
+    ) {
       chart.destroy();
       chart = createChart(host, canvas, { onPlayChar });
       chart.update({ review, settings: { ...settings, ppu: PPU }, focus: null });
