@@ -50,14 +50,34 @@ export function Report({
      tolerance" note over a grade with no elements in it would say something
      untrue. */
   if (isBlankTake(review.take)) {
+    /* Two different nothings. With a message there is a target on screen to
+       work against and the next move is to hear it; without one there is an
+       empty chart, and saying "the target above is what you are about to
+       send" would be pointing at nothing. */
+    const hasTarget = review.ideal.chars.length > 0;
     return (
       <section className="report">
         <div className="card">
           <h2>Nothing recorded yet</h2>
-          <p className="note empty" data-testid="report-blank">
-            The target above is what you are about to send. Hear it with{" "}
-            <b>Target</b>, set the speeds and the tolerance you want to be held
-            to, then record — the grading appears here.
+          <p
+            className="note empty"
+            data-testid="report-blank"
+            data-target={String(hasTarget)}
+          >
+            {hasTarget ? (
+              <>
+                The target above is what you are about to send. Hear it with{" "}
+                <b>Target</b>, set the speeds and the tolerance you want to be
+                held to, then record — the grading appears here.
+              </>
+            ) : (
+              <>
+                Say what you are going to send in <b>Intended message</b> above
+                and the target appears, to hear and to key against. You can
+                record without one — the timing still gets graded, against your
+                own sending rather than against anything you meant.
+              </>
+            )}
           </p>
         </div>
       </section>

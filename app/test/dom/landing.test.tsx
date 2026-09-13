@@ -351,24 +351,21 @@ describe("the landing screen", () => {
     /* Recording without hearing the target first, and without a cursor to keep
        time against, is keying blind — and everything that fixes that lives one
        screen in. This is the door to it. */
-    it("needs to know what you are going to send", async () => {
-      /* The target is rendered from the intended message. Without one there is
-         no row to read, no audio to hear and no cursor to follow, so there is
-         nothing to practice against. */
-      const user = userEvent.setup();
-      const { props } = renderLanding({ expected: "" });
-      const go = screen.getByTestId("practice");
-      expect(go).toBeDisabled();
-      expect(screen.getByTestId("practice-blocked")).toBeTruthy();
-
-      await user.click(go);
-      expect(props.onPractice).not.toHaveBeenCalled();
-    });
-
-    it("opens once there is one", async () => {
+    it("opens with a message", async () => {
       const user = userEvent.setup();
       const { props } = renderLanding({ expected: "CQ DE W7YFR" });
-      expect(screen.queryByTestId("practice-blocked")).toBeNull();
+      await user.click(screen.getByTestId("practice"));
+      expect(props.onPractice).toHaveBeenCalled();
+    });
+
+    it("opens without one too", async () => {
+      /* The target is built from the intended message and there is little to
+         practice against without one — but the box for it is right there on
+         the next screen, and a door that will not open is a worse way to say
+         so than the room itself saying it. */
+      const user = userEvent.setup();
+      const { props } = renderLanding({ expected: "" });
+      expect(screen.getByTestId("practice")).toBeEnabled();
       await user.click(screen.getByTestId("practice"));
       expect(props.onPractice).toHaveBeenCalled();
     });

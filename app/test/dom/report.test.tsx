@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Report } from "@/ui/Report";
+import { blankTake } from "@/io/take";
+import { defaultSettings, reviewTake } from "@/timing";
 import { Scores } from "@/ui/Scores";
 import { CLASS_LABEL } from "@/ui/copy";
 import { slotIndexAtTime } from "@/render/focus";
@@ -139,6 +141,39 @@ describe("the report", () => {
     // Grading a decode against itself is a meaningless 100%, so the panel is
     // absent rather than showing a perfect score nobody earned.
     expect(screen.queryByText(/Accuracy vs intended text/)).not.toBeInTheDocument();
+  });
+
+  describe("with nothing recorded yet", () => {
+    /* Two different nothings, and they want different sentences. With a
+       message there is a target on screen to work against; without one there
+       is an empty chart, and "the target above is what you are about to send"
+       would be pointing at nothing. */
+    const blank = (expected: string) => {
+      const take = blankTake({ expected: expected || null, charWpm: 15, farnsworthWpm: 15 });
+      return reviewTake(take, defaultSettings(take));
+    };
+    const show = (expected: string) =>
+      render(
+        <Report
+          review={blank(expected)}
+          tolerance={0.3}
+          onPlayDeviation={() => {}}
+          onFocus={() => {}}
+        />,
+      );
+
+    it("says what to do next instead of printing empty tables", () => {
+      show("CQ DE W7YFR");
+      expect(screen.getByTestId("report-blank").dataset.target).toBe("true");
+      // And none of the grading furniture, which would be tables of nothing.
+      expect(screen.queryByText(/Element & spacing/)).toBeNull();
+      expect(screen.queryByText(/Accuracy vs intended text/)).toBeNull();
+    });
+
+    it("asks for a message when there is not one, rather than pointing at nothing", () => {
+      show("");
+      expect(screen.getByTestId("report-blank").dataset.target).toBe("false");
+    });
   });
 
   it("shows both texts whole, not only where they parted company", () => {

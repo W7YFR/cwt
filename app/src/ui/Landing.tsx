@@ -47,10 +47,6 @@ export function Landing(props: LandingProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   const { onAudio, onError } = props;
   const expected = useUpperField(props.onExpectedChange);
-  /* The target is rendered from the intended message, so without one there is
-     nothing on the practice screen to send against — no row to read, no audio
-     to hear, no cursor to follow. */
-  const ready = props.expected.trim().length > 0;
 
   const rec = useRecorder({
     deviceId: props.deviceId,
@@ -182,20 +178,14 @@ export function Landing(props: LandingProps): React.ReactElement {
         <div className="way practice">
           <h2>Start Practicing</h2>
           <p>Enter the review area to practice drills and improve your timing.</p>
-          <button
-            className="big"
-            data-testid="practice"
-            onClick={props.onPractice}
-            disabled={!ready}
-          >
+          {/* Never barred, even with nothing typed above. The target is built
+              from the intended message and there is little to practice against
+              without one — but the box for it is right there on the next
+              screen, and a door that will not open is a worse way to say so
+              than the room itself saying it. */}
+          <button className="big" data-testid="practice" onClick={props.onPractice}>
             Let&rsquo;s go!
           </button>
-          {!ready && (
-            <p className="hint" data-testid="practice-blocked">
-              Say what you are going to send first — the target is built from
-              it, and there is nothing to practice against without one.
-            </p>
-          )}
         </div>
       </div>
 
