@@ -16,6 +16,20 @@ import type { AudioClip, Take } from "@/types";
  *  time, but a download still needs a filename stem. */
 export const MIC_SOURCE = "microphone";
 
+/** There was no keying in the audio — see dsp/presence.ts.
+ *
+ * Its own type because it is not a failure of anything. The file opened, the
+ * audio decoded, and the honest answer is that there is nothing in it to
+ * grade; the caller should say so plainly rather than dress it up as a fault.
+ * Loading is refused because a take of nothing has no speed, no decode and no
+ * timeline, and a review page built from one would be a page of zeros. */
+export class NoKeyingError extends Error {
+  constructor(message = "I could not hear any CW in this recording.") {
+    super(message);
+    this.name = "NoKeyingError";
+  }
+}
+
 export interface AnalyzeOptions {
   /** Where the audio came from: a filename, or MIC_SOURCE. */
   readonly source: string;
@@ -79,9 +93,12 @@ export function analyzeClip(input: AudioClip, options: AnalyzeOptions): AnalyzeR
   // The threshold works on absolute amplitude, so the DSP gets a normalized
   // copy — and only the DSP. `clip` stays at the recorded level.
   const forAnalysis = normalized(clip);
-  const { toneHz, segments } = segmentsFrom(forAnalysis.samples, forAnalysis.rate, {
-    ...(options.toneHz !== undefined ? { toneHz: options.toneHz } : {}),
-  });
+  const { toneHz, segments, presence } = segmentsFrom(
+    forAnalysis.samples,
+    forAnalysis.rate,
+    { ...(options.toneHz !== undefined ? { toneHz: options.toneHz } : {}) },
+  );
+  if (!presence.keyed) throw new NoKeyingError();
 
   const expected = (options.expected ?? "").trim() || null;
   const measured = estimateTiming(segments, expected);

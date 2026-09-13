@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { loadAudioFile } from "@/capture/file";
 import { loadBundle } from "@/io/bundle";
+import { NoKeyingError } from "@/io/take";
 import { loadPrefs, recallTake, savePrefs } from "@/io/storage";
 import type { AudioClip } from "@/types";
 import { Landing } from "./Landing";
@@ -114,6 +115,17 @@ export function App(): React.ReactElement {
           data,
         );
       } catch (e) {
+        /* Nothing keyed is its own answer, and already a complete sentence.
+           Telling somebody to make sure there is CW in it, when the whole
+           message is that there is none, reads as though the tool did not
+           understand what it just said. */
+        if (e instanceof NoKeyingError) {
+          setError(
+            `${e.message} Check that the tone is reaching the input you picked, ` +
+              "and that your microphone can hear it.",
+          );
+          return;
+        }
         setError(
           e instanceof Error
             ? `${e.message} — make sure the recording has some CW in it, then give it another go.`

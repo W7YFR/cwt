@@ -14,12 +14,15 @@ import { correctionWeight, edgeTransitionSec, refineEdges } from "./edges";
 import { applyReleaseOffset, type Calibration } from "./calibrate";
 import { localPeak, LEVEL_WINDOW_SEC } from "./level";
 import { keyingThreshold } from "./threshold";
+import { tonePresence, type Presence } from "./presence";
 import { detectTone } from "./tone";
-import { runLengths, debounce, percentile } from "./segments";
+import { runLengths, debounce, roughUnitSec } from "./segments";
 
 export * from "./envelope";
 export * from "./filters";
 export * from "./level";
+export * from "./presence";
+export * from "./quality";
 export * from "./ripple";
 export * from "./edges";
 export * from "./calibrate";
@@ -30,13 +33,8 @@ export * from "./tone";
 export * from "./trim";
 export * from "./decode-audio";
 
-/** How short a run has to be, relative to the rough dit, before it's a glitch.
- *
- * Measured against a low percentile of mark lengths rather than the median:
- * the median can land on a dah in text that is dah-heavy, and 35% of a dah is
- * longer than a real dit. */
+/** How short a run has to be, relative to the rough dit, before it's a glitch. */
 export const DEBOUNCE_FRAC = 0.35;
-const ROUGH_UNIT_PERCENTILE = 20;
 
 /** How many times the glitch floor may be re-estimated from its own output. */
 const DEGLITCH_PASSES = 6;
@@ -60,33 +58,16 @@ const DEGLITCH_PASSES = 6;
  * the second estimate equals the first and it stops immediately, having done
  * exactly what it did before. */
 function deglitch(segments: readonly Segment[]): Segment[] {
-  // Estimated from the marks AND the gaps, taking whichever is shorter.
-  //
-  // Marks alone are wrong for a drill with no dits in it. Hold the dah paddle
-  // and every mark is three units, so the percentile lands on a dah, and 0.35
-  // of three units is longer than the one-unit gaps between them — the floor
-  // then condemns every gap in the recording and merges the whole thing into a
-  // single eleven-second mark. Gaps are one unit there, so including them puts
-  // the estimate back on the unit. For ordinary text both come out at one unit
-  // and nothing changes.
-  const unitOf = (segs: readonly Segment[]): number => {
-    const marks = segs.filter((s) => s[0] === 1).map((s) => s[1]);
-    // The first and last runs are the silence the recording opens and closes
-    // with, which are not gaps between anything.
-    const gaps = segs.slice(1, -1).filter((s) => s[0] === 0).map((s) => s[1]);
-    const fromMarks = marks.length > 0 ? percentile(marks, ROUGH_UNIT_PERCENTILE) : 0;
-    const fromGaps = gaps.length > 0 ? percentile(gaps, ROUGH_UNIT_PERCENTILE) : 0;
-    if (!(fromMarks > 0)) return fromGaps;
-    if (!(fromGaps > 0)) return fromMarks;
-    return Math.min(fromMarks, fromGaps);
-  };
-
-  let unit = unitOf(segments);
+  // The floor is a fraction of the unit that marks AND gaps agree on — see
+  // roughUnitSec, where taking whichever is shorter is what stops a drill of
+  // nothing but dahs from condemning every gap in the recording and merging
+  // the whole thing into a single eleven-second mark.
+  let unit = roughUnitSec(segments);
   if (!(unit > 0)) return segments.slice();
 
   let out = debounce(segments, DEBOUNCE_FRAC * unit);
   for (let pass = 1; pass < DEGLITCH_PASSES; pass++) {
-    const next = unitOf(out);
+    const next = roughUnitSec(out);
     // Only ever upward, and only when it actually moved: a floor that shrank
     // would re-admit shards this pass had already established were not real.
     if (!(next > unit * 1.000001)) break;
@@ -101,6 +82,9 @@ export interface SegmentationResult {
   readonly segments: Segment[];
   /** The amplitude that counted as key-down, for diagnostics. */
   readonly threshold: number;
+  /** Whether there was anything here to decode — see presence.ts. When there
+   *  was not, `segments` is empty rather than full of invented elements. */
+  readonly presence: Presence;
 }
 
 export interface SegmentOptions {
@@ -129,6 +113,12 @@ export function segmentsFrom(
 ): SegmentationResult {
   const bandwidth = options.bandwidth ?? DEFAULT_BANDWIDTH;
   const toneHz = options.toneHz ?? detectTone(samples, rate);
+
+  // Before anything else: is there a tone in here at all? Everything below
+  // will find structure in whatever it is handed, so silence decodes as a
+  // hundred invented elements unless something is willing to say no.
+  const presence = tonePresence(samples, rate);
+  if (!presence.keyed) return { toneHz, segments: [], threshold: 0, presence };
 
   const env = envelope(samples, rate, toneHz, bandwidth);
   const threshold = keyingThreshold(env);
@@ -164,5 +154,5 @@ export function segmentsFrom(
   const corrected = cal ? applyReleaseOffset(raw, cal.releaseOffsetSec) : raw;
   const segments = deglitch(corrected);
 
-  return { toneHz, segments, threshold };
+  return { toneHz, segments, threshold, presence };
 }

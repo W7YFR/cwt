@@ -87,3 +87,35 @@ export function median(values: readonly number[]): number {
   const mid = v.length >> 1;
   return v.length % 2 ? v[mid]! : (v[mid - 1]! + v[mid]!) / 2;
 }
+
+/** How short a run has to be, relative to the rough dit, before it's a glitch.
+ *
+ * Measured against a low percentile of mark lengths rather than the median:
+ * the median can land on a dah in text that is dah-heavy, and 35% of a dah is
+ * longer than a real dit. */
+export const ROUGH_UNIT_PERCENTILE = 20;
+
+/** The dit length these segments imply, roughly, in seconds.
+ *
+ * Estimated from the marks AND the gaps, taking whichever is shorter.
+ *
+ * Marks alone are wrong for a drill with no dits in it. Hold the dah paddle
+ * and every mark is three units, so the percentile lands on a dah — three
+ * times the truth. Gaps are one unit there, so including them puts the
+ * estimate back on the unit. For ordinary text both come out at one unit and
+ * it makes no difference.
+ *
+ * Rough in the sense that it costs nothing and needs no clustering: this is
+ * for sizing tolerances, not for reporting a speed. `estimateTiming` is what
+ * measures speed properly. */
+export function roughUnitSec(segs: readonly Segment[]): number {
+  const marks = segs.filter((s) => s[0] === 1).map((s) => s[1]);
+  // The first and last runs are the silence the recording opens and closes
+  // with, which are not gaps between anything.
+  const gaps = segs.slice(1, -1).filter((s) => s[0] === 0).map((s) => s[1]);
+  const fromMarks = marks.length > 0 ? percentile(marks, ROUGH_UNIT_PERCENTILE) : 0;
+  const fromGaps = gaps.length > 0 ? percentile(gaps, ROUGH_UNIT_PERCENTILE) : 0;
+  if (!(fromMarks > 0)) return fromGaps;
+  if (!(fromGaps > 0)) return fromMarks;
+  return Math.min(fromMarks, fromGaps);
+}
