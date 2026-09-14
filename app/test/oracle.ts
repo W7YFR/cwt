@@ -1,4 +1,4 @@
-/* The shape of the Python oracle dumps.
+/* The shape of the recorded reference dumps.
  *
  * Types and pure helpers only — deliberately no filesystem access, because the
  * browser tier imports this too and reaching for node:fs there takes the whole
@@ -102,13 +102,13 @@ export interface OracleCase {
   /** The speed the recording was really sent at — ground truth, which neither
    *  decoder is told. Only on the real-recording fixtures. */
   nominalWpm?: number;
-  /** Present for the cases the Python synthesizer generated. */
+  /** Present for the synthesized cases. */
   synth?: {
     text: string;
     wpm: number;
     farnsworthWpm: number;
     rate: number;
-    /** Fingerprint of the Python waveform, so the TS synthesizer can be shown
+    /** Fingerprint of the reference waveform, so the synthesizer can be shown
      *  to produce the same signal rather than merely a decodable one. */
     nSamples: number;
     absSum: number;

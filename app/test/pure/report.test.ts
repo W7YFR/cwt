@@ -1,8 +1,7 @@
 /* The JSON report: the shape a directory of practice sessions is made of.
  *
- * Checked against what the Python CLI writes, key for key, because the whole
- * point of a stable shape is that reports from either source drop into the same
- * file and compare. And checked for following the controls, because a report
+ * Checked key for key, because the whole point of a stable shape is that a
+ * directory of reports from different days compares cleanly. And checked for following the controls, because a report
  * that silently described some other grading would be worse than no report.
  */
 
@@ -36,10 +35,10 @@ describe("the JSON report", () => {
     );
   });
 
-  it("stamps a timestamp Python's would sort beside", () => {
+  it("stamps a timestamp that sorts as text", () => {
     const { review, settings } = reviewFrom(caseNamed(SLOPPY));
-    // Python writes `...+00:00` at second resolution. Matching it means the
-    // two sources sort and parse identically instead of nearly so.
+    // An offset rather than a `Z`, and no fractional part: a directory of
+    // reports then sorts by name in the order they were made.
     expect(buildJsonReport(review, settings, AT).generated).toBe(
       "2026-03-04T05:06:07+00:00",
     );

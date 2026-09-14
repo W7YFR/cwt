@@ -1,10 +1,11 @@
 /* Render CW as a waveform. No Web Audio — just samples.
  *
  * Two callers with different needs, one implementation so they cannot drift:
- * the target-audio download wants a file, and the oracle test wants a signal
- * identical to the one Python's synth.generate produces so the two decoders
- * can be compared on the same input. Matching Python exactly, down to the
- * per-segment sample truncation, is what makes the second use possible.
+ * the target-audio download wants a file, and the tests want a signal
+ * reproducible to the sample, so a decode can be compared against a recorded
+ * fingerprint of the exact input it was measured from. The second use is why
+ * the per-segment sample truncation below is spelled out rather than left to
+ * whatever rounding happens to fall out.
  *
  * Realtime playback does NOT go through here — it schedules an oscillator, so
  * moving the speed slider re-renders instantly. `audio/scheduler.ts` builds
@@ -72,8 +73,10 @@ export function synthesize(
   ];
 
   // Sum the durations first and truncate once, then truncate each span as it
-  // is laid down. Python does exactly this, and the two truncations do not
-  // commute — doing it any other way puts the last sample in a different place.
+  // is laid down. The two truncations do not commute — doing it any other way
+  // puts the last sample in a different place, and the whole point of
+  // rendering here rather than scheduling is that it comes out the same every
+  // time.
   const total = plan.reduce((a, [, d]) => a + d, 0);
   const n = Math.trunc(total * rate);
   const env = new Float32Array(n);
@@ -127,7 +130,8 @@ export function synthesize(
   return { samples, rate };
 }
 
-/** Peak-normalize in place, the way the Python synth's last step does. */
+/** Peak-normalize in place: the last step, so a rendered file lands at full
+ *  scale whatever the tone and envelope did on the way. */
 export function peakNormalize(samples: Float32Array): Float32Array {
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {

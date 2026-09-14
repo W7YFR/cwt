@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadAudioFile } from "@/capture/file";
-import { loadBundle } from "@/io/bundle";
 import { NoKeyingError } from "@/io/take";
 import {
   activeProfile,
@@ -77,22 +76,14 @@ export function App(): React.ReactElement {
     setProfileId(id);
   }, []);
 
-  /* Where a session comes from, in order of precedence.
-     1. A bundle beside the app: `cw-decode --serve` wrote one and opened a
-        browser at it, so it is what you asked to look at just now.
-     2. The take you were last looking at, out of IndexedDB. A reload must not
-        drop a recording you just spent thirty seconds keying.
-     3. Nothing, which is the ordinary first visit and not an error. */
+  /* Where a session comes from on the way in.
+     1. The session you were in the middle of, out of IndexedDB. A reload must
+        not drop recordings you just spent a minute keying.
+     2. Nothing, which is the ordinary first visit and not an error. */
   useEffect(() => {
     let live = true;
     void (async () => {
       try {
-        const bundle = await loadBundle();
-        if (!live) return;
-        if (bundle) {
-          take.adopt(bundle.take, bundle.audio);
-          return;
-        }
         /* A whole session, when there was one: several attempts at one
            message are what you were in the middle of, and coming back to the
            last of them alone would look like the others had been thrown
@@ -320,6 +311,7 @@ export function App(): React.ReactElement {
             setError(null);
             setConfiguring(true);
           }}
+          onFile={(file) => void openFile(file)}
           onClear={() => {
             setError(null);
             take.reset();

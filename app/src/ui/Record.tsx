@@ -7,6 +7,8 @@
  * screen's larger arrangement live here too, so the two cannot drift.
  */
 
+import { useRef } from "react";
+import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
 import { profilesFor, type Profile } from "@/io/profiles";
 import { fmtElapsed } from "./format";
@@ -125,6 +127,15 @@ export interface RecordBarProps {
   onClear?: (() => void) | undefined;
   /** Start over at a new message and a new speed. */
   onNewSession?: (() => void) | undefined;
+  /** Open a recording from disk.
+   *
+   * Beside dropping one on the page rather than instead of it. The drop target
+   * is the whole window and says nothing about itself until something is being
+   * dragged over it, so on its own it is a feature you have to already know
+   * about. */
+  onFile?: ((file: File) => void) | undefined;
+  /** False once the session has something in it — see the title below. */
+  canOpenFile?: boolean | undefined;
 }
 
 /** Record another, without leaving the review. */
@@ -140,7 +151,11 @@ export function RecordBar({
   leadLeft,
   onClear,
   onNewSession,
+  onFile,
+  canOpenFile = true,
 }: RecordBarProps): React.ReactElement {
+  const fileInput = useRef<HTMLInputElement>(null);
+
   if (rec.recorder) {
     return (
       <div className="recordbar recording">
@@ -175,8 +190,48 @@ export function RecordBar({
 
   return (
     <div className="recordbar">
-      <button onClick={() => void rec.start()} disabled={rec.busy}>
-        <RecDot /> Record another
+      {onFile && (
+        <>
+          {/* Icon only, and first, because opening a file is the rarer of the
+              two ways in — it reads as the smaller sibling of Record rather
+              than as a competing headline. */}
+          <button
+            className="iconbtn"
+            data-testid="open-file"
+            disabled={!canOpenFile}
+            aria-label="Open a recording"
+            title={
+              canOpenFile
+                ? "Open a recording from disk"
+                : "A recording sets the speed for the session, so it can only" +
+                  " start one. Clear or start a new session to open a file."
+            }
+            onClick={() => fileInput.current?.click()}
+          >
+            <span aria-hidden="true">↑</span>
+          </button>
+          <input
+            ref={fileInput}
+            className="visually-hidden"
+            type="file"
+            accept={ACCEPTED}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onFile(file);
+              // Cleared, or choosing the same file twice in a row is silent.
+              e.target.value = "";
+            }}
+          />
+        </>
+      )}
+      <button
+        className="iconbtn"
+        onClick={() => void rec.start()}
+        disabled={rec.busy}
+        aria-label="Record another"
+        title="Record another"
+      >
+        <RecDot />
       </button>
       {/* Not "back": this keeps the session — the message, the speeds, the
           pacing cursor — and drops only what was recorded into it, which is

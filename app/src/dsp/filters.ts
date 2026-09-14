@@ -1,11 +1,11 @@
 /* Zero-phase smoothing primitives.
  *
  * Everything here is a *centered* moving average, and that is the whole point.
- * The Python decoder used scipy's `filtfilt`, which runs an IIR forward and
- * backward so the result has no phase shift; a plain causal filter would delay
- * the envelope and move every mark boundary. Rise and fall edges would not
- * even move by the same amount, so dit and dah lengths would come out wrong
- * rather than merely offset.
+ * A plain causal filter delays the envelope and moves every mark boundary —
+ * and it does not move rise and fall edges by the same amount, so dit and dah
+ * lengths come out wrong rather than merely offset. Zero phase is not a
+ * refinement here; it is the difference between measuring the keying and
+ * measuring the filter.
  *
  * A boxcar applied about its center is exactly zero-phase and costs two adds
  * per sample regardless of width. Cascading three of them approximates a

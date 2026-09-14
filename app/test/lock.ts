@@ -1,13 +1,13 @@
 /* The clean-path lock: what the DSP says today, recorded so it cannot drift.
  *
- * This is not the oracle. The oracle holds TypeScript to *Python* within
- * 1.5 ms per boundary, which is the right tolerance for two deliberately
- * different pipelines — but it means a change to the TypeScript DSP could move
- * every boundary on every clean recording by 1.4 ms and still pass. That is
- * exactly the kind of change this file exists to refuse.
+ * This is not the oracle. That one allows 1.5 ms per boundary, which is the
+ * right tolerance for a reference derived along different lines — but it means
+ * a change to the DSP could move every boundary on every clean recording by
+ * 1.4 ms and still pass. That is exactly the kind of change this file exists
+ * to refuse.
  *
- * So the comparison here is against TypeScript's own previous answer, and the
- * tolerance is nothing at all. Work on poor-quality audio must leave good
+ * So the comparison here is against our own previous answer, and the tolerance
+ * is nothing at all. Work on poor-quality audio must leave good
  * audio bit-identical, and "bit-identical" is the only version of that promise
  * a test can actually enforce.
  *

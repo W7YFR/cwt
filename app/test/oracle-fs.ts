@@ -33,8 +33,8 @@ export function oracleCasesFromDisk(): OracleCase[] {
   const index = `${ORACLE_DIR}/index.json`;
   if (!existsSync(index)) {
     throw new Error(
-      "No oracle dumps found. Run `npm run oracle` (needs the Python venv) " +
-        "to regenerate them from tests/data.",
+      "No oracle dumps found. They are checked in beside this file — see " +
+        `${ORACLE_DIR}.`,
     );
   }
   const { cases } = JSON.parse(readFileSync(index, "utf8")) as { cases: string[] };

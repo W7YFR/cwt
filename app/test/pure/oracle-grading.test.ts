@@ -1,12 +1,12 @@
-/* The grading port, held to the Python implementation exactly.
+/* Grading, held to a recorded reference exactly.
  *
- * This is the half that is a *port*, not a reimplementation: every function in
- * timing/ has a named counterpart in core.py and is supposed to compute the
- * identical number. So the Python segments go in verbatim and the outputs are
- * compared at 1e-9. A disagreement here is a bug, never a modeling difference
- * — which is what makes this the test to read first when something is off.
+ * Exactly, at 1e-9, and that is the point of having this file separate from
+ * the DSP's: the segments go in verbatim, so nothing here depends on how the
+ * audio was measured. A disagreement is a bug in the arithmetic, never a
+ * modeling difference — which makes this the test to read first when a number
+ * looks wrong.
  *
- * The DSP is the opposite case and gets its own file.
+ * The DSP is the opposite case, and says why in its own file.
  */
 
 import { describe, expect, it } from "vitest";
@@ -45,7 +45,7 @@ function expectTiming(got: Timing, want: OracleTiming, label: string) {
   }
 }
 
-describe("grading agrees with the Python oracle", () => {
+describe("grading agrees with the recorded reference", () => {
   it("has cases to check", () => {
     expect(cases.length).toBeGreaterThan(0);
   });

@@ -71,7 +71,7 @@ export function readWav(path: string): WavData {
   return { samples: out, rate, channels };
 }
 
-/** Peak-normalize, matching what the Python loader does before analysis. */
+/** Peak-normalize, the way a clip is levelled before analysis. */
 export function normalizePeak(samples: Float32Array): Float32Array {
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {

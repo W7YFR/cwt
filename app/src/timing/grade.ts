@@ -66,7 +66,7 @@ export function grade(
     const mean = g.vals.reduce((a, v) => a + v, 0) / n;
     // Population standard deviation, matching numpy's ddof=0 default. The
     // sample version would read differently for the short classes, and the
-    // Python oracle is the reference.
+    // recorded fixtures are the reference.
     const variance = g.vals.reduce((a, v) => a + (v - mean) * (v - mean), 0) / n;
     stats.push({
       name: kind as GradedKind,

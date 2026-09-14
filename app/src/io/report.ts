@@ -6,14 +6,15 @@
  * raw take — and it is why the `review` block records the settings that shaped
  * the numbers, without which a re-graded dump cannot be interpreted later.
  *
- * The shape matches what the Python CLI writes with `--json`, key for key, so
+ * A stable, documented shape, key for key, so
  * reports from either source drop into the same file and compare.
  */
 
 import { diffText } from "@/timing";
 import type { Review, ReviewSettings } from "@/types";
 
-/** To `n` decimals, matching the precision the Python report rounds to. */
+/** To `n` decimals. Rounded on the way out so a report is stable to read and
+ *  to diff, rather than carrying float noise nobody asked for. */
 function round(v: number, n: number): number {
   const f = Math.pow(10, n);
   return Math.round(v * f) / f;
@@ -93,8 +94,8 @@ export function buildJsonReport(
 
   const report: JsonReport = {
     source: take.source,
-    // Python writes `...+00:00` at second resolution; match it so the two
-    // sources sort and parse identically.
+    // `...+00:00` at second resolution: an offset rather than a `Z`, and no
+    // fractional part, so reports sort as text in the order they were made.
     generated: now.toISOString().replace(/\.\d+Z$/, "+00:00"),
     text: review.actual.text,
     tone_hz: take.toneHz,

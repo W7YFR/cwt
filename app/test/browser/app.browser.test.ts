@@ -1,18 +1,16 @@
 /* The whole app, mounted in a real browser.
  *
- * The one test that exercises every layer at once: a bundle arrives the way
- * `cw-decode --web-review` sends one, React mounts, the canvas rasterizes, the
- * grading runs, and the report comes out. Everything below has a sharper test
- * somewhere else — this is the one that would catch them being wired together
- * wrong.
+ * The one test that exercises every layer at once: a session comes back out of
+ * storage, React mounts, the canvas rasterizes, the grading runs, and the
+ * report comes out. Everything below has a sharper test somewhere else — this
+ * is the one that would catch them being wired together wrong.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App, BOOT_MESSAGE_DELAY_MS } from "@/ui/App";
-import { BUNDLE_PATH, BUNDLE_VERSION, loadBundle } from "@/io/bundle";
-import { loadPrefs, recallTake } from "@/io/storage";
+import { loadPrefs, recallTake, rememberTake } from "@/io/storage";
 import { encodeWavBuffer } from "@/audio/wav";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
@@ -24,30 +22,48 @@ import "@/ui/base.css";
 
 const TAKE = takeFrom(caseNamed(SLOPPY));
 
-/** A bundle served the way the CLI serves one. */
-function bundleFetch(overrides: Record<string, unknown> = {}) {
+/** Leave a recording where the app looks for one.
+ *
+ * The same place a previous visit would have left it, which is the only way in
+ * there now — so the delivery under test is the delivery that exists. */
+async function served(take = TAKE) {
   const audio = encodeWavBuffer(
     synthesize("CQ DE W7YFR", targetTiming(25, 25), { rate: 8000 }).samples,
     8000,
   );
-  return vi.fn(async (input: RequestInfo | URL) => {
-    const url = String(input);
-    if (url.includes(BUNDLE_PATH)) {
-      return new Response(
-        JSON.stringify({
-          version: BUNDLE_VERSION,
-          audioUrl: "audio.wav",
-          take: TAKE,
-          ...overrides,
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    }
-    if (url.includes("audio.wav")) {
-      return new Response(audio, { status: 200 });
-    }
-    return new Response("", { status: 404 });
-  }) as unknown as typeof fetch;
+  await rememberTake({ take, audio: new Blob([audio]) });
+}
+
+/** Hold the boot open, and let it go on demand.
+ *
+ * The boot's async work is one database read, so stalling the database is what
+ * stops it finishing. Two wrinkles make that less direct than it sounds: the
+ * open is cached behind a module-level promise, and a failed open is the only
+ * thing that clears it — so this deliberately fails one open first to empty
+ * that cache, and only then installs the handle that never answers.
+ *
+ * Released as a failure too: what is under test is the gate in front of the
+ * page, not what comes through it. */
+async function heldStorage(): Promise<() => void> {
+  const real = globalThis.indexedDB;
+  const put = (value: unknown) =>
+    Object.defineProperty(globalThis, "indexedDB", { configurable: true, value });
+
+  put({
+    open: () => {
+      const r: { onerror?: (() => void) | null } = {};
+      setTimeout(() => r.onerror?.(), 0);
+      return r;
+    },
+  });
+  await recallTake();
+
+  const held: { onerror?: (() => void) | null } = {};
+  put({ open: () => held });
+  return () => {
+    put(real);
+    held.onerror?.();
+  };
 }
 
 /** Drive a range input the way React's synthetic onChange expects. */
@@ -62,7 +78,6 @@ function setRange(el: HTMLInputElement, value: number) {
 
 let container: HTMLDivElement;
 let root: Root | null = null;
-const realFetch = globalThis.fetch;
 
 beforeEach(() => {
   /* React refuses to run act() outside an environment that has opted in, and
@@ -88,7 +103,6 @@ afterEach(async () => {
     root = null;
   }
   container.remove();
-  globalThis.fetch = realFetch;
   /* Remembering a take is fire-and-forget: it awaits IndexedDB and only then
      notes the id in the preferences. Clearing straight away leaves that write
      in flight, and it lands in the middle of the next test — which then opens
@@ -103,7 +117,7 @@ async function mount() {
   await act(async () => {
     r.render(createElement(App));
   });
-  // Let the bundle fetch and the effects that follow it settle.
+  // Let the database read and the effects that follow it settle.
   await act(async () => {
     await new Promise((res) => setTimeout(res, 40));
   });
@@ -111,9 +125,6 @@ async function mount() {
 
 describe("the app", () => {
   it("shows the landing screen when nothing was handed to it", async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response("", { status: 404 }),
-    ) as unknown as typeof fetch;
     await mount();
     expect(container.textContent).toContain("Start recording");
     expect(container.querySelector("canvas")).toBeNull();
@@ -128,11 +139,8 @@ describe("the app", () => {
        Held open by hand rather than raced against: `act` flushes the whole
        boot, so rendering and then looking is looking at the finished page. The
        only way to see the gate is to stop it from finishing. */
-    let release!: (r: Response) => void;
-    const held = new Promise<Response>((res) => {
-      release = res;
-    });
-    globalThis.fetch = vi.fn(() => held) as unknown as typeof fetch;
+    localStorage.setItem("cw-trainer:prefs", JSON.stringify({ currentId: "held" }));
+    const release = await heldStorage();
 
     root = createRoot(container);
     const r = root;
@@ -147,7 +155,7 @@ describe("the app", () => {
 
     // Finish well inside the delay, the way a real boot does.
     await act(async () => {
-      release(new Response("", { status: 404 }));
+      release();
       await new Promise((res) => setTimeout(res, 80));
     });
     expect(container.textContent).toContain("Start recording");
@@ -155,11 +163,10 @@ describe("the app", () => {
   });
 
   it("does explain itself when the boot is genuinely slow", async () => {
-    // The message still has a job: a slow network, or a long recording coming
-    // back off disk. Several seconds of silence would look broken.
-    globalThis.fetch = vi.fn(
-      () => new Promise<Response>(() => {}),
-    ) as unknown as typeof fetch;
+    // The message still has a job: a long recording coming back off disk.
+    // Several seconds of silence would look broken.
+    localStorage.setItem("cw-trainer:prefs", JSON.stringify({ currentId: "held" }));
+    const release = await heldStorage();
 
     root = createRoot(container);
     const r = root;
@@ -174,25 +181,14 @@ describe("the app", () => {
     expect(container.textContent).toMatch(/looking for your last session/i);
     // And it is still a gate: the landing screen has not been let through.
     expect(container.textContent).not.toContain("Start recording");
+    await act(async () => {
+      release();
+      await new Promise((res) => setTimeout(res, 20));
+    });
   });
 
-  it("shows no error at all under a dev server's single-page fallback", async () => {
-    // What `npm run dev` actually serves for a path that does not exist.
-    globalThis.fetch = vi.fn(
-      async () =>
-        new Response("<!doctype html><html lang=\"en\"></html>", {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-    ) as unknown as typeof fetch;
-    await mount();
-    expect(container.textContent).toContain("Start recording");
-    expect(container.textContent).not.toMatch(/not readable|cannot read/i);
-    expect(container.querySelector(".banner.error")).toBeNull();
-  });
-
-  it("goes straight to the review when a bundle is served beside it", async () => {
-    globalThis.fetch = bundleFetch();
+  it("opens on the recording it was left with", async () => {
+    await served();
     await mount();
 
     // The header, the chart, and the report — the three things that together
@@ -204,7 +200,7 @@ describe("the app", () => {
   });
 
   it("actually rasterizes the chart, rather than leaving a blank canvas", async () => {
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     const canvas = container.querySelector("canvas")!;
     expect(canvas.width).toBeGreaterThan(0);
@@ -216,7 +212,7 @@ describe("the app", () => {
   });
 
   it("grades the handed-over recording rather than re-deriving it", async () => {
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     // The decoded text on screen comes from the segments in the bundle. If the
     // app had re-run its own DSP on the audio (which is a synthesized
@@ -227,7 +223,7 @@ describe("the app", () => {
   it("gets you home from the name in the header", async () => {
     // The wordmark is the whole of the way back: without it the review is a
     // dead end, and a second control for the same job is one too many.
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     expect(container.textContent).not.toMatch(/start over/i);
     const brand = container.querySelector<HTMLButtonElement>(".brandmark")!;
@@ -246,7 +242,7 @@ describe("the app", () => {
   it("does not waste header room saying the recording came from a microphone", async () => {
     // A filename earns its place up there. "microphone" is the same word every
     // time and is already implied by the fact that you just recorded.
-    globalThis.fetch = bundleFetch({ take: { ...TAKE, source: "microphone" } });
+    await served({ ...TAKE, source: "microphone" });
     await mount();
     expect(container.querySelector("header")!.textContent).not.toMatch(/microphone/i);
     // Still a review, and still able to name the take for a download.
@@ -259,7 +255,7 @@ describe("the app", () => {
     document.body.appendChild(container);
 
     // A file keeps its name, which is the case the header is for.
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     expect(container.querySelector("header")!.textContent).toContain(TAKE.source);
   });
@@ -267,7 +263,7 @@ describe("the app", () => {
   it("takes a dropped recording on the review page, not just the landing one", async () => {
     // Having looked at one take, dragging the next one on is the obvious move
     // — and it should not mean clicking back to the landing screen first.
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     expect(container.querySelector("canvas")).not.toBeNull();
 
@@ -302,7 +298,7 @@ describe("the app", () => {
        long it happened to be. Nothing above it can move now, whatever it is
        called. */
     const long = "cq-de-w7-long-filename-what-do-you-do-oh-dear-oh-dear.wav";
-    globalThis.fetch = bundleFetch({ take: { ...TAKE, source: long } });
+    await served({ ...TAKE, source: long });
     await mount();
 
     const src = container.querySelector<HTMLElement>(".src")!;
@@ -327,7 +323,7 @@ describe("the app", () => {
     container = document.createElement("div");
     document.body.appendChild(container);
 
-    globalThis.fetch = bundleFetch({ take: { ...TAKE, source: "a.wav" } });
+    await served({ ...TAKE, source: "a.wav" });
     await mount();
     const short = container.querySelector<HTMLElement>(".recordbar")!.getBoundingClientRect();
     expect(short.left).toBeCloseTo(withName, 1);
@@ -339,7 +335,7 @@ describe("the app", () => {
        picker, a calibration picker and a cog, and the numbers landed wherever
        those left room — a different place on every screen, which is the one
        thing a row of figures read at a glance must not do. */
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
 
     const band = container.querySelector<HTMLElement>(".scoresrow")!;
@@ -368,7 +364,7 @@ describe("the app", () => {
   it("has the same way into configuration from either screen", async () => {
     /* A control that moves between screens is one somebody has to look for
        twice, so it is the same component in the same place on both. */
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     const onReview = container
       .querySelector<HTMLElement>("[data-testid='cog']")!
@@ -380,7 +376,6 @@ describe("the app", () => {
     container = document.createElement("div");
     document.body.appendChild(container);
 
-    globalThis.fetch = bundleFetch({ take: null });
     await mount();
     const onLanding = container
       .querySelector<HTMLElement>("[data-testid='cog']")!
@@ -393,7 +388,7 @@ describe("the app", () => {
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     const foot = container.querySelector<HTMLElement>(".colophon")!;
     expect(foot.textContent).toContain(String(new Date().getFullYear()));
@@ -410,7 +405,7 @@ describe("the app", () => {
        Checked per wrapped line rather than across the whole row: these rows
        wrap, and two groups that have wrapped onto different lines are supposed
        to be at different heights. */
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
 
     /** The middle of a group's control band — its last child, which is the
@@ -455,7 +450,7 @@ describe("the app", () => {
        the page jumps by some unpredictable amount as it lands — and by a
        different amount for a short message than for a long one. It is the same
        band the header is built from. */
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
 
     const band = parseFloat(
@@ -482,7 +477,7 @@ describe("the app", () => {
        follow the sliders, because the target is rendered from them — a figure
        that stayed put while the speed changed would be describing a different
        target from the one on the chart. */
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
 
     const shown = () =>
@@ -504,7 +499,7 @@ describe("the app", () => {
        used to change only that review, so the next recording was graded
        against whatever the page had loaded with and the correction you had
        just made was thrown away. */
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
 
     const box = container.querySelector<HTMLInputElement>("#expected")!;
@@ -532,7 +527,7 @@ describe("the app", () => {
       container.querySelector<HTMLElement>("[data-testid='clear-take']")!;
 
     it("keeps the target and drops the grading", async () => {
-      globalThis.fetch = bundleFetch();
+      await served();
       await mount();
       const before = container.querySelector<HTMLInputElement>("#expected")!.value;
       expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"))
@@ -552,7 +547,7 @@ describe("the app", () => {
       /* The target half needs no recording — a message and a pair of speeds
          are enough to render what you are about to send. If it went blank too
          there would be nothing to practice against. */
-      globalThis.fetch = bundleFetch();
+      await served();
       await mount();
       await act(async () => clear().click());
 
@@ -565,12 +560,16 @@ describe("the app", () => {
     });
 
     it("offers nothing that would act on a recording that is not there", async () => {
-      globalThis.fetch = bundleFetch();
+      await served();
       await mount();
       await act(async () => clear().click());
 
+      // Matched on the accessible name as well as the text, since some of
+      // these are icons.
       const named = (re: RegExp) =>
-        [...container.querySelectorAll("button")].find((b) => re.test(b.textContent ?? ""))!;
+        [...container.querySelectorAll("button")].find((b) =>
+          re.test(`${b.getAttribute("aria-label") ?? ""} ${b.textContent ?? ""}`),
+        )!;
       expect(named(/your sending/i).disabled, "play yours").toBe(true);
       expect(named(/your audio/i).disabled, "download yours").toBe(true);
       expect(named(/json report/i).disabled, "json").toBe(true);
@@ -580,6 +579,9 @@ describe("the app", () => {
       // What still works is everything about the target.
       expect(named(/target$/i).disabled, "play target").toBe(false);
       expect(named(/record another/i).disabled, "record").toBe(false);
+      // And opening a file, which is exactly when it is allowed: a cleared
+      // session has no speed of its own for a recording to contradict.
+      expect(named(/open a recording/i).disabled, "open a file").toBe(false);
     });
   });
 
@@ -588,7 +590,6 @@ describe("the app", () => {
        send, hear the target, set the pace, then key it. Reachable only through
        Clear, that first step would have required recording something blind in
        order to get to the screen that stops you recording blind. */
-    globalThis.fetch = bundleFetch({ take: null });
     localStorage.setItem(
       "cw-trainer:prefs",
       JSON.stringify({ expected: "CQ DE W7YFR" }),
@@ -617,17 +618,26 @@ describe("the app", () => {
   it("offers a recording control on the review itself", async () => {
     // Having just seen where the spacing drifted, the next thing you want is
     // another go — without losing the speeds and tolerance you just set.
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
-    const record = container.querySelector(".recordbar")!;
-    expect(record.textContent).toMatch(/Record another/i);
+    const bar = container.querySelector(".recordbar")!;
+    // By name rather than by text: it is an icon, and the name is what it is
+    // called for anyone who cannot see one.
+    const named = Array.from(bar.querySelectorAll("button")).map(
+      (b) => b.getAttribute("aria-label") ?? b.textContent ?? "",
+    );
+    expect(named.some((n) => /record/i.test(n))).toBe(true);
+    // And a way to open a recording, so the two ways in are not asymmetric —
+    // dropping a file on the page says nothing about itself until you are
+    // already dragging one.
+    expect(named.some((n) => /open a recording/i.test(n))).toBe(true);
   });
 
   it("comes back to the same recording after a reload", async () => {
     // A refresh must not drop a take you just spent thirty seconds keying. The
-    // bundle path is only how it gets *in* here; what is under test is that it
+    // Storage is only how it gets *in* here; what is under test is that it
     // was kept.
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
 
     // The write is fire-and-forget, so wait for it rather than assuming it
@@ -657,7 +667,7 @@ describe("the app", () => {
 
   it("stays on the landing screen after you deliberately start over", async () => {
     // Leaving the review is a decision, and a reload should not undo it.
-    globalThis.fetch = bundleFetch();
+    await served();
     await mount();
     for (let i = 0; i < 100 && !(await recallTake()); i++) {
       await new Promise((res) => setTimeout(res, 20));
@@ -678,95 +688,33 @@ describe("the app", () => {
     expect(container.textContent).toContain("Start recording");
   });
 
-  it("says so when the bundle is from a newer version than it understands", async () => {
-    globalThis.fetch = bundleFetch({ version: BUNDLE_VERSION + 5 });
+  it("makes a closed upload look closed, not merely quiet", async () => {
+    /* One glyph dims far less convincingly than a phrase does, so the shared
+       disabled opacity was not enough to read as off — it looked like a button
+       that happened to be understated. */
+    await served();
     await mount();
-    expect(container.textContent).toMatch(/newer version/i);
-    // And still offers a way forward rather than only an error.
-    expect(container.textContent).toContain("Start recording");
-  });
+    const open = container.querySelector<HTMLButtonElement>("[data-testid='open-file']")!;
+    expect(open.disabled).toBe(true);
+    /* Copied out, not held: getComputedStyle returns a LIVE declaration, and
+       React flips `disabled` on the same node — so a reference read after the
+       click reports the state after the click, and the two snapshots compare
+       equal however different they looked. */
+    const look = (el: Element) => {
+      const c = getComputedStyle(el);
+      return { bg: c.backgroundColor, ink: c.color, cursor: c.cursor };
+    };
+    const off = look(open);
 
-  it("says so when the bundle is not a recording at all", async () => {
-    globalThis.fetch = bundleFetch({ take: { nonsense: true } });
-    await mount();
-    expect(container.textContent).toMatch(/cannot read|does not contain/i);
-  });
-});
-
-describe("loading a bundle", () => {
-  it("treats a missing bundle as 'nothing to load', not an error", async () => {
-    const missing = vi.fn(async () => new Response("", { status: 404 }));
-    await expect(
-      loadBundle(BUNDLE_PATH, missing as unknown as typeof fetch),
-    ).resolves.toBeNull();
-  });
-
-  it("treats a single-page fallback as 'nothing to load' too", async () => {
-    // A dev server answers an unknown path with index.html and a 200, because
-    // in a single-page app an unknown path is a route rather than a missing
-    // file. Parsing that as JSON reports a corrupt bundle at the top of the
-    // page on every `npm run dev`.
-    const fallback = vi.fn(
-      async () =>
-        new Response("<!doctype html>\n<html lang=\"en\">", {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
+    // Against the same control when it is available.
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.click(),
     );
-    await expect(
-      loadBundle(BUNDLE_PATH, fallback as unknown as typeof fetch),
-    ).resolves.toBeNull();
-  });
+    const on = look(container.querySelector("[data-testid='open-file']")!);
 
-  it("recognizes the fallback even with no useful content type", async () => {
-    const bare = vi.fn(
-      async () => new Response("<!DOCTYPE html><html></html>", { status: 200 }),
-    );
-    await expect(
-      loadBundle(BUNDLE_PATH, bare as unknown as typeof fetch),
-    ).resolves.toBeNull();
-  });
-
-  it("still complains about a bundle that is genuinely corrupt", async () => {
-    // The distinction has to cut both ways: somebody meant to hand us this
-    // one, so silence would be the wrong answer.
-    const broken = vi.fn(
-      async () =>
-        new Response("{ take: nope", {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-    );
-    await expect(
-      loadBundle(BUNDLE_PATH, broken as unknown as typeof fetch),
-    ).rejects.toThrow(/not readable JSON/);
-  });
-
-  it("treats a blocked fetch as 'nothing to load' too", async () => {
-    // A file:// page cannot fetch at all. That is the ordinary way to open the
-    // deployed app, so it must not read as a failure.
-    const blocked = vi.fn(async () => {
-      throw new TypeError("Failed to fetch");
-    });
-    await expect(
-      loadBundle(BUNDLE_PATH, blocked as unknown as typeof fetch),
-    ).resolves.toBeNull();
-  });
-
-  it("resolves the audio against the bundle, not the site root", async () => {
-    const seen: string[] = [];
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      seen.push(url);
-      if (url.endsWith("take.json")) {
-        return new Response(
-          JSON.stringify({ version: 1, audioUrl: "audio.wav", take: TAKE }),
-        );
-      }
-      return new Response(new ArrayBuffer(8));
-    });
-    await loadBundle("sessions/today/take.json", fetcher as unknown as typeof fetch);
-    // A bundle in a subdirectory has to find its own audio beside itself.
-    expect(seen.some((u) => u.includes("sessions/today/audio.wav"))).toBe(true);
+    expect(off.bg).not.toBe(on.bg);
+    expect(off.ink).not.toBe(on.ink);
+    // And the pointer says so before the tooltip has to.
+    expect(off.cursor).toBe("not-allowed");
   });
 });

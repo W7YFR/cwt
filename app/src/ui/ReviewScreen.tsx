@@ -69,6 +69,8 @@ export interface ReviewScreenProps {
   onConfigure(): void;
   /** Drop the recording and stay here — see useTake.reset. */
   onClear(): void;
+  /** Open a recording from disk — the same path a dropped file takes. */
+  onFile(file: File): void;
   /** Start over at a new message and a new speed. */
   onNewSession(next: {
     expected: string;
@@ -111,6 +113,7 @@ export function ReviewScreen({
   onDeviceChange,
   onConfigure,
   onClear,
+  onFile,
   onNewSession,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
@@ -544,6 +547,11 @@ export function ReviewScreen({
           rereading={rereading}
           leadLeft={leadLeft}
           onClear={blank ? undefined : onClear}
+          onFile={onFile}
+          /* A recording carries its own speed, and only the attempt that
+             starts a session gets to set one — so a file can begin a session
+             but never join one. */
+          canOpenFile={blank}
           onNewSession={() => setStarting(true)}
         />
         {/* Last, and on a row of its own: a filename is the one thing here

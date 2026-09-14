@@ -14,9 +14,8 @@
  * the same keying, so both are correct to send and neither can be an error
  * against the other.
  *
- * Ported from cw_decoder/morse.py and asserted equal to it by the oracle test,
- * so the browser cannot disagree with the Python decoder about what a pattern
- * means — including the collision policy.
+ * The tables are checked against recorded fixtures, collision policy included,
+ * so a pattern cannot quietly change what it means.
  */
 
 /** Letters, digits, and punctuation. */

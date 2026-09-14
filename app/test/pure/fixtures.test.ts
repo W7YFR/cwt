@@ -1,7 +1,7 @@
 /* The fixture corpus itself.
  *
  * Small, but it guards a failure mode that is invisible otherwise: a new oracle
- * case added to tools/oracle.py and dumped to disk, but never wired into the
+ * case dumped to disk, but never wired into the
  * static list — so the pure and DOM tiers quietly go on testing a subset while
  * the agreement test covers them all.
  */

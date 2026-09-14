@@ -1,21 +1,5 @@
-# Virtualenv
-.venv/
-venv/
-env/
-
-# Python bytecode / caches
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Packaging / build artifacts.
-# dist/ is the built browser app; `npm run build` regenerates it.
-build/
+# Build output. dist/ is the built browser app; `npm run build` regenerates it.
 dist/
-*.egg-info/
-*.egg
-.eggs/
-pip-wheel-metadata/
 
 # Node / browser app
 node_modules/
@@ -25,14 +9,6 @@ node_modules/
 # Vitest's run output: failure screenshots and attachments, written fresh on
 # every run that fails. Artifacts of a run, not of the project.
 app/.vitest/
-
-# Test / tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-.tox/
 
 # Editor / OS cruft
 .vscode/
@@ -66,4 +42,6 @@ test-results/
 # screenshot is taken; nothing here asserts on images.
 app/test/**/__screenshots__/
 
-data
+# Local scratch
+/data/
+/docs/

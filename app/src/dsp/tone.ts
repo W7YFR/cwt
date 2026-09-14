@@ -1,9 +1,9 @@
 /* Find the CW carrier frequency.
  *
- * Python did this with one FFT over the whole clip and an argmax inside the
- * band. A full FFT is the wrong shape in the browser — we only care about
- * 200-1500 Hz, which is under 3% of a 48 kHz spectrum, so computing the other
- * 97% and throwing it away is most of the work.
+ * The obvious way is one FFT over the whole clip and an argmax inside the
+ * band. That is the wrong shape here — we only care about 200-1500 Hz, which
+ * is under 3% of a 48 kHz spectrum, so computing the other 97% and throwing it
+ * away is most of the work.
  *
  * Instead: decimate to a rate that comfortably covers the band, then sweep
  * Goertzel over it. Goertzel is one bin of a DFT at the cost of one multiply

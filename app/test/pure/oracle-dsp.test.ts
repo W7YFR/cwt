@@ -1,26 +1,23 @@
-/* The DSP port, held to the Python implementation within a stated tolerance.
+/* The DSP, held to a recorded reference within a stated tolerance.
  *
- * Unlike the grading, this is deliberately NOT a line-for-line port, so
- * demanding identical numbers would be demanding the wrong thing. Python
- * bandpassed with a 4th-order Butterworth, took the magnitude of the analytic
- * signal via Hilbert transform, and did it all at 8 kHz after resampling.
- * TypeScript quadrature-demodulates and lowpasses with cascaded boxcars, at
- * the recording's own rate, with no resampler anywhere.
+ * The reference numbers were derived independently, by a pipeline built along
+ * different lines — a Butterworth bandpass and a Hilbert transform at a fixed
+ * 8 kHz, where this one quadrature-demodulates through cascaded boxcars at the
+ * recording's own rate. That is worth knowing here and nowhere else, because
+ * it is the reason for every tolerance below: two filters with the same
+ * passband put a mark boundary in almost, but not exactly, the same place, and
+ * demanding identical numbers would be demanding the wrong thing.
  *
- * Two different filters with the same passband put a mark boundary in almost
- * but not exactly the same place. What must not change is anything a user
- * would notice, so that is what this asserts:
+ * What must not change is anything a user would notice, so that is what this
+ * asserts:
  *
  *   - the same number of segments (a lost or invented one is a decode change)
  *   - every boundary within 1.5 ms
  *   - the same decoded text
  *   - a measured speed close to what the recording was really sent at
  *
- * That last one is checked against ground truth rather than against Python on
- * purpose. The two pipelines put the threshold at slightly different heights on
- * the keying edge and disagree by up to 0.7 wpm — and on this corpus the
- * TypeScript answer is the more consistent of the two, so demanding agreement
- * would be demanding the worse number.
+ * That last one is checked against ground truth rather than against the
+ * reference on purpose — see NOMINAL_WPM_TOLERANCE.
  */
 
 import { describe, expect, it } from "vitest";
@@ -34,7 +31,7 @@ import { synthesize, peakNormalize } from "@/audio/synth";
 import { targetTiming as ideal } from "@/timing/model";
 import type { Segment } from "@/types";
 
-/** How far a segment boundary may move between the two pipelines.
+/** How far a segment boundary may move from the reference.
  *
  * Measured worst case across the corpus is 1.18 ms. Set at 1.5 to leave a
  * little room without leaving enough for anything to matter: 1.5 ms is 3% of
@@ -49,14 +46,14 @@ const TONE_TOLERANCE_HZ = 0.5;
  *  really sent at.
  *
  * This is the assertion that matters, and it is deliberately against ground
- * truth rather than against Python: the two pipelines put the threshold at
- * slightly different heights on the keying edge, so they disagree by up to
- * 0.7 wpm on the real recordings — but on this corpus the TypeScript answer is
- * the more consistent of the two (worst error 1.1% against Python's 3.8%), so
- * "agrees with Python" would be the wrong thing to demand. */
+ * truth rather than against the reference. The two pipelines put the threshold
+ * at slightly different heights on the keying edge, so they disagree by up to
+ * 0.7 wpm on the real recordings — and on this corpus these are the more
+ * consistent numbers of the two (worst error 1.1% against the reference's
+ * 3.8%). Demanding agreement would be demanding the worse answer. */
 const NOMINAL_WPM_TOLERANCE = 0.5;
 
-/** How far the two implementations may disagree with EACH OTHER on speed.
+/** How far this may sit from the reference's own speed reading.
  *  Loose, because the above is the real check; this one only catches a port
  *  that has wandered off somewhere new. */
 const CROSS_WPM_TOLERANCE = 1.2;
@@ -103,7 +100,7 @@ function compareSegments(
   ).toBeLessThan(tolerance);
 }
 
-describe("the TypeScript synthesizer matches the Python one", () => {
+describe("the synthesizer reproduces the reference waveform", () => {
   const synthCases = cases.filter((c) => c.synth);
 
   it.each(synthCases.map((c) => [c.name, c] as const))(
@@ -117,7 +114,7 @@ describe("the TypeScript synthesizer matches the Python one", () => {
       });
       peakNormalize(samples);
 
-      // Within one sample, not exactly. The Python synthesizer carried its
+      // Within one sample, not exactly. The reference carried its
       // own copy of the Farnsworth formula; this one drives off targetTiming,
       // the single model everything else uses. The two agree to the last bit
       // of a float, which over a few dozen gaps is occasionally enough to
@@ -134,7 +131,7 @@ describe("the TypeScript synthesizer matches the Python one", () => {
   );
 });
 
-describe("the DSP agrees with the Python oracle", () => {
+describe("the DSP agrees with the recorded reference", () => {
   // Synthesized cases run at the SAME rate on both sides, so the only thing
   // that differs is the envelope algorithm. Any drift here is attributable to
   // that alone, which is what makes these the sharper test.
@@ -163,7 +160,8 @@ describe("the DSP agrees with the Python oracle", () => {
     );
   });
 
-  // Real recordings run at their NATIVE rate here and at 8 kHz in Python, so
+  // Real recordings run at their NATIVE rate here and at 8 kHz in the
+  // reference, so
   // these additionally cross a resampler that only one side has. That is the
   // configuration the app actually ships, so the user-visible properties are
   // what get asserted.
@@ -192,7 +190,7 @@ describe("the DSP agrees with the Python oracle", () => {
         expect(text).toBe(wantText);
 
         // And a speed close to what was actually sent. Checked against the
-        // recording's true speed first, and only loosely against Python.
+        // recording's true speed first, and only loosely against the reference.
         const measured = estimateTiming(got.segments, c.expected);
         expect(
           Math.abs(measured.charWpm - c.nominalWpm!),
@@ -201,7 +199,7 @@ describe("the DSP agrees with the Python oracle", () => {
         ).toBeLessThan(NOMINAL_WPM_TOLERANCE);
         expect(
           Math.abs(measured.charWpm - c.grading.measured.charWpm),
-          `char wpm ${measured.charWpm.toFixed(2)} vs Python's ` +
+          `char wpm ${measured.charWpm.toFixed(2)} vs the reference's ` +
             `${c.grading.measured.charWpm.toFixed(2)}`,
         ).toBeLessThan(CROSS_WPM_TOLERANCE);
       },
@@ -248,7 +246,7 @@ describe("the DSP agrees with the Python oracle", () => {
     // Note what is NOT asserted here. A synthesized 25 wpm signal measures
     // about 27 — the 5 ms raised-cosine ramp is 10% of a dit at that speed, so
     // the threshold crossings sit inside the nominal mark and every mark reads
-    // short. Python does exactly the same thing (26.92 for this drill), and
+    // short. The reference reads it the same way (26.92 for this drill), and
     // real recordings do not show it: the k3ng fixture reads 20.16 against a
     // true 20. So absolute accuracy belongs in the real-recording tests above,
     // and what belongs here is that the rate cannot change the answer.

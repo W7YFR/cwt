@@ -3,7 +3,7 @@
  * This is the ONLY file in dsp/ that touches a browser API, and that is a load-
  * bearing rule rather than a tidiness one: everything downstream of it takes a
  * Float32Array and a rate, which is why the whole analysis runs under Node in
- * the pure test tier and can be checked against the Python oracle.
+ * the pure test tier, against real recordings and with nothing stubbed.
  *
  * decodeAudioData handles wav, mp3, m4a, flac, ogg and opus with no work on our
  * part and nothing to install.
@@ -18,8 +18,8 @@
  * So decoding happens in an OfflineAudioContext whose rate we choose:
  *   - a WAV says its own rate in its header, so it is decoded at that rate and
  *     no resampling happens at all. This is the case that matters, both because
- *     it is what a recorder and this app itself produce, and because it is what
- *     the Python oracle is compared against;
+ *     it is what a recorder and this app itself produce, and because it is
+ *     what the recorded fixtures are made of;
  *   - anything else is decoded at a fixed 48 kHz, so at least the answer does
  *     not depend on the machine. The tone is around 600 Hz — forty times below
  *     Nyquist even at 8 kHz — so a resample at this ratio cannot move a keying

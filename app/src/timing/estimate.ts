@@ -55,12 +55,15 @@ export function kmeans1d(
     const next = centers.map((c, j) =>
       counts[j]! > 0 ? sums[j]! / counts[j]! : c,
     );
-    // numpy.allclose defaults, so convergence matches the Python original.
+    // Relative-plus-absolute tolerance, so a center near zero settles on the
+    // absolute term and a large one on the relative.
     const settled = next.every(
       (v, j) => Math.abs(v - centers[j]!) <= 1e-8 + 1e-5 * Math.abs(centers[j]!),
     );
-    // Break *before* adopting `next`, matching the Python original exactly:
-    // once the move is below the tolerance the old centers are the answer.
+    // Break *before* adopting `next`: once the move is below the tolerance the
+    // OLD centers are the answer. Taking the new ones would be one more
+    // iteration than the test just said was needed, which sounds harmless and
+    // is exactly the kind of off-by-one that makes two runs disagree.
     if (settled) break;
     centers = next;
   }

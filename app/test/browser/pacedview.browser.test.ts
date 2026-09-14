@@ -119,6 +119,7 @@ function mount(over: Partial<ReviewSettings> & { runs?: number }) {
       onProfileChange: () => {},
       onDeviceChange: () => {},
       onConfigure: () => {},
+      onFile: () => {},
       onClear: () => {},
       onNewSession: () => {},
       onBack: () => {},
@@ -129,14 +130,19 @@ function mount(over: Partial<ReviewSettings> & { runs?: number }) {
   return { view: () => latest.view, seen, picked: () => picked };
 }
 
-/** The button whose label contains this text. Found by what it says, because
- *  that is what a person clicks; there is no test hook on these. */
+/** The button that goes by this name.
+ *
+ * Its accessible name rather than its text: the record control is an icon, and
+ * the name is what it is called for anyone who cannot see the icon — so it is
+ * both the durable anchor and the one a screen reader would use. */
 function press(label: string) {
+  const named = (b: HTMLButtonElement) =>
+    `${b.getAttribute("aria-label") ?? ""} ${b.textContent ?? ""}`;
   const button = Array.from(host.querySelectorAll("button")).find((b) =>
-    b.textContent?.includes(label),
+    named(b).includes(label),
   );
   if (!button) {
-    const had = Array.from(host.querySelectorAll("button")).map((b) => b.textContent);
+    const had = Array.from(host.querySelectorAll("button")).map(named);
     throw new Error(`no "${label}" button; screen had ${JSON.stringify(had)}`);
   }
   return act(async () => {

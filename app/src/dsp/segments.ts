@@ -37,9 +37,9 @@ export function runLengths(
  * shorter than any real element. Removing one joins the same-state runs either
  * side of it into a single run, which is what a clean recording would have had.
  *
- * Repeatedly removes the *first* sub-threshold run and re-scans, matching the
- * Python implementation exactly: a single pass would let a merge create a new
- * short run and leave it in place. */
+ * Repeatedly removes the *first* sub-threshold run and re-scans, rather than
+ * sweeping once: a merge can create a new short run, and a single pass would
+ * walk straight past it. */
 export function debounce(segs: readonly Segment[], minDur: number): Segment[] {
   let out = segs.slice();
   if (out.length === 0) return out;

@@ -2,7 +2,7 @@
  *
  * Every other module imports its shapes from here and nothing else imports
  * from those modules in turn, so this file is the one place the data model is
- * written down. That's deliberate: it replaces the Python<->JS agreement test
+ * written down. That's deliberate: it is what the agreement fixtures test
  * as the thing that keeps shapes honest across the app, and it's why `dsp/`
  * and `timing/` can be pure functions with no environment at all.
  *

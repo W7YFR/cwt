@@ -127,6 +127,38 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 }
 .recordbar .hint { white-space: nowrap; }
 .recordbar button { font-size: 12px; padding: 5px 10px; }
+/* A button that is only its icon. Square, so Record and Open read as a pair
+   rather than as two differently-shaped things that happen to sit together. */
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+.recordbar .iconbtn { padding: 0; }
+/* A disabled icon button has one glyph to dim where a word button has a whole
+   phrase, so the shared 45% opacity reads as merely quiet rather than as off.
+   This one flattens instead: no longer standing proud of the band, its glyph
+   dropped to the faintest ink, and `not-allowed` under the pointer — which is
+   also the cursor that invites the hover the explanation is waiting behind. */
+.iconbtn:disabled {
+  opacity: 1;
+  /* Flush with the band it sits in rather than sunk below it: an available
+     button stands a shade proud of the header, and taking that away is enough
+     to stop it reading as one. Dropping all the way to the page background
+     made a hole. */
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+/* The record dot is colored in its own right, so opacity is the only thing
+   that reaches it. */
+.iconbtn:disabled .recdot { opacity: .35; }
 /* The landing screen stacks these; here they sit in a header row. */
 .recordbar.recording { flex-direction: row; }
 .recordbar .reclight { font-size: 14px; }

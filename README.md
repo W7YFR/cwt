@@ -19,27 +19,18 @@ npm run dev        # then open the URL it prints
 
 ---
 
-## Two halves, one analysis
+## What it is
 
-The project is a browser app with a command-line front door.
+A browser app. TypeScript and React, no server: it records from your input
+device, decodes, grades and draws, entirely client-side, and deploys as static
+files.
 
-| | |
-|---|---|
-| **`app/`** | The trainer. TypeScript + React. Records, decodes, grades and draws — the whole thing, client-side. Deploys as static files. |
-| **`src/cw_decoder/`** | The CLI, `cw-decode`. Records or reads a file, runs its own DSP, and hands the result to the app. Also the oracle the port is checked against. |
-
-The important part is what they *don't* both do. The CLI decodes audio into
-segments — `(key down, 0.061 s)`, `(key up, 0.058 s)` — and stops there.
-Everything downstream of that (the timing model, the grading, the alignment
-against your intended message, the chart, the report) exists once, in
-TypeScript. A session reviewed from the terminal and one recorded in the browser
-go through the same code and cannot disagree.
+Audio never leaves the machine. Takes live in IndexedDB along with the settings
+you were looking at them under.
 
 ---
 
 ## Using it
-
-### In the browser
 
 `npm run dev`, then:
 
@@ -63,31 +54,8 @@ Reloading the page does not lose the session. The current take — audio and all
 a refresh comes back to exactly where you were. It never leaves the machine,
 and the last ten takes are kept so the audio cannot grow without a bound.
 
-### From the terminal
-
-```
-cw-decode                                  # record from the default input
-cw-decode -e "cq pota de w7yfr" -w 25 -f 14
-cw-decode ~/recordings/practice.wav
-cw-decode --demo "CQ CQ DE W1AW K"         # synthesize and analyze
-```
-
-Each of these writes a session bundle, serves it alongside the built app, and
-opens a browser at it. Ctrl-C when you're done with the page.
-
-| flag | |
-|---|---|
-| `-e TEXT\|FILE` | what you meant to send; enables accuracy scoring and fixes the gap classes |
-| `-w`, `-f` | target character and overall (Farnsworth) speed |
-| `--json` | machine-readable report to stdout; no browser |
-| `--basic` | the plain terminal report; no browser |
-| `--web-out DIR` | where to write the session (default `~/.cw-decoder/sessions/<stamp>/`) |
-| `--app-dir DIR` | which build to serve (default: `dist/` beside the checkout) |
-| `--no-open` | serve, but print the URL instead of launching a browser |
-| `-D`, `--list-devices` | choose an input device |
-
-`--json` and the review's own **↓ JSON report** button write the same shape, so a
-directory of them from either source is one time series.
+The review's **↓ JSON report** button writes a stable, documented shape, so a
+directory of them is one time series.
 
 ---
 
@@ -196,9 +164,9 @@ one thing that cannot be inferred without being told what was sent.
 ```
 make help          # everything below, with descriptions
 make dev           # app with hot reload
-make test          # pure + DOM tiers, and the Python suite
+make test          # pure + DOM tiers
 make test-all      # all of it, including real Chromium
-make verify        # re-derive the oracle and hold the port to it
+make serve:latest  # build, then serve it at localhost:4173
 ```
 
 ### The module layout
@@ -211,7 +179,7 @@ app/src/
   render/     the canvas. Framework-free; React never enters the draw loop
   audio/      playback and the target synthesizer
   capture/    microphone and file input
-  io/         take building, the JSON report, storage, the CLI bundle
+  io/         take building, the JSON report, storage, calibration
   ui/         React
 ```
 
@@ -239,24 +207,31 @@ test for its rendering without being split in two.
 jsdom has no canvas context and no Web Audio at all, so anything touching those
 lives in the third tier rather than behind a mock convincing enough to lie.
 
-### The oracle
+### What the tests are held to
 
-`make verify` runs the Python decoder over the fixture corpus, dumps what it
-found, and holds the TypeScript to it. Two different standards, deliberately:
+Two recorded references, at two different standards, over a corpus of real
+recordings in `tests/data`.
 
-- **The grading must match exactly** — to 1e-9, fed the identical segments. It's
-  a port, not a reimplementation, so any disagreement is a bug.
-- **The DSP must match closely** — same segment count, every boundary within
-  1.5 ms, same decoded text, and a measured speed within half a wpm of what the
-  recording was *actually* sent at.
+- **The oracle** (`app/test/oracle/`) holds decoding and grading to numbers
+  derived independently. Grading must match **exactly**, to 1e-9, fed the same
+  segments — nothing there depends on how the audio was measured, so a
+  disagreement is a bug in the arithmetic. The DSP gets a stated tolerance
+  instead: same segment count, every boundary within 1.5 ms, the same decoded
+  text, and a measured speed within half a wpm of what the recording was
+  *actually* sent at.
+- **The clean-path lock** (`app/test/lock/`) holds the DSP to its own previous
+  answer, bit for bit. The oracle's 1.5 ms would let a change move every
+  boundary on every clean recording and still pass; work on poor-quality audio
+  has to leave good audio untouched, and bit-identical is the only version of
+  that promise a test can enforce. `make lock` re-records it, deliberately, and
+  the diff is a diff in what users get.
 
-The DSP is deliberately not a line-for-line port. Python bandpassed with a
-Butterworth and took the magnitude of the analytic signal via Hilbert transform,
-at 8 kHz after resampling. TypeScript quadrature-demodulates and lowpasses with
-cascaded zero-phase boxcars, at the recording's own rate. Same quantity, derived
-rather than transformed, O(N), and with no resampler in the measurement path —
-so two browsers can't disagree about a mark boundary because they round
-differently.
+The envelope detector is why the oracle's DSP half has a tolerance at all. It
+quadrature-demodulates and lowpasses with cascaded zero-phase boxcars at the
+recording's own rate — the same quantity a Butterworth-plus-Hilbert gives,
+derived rather than transformed, at O(N) and with no resampler in the
+measurement path, so two browsers can't disagree about a mark boundary because
+they round differently.
 
 That last point has one wrinkle worth knowing: `decodeAudioData` always
 resamples to the rate of the context it's called on, so decoding through a plain

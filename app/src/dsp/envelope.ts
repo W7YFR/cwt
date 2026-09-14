@@ -1,8 +1,8 @@
 /* Key-down power over time.
  *
- * Python bandpassed around the tone with a 4th-order Butterworth, took the
- * magnitude of the analytic signal via Hilbert transform, then smoothed. That
- * is three O(N log N)-or-worse operations and needs an FFT-based Hilbert.
+ * The textbook route is a bandpass around the tone, the magnitude of the
+ * analytic signal via Hilbert transform, then smoothing — three
+ * O(N log N)-or-worse operations, one of them needing an FFT.
  *
  * The same answer comes out of quadrature demodulation in one linear pass:
  * multiply by cos and -sin at the tone frequency to slide the carrier down to
@@ -11,11 +11,10 @@
  * envelope of the bandpassed input — the same quantity, derived rather than
  * transformed, at O(N) with small constants.
  *
- * It runs at the recording's own sample rate. The Python pipeline resampled to
- * 8 kHz first, which was a compute decision (filtfilt+hilbert over a minute of
- * 48 kHz audio is six times the work) and cost a resampler in the middle of the
- * measurement path. Here there is no resampler, so nothing depends on whether
- * Chrome and Firefox round the same way.
+ * It runs at the recording's own sample rate. Resampling to 8 kHz first would
+ * buy compute back, but it puts a resampler in the middle of the measurement
+ * path — and then every timing the app reports depends on whether two browsers
+ * round it the same way. There is no resampler here, so nothing does.
  */
 
 import { smooth, widthForCutoff } from "./filters";
@@ -23,9 +22,8 @@ import { smooth, widthForCutoff } from "./filters";
 /** Full width of the effective passband around the tone, in Hz. */
 export const DEFAULT_BANDWIDTH = 200;
 
-/** Envelope smoothing window. Matches the Python pipeline's 5 ms average —
- *  long enough to flatten ripple, short enough that a 40 wpm dit (30 ms)
- *  keeps square-ish edges. */
+/** Envelope smoothing window: long enough to flatten ripple, short enough
+ *  that a 40 wpm dit (30 ms) keeps square-ish edges. */
 export const SMOOTH_SEC = 0.005;
 
 /** Cascade depth of the baseband lowpass. Three passes put the 2f image more

@@ -2,8 +2,9 @@
  *
  * One entry point, `segmentsFrom`, and everything it calls is a pure function
  * over a Float32Array. The Web Audio dependency lives one module over in
- * decode-audio.ts and is not imported here, which is what lets the Python
- * oracle test run this exact code path under Node.
+ * decode-audio.ts and is not imported here, which is what lets the pure test
+ * tier run this exact code path under Node — against real recordings, with no
+ * browser and nothing stubbed.
  */
 
 import type { Segment } from "@/types";
