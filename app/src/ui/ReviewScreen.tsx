@@ -30,6 +30,7 @@ import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { reviewTake } from "@/timing";
 import { runOrder } from "./runOrder";
+import { NewSession } from "./NewSession";
 import { baseName } from "./format";
 import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
@@ -68,6 +69,12 @@ export interface ReviewScreenProps {
   onConfigure(): void;
   /** Drop the recording and stay here — see useTake.reset. */
   onClear(): void;
+  /** Start over at a new message and a new speed. */
+  onNewSession(next: {
+    expected: string;
+    charWpm: number;
+    farnsworthWpm: number;
+  }): void;
   onBack(): void;
 }
 
@@ -104,6 +111,7 @@ export function ReviewScreen({
   onDeviceChange,
   onConfigure,
   onClear,
+  onNewSession,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
   const rec = useRecorder({
@@ -123,6 +131,7 @@ export function ReviewScreen({
      works without one — that is the point of it — but everything that reads
      the recording has to say so rather than act on an empty one. */
   const blank = isBlankTake(loaded.take);
+  const [starting, setStarting] = useState(false);
 
   /* What the chart shows while a recording is running: the target, the cursor,
      and one empty row for what is arriving.
@@ -535,8 +544,7 @@ export function ReviewScreen({
           rereading={rereading}
           leadLeft={leadLeft}
           onClear={blank ? undefined : onClear}
-          onDropRun={blank ? undefined : () => onDropRun(selected)}
-          runOf={{ at: selected, of: stack.length }}
+          onNewSession={() => setStarting(true)}
         />
         {/* Last, and on a row of its own: a filename is the one thing here
             whose width nobody controls, and beside the brand it pushed the
@@ -554,7 +562,13 @@ export function ReviewScreen({
           padding and they got whatever was left — and they are the one thing
           on this screen read at a glance. */}
       <section className="scoresrow">
-        <Scores review={review} settings={settings} take={loaded.take} />
+        <Scores
+          review={review}
+          settings={settings}
+          take={loaded.take}
+          onDrop={() => onDropRun(selected)}
+          runOf={{ at: selected, of: stack.length }}
+        />
       </section>
 
       <Controls
@@ -567,6 +581,19 @@ export function ReviewScreen({
         onPlayTarget={() => playTarget()}
         onStop={stop}
       />
+
+      {starting && (
+        <NewSession
+          expected={settings.expected}
+          charWpm={settings.charWpm}
+          farnsworthWpm={settings.farnsworthWpm}
+          onCancel={() => setStarting(false)}
+          onStart={(next) => {
+            setStarting(false);
+            onNewSession(next);
+          }}
+        />
+      )}
 
       {settings.flashCard && (
         <FlashCard

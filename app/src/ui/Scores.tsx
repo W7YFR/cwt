@@ -18,9 +18,24 @@ export interface ScoresProps {
   review: Review;
   settings: ReviewSettings;
   take: Take;
+  /** Throw this attempt away, when there are others to keep.
+   *
+   * Here rather than up with the record controls because this band IS the
+   * attempt being read — the consistency, the accuracy, the speed it came out
+   * at. Deciding to drop a run is something you do while looking at its
+   * numbers, so the control belongs where the numbers are. */
+  onDrop?: (() => void) | undefined;
+  /** Which attempt these figures are, counted the way the chart counts. */
+  runOf?: { at: number; of: number } | undefined;
 }
 
-export function Scores({ review, settings, take }: ScoresProps): React.ReactElement {
+export function Scores({
+  review,
+  settings,
+  take,
+  onDrop,
+  runOf,
+}: ScoresProps): React.ReactElement {
   const g = review.analysis;
   const c = review.comparison;
   const m = take.measured;
@@ -121,6 +136,21 @@ export function Scores({ review, settings, take }: ScoresProps): React.ReactElem
             dBFS peak · {(take.rate / 1000).toFixed(take.rate % 1000 ? 1 : 0)} kHz
           </span>
         </div>
+      )}
+
+      {/* Last, and pushed to the far end: it is an action rather than a
+          reading, and it throws a recording away. Only when there is a rest of
+          the session to keep — with one attempt on screen, dropping it and
+          clearing are the same act. */}
+      {onDrop && runOf && runOf.of > 1 && (
+        <button
+          className="droprun"
+          onClick={onDrop}
+          data-testid="drop-run"
+          title="Throw this attempt away and keep the others"
+        >
+          Drop run {runOf.at + 1}
+        </button>
       )}
     </div>
   );

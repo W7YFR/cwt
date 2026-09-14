@@ -324,6 +324,14 @@ export function App(): React.ReactElement {
             setError(null);
             take.reset();
           }}
+          /* A new session is a reset that also says what the next one is
+             about. The message goes up to the app as well as into the
+             settings, because it outlives every attempt at it. */
+          onNewSession={(next) => {
+            setError(null);
+            chooseIntended(next.expected);
+            take.reset(next);
+          }}
           onProfileChange={async (id) => {
             chooseProfile(id);
             await take.recalibrate(profiles.find((p) => p.id === id) ?? null);

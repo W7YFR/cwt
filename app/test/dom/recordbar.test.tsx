@@ -1,9 +1,10 @@
-/* The bar above the chart, in a session with several attempts in it.
+/* The bar above the chart.
  *
  * Narrow on purpose: what a session does lives in `session.test.tsx`, and what
- * the chart draws lives in the pure tier. This asks the one question neither
- * can — whether the controls for throwing an attempt away are on screen when
- * there is something to throw away, and absent when there is not.
+ * the chart draws lives in the pure tier. What is left here is which controls
+ * the bar itself carries — and, since Drop moved down to the scores, that the
+ * two it keeps are the two that are about the whole session rather than about
+ * one attempt in it.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -43,27 +44,19 @@ function bar(over: Partial<React.ComponentProps<typeof RecordBar>> = {}) {
 }
 
 describe("the record bar in a session", () => {
-  it("offers no way to drop a run when there is only one", () => {
-    /* Dropping the only attempt and clearing the session are the same act, and
-       two buttons for one question is one too many. */
-    bar({ onDropRun: () => {}, runOf: { at: 0, of: 1 } });
-    expect(screen.queryByTestId("drop-run")).toBeNull();
-    expect(screen.getByTestId("clear-take")).toBeTruthy();
-  });
-
-  it("offers to drop the attempt being read, once there are others", () => {
-    const onDropRun = vi.fn();
-    bar({ onDropRun, runOf: { at: 2, of: 4 } });
-    const button = screen.getByTestId("drop-run");
-    // Named by the run it will throw away, counted the way the chart counts.
-    expect(button.textContent).toContain("3");
-    button.click();
-    expect(onDropRun).toHaveBeenCalled();
+  it("offers a new session, which is a different act from clearing", () => {
+    /* Clear keeps the message and the speeds and drops the recordings; a new
+       session is where those change. Two buttons because they are two
+       questions, and the one that throws more away says so in its dialog. */
+    const onNewSession = vi.fn();
+    bar({ onNewSession });
+    screen.getByTestId("new-session-open").click();
+    expect(onNewSession).toHaveBeenCalled();
   });
 
   it("keeps clearing the whole session on its own button", () => {
     const onClear = vi.fn();
-    bar({ onClear, onDropRun: () => {}, runOf: { at: 0, of: 3 } });
+    bar({ onClear });
     screen.getByTestId("clear-take").click();
     expect(onClear).toHaveBeenCalled();
   });

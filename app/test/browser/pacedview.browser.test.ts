@@ -120,6 +120,7 @@ function mount(over: Partial<ReviewSettings> & { runs?: number }) {
       onDeviceChange: () => {},
       onConfigure: () => {},
       onClear: () => {},
+      onNewSession: () => {},
       onBack: () => {},
     });
   }
