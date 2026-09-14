@@ -243,3 +243,73 @@ describe("a stack on the absolute axis", () => {
     expect(onTargetRow).toEqual(target);
   });
 });
+
+/* The drift plot with a session in it.
+ *
+ * The one place where several attempts are compared directly rather than read
+ * one at a time, which makes it the closest thing the app has to "am I getting
+ * better".
+ */
+describe("drift across a session", () => {
+  /** Every line drawn inside the drift band, as its own path. */
+  function traces(scene: Scene) {
+    const ctx = paint(scene);
+    const out: { alpha: number; width: number; points: number }[] = [];
+    let open: { alpha: number; width: number; points: number } | null = null;
+    for (const c of ctx.calls) {
+      if (c.op === "beginPath") open = null;
+      if (c.op === "moveTo" || c.op === "lineTo") {
+        const y = c.args[1]!;
+        if (y < scene.rows.drift || y > scene.rows.drift + 46) continue;
+        // The traces' own color. The band also holds the zero rule, drawn in
+        // the frame's line color at full strength — counting that as a trace
+        // let a one-trace plot satisfy "one bright and one dim".
+        if (c.stroke !== FALLBACK_PALETTE.you) continue;
+        if (!open) {
+          open = { alpha: c.alpha, width: 0, points: 0 };
+          out.push(open);
+        }
+        open.points++;
+      }
+      if (c.op === "stroke" && open) open.width = 1;
+    }
+    return out;
+  }
+
+  it("draws a trace for every attempt, not just the one being read", () => {
+    const one = traces(stack(reviews().slice(0, 1)));
+    const two = traces(stack(reviews()));
+    expect(two.length).toBeGreaterThan(one.length);
+  });
+
+  it("draws the others behind, and dimmer", () => {
+    /* Same measurement, subordinate: what is being read has to be findable in
+       the family without the family disappearing. */
+    const scene = stack(reviews(), 1);
+    const alphas = traces(scene).map((t) => t.alpha);
+    // Exactly one attempt is being read, so exactly one strength is full.
+    expect(alphas.filter((a) => a === 1).length).toBeGreaterThan(0);
+    expect(alphas.filter((a) => a < 1).length).toBeGreaterThan(0);
+    expect(new Set(alphas).size).toBe(2);
+  });
+
+  it("measures every attempt against one axis", () => {
+    /* The whole point of overlaying. Scaled to its own worst moment, a run
+       half as bad would draw an identical picture — so the thing you are
+       looking for, the wander getting smaller, would be invisible. */
+    const runs = reviews();
+    const together = stack(runs);
+    paint(together);
+    const shared = together.driftMax!;
+
+    for (const [i] of runs.entries()) {
+      const alone = stack([runs[i]!]);
+      paint(alone);
+      // One attempt out of the session can need less room, never more.
+      expect(alone.driftMax!).toBeLessThanOrEqual(shared + 1e-9);
+    }
+    // And the session's axis is one of theirs rather than something larger.
+    expect(shared).toBeGreaterThan(0);
+  });
+});
+

@@ -914,48 +914,84 @@ function drawGradeStrip(
  * stop reads as ±580u of "drift" and flattens every real deviation into the
  * center line. The runs are drawn separately so the plot shows a break rather
  * than a cliff between them. */
-function drawDrift(ctx: Ctx2D, scene: Scene): void {
-  const u = scene.layout.unitSec;
-  const runs: Array<Array<[number, number]>> = [];
+/** One attempt's drift, as a set of traces.
+ *
+ * A set rather than a line because a rest breaks it: you stopped, and what
+ * follows starts fresh, so carrying the accumulated drift across the break
+ * would report a gap you were not being graded on as if it were sending.
+ *
+ * The local name is "traces" and not "runs" — a run is an attempt now, and
+ * the two meanings sat on the same word in here. */
+function driftTraces(scene: Scene, lane: Lane): Array<Array<[number, number]>> {
+  const u = lane.layout.unitSec;
+  const traces: Array<Array<[number, number]>> = [];
   let pts: Array<[number, number]> | null = null;
   let base: number | null = null;
 
-  for (const it of scene.layout.items) {
+  for (const it of lane.layout.items) {
     const slot = it.slot;
     if (!slot.actual || !slot.ideal) continue;
     if (base === null || isRest(slot.actual.leadGap)) {
       base = slot.actual.t0 - slot.ideal.t0;
       pts = [];
-      runs.push(pts);
+      traces.push(pts);
     }
     const drift = (slot.actual.t1 - base - slot.ideal.t1) / u;
     const x =
       scene.view === "per-char"
         ? it.x! + it.gapW + it.bodyW / 2
-        : it.x! + (((slot.actual.t1 - slot.actual.t0) / u) * scene.layout.ppu) / 2;
+        : it.x! + (((slot.actual.t1 - slot.actual.t0) / u) * lane.layout.ppu) / 2;
     pts!.push([x, drift]);
   }
+  return traces;
+}
+
+/** Every attempt's drift, in one plot.
+ *
+ * Overlaid rather than given a plot each, and that is the point of it: what
+ * you want to know across a session is whether the wander is getting smaller,
+ * and four plots each scaled to their own worst moment would hide exactly that
+ * — a run half as bad would draw an identical picture. So the axis is measured
+ * across ALL of them and every trace is drawn against it, which makes a
+ * shrinking trace mean what it looks like it means.
+ *
+ * The attempt being read is drawn over the others and at full strength; the
+ * rest are the same measurement, subordinate. Nothing labels them, because at
+ * forty-six pixels tall there is no room for it and the question here is the
+ * shape of the family rather than which line is which. */
+function drawDrift(ctx: Ctx2D, scene: Scene): void {
+  const perLane = scene.runs.map((lane) => driftTraces(scene, lane));
 
   let driftMax = 1;
-  for (const run of runs) {
-    for (const p of run) driftMax = Math.max(driftMax, Math.abs(p[1]));
+  for (const traces of perLane) {
+    for (const trace of traces) {
+      for (const p of trace) driftMax = Math.max(driftMax, Math.abs(p[1]));
+    }
   }
   scene.driftMax = driftMax;
 
   const half = DRIFT_H / 2 - 8;
   const mid = scene.rows.drift + DRIFT_H / 2;
   ctx.strokeStyle = scene.palette.you;
-  ctx.lineWidth = 1.5;
-  for (const run of runs) {
-    if (run.length < 2) continue;
-    ctx.beginPath();
-    run.forEach((p, i) => {
-      const y = mid - (p[1] / driftMax) * half;
-      if (i === 0) ctx.moveTo(p[0], y);
-      else ctx.lineTo(p[0], y);
-    });
-    ctx.stroke();
+
+  // Others first, so the one being read is not drawn under them.
+  const order = perLane.map((_, r) => r).sort((a, b) => Number(a === scene.selected) - Number(b === scene.selected));
+  for (const r of order) {
+    const mine = r === scene.selected;
+    ctx.lineWidth = mine ? 1.5 : 1;
+    ctx.globalAlpha = mine ? 1 : 0.4;
+    for (const trace of perLane[r]!) {
+      if (trace.length < 2) continue;
+      ctx.beginPath();
+      trace.forEach((p, i) => {
+        const y = mid - (p[1] / driftMax) * half;
+        if (i === 0) ctx.moveTo(p[0], y);
+        else ctx.lineTo(p[0], y);
+      });
+      ctx.stroke();
+    }
   }
+  ctx.globalAlpha = 1;
 }
 
 /** The left band: track names and the drift axis bound. Drawn after the content
