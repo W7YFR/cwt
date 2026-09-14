@@ -74,7 +74,7 @@ describe("the JSON report", () => {
     const { review, settings } = reviewFrom(caseNamed(SLOPPY), { collapseRests: false });
     const report = buildJsonReport(review, settings, AT);
     expect(report.review.collapse_rests).toBe(false);
-    expect(report.review.from).toBe("cw-trainer");
+    expect(report.review.from).toBe("cwt");
     expect(report.target.char_wpm).toBe(settings.charWpm);
   });
 

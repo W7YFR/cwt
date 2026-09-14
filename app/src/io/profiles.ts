@@ -21,7 +21,7 @@
 import type { Calibration, SetupVerdict } from "@/dsp";
 import { loadPrefs, savePrefs } from "./storage";
 
-const KEY = "cw-trainer:profiles";
+const KEY = "cwt:profiles";
 
 /** How many to keep. Past this somebody has a naming problem, not a
  *  calibration problem, and an unbounded list in localStorage is a slow leak. */

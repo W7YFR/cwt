@@ -1,4 +1,4 @@
-# cw-trainer — a browser CW keying trainer.
+# cwt — a browser CW keying trainer.
 #
 # It records, decodes, grades and draws, entirely in the browser. Everything
 # under app/src is the product; app/test holds three test tiers and the

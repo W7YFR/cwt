@@ -139,7 +139,7 @@ describe("the app", () => {
        Held open by hand rather than raced against: `act` flushes the whole
        boot, so rendering and then looking is looking at the finished page. The
        only way to see the gate is to stop it from finishing. */
-    localStorage.setItem("cw-trainer:prefs", JSON.stringify({ currentId: "held" }));
+    localStorage.setItem("cwt:prefs", JSON.stringify({ currentId: "held" }));
     const release = await heldStorage();
 
     root = createRoot(container);
@@ -165,7 +165,7 @@ describe("the app", () => {
   it("does explain itself when the boot is genuinely slow", async () => {
     // The message still has a job: a long recording coming back off disk.
     // Several seconds of silence would look broken.
-    localStorage.setItem("cw-trainer:prefs", JSON.stringify({ currentId: "held" }));
+    localStorage.setItem("cwt:prefs", JSON.stringify({ currentId: "held" }));
     const release = await heldStorage();
 
     root = createRoot(container);
@@ -591,7 +591,7 @@ describe("the app", () => {
        Clear, that first step would have required recording something blind in
        order to get to the screen that stops you recording blind. */
     localStorage.setItem(
-      "cw-trainer:prefs",
+      "cwt:prefs",
       JSON.stringify({ expected: "CQ DE W7YFR" }),
     );
     await mount();

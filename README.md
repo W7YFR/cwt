@@ -11,6 +11,10 @@ change is something you can hear, not just a number.
 Everything runs in the browser. No account, no upload, no server: the audio
 never leaves the machine it was recorded on.
 
+### A short tour
+
+[![A brief overview of CWT](https://img.youtube.com/vi/GNOEatmSevQ/maxresdefault.jpg)](https://youtu.be/GNOEatmSevQ)
+
 ```
 npm install
 npm run build
@@ -242,12 +246,9 @@ doesn't depend on the machine.
 
 ### Deploying
 
-`npm run build` writes static files to `dist/`. For a GitHub Pages project site,
-set the base path to match the repo name:
-
-```
-PUBLIC_BASE=/your-repo-name/ npm run build
-```
+`npm run build` writes static files to `dist/`. Serve them from anywhere — asset
+paths are relative, so the same build works at a domain root, under a project
+subpath like `/cwt/`, or straight off disk. Nothing to configure.
 
 ---
 

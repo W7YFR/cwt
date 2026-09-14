@@ -531,7 +531,7 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
        which still shows the lengths — with it, it shows them against what was
        actually intended. */
     localStorage.setItem(
-      "cw-trainer:prefs",
+      "cwt:prefs",
       JSON.stringify({ expected: "CQ DE W7YFR" }),
     );
     const user = userEvent.setup();

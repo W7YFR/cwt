@@ -134,7 +134,7 @@ export function buildJsonReport(
     },
     comparison: null,
     review: {
-      from: "cw-trainer",
+      from: "cwt",
       recorded_at: take.recordedAt,
       take_id: take.id,
       expected: intended,

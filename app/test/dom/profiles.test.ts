@@ -104,11 +104,11 @@ describe("keeping calibrations", () => {
   });
 
   it("survives a corrupt store rather than taking the app down with it", () => {
-    localStorage.setItem("cw-trainer:profiles", "{not json");
+    localStorage.setItem("cwt:profiles", "{not json");
     expect(loadProfiles()).toEqual([]);
 
     localStorage.setItem(
-      "cw-trainer:profiles",
+      "cwt:profiles",
       JSON.stringify([profile(), { nickname: "half-written" }, null]),
     );
     expect(loadProfiles()).toHaveLength(1);

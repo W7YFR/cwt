@@ -29,9 +29,9 @@ import { playwright } from "@vitest/browser-playwright";
    chromium` once. */
 export default defineConfig({
   root: "app",
-  // Overridden at deploy time: GitHub Pages serves a project site from
-  // /<repo>/, so the base has to match or every asset 404s.
-  base: process.env.PUBLIC_BASE ?? "/",
+  // Relative, so the build works at the domain root or under any subpath —
+  // one page, no router, nothing to resolve against wrongly.
+  base: "./",
   plugins: [react()],
   resolve: {
     alias: {

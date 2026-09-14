@@ -15,9 +15,15 @@
 
 import type { ReviewSettings, Take } from "@/types";
 
-const DB_NAME = "cw-trainer";
-/** Bumped to 2 to add the calibration store. Additive only — the upgrade
- *  creates what is missing and touches nothing that already exists. */
+const DB_NAME = "cwt";
+/** The upgrade is additive and version-agnostic: it creates whichever stores
+ *  are missing and touches nothing that is already there, so a database being
+ *  made for the first time gets both in one pass.
+ *
+ *  Only ever raise this. IndexedDB refuses to open an existing database at a
+ *  lower version — and the refusal is quiet here, because a failed open is
+ *  swallowed by every caller, leaving an app that works perfectly while
+ *  saving nothing. */
 const DB_VERSION = 2;
 const TAKES = "takes";
 const CALIBRATIONS = "calibrations";
@@ -341,7 +347,7 @@ export async function forgetCalibrationsFor(profileId: string): Promise<void> {
 
 /* ---- settings ----------------------------------------------------------- */
 
-const SETTINGS_KEY = "cw-trainer:prefs";
+const SETTINGS_KEY = "cwt:prefs";
 
 /** Preferences that should outlive a take, kept small enough for localStorage.
  *
