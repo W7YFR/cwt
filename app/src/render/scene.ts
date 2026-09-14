@@ -268,12 +268,15 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
   /* A row and its own caption, and nothing else. Each track now carries its
      text on the outside — the target's above it, yours below — so lighting a
      row means lighting the band from its caption through its marks. */
+  const lit = scene.rows.runs[scene.focus.run ?? scene.selected] ?? scene.rows.runs[0]!;
   if (scene.view === "overlay") {
     top = scene.rows.tgtLabel;
-    h = scene.rows.runs[0]!.label! + LABEL_H - scene.rows.tgtLabel;
+    h = (lit.label ?? lit.row + ROW_H) + LABEL_H - scene.rows.tgtLabel;
   } else if (scene.focus.side === "you") {
-    top = scene.rows.runs[0]!.row - 2;
-    h = ROW_H + LABEL_H + 2;
+    top = lit.row - 2;
+    // A row without a caption band of its own is lit to its own bottom edge
+    // rather than into the row below it.
+    h = ROW_H + (lit.label === null ? 2 : LABEL_H + 2);
   } else {
     top = scene.rows.tgtLabel;
     h = LABEL_H + ROW_H + 2;
@@ -424,8 +427,34 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
 
 function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
   const C = scene.palette;
-  const u = scene.layout.unitSec;
-  const ppu = scene.layout.ppu;
+
+  /* The target once, on its own row. Read off the run being read, since every
+     attempt in a session is paired against the same target and places it at
+     the same time — so any of them would say the same thing. */
+  const ref = scene.runs[scene.selected] ?? scene.runs[0];
+  if (ref) {
+    const u = ref.layout.unitSec;
+    const ppu = ref.layout.ppu;
+    for (const it of ref.layout.items) {
+      const slot = it.slot;
+      if (!slot.ideal || it.ix === null) continue;
+      const iw = ((slot.ideal.t1 - slot.ideal.t0) / u) * ppu;
+      const ig = slot.ideal.leadGap;
+      const igw = gapWidth(ig, ppu);
+      if (!visible(it.ix - igw, igw + iw, scene)) continue;
+      if (ig) drawGap(ctx, scene, ig, it.ix - igw, igw, scene.rows.tgt, true);
+      drawMarks(ctx, scene, slot.ideal, it.ix, scene.rows.tgt, true);
+      /* Labeled too, on this axis. The target row used to go unnamed here
+         because there was one caption band and it belonged to the decode —
+         but on a wall clock the two rows' characters sit at different x, and
+         that offset IS the drift. Naming both is what makes it readable. */
+      ctx.fillStyle = C["ink-dim"];
+      ctx.font = `600 11px ${C.mono}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
+    }
+  }
 
   /* Culled over the gap as well as the character.
    *
@@ -436,42 +465,35 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
    * once — so the chart looked like it simply stopped, and the connection to
    * what came next snapped into existence out of nowhere. The span that gets
    * drawn is the span that decides. */
-  for (const it of scene.layout.items) {
-    const slot = it.slot;
-    if (slot.actual && it.x !== null) {
+  scene.runs.forEach((lane, r) => {
+    const row = scene.rows.runs[r];
+    if (!row) return;
+    const u = lane.layout.unitSec;
+    const ppu = lane.layout.ppu;
+    const blank = lane.blank === true;
+
+    for (const it of lane.layout.items) {
+      const slot = it.slot;
+      if (!slot.actual || it.x === null) continue;
       const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
       const g = slot.actual.leadGap;
       const gw = gapWidth(g, ppu);
-      if (visible(it.x - gw, gw + w, scene)) {
-        if (g) drawGap(ctx, scene, g, it.x - gw, gw, scene.rows.runs[0]!.row, false);
-        drawMarks(ctx, scene, slot.actual, it.x, scene.rows.runs[0]!.row, false);
-        const cap = sentCaption(slot, scene.runs[scene.selected]?.blank === true);
-        ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
-        ctx.font = `600 11px ${C.mono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(cap.text, it.x + w / 2, scene.rows.runs[0]!.label! + LABEL_H / 2);
-      }
+      if (!visible(it.x - gw, gw + w, scene)) continue;
+
+      if (g) drawGap(ctx, scene, g, it.x - gw, gw, row.row, false);
+      drawMarks(ctx, scene, slot.actual, it.x, row.row, false);
+
+      // Only the attempt being read carries text; the others have no band to
+      // put it in, and writing it anyway would land it on somebody else's row.
+      if (row.label === null) continue;
+      const cap = sentCaption(slot, blank);
+      ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
+      ctx.font = `600 11px ${C.mono}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(cap.text, it.x + w / 2, row.label + LABEL_H / 2);
     }
-    if (slot.ideal && it.ix !== null) {
-      const iw = ((slot.ideal.t1 - slot.ideal.t0) / u) * ppu;
-      const ig = slot.ideal.leadGap;
-      const igw = gapWidth(ig, ppu);
-      if (visible(it.ix - igw, igw + iw, scene)) {
-        if (ig) drawGap(ctx, scene, ig, it.ix - igw, igw, scene.rows.tgt, true);
-        drawMarks(ctx, scene, slot.ideal, it.ix, scene.rows.tgt, true);
-        /* Labeled too, on this axis. The target row used to go unnamed here
-           because there was one caption band and it belonged to the decode —
-           but on a wall clock the two rows' characters sit at different x, and
-           that offset IS the drift. Naming both is what makes it readable. */
-        ctx.fillStyle = C["ink-dim"];
-        ctx.font = `600 11px ${C.mono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
-      }
-    }
-  }
+  });
 }
 
 /** Overlay: both tracks superimposed on one absolute-time axis, each
@@ -522,19 +544,26 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
       }
     }
   }
-  for (const it of scene.layout.items) {
-    const slot = it.slot;
-    if (!slot.actual || it.x === null) continue;
-    const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
-    if (!visible(it.x, w, scene)) continue;
-    band(slot.actual, it.x, slot.op === "equal" ? C.you : C.bad, 0.55);
-    const cap = sentCaption(slot, scene.runs[scene.selected]?.blank === true);
-    ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
-    ctx.font = `600 11px ${C.mono}`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(cap.text, it.x + w / 2, scene.rows.runs[0]!.label! + LABEL_H / 2);
-  }
+  /* Every attempt in the one band — superimposing them is what this view is.
+     Only the one being read is captioned: there is a single band of text here
+     and four runs' worth of characters written into it would be unreadable. */
+  const capY = scene.rows.runs[scene.selected]?.label;
+  scene.runs.forEach((lane, r) => {
+    for (const it of lane.layout.items) {
+      const slot = it.slot;
+      if (!slot.actual || it.x === null) continue;
+      const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
+      if (!visible(it.x, w, scene)) continue;
+      band(slot.actual, it.x, slot.op === "equal" ? C.you : C.bad, 0.55);
+      if (r !== scene.selected || capY === null || capY === undefined) continue;
+      const cap = sentCaption(slot, lane.blank === true);
+      ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
+      ctx.font = `600 11px ${C.mono}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(cap.text, it.x + w / 2, capY + LABEL_H / 2);
+    }
+  });
 
   // A leader from each character to where the target put it, so the amount of
   // slip is readable as a length rather than guessed from the fringe.
@@ -1022,7 +1051,11 @@ function drawPlayhead(ctx: Ctx2D, scene: Scene): void {
 
   // In overlay both tracks share one band, so the playhead spans all of it.
   const y0 =
-    scene.view === "overlay" ? scene.rows.tgt : scene.playhead.side === "you" ? scene.rows.runs[0]!.row : scene.rows.tgt;
+    scene.view === "overlay"
+      ? scene.rows.tgt
+      : scene.playhead.side === "you"
+        ? (scene.rows.runs[scene.selected] ?? scene.rows.runs[0]!).row
+        : scene.rows.tgt;
   const h = scene.view === "overlay" ? OVER_H : ROW_H;
   ctx.strokeStyle = scene.playhead.side === "you" ? scene.palette.you : scene.palette.ink;
   ctx.lineWidth = PLAYHEAD_W;

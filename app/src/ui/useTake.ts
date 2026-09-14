@@ -27,6 +27,7 @@ import {
   forgetCurrentTake,
   loadPrefs,
   rememberSettings,
+  rememberSession,
   rememberTake,
   savePrefs,
 } from "@/io/storage";
@@ -40,6 +41,13 @@ export interface LoadedTake {
   /** The original file bytes, when the audio came from a file — so playback is
    *  the file itself rather than a re-encode of our decode of it. */
   data: ArrayBuffer | null;
+}
+
+/** One attempt as it comes back out of storage. */
+export interface StoredRun {
+  take: Take;
+  audio: ArrayBuffer;
+  settings?: ReviewSettings | undefined;
 }
 
 export interface AdoptOptions {
@@ -56,6 +64,8 @@ export interface TakeState {
   runs: readonly LoadedTake[];
   /** Which of them is being read in detail. */
   selected: number;
+  /** Restore a whole session from storage — see `recallSession`. */
+  adoptSession(entries: readonly StoredRun[], selected: number): void;
   /** One review per run, all against the same target. */
   reviews: readonly Review[];
   selectRun(i: number): void;
@@ -181,6 +191,15 @@ export function useTake(): TakeState {
 
   const runsRef = useRef(runs);
   runsRef.current = runs;
+
+  /* Written from one place rather than from each of load, drop, select, reset
+     and recalibrate. Those are five chances to forget, and forgetting shows up
+     as a reload quietly losing an attempt — which looks like the recording
+     failed rather than like the bookkeeping did. */
+  useEffect(() => {
+    const ids = runs.filter((r) => !isBlankTake(r.take)).map((r) => r.take.id);
+    rememberSession(ids, Math.min(selected, Math.max(ids.length - 1, 0)));
+  }, [runs, selected]);
 
   /** Start a session over with one attempt in it. */
   const showOnly = useCallback((entry: LoadedTake) => {
@@ -352,6 +371,33 @@ export function useTake(): TakeState {
     void rememberTake({ take: next, audio, settings: kept });
   }, []);
 
+  const adoptSession = useCallback(
+    (entries: readonly StoredRun[], at: number) => {
+      if (entries.length === 0) return;
+      const lanes: LoadedTake[] = entries.map((e) => ({
+        take: e.take,
+        clip: { samples: new Float32Array(0), rate: e.take.rate, peak: e.take.peak },
+        data: e.audio,
+      }));
+      const pick = Math.min(Math.max(at, 0), lanes.length - 1);
+      setRuns(lanes);
+      runsRef.current = lanes;
+      setSelected(pick);
+      loadedRef.current = lanes[pick]!;
+      takeIdRef.current = lanes[pick]!.take.id;
+
+      /* Settings belong to the session rather than to any one attempt, so the
+         one being read carries them — and failing that, the last recorded.
+         Rebuilding them from a take would drop the intended message, which is
+         the one thing every attempt in the session shares. */
+      const kept = entries[pick]?.settings ?? entries[entries.length - 1]?.settings;
+      const next = kept ?? openingSettings(lanes[pick]!.take, settingsRef.current);
+      settingsRef.current = next;
+      setSettingsRaw(next);
+    },
+    [],
+  );
+
   const adoptKeyerSpeed = useCallback(() => {
     const keyer = loadPrefs().keyerWpm;
     if (!keyer || !(keyer > 0)) return;
@@ -428,6 +474,7 @@ export function useTake(): TakeState {
 
   return {
     loaded,
+    adoptSession,
     runs,
     selected,
     reviews,

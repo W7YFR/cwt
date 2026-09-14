@@ -357,6 +357,13 @@ export interface Prefs {
   /** The take the review is currently showing, so a reload comes back to it
    *  rather than to an empty landing screen. */
   currentId?: string;
+  /** The session the review is showing: several attempts at one message.
+   *
+   * Only the order and which one was being read. The attempts themselves are
+   * already stored as takes, with their audio — a session is a way of reading
+   * them, not a second copy of them. Which also means a take outlives the
+   * session it was recorded in, and a history view can still find it. */
+  session?: { ids: string[]; selected: number };
   /** The speed the keyer is set to, for the calibration wizard. A property of
    *  the equipment rather than of a session, so it outlives both. */
   keyerWpm?: number;
@@ -455,6 +462,40 @@ export async function recallTake(): Promise<StoredTake | null> {
   }
 }
 
+/** Remember the session the review is showing. */
+export function rememberSession(ids: readonly string[], selected: number): void {
+  const next = { ...loadPrefs() };
+  if (ids.length) next.session = { ids: [...ids], selected };
+  else delete next.session;
+  savePrefs(next);
+}
+
+/** The attempts the review was last showing, oldest first.
+ *
+ * Any that have gone missing are skipped rather than failing the lot: a
+ * session with three of its four attempts still in it is worth coming back
+ * to, and there is nothing a reader could do about the fourth. */
+export async function recallSession(): Promise<StoredTake[]> {
+  try {
+    const s = loadPrefs().session;
+    if (!s?.ids?.length) return [];
+    const db = await store();
+    const out: StoredTake[] = [];
+    for (const id of s.ids) {
+      const got = await db.get(id);
+      if (got) out.push(got);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Which attempt of the remembered session was being read. */
+export function recallSelected(): number {
+  return loadPrefs().session?.selected ?? 0;
+}
+
 /** Stop coming back to the current take.
  *
  * The row itself stays — leaving the review is not throwing the recording
@@ -462,5 +503,6 @@ export async function recallTake(): Promise<StoredTake | null> {
 export function forgetCurrentTake(): void {
   const next = { ...loadPrefs() };
   delete next.currentId;
+  delete next.session;
   savePrefs(next);
 }

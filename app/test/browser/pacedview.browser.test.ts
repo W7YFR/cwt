@@ -70,7 +70,7 @@ afterEach(() => {
  * Driving it by calling `root.render` from a callback instead would not do:
  * nested inside `act`, those renders collapse into one, and a loop between two
  * views would be flattened out of existence before the assertion saw it. */
-function mount(over: Partial<ReviewSettings>) {
+function mount(over: Partial<ReviewSettings> & { runs?: number }) {
   const take = blankTake({
     expected: "CQ DE W7YFR",
     expectedSource: "the test",
@@ -83,17 +83,23 @@ function mount(over: Partial<ReviewSettings>) {
     data: null,
   };
   const seen: ReviewSettings["view"][] = [];
-  let latest: ReviewSettings = { ...defaultSettings(take), ...over };
+  const { runs: _runs, ...settingsOver } = over;
+  let latest: ReviewSettings = { ...defaultSettings(take), ...settingsOver };
 
   function Harness() {
     const [settings, setSettings] = useState<ReviewSettings>(latest);
     latest = settings;
     const review = reviewTake(take, settings);
+    /* A session with more than one attempt in it, so that dropping down to
+       just the incoming one is a visible difference. The same review twice is
+       enough: what is under test is how many rows are drawn, not what is in
+       them. */
+    const stack = Array.from({ length: over.runs ?? 1 }, () => review);
     return createElement(ReviewScreen, {
       loaded,
       review,
-      stack: [review],
-      selected: 0,
+      stack,
+      selected: stack.length - 1,
       onSelectRun: () => {},
       onDropRun: () => {},
       settings,
@@ -162,5 +168,26 @@ describe("the view while pacing", () => {
     const app = mount({ paceCursor: false, flashCard: true, view: "per-char" });
     await record();
     expect(app.view()).toBe("per-char");
+  });
+});
+
+describe("what the chart shows while recording", () => {
+  const height = () => host.querySelector("canvas")!.getBoundingClientRect().height;
+
+  it("comes down to the target and the attempt arriving", async () => {
+    /* With a paddle in your hand the earlier attempts are rows between your
+       eye and the cursor, and the cursor is the only thing on the chart that
+       is about the next second. The chart is measured rather than counted:
+       every lane makes it taller, so a shorter chart is fewer rows. */
+    mount({ paceCursor: true, runs: 3 });
+    const before = height();
+
+    await record();
+    const during = height();
+    expect(during).toBeLessThan(before);
+
+    await stop();
+    // And they come straight back once the paddle is down.
+    expect(height()).toBe(before);
   });
 });

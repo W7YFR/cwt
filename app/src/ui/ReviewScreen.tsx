@@ -27,7 +27,8 @@ import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
-import { MIC_SOURCE, isBlankTake } from "@/io/take";
+import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
+import { reviewTake } from "@/timing";
 import { baseName } from "./format";
 import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
@@ -121,6 +122,34 @@ export function ReviewScreen({
      works without one — that is the point of it — but everything that reads
      the recording has to say so rather than act on an empty one. */
   const blank = isBlankTake(loaded.take);
+
+  /* What the chart shows while a recording is running: the target, the cursor,
+     and one empty row for what is arriving.
+     
+     The rest of the session comes off. With a paddle in your hand the earlier
+     attempts are not something you can act on — they are just rows between
+     your eye and the cursor, and the cursor is the only thing on the chart
+     that is about the next second. They come back the moment you stop, with
+     the new attempt among them.
+     
+     A blank take rather than an empty list, so the row is there to be filled
+     rather than appearing from nowhere when the take lands. */
+  const recording = rec.recorder !== null;
+  const incoming = useMemo(
+    () =>
+      reviewTake(
+        blankTake({
+          expected: settings.expected || null,
+          charWpm: settings.charWpm,
+          farnsworthWpm: settings.farnsworthWpm,
+          toneHz: loaded.take.toneHz,
+        }),
+        settings,
+      ),
+    [settings, loaded.take.toneHz],
+  );
+  const shown = recording ? [incoming] : stack;
+  const shownAt = recording ? 0 : selected;
   const [rereading, setRereading] = useState(false);
   /* Seconds left of the lead-in, or null when no cursor is running. Whole
      numbers only: this is state, and updating it every frame would re-render
@@ -554,9 +583,9 @@ export function ReviewScreen({
           }}
         />
         <ChartView
-          review={review}
-          stack={stack}
-          selected={selected}
+          review={recording ? incoming : review}
+          stack={shown}
+          selected={shownAt}
           onSelectRun={onSelectRun}
           settings={settings}
           focus={focus}

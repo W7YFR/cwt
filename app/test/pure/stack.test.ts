@@ -15,7 +15,7 @@ import { draw, type Lane, type Scene } from "@/render/scene";
 import { buildLayout, measureColumns } from "@/render/layout";
 import { GUTTER, PAD_R, ROW_H, rowsFor } from "@/render/geometry";
 import { FALLBACK_PALETTE } from "@/render/theme";
-import type { Review } from "@/types";
+import type { Review, ViewMode } from "@/types";
 
 const PPU = 14;
 const TARGET = "CQ DE W7YFR";
@@ -33,15 +33,19 @@ function reviews(): Review[] {
   );
 }
 
-function stack(runs: Review[], selected = 0, trackW = 4000): Scene {
-  const columns = measureColumns(runs.map((r) => r.slots), PPU);
+function stack(
+  runs: Review[],
+  selected = 0,
+  trackW = 4000,
+  view: ViewMode = "per-char",
+): Scene {
+  const columns = view === "per-char" ? measureColumns(runs.map((r) => r.slots), PPU) : undefined;
   const lanes: Lane[] = runs.map((review, i) => ({
     layout: buildLayout(review, {
-      view: "per-char",
+      view,
       ppu: PPU,
       durationSec: review.take.durationSec,
-      columns,
-      run: i,
+      ...(columns ? { columns, run: i } : {}),
     }),
     slots: review.slots,
     analysis: review.analysis,
@@ -50,13 +54,13 @@ function stack(runs: Review[], selected = 0, trackW = 4000): Scene {
   return {
     runs: lanes,
     selected,
-    columns,
+    ...(columns ? { columns } : {}),
     layout: lanes[selected]!.layout,
     slots: runs[selected]!.slots,
     analysis: runs[selected]!.analysis,
     rows: rowsFor(lanes.length, selected),
     palette: FALLBACK_PALETTE,
-    view: "per-char",
+    view,
     tolerance: 0.3,
     scrollX: 0,
     viewport: {
@@ -168,5 +172,74 @@ describe("a stack of attempts", () => {
     const two = stack(reviews());
     expect(two.rows.height).toBeGreaterThan(one.rows.height);
     expect(two.rows.runs).toHaveLength(2);
+  });
+});
+
+/* The same stack on the wall clock.
+ *
+ * A separate renderer, and it had to be generalized separately — which is
+ * exactly how it got missed the first time. A paced recording switches the
+ * chart to this view automatically, so it is the view a practice session is
+ * most often looked at in, and it went out drawing one attempt at run one's
+ * row with its caption at the top of the canvas.
+ */
+describe("a stack on the absolute axis", () => {
+  const absolute = (selected = 0) => stack(reviews(), selected, 4000, "absolute");
+
+  it("draws every attempt in its own row", () => {
+    /* The bug: only the run being read was drawn, and always at the first
+       row's position — so one row held somebody else's marks and the other
+       held nothing at all. */
+    const scene = absolute(1);
+    const ctx = paint(scene);
+    for (const row of scene.rows.runs) {
+      expect(marksIn(ctx, row.row)).toBeGreaterThan(0);
+    }
+  });
+
+  it("writes no text above the target's own caption band", () => {
+    /* The other half of the same bug. An uncaptioned run has `label === null`,
+       and a non-null assertion on it put the text at `null + 11` — eleven
+       pixels down, in the middle of the ruler. */
+    const scene = absolute(1);
+    const above = paint(scene)
+      .ofType("fillText")
+      .filter((c) => c.args[1]! < scene.rows.tgtLabel)
+      .map((c) => c.text ?? "");
+    // The ruler's own second labels live up there and belong there. Nothing
+    // else may.
+    expect(above.filter((t) => !/^\d+s$/.test(t))).toEqual([]);
+  });
+
+  it("captions only the attempt being read", () => {
+    for (const pick of [0, 1]) {
+      const scene = absolute(pick);
+      const band = scene.rows.runs[pick]!.label!;
+      const captions = paint(scene)
+        .ofType("fillText")
+        .filter((c) => Math.abs(c.args[1]! - (band + 11)) < 2);
+      expect(captions.length).toBeGreaterThan(0);
+
+      // And nothing written into the row that has no band of its own.
+      const other = scene.rows.runs[1 - pick]!;
+      expect(other.label).toBeNull();
+      const intruders = paint(scene)
+        .ofType("fillText")
+        // Track content only: the gutter writes its row names down the left
+        // and they are not in the plot.
+        .filter((c) => c.args[0]! > GUTTER)
+        .filter((c) => c.args[1]! > other.row + ROW_H && c.args[1]! < other.row + ROW_H + 22);
+      expect(intruders).toEqual([]);
+    }
+  });
+
+  it("draws the target once, not once per attempt", () => {
+    const target = reviews()[0]!.ideal.chars.map((c) => c.char);
+    const scene = absolute(0);
+    const onTargetRow = paint(scene)
+      .ofType("fillText")
+      .filter((c) => Math.abs(c.args[1]! - (scene.rows.tgtLabel + 11)) < 2)
+      .map((c) => c.text);
+    expect(onTargetRow).toEqual(target);
   });
 });
