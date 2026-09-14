@@ -6,7 +6,12 @@ gap), conventionally written in angle brackets, e.g. <BK> = B+K = -...-.-.
 Some prosigns share their dit/dah pattern with a punctuation mark. We resolve
 those collisions toward whichever reading is normal in on-air CW (see
 `_PROSIGN_OVERRIDES` below): e.g. .-.-. decodes as <AR> (end of message) rather
-than "+", but -...- stays "=" (the separator, which hams write literally).
+than "+", and -...- as <BT> rather than "=".
+
+Which name wins only decides what a decode is WRITTEN as; it never decides
+whether two of them match. Both names of a pair are the same keying, so both
+are correct to send and neither is an error against the other — see
+`canonical_char`.
 """
 
 # Letters, digits, and punctuation.
@@ -49,7 +54,7 @@ CHAR_TO_MORSE = {**BASE, **PROSIGNS}
 # the between-thoughts separator). The rest are operational signals that, on the
 # air, almost always mean the prosign rather than the punctuation.
 _PROSIGN_OVERRIDES = {
-    "<AA>", "<AR>", "<AS>", "<BK>", "<CL>", "<CT>",
+    "<AA>", "<AR>", "<AS>", "<BK>", "<BT>", "<CL>", "<CT>",
     "<KN>", "<SK>", "<SN>", "<SOS>", "<HH>",
 }
 
@@ -59,6 +64,22 @@ for _ch, _pat in BASE.items():
     MORSE_TO_CHAR.setdefault(_pat, _ch)
 for _name in _PROSIGN_OVERRIDES:
     MORSE_TO_CHAR[PROSIGNS[_name]] = _name
+
+
+def canonical_char(ch: str) -> str:
+    """The name a character comes back as once it has been keyed and decoded.
+
+    Some patterns have two names: ``-...-`` is both ``=`` and ``<BT>``,
+    ``.-.-.`` is both ``+`` and ``<AR>``. A sender keying either name sends
+    exactly the same dits and dahs, so a decode can only return whichever name
+    the table picks — and comparing the two as text then reports a substitution
+    for sending precisely what was asked for.
+
+    So comparison goes through here. Display does not: what was written down is
+    what was meant, and the report still shows it.
+    """
+    pat = CHAR_TO_MORSE.get(ch)
+    return MORSE_TO_CHAR.get(pat, ch) if pat else ch
 
 
 def decode_pattern(pattern: str) -> str:

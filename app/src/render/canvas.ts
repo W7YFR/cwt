@@ -68,6 +68,9 @@ export interface ChartCallbacks {
 }
 
 export interface ChartInput {
+  /** Session indices, in the order their rows should be drawn. Omitted to
+   *  draw them in the order they were recorded. */
+  order?: readonly number[];
   /** The attempt being read in detail: the captioned row, and the one the
    *  report below the chart is about. */
   review: Review;
@@ -152,11 +155,25 @@ export function createChart(
   /** The run name under the pointer, for the gutter's highlight. */
   let picking = -1;
 
-  /** The attempts to draw, and which one is being read. */
-  function stackOf(inp: ChartInput): { reviews: readonly Review[]; selected: number } {
+  /** The attempts to draw, in the order their rows go, and which row is being
+   *  read.
+   *
+   * `order` is session indices — the order the attempts were recorded in is
+   * the order they arrive in, and sorting rearranges where they are drawn
+   * without renaming them. Everything the chart hands back out is a session
+   * index again, so nothing outside here has to know the rows moved. */
+  function stackOf(inp: ChartInput): {
+    reviews: readonly Review[];
+    order: readonly number[];
+    selected: number;
+  } {
     const reviews = inp.stack && inp.stack.length ? inp.stack : [inp.review];
+    const fallback = reviews.map((_, i) => i);
+    const order =
+      inp.order && inp.order.length === reviews.length ? inp.order : fallback;
     const at = inp.selected ?? reviews.indexOf(inp.review);
-    return { reviews, selected: at >= 0 && at < reviews.length ? at : reviews.length - 1 };
+    const pick = order.indexOf(at);
+    return { reviews, order, selected: pick >= 0 ? pick : order.length - 1 };
   }
   let palette: Palette = readPalette(document.body);
   let scrollX = 0;
@@ -241,16 +258,22 @@ export function createChart(
       tailSec: leadSec,
     };
 
-    lanes = stack.reviews.map((review, r) => ({
-      layout: buildLayout(review, {
-        ...opts,
-        durationSec: review.take.durationSec,
-        ...(columns ? { columns, run: r } : {}),
-      }),
-      slots: review.slots,
-      analysis: review.analysis,
-      blank: review.take.segments.length === 0,
-    }));
+    lanes = stack.order.map((at) => {
+      const review = stack.reviews[at]!;
+      return {
+        layout: buildLayout(review, {
+          ...opts,
+          durationSec: review.take.durationSec,
+          // Columns are measured in session order, so a run is asked for its
+          // own row of the plan rather than for wherever it is drawn.
+          ...(columns ? { columns, run: at } : {}),
+        }),
+        slots: review.slots,
+        analysis: review.analysis,
+        blank: review.take.segments.length === 0,
+        ordinal: at,
+      } satisfies Lane;
+    });
     layout = lanes[selected]!.layout;
     rows = rowsFor(lanes.length, selected);
   }
@@ -484,7 +507,7 @@ export function createChart(
     // The run names in the gutter pick a row up, and that is all they do.
     const named = gutterRunAt(p);
     if (named >= 0) {
-      if (named !== selected) callbacks.onSelectRun?.(named);
+      if (named !== selected) callbacks.onSelectRun?.(lanes[named]!.ordinal);
       return;
     }
 
@@ -501,7 +524,7 @@ export function createChart(
     // Another attempt: pick it up. Its audio and its numbers are not on screen
     // yet, and playing out of the wrong recording is worse than one more click.
     if (h.row === "you" && h.run !== selected) {
-      callbacks.onSelectRun?.(h.run);
+      callbacks.onSelectRun?.(lanes[h.run]!.ordinal);
       return;
     }
 
@@ -710,6 +733,7 @@ export function createChart(
             layout: exportLayout,
             slots: input.review.slots,
             analysis: input.review.analysis,
+            ordinal: 0,
           },
         ],
         selected: 0,

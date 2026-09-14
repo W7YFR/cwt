@@ -346,7 +346,7 @@
   },
   "rests": {
    "timeline": {
-    "text": "= TEST DE W1AW <AR> <SK>",
+    "text": "<BT> TEST DE W1AW <AR> <SK>",
     "duration": 0.0,
     "blocks": [
      {
@@ -437,7 +437,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "="
+      "context": "<BT>"
      },
      {
       "t0": 1.30275,
@@ -455,7 +455,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= T"
+      "context": "<BT> T"
      },
      {
       "t0": 1.6627500000000002,
@@ -473,7 +473,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TE"
+      "context": "<BT> TE"
      },
      {
       "t0": 1.9027500000000002,
@@ -527,7 +527,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TES"
+      "context": "<BT> TES"
      },
      {
       "t0": 2.3827500000000006,
@@ -545,7 +545,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST"
+      "context": "<BT> TEST"
      },
      {
       "t0": 2.9827500000000002,
@@ -599,7 +599,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TEST D"
+      "context": "BT> TEST D"
      },
      {
       "t0": 3.5827500000000003,
@@ -617,7 +617,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST DE"
+      "context": "T> TEST DE"
      },
      {
       "t0": 4.06275,
@@ -1045,7 +1045,7 @@
     ],
     "chars": [
      {
-      "char": "=",
+      "char": "<BT>",
       "pattern": "-...-",
       "t0": 0.10275,
       "t1": 0.877375,
@@ -1151,7 +1151,7 @@
     ]
    },
    "retargetedTimeline": {
-    "text": "= TEST DE W1AW <AR> <SK>",
+    "text": "<BT> TEST DE W1AW <AR> <SK>",
     "duration": 0.0,
     "blocks": [
      {
@@ -1242,7 +1242,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "="
+      "context": "<BT>"
      },
      {
       "t0": 1.30275,
@@ -1260,7 +1260,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= T"
+      "context": "<BT> T"
      },
      {
       "t0": 1.6627500000000002,
@@ -1278,7 +1278,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TE"
+      "context": "<BT> TE"
      },
      {
       "t0": 1.9027500000000002,
@@ -1332,7 +1332,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TES"
+      "context": "<BT> TES"
      },
      {
       "t0": 2.3827500000000006,
@@ -1350,7 +1350,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST"
+      "context": "<BT> TEST"
      },
      {
       "t0": 2.9827500000000002,
@@ -1404,7 +1404,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TEST D"
+      "context": "BT> TEST D"
      },
      {
       "t0": 3.5827500000000003,
@@ -1422,7 +1422,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST DE"
+      "context": "T> TEST DE"
      },
      {
       "t0": 4.06275,
@@ -1850,7 +1850,7 @@
     ],
     "chars": [
      {
-      "char": "=",
+      "char": "<BT>",
       "pattern": "-...-",
       "t0": 0.10275,
       "t1": 0.877375,
@@ -2002,7 +2002,7 @@
   },
   "noRests": {
    "timeline": {
-    "text": "= TEST DE W1AW <AR> <SK>",
+    "text": "<BT> TEST DE W1AW <AR> <SK>",
     "duration": 0.0,
     "blocks": [
      {
@@ -2093,7 +2093,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "="
+      "context": "<BT>"
      },
      {
       "t0": 1.30275,
@@ -2111,7 +2111,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= T"
+      "context": "<BT> T"
      },
      {
       "t0": 1.6627500000000002,
@@ -2129,7 +2129,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TE"
+      "context": "<BT> TE"
      },
      {
       "t0": 1.9027500000000002,
@@ -2183,7 +2183,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TES"
+      "context": "<BT> TES"
      },
      {
       "t0": 2.3827500000000006,
@@ -2201,7 +2201,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST"
+      "context": "<BT> TEST"
      },
      {
       "t0": 2.9827500000000002,
@@ -2255,7 +2255,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TEST D"
+      "context": "BT> TEST D"
      },
      {
       "t0": 3.5827500000000003,
@@ -2273,7 +2273,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST DE"
+      "context": "T> TEST DE"
      },
      {
       "t0": 4.06275,
@@ -2701,7 +2701,7 @@
     ],
     "chars": [
      {
-      "char": "=",
+      "char": "<BT>",
       "pattern": "-...-",
       "t0": 0.10275,
       "t1": 0.877375,
@@ -2807,7 +2807,7 @@
     ]
    },
    "retargetedTimeline": {
-    "text": "= TEST DE W1AW <AR> <SK>",
+    "text": "<BT> TEST DE W1AW <AR> <SK>",
     "duration": 0.0,
     "blocks": [
      {
@@ -2898,7 +2898,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "="
+      "context": "<BT>"
      },
      {
       "t0": 1.30275,
@@ -2916,7 +2916,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= T"
+      "context": "<BT> T"
      },
      {
       "t0": 1.6627500000000002,
@@ -2934,7 +2934,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TE"
+      "context": "<BT> TE"
      },
      {
       "t0": 1.9027500000000002,
@@ -2988,7 +2988,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TES"
+      "context": "<BT> TES"
      },
      {
       "t0": 2.3827500000000006,
@@ -3006,7 +3006,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST"
+      "context": "<BT> TEST"
      },
      {
       "t0": 2.9827500000000002,
@@ -3060,7 +3060,7 @@
       "units": 3.0895833333333336,
       "targetUnits": 3.0,
       "targetKind": "char-gap",
-      "context": "= TEST D"
+      "context": "BT> TEST D"
      },
      {
       "t0": 3.5827500000000003,
@@ -3078,7 +3078,7 @@
       "units": 7.089583333333334,
       "targetUnits": 7.0,
       "targetKind": "word-gap",
-      "context": "= TEST DE"
+      "context": "T> TEST DE"
      },
      {
       "t0": 4.06275,
@@ -3506,7 +3506,7 @@
     ],
     "chars": [
      {
-      "char": "=",
+      "char": "<BT>",
       "pattern": "-...-",
       "t0": 0.10275,
       "t1": 0.877375,
@@ -4463,13 +4463,13 @@
   },
   "comparison": {
    "expected": "<BT> TEST DE W1AW <AR> <SK>",
-   "decoded": "= TEST DE W1AW <AR> <SK>",
-   "accuracy": 0.9444444444444444,
+   "decoded": "<BT> TEST DE W1AW <AR> <SK>",
+   "accuracy": 1.0,
    "nExpected": 18,
-   "substitutions": 1,
+   "substitutions": 0,
    "insertions": 0,
    "deletions": 0,
-   "diff": "[<BT>\u2192=] TEST DE W1AW <AR> <SK>"
+   "diff": "<BT> TEST DE W1AW <AR> <SK>"
   }
  },
  "synth": {

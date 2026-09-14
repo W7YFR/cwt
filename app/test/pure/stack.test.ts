@@ -38,26 +38,32 @@ function stack(
   selected = 0,
   trackW = 4000,
   view: ViewMode = "per-char",
+  order?: number[],
 ): Scene {
   const columns = view === "per-char" ? measureColumns(runs.map((r) => r.slots), PPU) : undefined;
-  const lanes: Lane[] = runs.map((review, i) => ({
-    layout: buildLayout(review, {
-      view,
-      ppu: PPU,
-      durationSec: review.take.durationSec,
-      ...(columns ? { columns, run: i } : {}),
-    }),
-    slots: review.slots,
-    analysis: review.analysis,
-  }));
+  const at = order ?? runs.map((_, i) => i);
+  const lanes: Lane[] = at.map((i) => {
+    const review = runs[i]!;
+    return {
+      layout: buildLayout(review, {
+        view,
+        ppu: PPU,
+        durationSec: review.take.durationSec,
+        ...(columns ? { columns, run: i } : {}),
+      }),
+      slots: review.slots,
+      analysis: review.analysis,
+      ordinal: i,
+    };
+  });
   const first = lanes[0]!;
   return {
     runs: lanes,
     selected,
     ...(columns ? { columns } : {}),
     layout: lanes[selected]!.layout,
-    slots: runs[selected]!.slots,
-    analysis: runs[selected]!.analysis,
+    slots: lanes[selected]!.slots,
+    analysis: lanes[selected]!.analysis,
     rows: rowsFor(lanes.length, selected),
     palette: FALLBACK_PALETTE,
     view,
@@ -69,8 +75,8 @@ function stack(
       contentW: first.layout.width,
       maxScroll: Math.max(0, first.layout.width - trackW),
     },
-    durationSec: runs[selected]!.take.durationSec,
-    idealDuration: runs[selected]!.ideal.duration,
+    durationSec: runs[at[selected]!]!.take.durationSec,
+    idealDuration: runs[at[selected]!]!.ideal.duration,
     hover: null,
     focus: null,
     playhead: null,
@@ -313,3 +319,50 @@ describe("drift across a session", () => {
   });
 });
 
+/* Sorting the rows.
+ *
+ * What has to hold is that sorting moves a row and changes nothing else about
+ * it — above all not its name. A run's number is the order it was recorded in,
+ * so the third attempt is RUN 3 wherever it is drawn.
+ */
+describe("rows in a chosen order", () => {
+  const names = (scene: Scene) =>
+    paint(scene)
+      .ofType("fillText")
+      .filter((c) => c.args[0]! < GUTTER && /^RUN /.test(c.text ?? ""))
+      .sort((a, b) => a.args[1]! - b.args[1]!)
+      .map((c) => c.text);
+
+  it("names a run for when it was recorded, not for where it sits", () => {
+    /* Renumbering by position would have the row you are reading take another
+       attempt's name, and the Drop button offer to throw away a recording it
+       did not name. */
+    const runs = reviews();
+    expect(names(stack(runs, 0, 4000, "per-char", [0, 1]))).toEqual(["RUN 1", "RUN 2"]);
+    expect(names(stack(runs, 0, 4000, "per-char", [1, 0]))).toEqual(["RUN 2", "RUN 1"]);
+  });
+
+  it("draws the reordered rows in the order given", () => {
+    const runs = reviews();
+    const forward = stack(runs, 0, 4000, "per-char", [0, 1]);
+    const reversed = stack(runs, 0, 4000, "per-char", [1, 0]);
+    // The same two lanes, swapped: what was on the top row is now underneath.
+    expect(reversed.runs.map((l) => l.ordinal)).toEqual(
+      [...forward.runs.map((l) => l.ordinal)].reverse(),
+    );
+    for (const scene of [forward, reversed]) {
+      const ctx = paint(scene);
+      for (const row of scene.rows.runs) expect(marksIn(ctx, row.row)).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps the caption with the attempt being read, wherever it lands", () => {
+    /* Selection is a row position inside the renderer, so a reorder must not
+       leave the caption band on the attempt that used to be there. */
+    const runs = reviews();
+    const scene = stack(runs, 0, 4000, "per-char", [1, 0]);
+    expect(scene.runs[0]!.ordinal).toBe(1);
+    expect(scene.rows.runs[0]!.label).not.toBeNull();
+    expect(scene.rows.runs[1]!.label).toBeNull();
+  });
+});

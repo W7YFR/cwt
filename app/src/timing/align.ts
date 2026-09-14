@@ -6,19 +6,29 @@
  */
 
 import type { AlignOp, Comparison, EditOp } from "@/types";
-import { tokenize } from "@/morse";
+import { canonicalChar, tokenize } from "@/morse";
 
 /** Above this many cells the full DP matrix is not worth allocating; the
  *  banded fallback below takes over. A minute of 25 wpm sending is about 150
  *  tokens, so real input never comes close. */
 const FULL_DP_LIMIT = 4_000_000;
 
-/** Optimal alignment of token list `a` (expected) to `b` (decoded). */
+/** Optimal alignment of token list `a` (expected) to `b` (decoded).
+ *
+ * Tokens are matched by what they SOUND like, not by how they are written.
+ * A handful of patterns have two names — `-...-` is both `=` and `<BT>` — and
+ * a sender keying either one sends the same dits and dahs, so calling that a
+ * substitution blames somebody for sending exactly what was asked for. The ops
+ * still carry the original spellings: the comparison is normalized, the report
+ * is not. */
 export function align(a: readonly string[], b: readonly string[]): AlignOp[] {
   const n = a.length;
   const m = b.length;
   if (n === 0 && m === 0) return [];
   if (n * m > FULL_DP_LIMIT) return alignGreedy(a, b);
+
+  const ka = a.map(canonicalChar);
+  const kb = b.map(canonicalChar);
 
   const w = m + 1;
   const d = new Int32Array((n + 1) * w);
@@ -26,11 +36,11 @@ export function align(a: readonly string[], b: readonly string[]): AlignOp[] {
   for (let j = 0; j <= m; j++) d[j] = j;
 
   for (let i = 1; i <= n; i++) {
-    const ai = a[i - 1];
+    const ai = ka[i - 1];
     const row = i * w;
     const prev = row - w;
     for (let j = 1; j <= m; j++) {
-      const sub = d[prev + j - 1]! + (ai === b[j - 1] ? 0 : 1);
+      const sub = d[prev + j - 1]! + (ai === kb[j - 1] ? 0 : 1);
       const del = d[prev + j]! + 1;
       const ins = d[row + j - 1]! + 1;
       d[row + j] = Math.min(sub, del, ins);
@@ -46,10 +56,10 @@ export function align(a: readonly string[], b: readonly string[]): AlignOp[] {
     if (
       i > 0 &&
       j > 0 &&
-      d[i * w + j] === d[(i - 1) * w + j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)
+      d[i * w + j] === d[(i - 1) * w + j - 1]! + (ka[i - 1] === kb[j - 1] ? 0 : 1)
     ) {
       ops.push({
-        op: a[i - 1] === b[j - 1] ? "equal" : "sub",
+        op: ka[i - 1] === kb[j - 1] ? "equal" : "sub",
         a: a[i - 1]!,
         b: b[j - 1]!,
       });
@@ -74,7 +84,9 @@ function alignGreedy(a: readonly string[], b: readonly string[]): AlignOp[] {
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) ops.push({ op: "equal", a: a[i]!, b: b[j]! });
+    if (canonicalChar(a[i]!) === canonicalChar(b[j]!)) {
+      ops.push({ op: "equal", a: a[i]!, b: b[j]! });
+    }
     else ops.push({ op: "sub", a: a[i]!, b: b[j]! });
     i++;
     j++;

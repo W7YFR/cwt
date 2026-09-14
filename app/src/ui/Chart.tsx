@@ -25,6 +25,8 @@ export interface ChartProps {
   review: Review;
   /** Every attempt in the session. Omitted when there is one thing to show. */
   stack?: readonly Review[];
+  /** Session indices, in the order their rows go. */
+  order?: readonly number[];
   selected?: number;
   settings: ReviewSettings;
   focus: Focus | null;
@@ -93,6 +95,7 @@ function tipFor(hit: HitResult, unitSec: number): string {
 export function ChartView({
   review,
   stack,
+  order,
   selected,
   settings,
   focus,
@@ -162,9 +165,10 @@ export function ChartView({
       settings,
       focus,
       ...(stack ? { stack } : {}),
+      ...(order ? { order } : {}),
       ...(selected === undefined ? {} : { selected }),
     });
-  }, [review, stack, selected, settings, focus]);
+  }, [review, stack, order, selected, settings, focus]);
 
   useEffect(() => {
     chartRef.current?.setPlayhead(playhead);

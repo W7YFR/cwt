@@ -103,6 +103,14 @@ export interface Lane {
   layout: Layout;
   slots: readonly Slot[];
   analysis: Analysis;
+  /** Which attempt this is, counted in the order they were recorded.
+   *
+   * Carried on the lane rather than taken from its position, because the rows
+   * can be sorted. The third attempt is RUN 3 wherever it lands — renumbering
+   * by position would have the row you were reading take another attempt's
+   * name, and the Drop button offer to throw away a recording it did not
+   * name. */
+  ordinal: number;
   /** Nothing was recorded into this one, so its row is ghosts and none of
    *  them is a mistake. */
   blank?: boolean;
@@ -1028,10 +1036,10 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
              from one, in the order they were recorded, because that is what
              the Drop button calls them too. */
           ...scene.runs.map(
-            (_, r) =>
+            (lane, r) =>
               [
                 scene.rows.runs[r]!.row + ROW_H / 2,
-                scene.runs.length === 1 ? "YOU" : `RUN ${r + 1}`,
+                scene.runs.length === 1 ? "YOU" : `RUN ${lane.ordinal + 1}`,
                 r === scene.selected
                   ? C.you
                   : r === scene.picking

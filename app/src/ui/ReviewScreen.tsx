@@ -29,6 +29,7 @@ import { APP_NAME, Brandmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { reviewTake } from "@/timing";
+import { runOrder } from "./runOrder";
 import { baseName } from "./format";
 import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
@@ -150,6 +151,12 @@ export function ReviewScreen({
   );
   const shown = recording ? [incoming] : stack;
   const shownAt = recording ? 0 : selected;
+  /* Where each attempt's row goes. Session indices throughout — sorting moves
+     rows, and nothing else in here has to know that it did. */
+  const order = useMemo(
+    () => (recording ? [0] : runOrder(stack, settings.runSort)),
+    [recording, stack, settings.runSort],
+  );
   const [rereading, setRereading] = useState(false);
   /* Seconds left of the lead-in, or null when no cursor is running. Whole
      numbers only: this is state, and updating it every frame would re-render
@@ -576,6 +583,7 @@ export function ReviewScreen({
             on the page — they change what is on screen. */}
         <ViewControls
           settings={settings}
+          runs={stack.length}
           onChange={onChange}
           onFit={() => {
             const ppu = handle.chart?.fit();
@@ -585,6 +593,7 @@ export function ReviewScreen({
         <ChartView
           review={recording ? incoming : review}
           stack={shown}
+          order={order}
           selected={shownAt}
           onSelectRun={onSelectRun}
           settings={settings}

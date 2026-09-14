@@ -7,7 +7,12 @@
  * Some prosigns share their dit/dah pattern with a punctuation mark. Those
  * collisions resolve toward whichever reading is normal on the air (see
  * PROSIGN_OVERRIDES): .-.-. decodes as <AR> (end of message) rather than "+",
- * but -...- stays "=", the separator hams write literally.
+ * and -...- as <BT> rather than "=".
+ *
+ * Which name wins only decides what a decode is WRITTEN as. It never decides
+ * whether two of them match — see `canonicalChar`. Both names of a pair are
+ * the same keying, so both are correct to send and neither can be an error
+ * against the other.
  *
  * Ported from cw_decoder/morse.py and asserted equal to it by the oracle test,
  * so the browser cannot disagree with the Python decoder about what a pattern
@@ -52,11 +57,11 @@ export const CHAR_TO_MORSE: Readonly<Record<string, string>> = {
   ...PROSIGNS,
 };
 
-/* Which prosigns win over a colliding punctuation mark when decoding. <BT> is
-   intentionally absent, so -...- decodes as "=". The rest are operational
-   signals that on the air almost always mean the prosign. */
+/* Which prosigns win over a colliding punctuation mark when decoding — which
+   is a question about spelling and nothing more. Every one of these is an
+   operational signal that on the air almost always means the prosign. */
 const PROSIGN_OVERRIDES = [
-  "<AA>", "<AR>", "<AS>", "<BK>", "<CL>", "<CT>",
+  "<AA>", "<AR>", "<AS>", "<BK>", "<BT>", "<CL>", "<CT>",
   "<KN>", "<SK>", "<SN>", "<SOS>", "<HH>",
 ] as const;
 
@@ -72,6 +77,21 @@ export const MORSE_TO_CHAR: Readonly<Record<string, string>> = (() => {
   }
   return out;
 })();
+
+/** The name a character comes back as once it has been keyed and decoded.
+ *
+ * Some patterns have two names. `-...-` is both `=` and `<BT>`; `.-.-.` is
+ * both `+` and `<AR>`. A sender keying either name of a pair sends exactly the
+ * same dits and dahs, so a decode can only ever return whichever name the
+ * table picks — and comparing the two names as text then reports a
+ * substitution for sending precisely what was asked for.
+ *
+ * So comparison goes through here. Display does not: what you typed is what
+ * you meant, and the chart still shows it. */
+export function canonicalChar(ch: string): string {
+  const pat = CHAR_TO_MORSE[ch];
+  return pat ? (MORSE_TO_CHAR[pat] ?? ch) : ch;
+}
 
 /** Map a dit/dah string (e.g. ".-") to a character or prosign, or "?". */
 export function decodePattern(pattern: string): string {

@@ -127,6 +127,15 @@ export const GAIN_HELP =
   "Applied at playback only — the recording and any download stay at the level " +
   "you recorded.";
 
+export const RUN_SORT_HELP =
+  "What order the attempts are drawn in. Newest first while you are still " +
+  "going, most consistent first when you are looking for the one that went " +
+  "right. It changes where a row sits and nothing else — a run keeps the " +
+  "number it was recorded with wherever it lands, and nothing about the " +
+  "grading moves. Consistency rather than accuracy is what \u201cbest\u201d " +
+  "means here: you can send every character correctly and still be all over " +
+  "the place, and that is the thing being practiced.";
+
 export const ZOOM_HELP = "Or scroll over the chart, which zooms about the pointer";
 
 export const DEVIATION_SCOPE_NOTE =

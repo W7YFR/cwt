@@ -139,6 +139,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     flashCue: p.flashCue ?? base.flashCue,
     flashLeadMs: p.flashLeadMs ?? base.flashLeadMs,
     wordPreview: p.wordPreview ?? base.wordPreview,
+    runSort: (p.runSort as ReviewSettings["runSort"]) ?? base.runSort,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
   };
 }
@@ -158,6 +159,7 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     flashCue: prev.flashCue,
     flashLeadMs: prev.flashLeadMs,
     wordPreview: prev.wordPreview,
+    runSort: prev.runSort,
     view: prev.view,
   };
 }
@@ -183,6 +185,7 @@ export function useTake(): TakeState {
       flashCue: true,
       flashLeadMs: FLASH_LEAD_DEFAULT_MS,
       wordPreview: false,
+      runSort: "oldest",
       gainDb: 0,
       view: "per-char",
       ppu: 12,
@@ -244,6 +247,7 @@ export function useTake(): TakeState {
         flashCue: next.flashCue,
         flashLeadMs: next.flashLeadMs,
         wordPreview: next.wordPreview,
+        runSort: next.runSort,
         view: next.view,
       });
       // The rest of the settings belong to the take, so they ride along with

@@ -298,10 +298,16 @@ export interface ReviewSettings {
   /** Spell the word being sent under the card, greening each letter as it
    *  passes. The card alone says nothing about where a word ends. */
   wordPreview: boolean;
+  /** What order the attempts in a session are drawn in. Changes where a row
+   *  sits and nothing else — not what it is called, and not what is graded. */
+  runSort: RunSort;
   gainDb: number;
   view: ViewMode;
   ppu: number;
 }
+
+/** What order a session's attempts are drawn in — see ui/runOrder.ts. */
+export type RunSort = "oldest" | "newest" | "best" | "worst";
 
 export type ViewMode = "per-char" | "absolute" | "overlay";
 

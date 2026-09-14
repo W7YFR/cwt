@@ -740,10 +740,30 @@ def test_ideal_timeline_is_the_keying_synth_would_have_produced():
 
 
 def test_prosign_collision_policy():
-    # Pattern map: <AR> wins over "+", but "=" wins over <BT>.
+    # Which name a shared pattern is WRITTEN as: the prosign, in both cases.
     from cw_decoder.morse import decode_pattern
     assert decode_pattern(".-.-.") == "<AR>"
-    assert decode_pattern("-...-") == "="
+    assert decode_pattern("-...-") == "<BT>"
     # And it round-trips through real audio in a realistic message.
     assert _roundtrip("TU DE W7YFR <AR>", wpm=20).text.strip() == "TU DE W7YFR <AR>"
-    assert _roundtrip("RST 599 = QTH SEATTLE", wpm=20).text.strip() == "RST 599 = QTH SEATTLE"
+    assert (_roundtrip("RST 599 = QTH SEATTLE", wpm=20).text.strip()
+            == "RST 599 <BT> QTH SEATTLE")
+
+
+def test_shared_patterns_are_not_errors():
+    """Two names for one pattern are the same keying, so neither is wrong.
+
+    The spelling a decode comes back with is a table's choice; what the sender
+    did with the paddle is identical either way. Scoring the two names against
+    each other reported a substitution for sending exactly what was asked for.
+    """
+    from cw_decoder.core import compare_text
+    for a, b in (("<BT>", "="), ("+", "<AR>"), ("&", "<AS>")):
+        assert compare_text(a, b).accuracy == 1.0
+        assert compare_text(b, a).accuracy == 1.0
+        assert compare_text(a, b).substitutions == 0
+    # Without making every comparison pass: a different pattern is still wrong.
+    assert compare_text("<BT>", "A").substitutions == 1
+    # And what was written down is still what is shown.
+    got = compare_text("CQ <BT> DE", "CQ = DE")
+    assert "<BT>" in got.expected and "=" in got.decoded

@@ -381,6 +381,7 @@ export interface Prefs {
   flashCue?: boolean;
   flashLeadMs?: number;
   wordPreview?: boolean;
+  runSort?: string;
 }
 
 export function loadPrefs(): Prefs {

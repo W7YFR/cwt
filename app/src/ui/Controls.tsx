@@ -20,6 +20,7 @@ import {
   FLASH_CARD_HELP,
   FLASH_CUE_HELP,
   FLASH_LEAD_HELP,
+  RUN_SORT_HELP,
   WORD_PREVIEW_HELP,
   GAIN_HELP,
   PACE_CURSOR_HELP,
@@ -33,6 +34,7 @@ import {
   PACE_LEAD_MIN_SEC,
 } from "@/render/geometry";
 import { fmtGain, fmtPpu, fmtSeconds, fmtTolerance, fmtWpm } from "./format";
+import { RUN_SORTS, type RunSort } from "./runOrder";
 import { useUpperField } from "./useUpperField";
 
 export interface ControlsProps {
@@ -231,6 +233,10 @@ export interface ViewControlsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
   onFit(): void;
+  /** How many attempts are in the session. With one there is nothing to
+   *  order, and a control for arranging a single row is a control for
+   *  nothing. */
+  runs: number;
 }
 
 /** How the chart is drawn, next to the chart.
@@ -245,6 +251,25 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
   const { settings: s, onChange } = props;
   return (
     <section className="viewcontrols">
+      {props.runs > 1 && (
+        <div className="group">
+          <label htmlFor="run-sort" title={RUN_SORT_HELP}>
+            Sort
+          </label>
+          <select
+            id="run-sort"
+            value={s.runSort}
+            onChange={(e) => onChange({ runSort: e.target.value as RunSort })}
+          >
+            {RUN_SORTS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="group">
         <label htmlFor="view">View</label>
         <select

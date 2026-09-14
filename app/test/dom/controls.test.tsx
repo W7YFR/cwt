@@ -53,7 +53,7 @@ function Harness({
 const defaults = () => defaultSettings(takeFrom(caseNamed(SLOPPY)));
 
 function view(over: Partial<ReviewSettings>, onChange: (p: Partial<ReviewSettings>) => void) {
-  return <ViewControls settings={{ ...defaults(), ...over }} onChange={onChange} onFit={() => {}} />;
+  return <ViewControls runs={1} settings={{ ...defaults(), ...over }} onChange={onChange} onFit={() => {}} />;
 }
 
 function renderView({
@@ -69,7 +69,7 @@ function renderStateful() {
   function Harnessed() {
     const [s, set] = useState<ReviewSettings>({ ...defaults(), paceCursor: true });
     return (
-      <ViewControls
+      <ViewControls runs={1}
         settings={s}
         onChange={(patch) => set((prev) => ({ ...prev, ...patch }))}
         onFit={() => {}}
@@ -216,7 +216,7 @@ describe("controls", () => {
     }
 
     render(
-      <ViewControls
+      <ViewControls runs={1}
         settings={defaultSettings(take)}
         onChange={() => {}}
         onFit={() => {}}
@@ -284,7 +284,7 @@ describe("controls", () => {
     const take = takeFrom(caseNamed(SLOPPY));
     const onChange = vi.fn();
     render(
-      <ViewControls
+      <ViewControls runs={1}
         settings={defaultSettings(take)}
         onChange={onChange}
         onFit={() => {}}
@@ -345,7 +345,7 @@ describe("controls", () => {
     const onFit = vi.fn();
     const take = takeFrom(caseNamed(SLOPPY));
     render(
-      <ViewControls settings={defaultSettings(take)} onChange={() => {}} onFit={onFit} />,
+      <ViewControls runs={1} settings={defaultSettings(take)} onChange={() => {}} onFit={onFit} />,
     );
     await user.click(screen.getByRole("button", { name: "Fit" }));
     expect(onFit).toHaveBeenCalledOnce();
