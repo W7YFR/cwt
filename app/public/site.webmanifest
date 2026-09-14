@@ -1,0 +1,14 @@
+{
+  "name": "CWT — CW Trainer",
+  "short_name": "CWT",
+  "description": "Record your sending and see exactly where your keying timing is solid and where a little practice will sharpen it up.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#12151a",
+  "theme_color": "#12151a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
