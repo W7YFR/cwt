@@ -199,3 +199,41 @@ describe("coming back to a session", () => {
   });
 });
 
+describe("the speed a session declares", () => {
+  it("survives the first recording", () => {
+    /* A session is several attempts at one message at ONE speed — that is what
+       makes its rows comparable. Declaring 25/12 and then having the first
+       recording replace the overall speed with whatever it measured means the
+       figure you set is not the figure you are graded against, and the "wpm
+       overall (target N)" reading is quietly comparing you to yourself. */
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.reset({ charWpm: 25, farnsworthWpm: 12 }));
+    expect(result.current.settings.farnsworthWpm).toBe(12);
+
+    record(result, SLOPPY, "r1");
+    expect(result.current.settings.charWpm).toBe(25);
+    expect(result.current.settings.farnsworthWpm).toBe(12);
+  });
+
+  it("grades that recording against the speed declared, not its own", () => {
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.reset({ charWpm: 25, farnsworthWpm: 12 }));
+    record(result, SLOPPY, "r1");
+
+    const take = result.current.runs[0]!.take;
+    expect(take.target).toMatchObject({ charWpm: 25, farnsworthWpm: 12 });
+    // And it is recorded as a target that was asked for rather than inferred.
+    expect(take.target.explicit).toBe(true);
+  });
+
+  it("still reads an opened file at its own speed", () => {
+    /* A file was made somewhere else, possibly by somebody else, and nobody
+       declared anything about it. Inferring its speed is the only thing that
+       can be done, and it is what has always happened. */
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.reset({ charWpm: 25, farnsworthWpm: 12 }));
+    act(() => result.current.load(clipOf(SLOPPY), { source: "a-file.wav", id: "f1" }));
+    expect(result.current.runs[0]!.take.target.explicit).toBe(false);
+  });
+});
+

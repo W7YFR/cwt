@@ -273,7 +273,29 @@ export function useTake(): TakeState {
 
   const load = useCallback(
     (clip: AudioClip, options: AnalyzeOptions, data: ArrayBuffer | null = null) => {
-      const { take, clip: analyzed } = analyzeClip(clip, options);
+      /* What this attempt was aimed at.
+       *
+       * A session declares its speeds — in the New session dialog, or on the
+       * controls — and every microphone take in it is an attempt to hit them.
+       * Left unsaid, `analyzeClip` falls back to the speed it MEASURES off the
+       * recording, which then flows back into the settings through
+       * `openingSettings`: declare 25 over 12, send at 26 over 14, and the
+       * targets quietly become 26 and 14. The reading "wpm overall (target N)"
+       * is then comparing you against yourself, which can never be wrong and
+       * so can never be useful.
+       *
+       * A file is the exception and keeps inferring. It was made somewhere
+       * else, possibly by somebody else, and nobody declared anything about
+       * it. */
+      const aimed: AnalyzeOptions =
+        options.source === MIC_SOURCE && options.targetWpm === undefined
+          ? {
+              ...options,
+              targetWpm: settingsRef.current.charWpm,
+              targetFarnsworth: settingsRef.current.farnsworthWpm,
+            }
+          : options;
+      const { take, clip: analyzed } = analyzeClip(clip, aimed);
       const entry: LoadedTake = { take, clip: analyzed, data };
       /* The first attempt establishes what the session is about; later ones
          join it. So only the first sets the speed and the intended message —
