@@ -111,6 +111,33 @@ afterEach(async () => {
   localStorage.clear();
 });
 
+/** A drag carrying files, the way a browser reports one. */
+function drag(type: string) {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "dataTransfer", {
+    value: { types: ["Files"], files: [], dropEffect: "" },
+  });
+  window.dispatchEvent(event);
+  return event;
+}
+
+/** Drop a real, decodable recording on the window. */
+async function drop(name: string) {
+  const wav = encodeWavBuffer(
+    synthesize("TEST", targetTiming(20, 20), { rate: 8000 }).samples,
+    8000,
+  );
+  const file = new File([wav], name, { type: "audio/wav" });
+  const event = new Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "dataTransfer", {
+    value: { types: ["Files"], files: [file], dropEffect: "" },
+  });
+  await act(async () => {
+    window.dispatchEvent(event);
+    await new Promise((res) => setTimeout(res, 300));
+  });
+}
+
 async function mount() {
   root = createRoot(container);
   const r = root;
@@ -267,15 +294,6 @@ describe("the app", () => {
     await mount();
     expect(container.querySelector("canvas")).not.toBeNull();
 
-    const drag = (type: string) => {
-      const event = new Event(type, { bubbles: true, cancelable: true });
-      Object.defineProperty(event, "dataTransfer", {
-        value: { types: ["Files"], files: [], dropEffect: "" },
-      });
-      window.dispatchEvent(event);
-      return event;
-    };
-
     await act(async () => {
       drag("dragenter");
     });
@@ -291,6 +309,54 @@ describe("the app", () => {
       drag("dragleave");
     });
     expect(document.querySelector(".dropveil")).toBeNull();
+  });
+
+  it("ignores a file dropped onto a session that already has attempts", async () => {
+    /* A recording carries its own speed, and only the attempt that starts a
+       session gets to set one — so a file can begin a session but never join
+       one. The drag itself is left alone: the page still invites the drop,
+       because turning the invitation off would be a second rule to notice for
+       a gesture that costs nothing to repeat after clearing. */
+    await served();
+    await mount();
+    const before = container.textContent ?? "";
+    expect(before).toContain(TAKE.source);
+
+    /* And the invitation says so while the file is still in the air. Promising
+       to open it and then quietly doing nothing is the worse half of both
+       options — it looks broken rather than closed. */
+    await act(async () => {
+      drag("dragenter");
+    });
+    const veil = document.querySelector<HTMLElement>(".dropveil")!;
+    expect(veil.dataset.accepts).toBe("false");
+    expect(veil.textContent).toMatch(/speed|clear|new session/i);
+    await act(async () => {
+      drag("dragleave");
+    });
+
+    await drop("dropped.wav");
+    expect(container.textContent).toContain(TAKE.source);
+    expect(container.textContent).not.toContain("dropped.wav");
+    // Ignored, not failed: no error banner for a gesture that simply does not
+    // apply here.
+    expect(container.querySelector(".banner.error")).toBeNull();
+
+    // And accepted once there is no session for it to contradict — the
+    // invitation goes back to inviting.
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.click(),
+    );
+    await act(async () => {
+      drag("dragenter");
+    });
+    expect(document.querySelector<HTMLElement>(".dropveil")!.dataset.accepts).toBe("true");
+    await act(async () => {
+      drag("dragleave");
+    });
+
+    await drop("dropped.wav");
+    expect(container.textContent).toContain("dropped.wav");
   });
 
   it("puts a long filename on a row of its own", async () => {

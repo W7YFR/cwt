@@ -127,6 +127,13 @@ export const GAIN_HELP =
   "Applied at playback only — the recording and any download stay at the level " +
   "you recorded.";
 
+export const OPEN_FILE_HELP = "Open a recording from disk";
+
+/** Why a file cannot join a session that already has attempts in it. */
+export const OPEN_FILE_CLOSED =
+  "A recording sets the speed for the session, so it can only start one. " +
+  "Clear or start a new session to open a file.";
+
 export const RUN_SORT_HELP =
   "What order the attempts are drawn in. Newest first while you are still " +
   "going, most consistent first when you are looking for the one that went " +

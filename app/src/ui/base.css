@@ -942,6 +942,16 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   border: 1px solid var(--you);
   color: var(--ink);
   font-size: 15px;
+  max-width: 42ch;
+  text-align: center;
+  line-height: 1.5;
+}
+/* Nothing will be taken. Not an error — you have done nothing wrong by
+   dragging — so it steps back to the ordinary outline rather than going red. */
+.dropveil.closed { box-shadow: inset 0 0 0 3px var(--line); }
+.dropveil.closed p {
+  border-color: var(--line);
+  color: var(--ink-dim);
 }
 
 .busy {

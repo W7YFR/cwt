@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadAudioFile } from "@/capture/file";
-import { NoKeyingError } from "@/io/take";
+import { NoKeyingError, isBlankTake } from "@/io/take";
 import {
   activeProfile,
   loadProfiles,
@@ -23,6 +23,7 @@ import { Landing } from "./Landing";
 import { Settings } from "./Settings";
 import { ReviewScreen } from "./ReviewScreen";
 import { useFileDrop } from "./useFileDrop";
+import { OPEN_FILE_CLOSED } from "./copy";
 import { useTake } from "./useTake";
 
 /** How long the boot may take before it says anything.
@@ -212,8 +213,17 @@ export function App(): React.ReactElement {
     [onAudio],
   );
 
+  /* A file carries its own speed, and only the attempt that starts a session
+     gets to set one — so a file can begin a session but never join one. The
+     button beside Record says that when it is closed; a drop just does
+     nothing, rather than putting an error in front of somebody for a gesture
+     they can simply repeat after clearing. */
+  const canOpenFile = !take.loaded || isBlankTake(take.loaded.take);
+
   const dropping = useFileDrop({
-    onFile: (file) => void openFile(file),
+    onFile: (file) => {
+      if (canOpenFile) void openFile(file);
+    },
     onError: setError,
     disabled: opening,
   });
@@ -221,8 +231,15 @@ export function App(): React.ReactElement {
   return (
     <div className="app">
       {dropping && (
-        <div className="dropveil" role="presentation">
-          <p>Drop a recording to open it</p>
+        /* The invitation says which of the two it is. Letting it read "drop a
+           recording to open it" and then quietly doing nothing is the worse
+           half of both options: it promises, and then it looks broken. */
+        <div
+          className={`dropveil ${canOpenFile ? "" : "closed"}`}
+          role="presentation"
+          data-accepts={String(canOpenFile)}
+        >
+          <p>{canOpenFile ? "Drop a recording to open it" : OPEN_FILE_CLOSED}</p>
         </div>
       )}
 

@@ -12,6 +12,7 @@ import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
 import { profilesFor, type Profile } from "@/io/profiles";
 import { fmtElapsed } from "./format";
+import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import type { RecorderHandle } from "./useRecorder";
 
 /** The dot on every button that starts a recording.
@@ -200,12 +201,7 @@ export function RecordBar({
             data-testid="open-file"
             disabled={!canOpenFile}
             aria-label="Open a recording"
-            title={
-              canOpenFile
-                ? "Open a recording from disk"
-                : "A recording sets the speed for the session, so it can only" +
-                  " start one. Clear or start a new session to open a file."
-            }
+            title={canOpenFile ? OPEN_FILE_HELP : OPEN_FILE_CLOSED}
             onClick={() => fileInput.current?.click()}
           >
             <span aria-hidden="true">↑</span>
