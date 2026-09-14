@@ -88,9 +88,14 @@ function mount(over: Partial<ReviewSettings>) {
   function Harness() {
     const [settings, setSettings] = useState<ReviewSettings>(latest);
     latest = settings;
+    const review = reviewTake(take, settings);
     return createElement(ReviewScreen, {
       loaded,
-      review: reviewTake(take, settings),
+      review,
+      stack: [review],
+      selected: 0,
+      onSelectRun: () => {},
+      onDropRun: () => {},
       settings,
       onChange: (patch) => {
         if (patch.view) seen.push(patch.view);

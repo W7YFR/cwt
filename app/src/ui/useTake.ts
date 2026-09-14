@@ -52,6 +52,18 @@ export interface AdoptOptions {
 
 export interface TakeState {
   loaded: LoadedTake | null;
+  /** Every attempt in this session, oldest first. */
+  runs: readonly LoadedTake[];
+  /** Which of them is being read in detail. */
+  selected: number;
+  /** One review per run, all against the same target. */
+  reviews: readonly Review[];
+  selectRun(i: number): void;
+  /** Throw away one attempt and keep the rest — a sneeze, a dropped paddle.
+   *
+   * Distinct from `reset`, which wipes the whole session. A bad run is the
+   * common case and wants one click; starting over is the rarer one. */
+  dropRun(i: number): void;
   settings: ReviewSettings;
   review: Review | null;
   setSettings(patch: Partial<ReviewSettings>): void;
@@ -141,7 +153,12 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
 }
 
 export function useTake(): TakeState {
-  const [loaded, setLoaded] = useState<LoadedTake | null>(null);
+  /* A session is several attempts at one message, so what is held is a list.
+   * `loaded` is whichever of them is being read in detail — everything below
+   * the chart is about one attempt, and the list is what the chart draws. */
+  const [runs, setRuns] = useState<LoadedTake[]>([]);
+  const [selected, setSelected] = useState(0);
+  const loaded = runs[selected] ?? runs[runs.length - 1] ?? null;
   const [settings, setSettingsRaw] = useState<ReviewSettings>(() =>
     restorePrefs({
       charWpm: 20,
@@ -161,6 +178,16 @@ export function useTake(): TakeState {
       ppu: 12,
     }),
   );
+
+  const runsRef = useRef(runs);
+  runsRef.current = runs;
+
+  /** Start a session over with one attempt in it. */
+  const showOnly = useCallback((entry: LoadedTake) => {
+    setRuns([entry]);
+    setSelected(0);
+    runsRef.current = [entry];
+  }, []);
 
   /* Read by the callbacks below, which are deliberately stable: a settings
      change must not rebuild `load`, or every consumer of it re-renders on
@@ -218,12 +245,21 @@ export function useTake(): TakeState {
   const load = useCallback(
     (clip: AudioClip, options: AnalyzeOptions, data: ArrayBuffer | null = null) => {
       const { take, clip: analyzed } = analyzeClip(clip, options);
-      setLoaded({ take, clip: analyzed, data });
-      loadedRef.current = { take, clip: analyzed, data };
+      const entry: LoadedTake = { take, clip: analyzed, data };
+      /* The first attempt establishes what the session is about; later ones
+         join it. So only the first sets the speed and the intended message —
+         letting run 2 do that would replace the target halfway through a
+         session with whatever that run happened to be recorded against, and
+         re-grade everything already on screen. */
+      const first = runsRef.current.filter((r) => !isBlankTake(r.take)).length === 0;
+      const next = first ? openingSettings(take, settingsRef.current) : settingsRef.current;
+
+      const stacked = first ? [entry] : [...runsRef.current, entry];
+      setRuns(stacked);
+      runsRef.current = stacked;
+      setSelected(stacked.length - 1);
+      loadedRef.current = entry;
       takeIdRef.current = take.id;
-      // A new recording resets the speed and the intended message — those
-      // belong to it — but keeps the preferences restored above.
-      const next = openingSettings(take, settingsRef.current);
       setSettingsRaw(next);
 
       /* A file keeps its own bytes; a microphone take has none until they are
@@ -249,7 +285,7 @@ export function useTake(): TakeState {
         clip: { samples: new Float32Array(0), rate: take.rate, peak: take.peak },
         data: audio,
       };
-      setLoaded(entry);
+      showOnly(entry);
       loadedRef.current = entry;
       takeIdRef.current = take.id;
       const next = options.settings ?? openingSettings(take, settingsRef.current);
@@ -300,7 +336,12 @@ export function useTake(): TakeState {
 
     // Same recording, same identity — not a new entry in the history each
     // time somebody tries a different profile.
-    setLoaded({ take: next, clip: current.clip, data: current.data });
+    const reread: LoadedTake = { take: next, clip: current.clip, data: current.data };
+    setRuns((prev) => {
+      const out = prev.map((r) => (r.take.id === take.id ? reread : r));
+      runsRef.current = out;
+      return out;
+    });
     /* And the same settings. Zoom, tolerance, speeds and intended text belong
        to the person looking, not to the analysis, and resetting them here
        would punish exactly the comparison this exists for. */
@@ -338,7 +379,7 @@ export function useTake(): TakeState {
       clip: { samples: new Float32Array(0), rate: take.rate, peak: 0 },
       data: null,
     };
-    setLoaded(entry);
+    showOnly(entry);
     loadedRef.current = entry;
     takeIdRef.current = null;
     settingsRef.current = s;
@@ -350,7 +391,9 @@ export function useTake(): TakeState {
   }, []);
 
   const clear = useCallback(() => {
-    setLoaded(null);
+    setRuns([]);
+    setSelected(0);
+    runsRef.current = [];
     takeIdRef.current = null;
     // The recording stays in storage — leaving the review is not throwing it
     // away — but a reload should now land on the landing screen, because that
@@ -358,13 +401,38 @@ export function useTake(): TakeState {
     forgetCurrentTake();
   }, []);
 
-  const review = useMemo(
-    () => (loaded ? reviewTake(loaded.take, settings) : null),
-    [loaded, settings],
+  /* Every attempt, graded against the same target at the same settings.
+   *
+   * One review each rather than one review of several takes: a Review pairs
+   * one decode against one target, and that is exactly what a run is. What
+   * they share is the target, which comes out of the settings — so changing a
+   * speed or fixing a typo in the message re-grades the whole session at once,
+   * which is what keeps the rows comparable. */
+  const reviews = useMemo(
+    () => runs.map((r) => reviewTake(r.take, settings)),
+    [runs, settings],
   );
+  const review = reviews[selected] ?? reviews[reviews.length - 1] ?? null;
+
+  const selectRun = useCallback((i: number) => {
+    setSelected((prev) => (i >= 0 && i < runsRef.current.length ? i : prev));
+  }, []);
+
+  const dropRun = useCallback((i: number) => {
+    const rest = runsRef.current.filter((_, k) => k !== i);
+    runsRef.current = rest;
+    setRuns(rest);
+    // Land on the attempt that took its place, or the last one if it was.
+    setSelected((prev) => Math.max(0, Math.min(prev > i ? prev - 1 : prev, rest.length - 1)));
+  }, []);
 
   return {
     loaded,
+    runs,
+    selected,
+    reviews,
+    selectRun,
+    dropRun,
     settings,
     review,
     setSettings,

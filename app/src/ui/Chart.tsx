@@ -23,6 +23,9 @@ export interface ChartHandle {
 
 export interface ChartProps {
   review: Review;
+  /** Every attempt in the session. Omitted when there is one thing to show. */
+  stack?: readonly Review[];
+  selected?: number;
   settings: ReviewSettings;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
@@ -31,6 +34,7 @@ export interface ChartProps {
      nothing would be a control that lies. */
   onPlayChar?: ChartCallbacks["onPlayChar"];
   onSeek?: ChartCallbacks["onSeek"];
+  onSelectRun?: ChartCallbacks["onSelectRun"];
   onZoom?: ChartCallbacks["onZoom"];
   /** The view moved. Used to keep more than one chart in step. */
   onScroll?: ChartCallbacks["onScroll"];
@@ -88,11 +92,14 @@ function tipFor(hit: HitResult, unitSec: number): string {
 
 export function ChartView({
   review,
+  stack,
+  selected,
   settings,
   focus,
   playhead,
   onPlayChar,
   onSeek,
+  onSelectRun,
   onZoom,
   onScroll,
   handle,
@@ -105,8 +112,8 @@ export function ChartView({
   // Callbacks are held in a ref so the chart is created exactly once. Passing
   // them straight through would tear the canvas down and rebuild it on every
   // parent render, losing the scroll position each time.
-  const cb = useRef({ onPlayChar, onSeek, onZoom, onScroll });
-  cb.current = { onPlayChar, onSeek, onZoom, onScroll };
+  const cb = useRef({ onPlayChar, onSeek, onSelectRun, onZoom, onScroll });
+  cb.current = { onPlayChar, onSeek, onSelectRun, onZoom, onScroll };
   const unitRef = useRef(review.ref.unitSec);
   unitRef.current = review.ref.unitSec;
   const blocksRef = useRef(settings.charMarkers);
@@ -120,6 +127,7 @@ export function ChartView({
     const chart = createChart(host, canvas, {
       onPlayChar: (...a) => cb.current.onPlayChar?.(...a),
       onSeek: (...a) => cb.current.onSeek?.(...a),
+      onSelectRun: (...a) => cb.current.onSelectRun?.(...a),
       onZoom: (...a) => cb.current.onZoom?.(...a),
       onScroll: (...a) => cb.current.onScroll?.(...a),
       onHover: (hit, x, y) => {
@@ -149,8 +157,14 @@ export function ChartView({
   }, [handle]);
 
   useEffect(() => {
-    chartRef.current?.update({ review, settings, focus });
-  }, [review, settings, focus]);
+    chartRef.current?.update({
+      review,
+      settings,
+      focus,
+      ...(stack ? { stack } : {}),
+      ...(selected === undefined ? {} : { selected }),
+    });
+  }, [review, stack, selected, settings, focus]);
 
   useEffect(() => {
     chartRef.current?.setPlayhead(playhead);

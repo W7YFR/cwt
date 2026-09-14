@@ -35,6 +35,12 @@ import type { LoadedTake } from "./useTake";
 export interface ReviewScreenProps {
   loaded: LoadedTake;
   review: Review;
+  /** Every attempt in this session, oldest first, all against one target. */
+  stack: readonly Review[];
+  selected: number;
+  onSelectRun(i: number): void;
+  /** Throw away one attempt and keep the rest. */
+  onDropRun(i: number): void;
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
   /* Recording again without leaving: having just seen where your spacing
@@ -81,6 +87,10 @@ const EMPTY_WORDS: readonly Word[] = [];
 export function ReviewScreen({
   loaded,
   review,
+  stack,
+  selected,
+  onSelectRun,
+  onDropRun,
   settings,
   onChange,
   onAudio,
@@ -489,6 +499,8 @@ export function ReviewScreen({
           rereading={rereading}
           leadLeft={leadLeft}
           onClear={blank ? undefined : onClear}
+          onDropRun={blank ? undefined : () => onDropRun(selected)}
+          runOf={{ at: selected, of: stack.length }}
         />
         {/* Last, and on a row of its own: a filename is the one thing here
             whose width nobody controls, and beside the brand it pushed the
@@ -543,6 +555,9 @@ export function ReviewScreen({
         />
         <ChartView
           review={review}
+          stack={stack}
+          selected={selected}
+          onSelectRun={onSelectRun}
           settings={settings}
           focus={focus}
           playhead={playhead}

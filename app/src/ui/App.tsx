@@ -265,6 +265,10 @@ export function App(): React.ReactElement {
         <ReviewScreen
           loaded={take.loaded}
           review={take.review}
+          stack={take.reviews}
+          selected={take.selected}
+          onSelectRun={take.selectRun}
+          onDropRun={take.dropRun}
           settings={take.settings}
           /* The intended message is not a property of the take being looked
              at — it is what you are practicing, and it outlives every attempt

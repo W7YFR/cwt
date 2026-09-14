@@ -953,7 +953,19 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
         ]
       : [
           [scene.rows.tgt + ROW_H / 2, "TGT", C.tgt],
-          [scene.rows.runs[0]!.row + ROW_H / 2, "YOU", C.you],
+          /* One name per attempt. "YOU" only while there is one of them —
+             with a stack, which attempt a row is is the thing you need from
+             this band, and four rows all called YOU would not say it. Numbered
+             from one, in the order they were recorded, because that is what
+             the Drop button calls them too. */
+          ...scene.runs.map(
+            (_, r) =>
+              [
+                scene.rows.runs[r]!.row + ROW_H / 2,
+                scene.runs.length === 1 ? "YOU" : `RUN ${r + 1}`,
+                r === scene.selected ? C.you : C["ink-dim"],
+              ] as [number, string, string],
+          ),
           [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],
         ];
   for (const [y, label, color] of rows) {

@@ -45,6 +45,13 @@ import { readPalette, type Palette } from "./theme";
 export interface ChartCallbacks {
   /** A character was clicked on one of the tracks. */
   onPlayChar?: (side: "you" | "tgt", from: number, to: number) => void;
+  /** A row other than the one being read was clicked.
+   *
+   * Picking it up rather than playing it: the report below the chart, the
+   * audio and the caption band all follow the selection, so the first click on
+   * another attempt is what moves them there. A second click then plays it,
+   * out of the right recording. */
+  onSelectRun?: (run: number) => void;
   /** The ruler was clicked: seek and play from here. */
   onSeek?: (t: number) => void;
   /** Pointer moved over (or off) a block, for the tooltip. */
@@ -61,7 +68,15 @@ export interface ChartCallbacks {
 }
 
 export interface ChartInput {
+  /** The attempt being read in detail: the captioned row, and the one the
+   *  report below the chart is about. */
   review: Review;
+  /** Every attempt in the session, oldest first. Omitted by a chart that is
+   *  showing one thing — the calibration preview is one — in which case the
+   *  stack is just `review`. */
+  stack?: readonly Review[];
+  /** Which of `stack` is `review`. */
+  selected?: number;
   settings: ReviewSettings;
   focus: Focus | null;
 }
@@ -133,7 +148,14 @@ export function createChart(
      them to disagree. */
   let lanes: Lane[] = [];
   let rows = rowsFor(1, 0);
-  const selected = 0;
+  let selected = 0;
+
+  /** The attempts to draw, and which one is being read. */
+  function stackOf(inp: ChartInput): { reviews: readonly Review[]; selected: number } {
+    const reviews = inp.stack && inp.stack.length ? inp.stack : [inp.review];
+    const at = inp.selected ?? reviews.indexOf(inp.review);
+    return { reviews, selected: at >= 0 && at < reviews.length ? at : reviews.length - 1 };
+  }
   let palette: Palette = readPalette(document.body);
   let scrollX = 0;
   let hover: Block | null = null;
@@ -165,8 +187,8 @@ export function createChart(
       selected,
       ...(columns ? { columns } : {}),
       layout,
-      slots: input.review.slots,
-      analysis: input.review.analysis,
+      slots: lanes[selected]!.slots,
+      analysis: lanes[selected]!.analysis,
       rows,
       palette,
       view: input.settings.view,
@@ -197,28 +219,36 @@ export function createChart(
 
   function relayout(): void {
     if (!input) return;
+    const stack = stackOf(input);
+    selected = stack.selected;
+
+    /* One axis for every attempt, measured before any of them is laid out —
+       which is what makes a column mean the same thing on every row. */
     columns =
       input.settings.view === "per-char"
-        ? measureColumns([input.review.slots], input.settings.ppu)
+        ? measureColumns(stack.reviews.map((r) => r.slots), input.settings.ppu)
         : undefined;
-    layout = buildLayout(input.review, {
-      ...(columns ? { columns, run: 0 } : {}),
+
+    const opts = {
       view: input.settings.view,
       ppu: input.settings.ppu,
-      durationSec: input.review.take.durationSec,
       leadSec,
       // The same runway either side: it is the room a centered playhead needs
       // to keep moving at both ends, and one number is one thing to get wrong.
       tailSec: leadSec,
-    });
-    lanes = [
-      {
-        layout,
-        slots: input.review.slots,
-        analysis: input.review.analysis,
-        blank: input.review.take.segments.length === 0,
-      },
-    ];
+    };
+
+    lanes = stack.reviews.map((review, r) => ({
+      layout: buildLayout(review, {
+        ...opts,
+        durationSec: review.take.durationSec,
+        ...(columns ? { columns, run: r } : {}),
+      }),
+      slots: review.slots,
+      analysis: review.analysis,
+      blank: review.take.segments.length === 0,
+    }));
+    layout = lanes[selected]!.layout;
     rows = rowsFor(lanes.length, selected);
   }
 
@@ -426,6 +456,13 @@ export function createChart(
     }
     const h = hitAt(p);
     if (!h || !input) return;
+
+    // Another attempt: pick it up. Its audio and its numbers are not on screen
+    // yet, and playing out of the wrong recording is worse than one more click.
+    if (h.row === "you" && h.run !== selected) {
+      callbacks.onSelectRun?.(h.run);
+      return;
+    }
 
     /* A mark is its own context; a gap is not.
      *

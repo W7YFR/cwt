@@ -123,6 +123,14 @@ export interface RecordBarProps {
   /** Throw the recording away and stay here. Absent when there is nothing to
    *  throw away. */
   onClear?: (() => void) | undefined;
+  /** Throw away the attempt being read and keep the rest of the session.
+   *
+   * Only offered when there is a rest of the session to keep — with one
+   * attempt on screen, dropping it and clearing are the same act, and two
+   * buttons for it would be two ways to ask the same question. */
+  onDropRun?: (() => void) | undefined;
+  /** Which attempt is being read, and how many there are. */
+  runOf?: { at: number; of: number } | undefined;
 }
 
 /** Record another, without leaving the review. */
@@ -137,6 +145,8 @@ export function RecordBar({
   rereading,
   leadLeft,
   onClear,
+  onDropRun,
+  runOf,
 }: RecordBarProps): React.ReactElement {
   if (rec.recorder) {
     return (
@@ -179,6 +189,15 @@ export function RecordBar({
           pacing cursor — and drops only what was recorded into it, which is
           the loop. Set it up, hear the target, send it, look at it, wipe it,
           send it again. */}
+      {onDropRun && runOf && runOf.of > 1 && (
+        <button
+          onClick={onDropRun}
+          data-testid="drop-run"
+          title="Throw away this attempt and keep the others"
+        >
+          Drop run {runOf.at + 1}
+        </button>
+      )}
       {onClear && (
         <button
           onClick={onClear}
