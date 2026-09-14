@@ -11,7 +11,13 @@ import {
   selectProfile,
   type Profile,
 } from "@/io/profiles";
-import { loadPrefs, recallTake, savePrefs } from "@/io/storage";
+import {
+  loadPrefs,
+  recallSelected,
+  recallSession,
+  recallTake,
+  savePrefs,
+} from "@/io/storage";
 import type { AudioClip } from "@/types";
 import { Calibrate } from "./Calibrate";
 import { Landing } from "./Landing";
@@ -87,6 +93,28 @@ export function App(): React.ReactElement {
           take.adopt(bundle.take, bundle.audio);
           return;
         }
+        /* A whole session, when there was one: several attempts at one
+           message are what you were in the middle of, and coming back to the
+           last of them alone would look like the others had been thrown
+           away. */
+        const session = await recallSession();
+        if (!live) return;
+        if (session.length) {
+          const entries = await Promise.all(
+            session.map(async (e) => ({
+              take: e.take,
+              audio: await e.audio.arrayBuffer(),
+              settings: e.settings,
+            })),
+          );
+          if (!live) return;
+          take.adoptSession(entries, recallSelected());
+          return;
+        }
+
+        /* One take, for a review that was left before sessions existed. The
+           ordering is what is new; the takes themselves are stored the way
+           they always were, so an old one still opens. */
         const saved = await recallTake();
         if (!live || !saved) return;
         take.adopt(saved.take, await saved.audio.arrayBuffer(), {

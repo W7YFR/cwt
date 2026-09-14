@@ -10,6 +10,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useTake } from "@/ui/useTake";
 import { MIC_SOURCE } from "@/io/take";
+import { loadPrefs } from "@/io/storage";
 import { caseNamed, CLEAN, SLOPPY } from "../fixture";
 import { oracleSegments } from "../oracle";
 import type { AudioClip } from "@/types";
@@ -133,3 +134,68 @@ describe("a practice session", () => {
     expect(result.current.runs[0]!.take.segments.length).toBeGreaterThan(0);
   });
 });
+
+describe("coming back to a session", () => {
+  it("writes down the order and which attempt was being read", () => {
+    const { result } = renderHook(() => useTake());
+    record(result, SLOPPY, "r1");
+    record(result, CLEAN, "r2");
+    act(() => result.current.selectRun(0));
+
+    const saved = loadPrefs().session!;
+    expect(saved.ids).toEqual(result.current.runs.map((r) => r.take.id));
+    expect(saved.selected).toBe(0);
+  });
+
+  it("does not wipe it on the way up", () => {
+    /* The bug this exists for: the effect that records the session also ran on
+       the very first render, with nothing loaded — and it runs before the one
+       that restores. Clearing on an empty list wiped the thing about to be
+       restored, so every reload lost the stack and looked like the recording
+       had failed rather than the bookkeeping. */
+    const first = renderHook(() => useTake());
+    record(first.result, SLOPPY, "r1");
+    record(first.result, CLEAN, "r2");
+    const wanted = loadPrefs().session!;
+    first.unmount();
+
+    // A fresh page: the hook mounts with nothing in it, as it would on boot.
+    renderHook(() => useTake());
+    expect(loadPrefs().session).toEqual(wanted);
+  });
+
+  it("opens every attempt again, reading the one that was being read", () => {
+    const first = renderHook(() => useTake());
+    record(first.result, SLOPPY, "r1");
+    record(first.result, CLEAN, "r2");
+    act(() => first.result.current.setSettings({ expected: "CQ DE W7YFR" }));
+    const ids = first.result.current.runs.map((r) => r.take.id);
+    const takes = first.result.current.runs.map((r) => r.take);
+    first.unmount();
+
+    const back = renderHook(() => useTake());
+    act(() =>
+      back.result.current.adoptSession(
+        takes.map((take) => ({ take, audio: new ArrayBuffer(0) })),
+        0,
+      ),
+    );
+    expect(back.result.current.runs.map((r) => r.take.id)).toEqual(ids);
+    expect(back.result.current.selected).toBe(0);
+    expect(back.result.current.reviews).toHaveLength(2);
+  });
+
+  it("carries the session's settings back rather than rebuilding them", () => {
+    /* The intended message is the one thing every attempt shares, and it lives
+       in the settings rather than on any one take. Rebuilding from a take
+       would drop it and re-grade the session against its own decode. */
+    const { result } = renderHook(() => useTake());
+    record(result, SLOPPY, "r1");
+    const take = result.current.runs[0]!.take;
+    const settings = { ...result.current.settings, expected: "PARIS PARIS" };
+
+    act(() => result.current.adoptSession([{ take, audio: new ArrayBuffer(0), settings }], 0));
+    expect(result.current.settings.expected).toBe("PARIS PARIS");
+  });
+});
+

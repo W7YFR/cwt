@@ -198,7 +198,13 @@ export function useTake(): TakeState {
      failed rather than like the bookkeeping did. */
   useEffect(() => {
     const ids = runs.filter((r) => !isBlankTake(r.take)).map((r) => r.take.id);
-    rememberSession(ids, Math.min(selected, Math.max(ids.length - 1, 0)));
+    /* Only ever written, never cleared from here. On the first render there is
+       nothing loaded yet — and this effect runs before the one that restores a
+       session, so clearing on an empty list would wipe the thing we are about
+       to come back to, every single reload. Forgetting a session is Clear's
+       job, and it says so explicitly. */
+    if (ids.length === 0) return;
+    rememberSession(ids, Math.min(selected, ids.length - 1));
   }, [runs, selected]);
 
   /** Start a session over with one attempt in it. */
