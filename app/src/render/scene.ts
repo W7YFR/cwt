@@ -33,7 +33,13 @@ import {
 } from "./geometry";
 import { subLabel } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
-import { gapWidth, isRest, timeToX, type Layout } from "./layout";
+import {
+  gapWidth,
+  isRest,
+  timeToX,
+  type ColumnMetrics,
+  type Layout,
+} from "./layout";
 import type { Palette } from "./theme";
 
 /** Exactly the 2D context surface the renderer uses. */
@@ -89,10 +95,28 @@ export interface Viewport {
   maxScroll: number;
 }
 
-export interface Scene {
-  /** Nothing has been recorded into this session yet, so the "yours" row is
-   *  ghosts and none of them is a mistake. */
+/** One attempt, and everything drawing its row needs.
+ *
+ * Every lane is paired against the same target, so they share a column axis
+ * and can be read down a column as well as along a row. */
+export interface Lane {
+  layout: Layout;
+  slots: readonly Slot[];
+  analysis: Analysis;
+  /** Nothing was recorded into this one, so its row is ghosts and none of
+   *  them is a mistake. */
   blank?: boolean;
+}
+
+export interface Scene {
+  /** The attempts on screen, in the order they are drawn. */
+  runs: readonly Lane[];
+  /** Which of them is being read in detail: the one with a caption band, and
+   *  the one the report below the chart is about. */
+  selected: number;
+  /** The shared per-character column axis. Absent in the time views, which
+   *  need no columns — there the axis is the clock. */
+  columns?: ColumnMetrics;
   /** Draw each character as a fixed-width marker at the moment it starts,
    *  rather than as its own dits and dahs. See `drawCharMarker`. */
   charMarkers?: boolean;
@@ -291,77 +315,111 @@ function sentCaption(slot: Slot, blank: boolean): { text: string; bad: boolean }
   return { text: slot.actual ? slot.actual.char : "·", bad: false };
 }
 
-/** One slot: the lead gap, then the character's marks, on both tracks. */
-function drawPerChar(ctx: Ctx2D, scene: Scene): void {
+/** The per-character view: the target once, then every attempt at it.
+ *
+ * Split that way because the two halves answer to different things. The target
+ * belongs to the COLUMN — it is the same on every row and it is what the
+ * columns are keyed to — while what was sent belongs to a run. Drawing the
+ * target from whichever run happened to be selected would leave a column the
+ * selected run has nothing in saying nothing about what was asked for there.
+ */
+function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
   const C = scene.palette;
-  for (const it of scene.layout.items) {
+  const cols = scene.columns;
+  if (!cols) return;
+  const bottom = scene.rows.runs[scene.rows.runs.length - 1]!;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let c = 0; c < cols.x.length; c++) {
+    const x = cols.x[c]!;
+    const gapW = cols.gapW[c]!;
+    const bodyW = cols.bodyW[c]!;
+    if (!visible(x, gapW + bodyW, scene)) continue;
+    const ideal = cols.ideal[c] ?? null;
+    const bx = x + gapW;
+
+    /* The message you meant to send, and nothing else. It is the reference, so
+       it is never marked up — a character cannot be wrong in the text that
+       defines what right is. Where some run sent something that was not asked
+       for there is no intended character at all, and the blank says so. */
+    ctx.fillStyle = C.ink;
+    ctx.font = `600 12px ${C.mono}`;
+    ctx.fillText(ideal ? ideal.char : "·", bx + bodyW / 2, scene.rows.tgtLabel + LABEL_H / 2);
+
+    // Where the character starts, when the gaps arriving here disagree about
+    // it. Drawn once, down the whole stack: it is a fact about the column.
+    if (cols.ragged[c]) {
+      ctx.strokeStyle = C.line;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(bx - 0.5, scene.rows.tgt + 2);
+      ctx.lineTo(bx - 0.5, bottom.row + ROW_H - 2);
+      ctx.stroke();
+    }
+
+    drawGap(ctx, scene, ideal?.leadGap ?? null, x, gapWidth(ideal?.leadGap, scene.layout.ppu), scene.rows.tgt, true);
+    if (ideal) drawMarks(ctx, scene, ideal, bx, scene.rows.tgt, true);
+    else drawGhost(ctx, scene, bx, bodyW, scene.rows.tgt);
+  }
+}
+
+/** One attempt's row: its lead gaps, its marks, its grade, and — if it is the
+ *  one being read — what it decoded to. */
+function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
+  const C = scene.palette;
+  const lane = scene.runs[r]!;
+  const row = scene.rows.runs[r]!;
+  const blank = lane.blank === true;
+
+  for (const it of lane.layout.items) {
     if (it.x === null || !visible(it.x, it.w, scene)) continue;
     const slot = it.slot;
+    const bx = it.x + it.gapW;
+    const mid = bx + it.bodyW / 2;
 
-    const mid = it.x + it.gapW + it.bodyW / 2;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    /* Above the target row: the message you meant to send, and nothing else.
-       It is the reference, so it is never marked up — a character cannot be
-       wrong in the text that defines what right is. Where you sent something
-       that was not asked for there is no intended character at all, and the
-       blank says exactly that. */
-    ctx.fillStyle = C.ink;
-    ctx.font = `600 12px ${C.mono}`;
-    ctx.fillText(slot.ideal ? slot.ideal.char : "·", mid, scene.rows.tgtLabel + LABEL_H / 2);
-
-    /* Below your row: what came out, and how it differs from the line above.
+    /* What came out, and how it differs from the target above.
      *
      * All of it suppressed when nothing has been recorded. Against an empty
      * decode the alignment quite correctly calls every character a deletion
      * and every word boundary a missing space — and drawing that reads as a
      * page of faults in sending that has not happened yet. */
-    const blank = scene.blank === true;
-    const cap = sentCaption(slot, blank);
-    ctx.fillStyle = cap.bad ? C.bad : C.ink;
-    ctx.font = `600 12px ${C.mono}`;
-    ctx.fillText(cap.text, mid, scene.rows.runs[0]!.label! + LABEL_H / 2);
+    if (row.label !== null) {
+      const cap = sentCaption(slot, blank);
+      ctx.fillStyle = cap.bad ? C.bad : C.ink;
+      ctx.font = `600 12px ${C.mono}`;
+      ctx.fillText(cap.text, mid, row.label + LABEL_H / 2);
 
-    // A word-boundary error is a fault in what was sent, so it is called out
-    // beside that row's caption, over the gap that caused it.
-    if (!blank && (slot.spaceOp === "del" || slot.spaceOp === "ins")) {
-      ctx.fillStyle = C.bad;
-      ctx.font = `600 9px ${C.mono}`;
-      ctx.fillText(
-        slot.spaceOp === "del" ? "no space" : "extra space",
-        it.x + it.gapW / 2,
-        scene.rows.runs[0]!.label! + LABEL_H - 5,
-      );
+      // A word-boundary error is a fault in what was sent, so it is called out
+      // beside that row's caption, over the gap that caused it.
+      if (!blank && (slot.spaceOp === "del" || slot.spaceOp === "ins")) {
+        ctx.fillStyle = C.bad;
+        ctx.font = `600 9px ${C.mono}`;
+        ctx.fillText(
+          slot.spaceOp === "del" ? "no space" : "extra space",
+          it.x + it.gapW / 2,
+          row.label + LABEL_H - 5,
+        );
+      }
     }
 
-    const bx = it.x + it.gapW;
-
-    // Where the character starts. Both rows' gaps begin at the slot's left
-    // edge, but the slot is as wide as the LONGER of the two, so the shorter
-    // gap's bracket stops short of this line. Without the line that shortfall
-    // reads as a rendering gap instead of the measurement it is.
-    if (it.gapW > 0 && Math.abs(it.youGapW - it.tgtGapW) > 1.5) {
-      ctx.strokeStyle = C.line;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(bx - 0.5, scene.rows.tgt + 2);
-      ctx.lineTo(bx - 0.5, scene.rows.runs[0]!.row + ROW_H - 2);
-      ctx.stroke();
-    }
-
-    drawGap(ctx, scene, slot.actual?.leadGap ?? null, it.x, it.youGapW, scene.rows.runs[0]!.row, false);
-    drawGap(ctx, scene, slot.ideal?.leadGap ?? null, it.x, it.tgtGapW, scene.rows.tgt, true);
+    drawGap(ctx, scene, slot.actual?.leadGap ?? null, it.x, it.youGapW, row.row, false);
 
     // A side with no character gets an outlined ghost, so a missed or an extra
     // character reads as a hole rather than as a shifted neighbor.
-    if (slot.actual) drawMarks(ctx, scene, slot.actual, bx, scene.rows.runs[0]!.row, false);
-    else drawGhost(ctx, scene, bx, it.bodyW, scene.rows.runs[0]!.row);
-    if (slot.ideal) drawMarks(ctx, scene, slot.ideal, bx, scene.rows.tgt, true);
-    else drawGhost(ctx, scene, bx, it.bodyW, scene.rows.tgt);
+    if (slot.actual) drawMarks(ctx, scene, slot.actual, bx, row.row, false);
+    else drawGhost(ctx, scene, bx, it.bodyW, row.row);
 
-    drawGradeStrip(ctx, scene, slot, bx, it.bodyW);
+    drawGradeStrip(ctx, scene, slot, bx, it.bodyW, row.grade);
   }
+}
+
+function drawPerChar(ctx: Ctx2D, scene: Scene): void {
+  drawTargetRow(ctx, scene);
+  for (let r = 0; r < scene.runs.length; r++) drawRunRow(ctx, scene, r);
 }
 
 function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
@@ -387,7 +445,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       if (visible(it.x - gw, gw + w, scene)) {
         if (g) drawGap(ctx, scene, g, it.x - gw, gw, scene.rows.runs[0]!.row, false);
         drawMarks(ctx, scene, slot.actual, it.x, scene.rows.runs[0]!.row, false);
-        const cap = sentCaption(slot, scene.blank === true);
+        const cap = sentCaption(slot, scene.runs[scene.selected]?.blank === true);
         ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
         ctx.font = `600 11px ${C.mono}`;
         ctx.textAlign = "center";
@@ -470,7 +528,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
     if (!visible(it.x, w, scene)) continue;
     band(slot.actual, it.x, slot.op === "equal" ? C.you : C.bad, 0.55);
-    const cap = sentCaption(slot, scene.blank === true);
+    const cap = sentCaption(slot, scene.runs[scene.selected]?.blank === true);
     ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
     ctx.font = `600 11px ${C.mono}`;
     ctx.textAlign = "center";
@@ -794,6 +852,7 @@ function drawGradeStrip(
   slot: Slot,
   x: number,
   w: number,
+  y: number,
 ): void {
   if (!slot.actual || !slot.ideal) return; // nothing to compare
   // Never "none": this only runs when both sides have a character, and every
@@ -810,7 +869,7 @@ function drawGradeStrip(
   ctx.font = `600 9px ${scene.palette.mono}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(GRADE_MARK[worst], x + w / 2, scene.rows.runs[0]!.grade + GRADE_H / 2);
+  ctx.fillText(GRADE_MARK[worst], x + w / 2, y + GRADE_H / 2);
 }
 
 /** Cumulative timing drift: how far behind or ahead of the ideal clock you have

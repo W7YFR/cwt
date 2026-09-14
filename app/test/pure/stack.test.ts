@@ -1,0 +1,172 @@
+/* Several attempts at one message, drawn on one chart.
+ *
+ * The chart could only ever hold one attempt, and a great deal of it said so:
+ * two fixed rows, a grade strip in the space between them, and columns that
+ * came from one run's own pairing. What is checked here is the part that had
+ * to be generalized for a stack — that every run gets drawn, that they line up
+ * down the columns, and that the things which belong to the target rather than
+ * to a run are drawn once and belong to nobody.
+ */
+
+import { describe, expect, it } from "vitest";
+import { recordingCtx } from "../recording-ctx";
+import { caseNamed, reviewFrom, CLEAN, SLOPPY } from "../fixture";
+import { draw, type Lane, type Scene } from "@/render/scene";
+import { buildLayout, measureColumns } from "@/render/layout";
+import { GUTTER, PAD_R, ROW_H, rowsFor } from "@/render/geometry";
+import { FALLBACK_PALETTE } from "@/render/theme";
+import type { Review } from "@/types";
+
+const PPU = 14;
+const TARGET = "CQ DE W7YFR";
+
+/** Two real recordings, graded against one message — which is what a session
+ *  is. They decode differently, so the stack has something to show. */
+function reviews(): Review[] {
+  return [SLOPPY, CLEAN].map(
+    (name) =>
+      reviewFrom(caseNamed(name), {
+        expected: TARGET,
+        charWpm: 20,
+        farnsworthWpm: 20,
+      }).review,
+  );
+}
+
+function stack(runs: Review[], selected = 0, trackW = 4000): Scene {
+  const columns = measureColumns(runs.map((r) => r.slots), PPU);
+  const lanes: Lane[] = runs.map((review, i) => ({
+    layout: buildLayout(review, {
+      view: "per-char",
+      ppu: PPU,
+      durationSec: review.take.durationSec,
+      columns,
+      run: i,
+    }),
+    slots: review.slots,
+    analysis: review.analysis,
+  }));
+  const first = lanes[0]!;
+  return {
+    runs: lanes,
+    selected,
+    columns,
+    layout: lanes[selected]!.layout,
+    slots: runs[selected]!.slots,
+    analysis: runs[selected]!.analysis,
+    rows: rowsFor(lanes.length, selected),
+    palette: FALLBACK_PALETTE,
+    view: "per-char",
+    tolerance: 0.3,
+    scrollX: 0,
+    viewport: {
+      viewW: trackW + GUTTER + PAD_R,
+      trackW,
+      contentW: first.layout.width,
+      maxScroll: Math.max(0, first.layout.width - trackW),
+    },
+    durationSec: runs[selected]!.take.durationSec,
+    idealDuration: runs[selected]!.ideal.duration,
+    hover: null,
+    focus: null,
+    playhead: null,
+  };
+}
+
+/** Every filled rectangle drawn inside a row band. Marks are rects, so this is
+ *  "did this row get anything on it". */
+function marksIn(ctx: ReturnType<typeof recordingCtx>, top: number): number {
+  return ctx
+    .ofType("fillRect")
+    .filter((c) => c.args[1]! >= top && c.args[1]! < top + ROW_H).length;
+}
+
+function paint(scene: Scene) {
+  const ctx = recordingCtx();
+  draw(ctx, scene);
+  return ctx;
+}
+
+describe("a stack of attempts", () => {
+  it("draws every run, not just the one being read", () => {
+    const scene = stack(reviews());
+    const ctx = paint(scene);
+    for (const row of scene.rows.runs) {
+      expect(marksIn(ctx, row.row)).toBeGreaterThan(0);
+    }
+  });
+
+  it("gives each run its own grade strip rather than one between two rows", () => {
+    /* With one attempt, "between the rows" and "above this run" are the same
+       place. With several they are not, and a strip between rows would be
+       ambiguous about which run it was reporting on. */
+    const scene = stack(reviews());
+    const grades = paint(scene)
+      .ofType("fillText")
+      .filter((c) => ["OK", "~", "**"].includes(c.text ?? ""));
+    for (const row of scene.rows.runs) {
+      expect(grades.some((g) => Math.abs(g.args[1]! - (row.grade + 7)) < 2)).toBe(true);
+    }
+  });
+
+  it("captions the run being read and no other", () => {
+    const scene = stack(reviews(), 1);
+    const labels = scene.rows.runs.map((r) => r.label);
+    expect(labels.filter((l) => l !== null)).toHaveLength(1);
+    expect(labels[1]).not.toBeNull();
+
+    // And the caption text lands on that band rather than anywhere else.
+    const decoded = paint(scene)
+      .ofType("fillText")
+      .filter((c) => c.args[1]! > scene.rows.runs[1]!.row + ROW_H);
+    expect(decoded.length).toBeGreaterThan(0);
+  });
+
+  it("draws the target once, however many attempts are under it", () => {
+    /* Once each, and no more: the target row is drawn from the columns rather
+       than from any run's slots, so adding an attempt must not add a second
+       copy of the message. */
+    const target = reviews()[0]!.ideal.chars.map((c) => c.char);
+    const onTargetRow = (scene: Scene) =>
+      paint(scene)
+        .ofType("fillText")
+        .filter((c) => Math.abs(c.args[1]! - (scene.rows.tgtLabel + 11)) < 2)
+        .map((c) => c.text);
+
+    for (const scene of [stack(reviews().slice(0, 1)), stack(reviews())]) {
+      expect(onTargetRow(scene).filter((t) => t !== "·")).toEqual(target);
+    }
+  });
+
+  it("says nothing was asked for, where a run keyed something extra", () => {
+    /* An interstice belongs to whichever run put a character there, but the
+       fact that the target wanted nothing is a property of the column — so it
+       has to be said even when the run being read is not that one. */
+    const scene = stack(reviews(), 0);
+    const interstices = scene.columns!.ideal.filter((c) => c === null).length;
+    expect(interstices).toBeGreaterThan(0);
+
+    const dots = paint(scene)
+      .ofType("fillText")
+      .filter((c) => c.text === "·" && Math.abs(c.args[1]! - (scene.rows.tgtLabel + 11)) < 2);
+    expect(dots).toHaveLength(interstices);
+  });
+
+  it("lines the runs up, so a column means the same thing on every row", () => {
+    /* The reason the whole column axis exists. Two runs that decode
+       differently still have to put the same target character in the same
+       place, or reading down a column would mean nothing. */
+    const scene = stack(reviews());
+    const xs = scene.runs.map((lane) =>
+      lane.layout.items.filter((it) => it.slot.ideal).map((it) => it.x),
+    );
+    expect(xs[0]).toEqual(xs[1]);
+  });
+
+  it("is taller with more attempts, and by exactly the lanes it added", () => {
+    const one = stack(reviews().slice(0, 1));
+    const two = stack(reviews());
+    expect(two.rows.height).toBeGreaterThan(one.rows.height);
+    expect(two.rows.runs).toHaveLength(2);
+  });
+});

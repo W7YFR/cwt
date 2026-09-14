@@ -14,6 +14,9 @@ import { opensWord } from "@/timing/timeline";
 export type Side = "you" | "tgt";
 
 export interface Focus {
+  /** Which attempt the deviation belongs to. Absent means the one being read,
+   *  which is the only answer when there is one attempt on screen. */
+  run?: number;
   side: Side;
   /** Slot index the deviation belongs to. */
   idx: number;
@@ -151,6 +154,9 @@ export interface HitResult {
   char: Char;
   row: Side;
   slot: Slot;
+  /** Which attempt was hit. The target row belongs to the whole stack, and is
+   *  reported against the run being read. */
+  run: number;
   /** Where that slot sits in `review.slots`.
    *
    * Layout items are built one per slot, in order, so the two indices are the
@@ -166,6 +172,7 @@ export function hitTest(
   contentX: number,
   y: number,
   bands: { you: [number, number]; tgt: [number, number] },
+  run = 0,
 ): HitResult | null {
   const inBand = (b: [number, number]) => y >= b[0] && y < b[1];
   const row: Side | null = inBand(bands.you)
@@ -186,7 +193,7 @@ export function hitTest(
       bx = it.x! + it.gapW;
       const gw = row === "you" ? it.youGapW : it.tgtGapW;
       if (gap && contentX >= it.x! && contentX < it.x! + gw) {
-        return { block: gap, char: ch, row, slot: it.slot, index };
+        return { block: gap, char: ch, row, slot: it.slot, index, run };
       }
     } else {
       const start = row === "you" ? it.x : it.ix;
@@ -196,14 +203,14 @@ export function hitTest(
       bx = start;
       const gw = gapWidth(gap, layout.ppu);
       if (gap && contentX >= bx - gw && contentX < bx) {
-        return { block: gap, char: ch, row, slot: it.slot, index };
+        return { block: gap, char: ch, row, slot: it.slot, index, run };
       }
     }
 
     for (const b of ch.blocks) {
       const w = b.units * layout.ppu;
       if (contentX >= bx && contentX < bx + w) {
-        return { block: b, char: ch, row, slot: it.slot, index };
+        return { block: b, char: ch, row, slot: it.slot, index, run };
       }
       bx += w;
     }

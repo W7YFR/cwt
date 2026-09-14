@@ -86,6 +86,21 @@ export interface ColumnMetrics {
   readonly x: readonly number[];
   readonly gapW: readonly number[];
   readonly bodyW: readonly number[];
+  /** The target's character in each column, or null for an interstice.
+   *
+   * Held per column rather than read off some run's slots because the target
+   * row is drawn once for the whole stack. An interstice belongs to whichever
+   * run keyed something extra there, but the fact that the target asked for
+   * nothing is a property of the column, and has to be said even when the run
+   * being read in detail is not the one that put a character in it. */
+  readonly ideal: readonly (Char | null)[];
+  /** Do the gaps arriving at this column disagree about where it starts?
+   *
+   * A column is as wide as the widest gap any run brought to it, so a shorter
+   * one stops short of the character. Without a line at the column's own start
+   * that shortfall reads as a rendering fault instead of the measurement it
+   * is. */
+  readonly ragged: readonly boolean[];
   /** Total content width, including both margins. */
   readonly width: number;
 }
@@ -105,23 +120,31 @@ export function measureColumns(
   const n = plan.columns.length;
   const gapW = new Array<number>(n).fill(0);
   const bodyW = new Array<number>(n).fill(0);
+  const ideal = new Array<Char | null>(n).fill(null);
+  const narrowest = new Array<number>(n).fill(Infinity);
 
   runs.forEach((slots, r) => {
     const at = plan.at[r]!;
     slots.forEach((slot, i) => {
       const c = at[i]!;
-      gapW[c] = Math.max(
-        gapW[c]!,
-        gapWidth(slot.actual?.leadGap, ppu),
-        gapWidth(slot.ideal?.leadGap, ppu),
-      );
+      const yg = gapWidth(slot.actual?.leadGap, ppu);
+      const tg = gapWidth(slot.ideal?.leadGap, ppu);
+      gapW[c] = Math.max(gapW[c]!, yg, tg);
+      narrowest[c] = Math.min(narrowest[c]!, yg, tg);
       bodyW[c] = Math.max(
         bodyW[c]!,
         charWidth(slot.actual, ppu),
         charWidth(slot.ideal, ppu),
       );
+      // Every run holds the same target character here; the first to say so
+      // settles it.
+      if (slot.ideal && !ideal[c]) ideal[c] = slot.ideal;
     });
   });
+
+  const ragged = gapW.map(
+    (w, c) => w > 0 && w - (narrowest[c] === Infinity ? w : narrowest[c]!) > 1.5,
+  );
 
   const x: number[] = [];
   let cur = PAD_X;
@@ -129,7 +152,7 @@ export function measureColumns(
     x.push(cur);
     cur += gapW[c]! + bodyW[c]! + SLOT_GAP;
   }
-  return { plan, x, gapW, bodyW, width: cur + PAD_X };
+  return { plan, x, gapW, bodyW, ideal, ragged, width: cur + PAD_X };
 }
 
 export interface LayoutOptions {

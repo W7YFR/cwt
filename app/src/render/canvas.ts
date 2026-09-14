@@ -16,15 +16,30 @@ import {
   HEIGHT,
   PAD_R,
   RULER_H,
-  Y_SCROLL,
+  ROW_H,
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_RATE,
   rowsFor,
 } from "./geometry";
 import { contextWindow, hitTest, type Focus, type HitResult } from "./focus";
-import { buildLayout, fitZoom, timeToX, xToTime, type Layout } from "./layout";
-import { draw, scrollbarThumb, trackBands, type Scene, type Viewport } from "./scene";
+import {
+  buildLayout,
+  fitZoom,
+  measureColumns,
+  timeToX,
+  xToTime,
+  type ColumnMetrics,
+  type Layout,
+} from "./layout";
+import {
+  draw,
+  scrollbarThumb,
+  trackBands,
+  type Lane,
+  type Scene,
+  type Viewport,
+} from "./scene";
 import { readPalette, type Palette } from "./theme";
 
 export interface ChartCallbacks {
@@ -109,6 +124,16 @@ export function createChart(
 
   let input: ChartInput | null = null;
   let layout: Layout | null = null;
+  /* The shared column axis, measured once for every run on screen. Only the
+     per-character view has columns; the time views are keyed to the clock. */
+  let columns: ColumnMetrics | undefined;
+  /* Every attempt on screen, and where its row sits. Held here rather than
+     rebuilt inside `scene()` because hit testing has to agree with drawing
+     about which row is where, and two places computing that is two places for
+     them to disagree. */
+  let lanes: Lane[] = [];
+  let rows = rowsFor(1, 0);
+  const selected = 0;
   let palette: Palette = readPalette(document.body);
   let scrollX = 0;
   let hover: Block | null = null;
@@ -136,10 +161,13 @@ export function createChart(
   function scene(v: Viewport): Scene | null {
     if (!input || !layout) return null;
     const s: Scene = {
+      runs: lanes,
+      selected,
+      ...(columns ? { columns } : {}),
       layout,
       slots: input.review.slots,
       analysis: input.review.analysis,
-      rows: rowsFor(1, 0),
+      rows,
       palette,
       view: input.settings.view,
       tolerance: input.settings.tolerance,
@@ -153,7 +181,6 @@ export function createChart(
       driftMax,
       leadSec,
       charMarkers: input.settings.charMarkers,
-      blank: input.review.take.segments.length === 0,
     };
     return s;
   }
@@ -170,7 +197,12 @@ export function createChart(
 
   function relayout(): void {
     if (!input) return;
+    columns =
+      input.settings.view === "per-char"
+        ? measureColumns([input.review.slots], input.settings.ppu)
+        : undefined;
     layout = buildLayout(input.review, {
+      ...(columns ? { columns, run: 0 } : {}),
       view: input.settings.view,
       ppu: input.settings.ppu,
       durationSec: input.review.take.durationSec,
@@ -179,6 +211,15 @@ export function createChart(
       // to keep moving at both ends, and one number is one thing to get wrong.
       tailSec: leadSec,
     });
+    lanes = [
+      {
+        layout,
+        slots: input.review.slots,
+        analysis: input.review.analysis,
+        blank: input.review.take.segments.length === 0,
+      },
+    ];
+    rows = rowsFor(lanes.length, selected);
   }
 
   function resize(): void {
@@ -186,9 +227,12 @@ export function createChart(
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(host.clientWidth, 1);
     canvas.style.width = `${w}px`;
-    canvas.style.height = `${HEIGHT}px`;
+    // Taller with every attempt stacked on it, so the element is sized from
+    // the rows rather than from a constant. With one attempt that constant is
+    // exactly what `rows.height` comes to.
+    canvas.style.height = `${rows.height}px`;
     canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(HEIGHT * dpr);
+    canvas.height = Math.round(rows.height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     paint();
   }
@@ -264,7 +308,7 @@ export function createChart(
     const v = viewport();
     suppressClick = false;
     const th = scrollbarThumb(scrollX, v);
-    if (th && p.y >= Y_SCROLL) {
+    if (th && p.y >= rows.scroll) {
       if (p.x >= th.x && p.x <= th.x + th.w) {
         drag = {
           kind: "thumb",
@@ -311,9 +355,35 @@ export function createChart(
     drag = null;
   };
 
+  /** Never matches, since y is never negative. Used to ask one row's question
+   *  without the other row answering it. */
+  const NO_BAND: [number, number] = [-1, -1];
+
   function hitAt(p: { x: number; y: number }): HitResult | null {
     if (!layout || !input || p.x < GUTTER) return null;
-    return hitTest(layout, contentXOf(p.x), p.y, trackBands(input.settings.view));
+    const x = contentXOf(p.x);
+    const bands = trackBands(input.settings.view, rows);
+
+    /* The target belongs to the whole stack rather than to any one attempt, so
+       it is asked once — of the run being read, whose layout carries the same
+       target geometry every other one does. */
+    const sel = lanes[selected];
+    if (sel) {
+      const h = hitTest(sel.layout, x, p.y, { you: NO_BAND, tgt: bands.tgt }, selected);
+      if (h) return h;
+    }
+
+    /* Then each attempt, in its own band. Overlay superimposes them, so there
+       is one band to share. */
+    for (let r = 0; r < lanes.length; r++) {
+      const row = rows.runs[r];
+      if (!row) continue;
+      const band: [number, number] =
+        input.settings.view === "overlay" ? bands.you : [row.row, row.row + ROW_H];
+      const h = hitTest(lanes[r]!.layout, x, p.y, { you: band, tgt: NO_BAND }, r);
+      if (h) return h;
+    }
+    return null;
   }
 
   const onMouseMove = (ev: MouseEvent) => {
@@ -347,7 +417,7 @@ export function createChart(
     }
     if (!layout) return;
     const p = localPos(ev);
-    if (p.x < GUTTER || p.y >= Y_SCROLL) return;
+    if (p.x < GUTTER || p.y >= rows.scroll) return;
 
     // The ruler band is a seek strip.
     if (p.y < RULER_H) {
@@ -371,7 +441,7 @@ export function createChart(
      * an overlong letter gap is still a letter gap, and playing it with a
      * whole word either side would bury the fault it is being blamed for. */
     if (isGap(h.block.kind)) {
-      const w = contextWindow(input.review.slots, h.row, h.index, h.block.targetKind);
+      const w = contextWindow(lanes[h.run]!.slots, h.row, h.index, h.block.targetKind);
       if (w) {
         callbacks.onPlayChar?.(h.row, w[0], w[1]);
         return;
@@ -537,6 +607,14 @@ export function createChart(
         note = `zoomed to ${ppu.toFixed(1)} px/unit so the whole session fits`;
       }
 
+      /* Measured at the export's own zoom, which the fit above may have
+         changed. Without them the target row has no columns to draw itself
+         against and would be missing from the picture entirely. */
+      const exportColumns =
+        input.settings.view === "per-char"
+          ? measureColumns([input.review.slots], ppu)
+          : undefined;
+
       const w = Math.ceil(GUTTER + exportLayout.width + PAD_R);
       const off = document.createElement("canvas");
       off.width = Math.round(w * dpr);
@@ -549,6 +627,15 @@ export function createChart(
       offCtx.fillRect(0, 0, w, HEIGHT);
 
       draw(offCtx as unknown as Parameters<typeof draw>[0], {
+        runs: [
+          {
+            layout: exportLayout,
+            slots: input.review.slots,
+            analysis: input.review.analysis,
+          },
+        ],
+        selected: 0,
+        ...(exportColumns ? { columns: exportColumns } : {}),
         layout: exportLayout,
         slots: input.review.slots,
         analysis: input.review.analysis,

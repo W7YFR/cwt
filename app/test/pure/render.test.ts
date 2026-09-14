@@ -19,6 +19,7 @@ import {
   timeToX,
   xToTime,
   type Layout,
+  measureColumns,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
 import { defaultSettings, reviewTake, subLabel } from "@/timing";
@@ -55,7 +56,11 @@ function layoutFor(review: Review, view: ViewMode, ppu: number): Layout {
 
 function sceneFor(review: Review, view: ViewMode, ppu: number, trackW = 900): Scene {
   const layout = layoutFor(review, view, ppu);
+  const columns = view === "per-char" ? measureColumns([review.slots], ppu) : undefined;
   return {
+    runs: [{ layout, slots: review.slots, analysis: review.analysis }],
+    selected: 0,
+    ...(columns ? { columns } : {}),
     layout,
     slots: review.slots,
     analysis: review.analysis,
@@ -254,7 +259,8 @@ describe("a chart with nothing recorded into it", () => {
 
   const paint = () => {
     const ctx = recordingCtx();
-    draw(ctx, { ...sceneFor(review, "per-char", 18, 4000), blank: true });
+    const base = sceneFor(review, "per-char", 18, 4000);
+    draw(ctx, { ...base, runs: base.runs.map((r) => ({ ...r, blank: true })) });
     return ctx;
   };
 
