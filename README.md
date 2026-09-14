@@ -29,8 +29,8 @@ A browser app. TypeScript and React, no server: it records from your input
 device, decodes, grades and draws, entirely client-side, and deploys as static
 files.
 
-Audio never leaves the machine. Takes live in IndexedDB along with the settings
-you were looking at them under.
+Audio never leaves the machine. Recordings live in IndexedDB along with the
+settings you were looking at them under.
 
 ---
 
@@ -38,25 +38,40 @@ you were looking at them under.
 
 `npm run dev`, then:
 
-1. Type what you're about to send (optional — timing works without it, but with
-   it you get accuracy too).
-2. Hit record and key.
+1. Say what you're about to send, and at what speed.
+2. Hit record and key it.
 3. Stop, and read.
+4. Record again.
 
-Then record again from the review itself, without losing the speeds and
-tolerance you have set — that is the loop. The name in the header takes you
-back to the start when you want a clean slate.
+That fourth step is the point. Attempts **stack**: a second recording joins the
+first rather than replacing it, and the chart draws them one under another
+against the same target, on the same columns. Reading down a column is then a
+real question — did I drop that letter every time, or only once — and the drift
+traces share one axis, so a wander getting smaller is a wander you can see
+getting smaller.
 
-Or drop a recording you already have onto the page. WAV, MP3, M4A, FLAC and OGG
-all work.
+Click a run's name in the gutter to read it in detail; the scores, the tables
+and the audio follow. **Drop run N** throws one attempt away and keeps the
+rest. **Sort** reorders the rows — newest first while you're still going, most
+consistent first when you're hunting for the one that went right. A run keeps
+the number it was recorded with wherever it lands.
+
+A session is several attempts at **one message at one speed** — that's what
+makes the rows comparable. **New session** is where those change; the intended
+message stays editable for fixing a typo, where re-grading
+every attempt is exactly what you want.
+
+Or open a recording you already have — the button beside record, or drop the
+file anywhere on the page. WAV, MP3, M4A, FLAC and OGG all work. A file carries
+its own speed, so it can start a session but not join one.
 
 A virtual loopback device (BlackHole, Loopback, VB-Cable) shows up as an
 ordinary input, so you can key an app on the same machine and record it.
 
-Reloading the page does not lose the session. The current take — audio and all
-— is kept in IndexedDB along with the settings you were looking at it under, so
-a refresh comes back to exactly where you were. It never leaves the machine,
-and the last ten takes are kept so the audio cannot grow without a bound.
+Reloading does not lose the session: every attempt — audio and all — is kept in
+IndexedDB with the settings you were looking at them under, and a refresh comes
+back to the one you were reading. Nothing leaves the machine, and the last ten
+recordings are kept so the audio cannot grow without a bound.
 
 The review's **↓ JSON report** button writes a stable, documented shape, so a
 directory of them is one time series.
@@ -74,7 +89,9 @@ clock, so accumulated drift shears them apart. **Overlay** superimposes them.
 - Purple with a wavy spine is a **rest** — you stopping between transmissions.
   Not graded, and drawn at a fixed width with its real length on the label.
 - The **DRIFT** strip is how far ahead or behind the ideal clock you've fallen.
-  It restarts after every rest, because stopping isn't drift.
+  It restarts after every rest, because stopping isn't drift. Every attempt in
+  the session draws a trace, all against one axis — scaled to its own worst
+  moment, a run half as bad would draw an identical picture.
 
 Scroll to zoom, drag or shift-scroll to pan, click a character to hear it, click
 the ruler to seek. In the deviations table, click **yours** and then **target**
