@@ -149,6 +149,8 @@ export function createChart(
   let lanes: Lane[] = [];
   let rows = rowsFor(1, 0);
   let selected = 0;
+  /** The run name under the pointer, for the gutter's highlight. */
+  let picking = -1;
 
   /** The attempts to draw, and which one is being read. */
   function stackOf(inp: ChartInput): { reviews: readonly Review[]; selected: number } {
@@ -185,6 +187,7 @@ export function createChart(
     const s: Scene = {
       runs: lanes,
       selected,
+      picking,
       ...(columns ? { columns } : {}),
       layout,
       slots: lanes[selected]!.slots,
@@ -389,6 +392,25 @@ export function createChart(
    *  without the other row answering it. */
   const NO_BAND: [number, number] = [-1, -1];
 
+  /** Which attempt's name in the gutter is under this point, or -1.
+   *
+   * The names are the handle for picking a row up. Clicking the row itself
+   * works too, but a row is mostly the marks on it, and going through a mark
+   * to reach the row it belongs to is an indirection you can feel — you aim at
+   * a dit to say "this run". The name says only that, which is why it is the
+   * one to click.
+   *
+   * Nothing to pick with a single attempt on screen: the label reads YOU and
+   * there is no other row for it to be. */
+  function gutterRunAt(p: { x: number; y: number }): number {
+    if (p.x >= GUTTER || lanes.length < 2) return -1;
+    for (let r = 0; r < lanes.length; r++) {
+      const row = rows.runs[r];
+      if (row && p.y >= row.row && p.y < row.row + ROW_H) return r;
+    }
+    return -1;
+  }
+
   function hitAt(p: { x: number; y: number }): HitResult | null {
     if (!layout || !input || p.x < GUTTER) return null;
     const x = contentXOf(p.x);
@@ -422,6 +444,12 @@ export function createChart(
       return;
     }
     const p = localPos(ev);
+    const over = gutterRunAt(p);
+    canvas.classList.toggle("picking", over >= 0);
+    if (over !== picking) {
+      picking = over;
+      paint();
+    }
     const h = hitAt(p);
     const b = h ? h.block : null;
     if (b !== hover) {
@@ -432,6 +460,11 @@ export function createChart(
   };
 
   const onMouseLeave = (ev: MouseEvent) => {
+    canvas.classList.remove("picking");
+    if (picking !== -1) {
+      picking = -1;
+      paint();
+    }
     callbacks.onHover?.(null, ev.clientX, ev.clientY);
     if (hover) {
       hover = null;
@@ -447,6 +480,14 @@ export function createChart(
     }
     if (!layout) return;
     const p = localPos(ev);
+
+    // The run names in the gutter pick a row up, and that is all they do.
+    const named = gutterRunAt(p);
+    if (named >= 0) {
+      if (named !== selected) callbacks.onSelectRun?.(named);
+      return;
+    }
+
     if (p.x < GUTTER || p.y >= rows.scroll) return;
 
     // The ruler band is a seek strip.

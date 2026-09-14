@@ -467,6 +467,8 @@ button.alt.on { background: var(--tgt); border-color: var(--tgt); }
 }
 canvas { display: block; touch-action: none; }
 canvas.grabbing { cursor: grabbing; }
+/* Over a run's name in the gutter, which picks that row up. */
+canvas.picking { cursor: pointer; }
 
 .tip {
   position: fixed;

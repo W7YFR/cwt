@@ -114,6 +114,10 @@ export interface Scene {
   /** Which of them is being read in detail: the one with a caption band, and
    *  the one the report below the chart is about. */
   selected: number;
+  /** The run whose name in the gutter the pointer is over, if any. Lights it,
+   *  because a word you can click has to look different from a word you
+   *  cannot. */
+  picking?: number;
   /** The shared per-character column axis. Absent in the time views, which
    *  need no columns — there the axis is the clock. */
   columns?: ColumnMetrics;
@@ -992,7 +996,11 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
               [
                 scene.rows.runs[r]!.row + ROW_H / 2,
                 scene.runs.length === 1 ? "YOU" : `RUN ${r + 1}`,
-                r === scene.selected ? C.you : C["ink-dim"],
+                r === scene.selected
+                  ? C.you
+                  : r === scene.picking
+                    ? C.ink
+                    : C["ink-dim"],
               ] as [number, string, string],
           ),
           [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],

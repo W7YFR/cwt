@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ReviewScreen } from "@/ui/ReviewScreen";
+import { ROW_H, rowsFor } from "@/render/geometry";
 import { defaultSettings, reviewTake } from "@/timing";
 import { blankTake } from "@/io/take";
 import type { ReviewSettings } from "@/types";
@@ -84,11 +85,14 @@ function mount(over: Partial<ReviewSettings> & { runs?: number }) {
   };
   const seen: ReviewSettings["view"][] = [];
   const { runs: _runs, ...settingsOver } = over;
+  let picked = Math.max((over.runs ?? 1) - 1, 0);
   let latest: ReviewSettings = { ...defaultSettings(take), ...settingsOver };
 
   function Harness() {
     const [settings, setSettings] = useState<ReviewSettings>(latest);
+    const [at, setAt] = useState(picked);
     latest = settings;
+    picked = at;
     const review = reviewTake(take, settings);
     /* A session with more than one attempt in it, so that dropping down to
        just the incoming one is a visible difference. The same review twice is
@@ -99,8 +103,8 @@ function mount(over: Partial<ReviewSettings> & { runs?: number }) {
       loaded,
       review,
       stack,
-      selected: stack.length - 1,
-      onSelectRun: () => {},
+      selected: at,
+      onSelectRun: setAt,
       onDropRun: () => {},
       settings,
       onChange: (patch) => {
@@ -121,7 +125,7 @@ function mount(over: Partial<ReviewSettings> & { runs?: number }) {
   }
 
   act(() => root.render(createElement(Harness)));
-  return { view: () => latest.view, seen };
+  return { view: () => latest.view, seen, picked: () => picked };
 }
 
 /** The button whose label contains this text. Found by what it says, because
@@ -191,3 +195,47 @@ describe("what the chart shows while recording", () => {
     expect(height()).toBe(before);
   });
 });
+
+describe("picking a run out of the stack", () => {
+  it("takes one click on its name in the gutter", () => {
+    /* The names are the handle. Going through a mark to reach the row it
+       belongs to means aiming at a dit in order to say "this run", which is an
+       indirection you can feel. */
+    const app = mount({ runs: 3 });
+    expect(app.picked()).toBe(2);
+
+    const canvas = host.querySelector("canvas")!;
+    const box = canvas.getBoundingClientRect();
+    const rows = rowsFor(3, 2);
+    act(() =>
+      canvas.dispatchEvent(
+        new MouseEvent("click", {
+          clientX: box.left + 8,
+          clientY: box.top + rows.runs[0]!.row + ROW_H / 2,
+          bubbles: true,
+        }),
+      ),
+    );
+    expect(app.picked()).toBe(0);
+  });
+
+  it("leaves the name alone when it is the only attempt there is", () => {
+    /* With one run the label reads YOU, and there is no other row for it to
+       be — so it is a label rather than a control. */
+    const app = mount({ runs: 1 });
+    const canvas = host.querySelector("canvas")!;
+    const box = canvas.getBoundingClientRect();
+    const rows = rowsFor(1, 0);
+    act(() =>
+      canvas.dispatchEvent(
+        new MouseEvent("click", {
+          clientX: box.left + 8,
+          clientY: box.top + rows.runs[0]!.row + ROW_H / 2,
+          bubbles: true,
+        }),
+      ),
+    );
+    expect(app.picked()).toBe(0);
+  });
+});
+
