@@ -1,52 +1,71 @@
-# cw-decoder — setup, test, and global install.
-
-PYTHON  ?= python3
-VENV    := .venv
-BIN     := $(VENV)/bin
-LOCALBIN := $(HOME)/.local/bin
+# cwt — a browser CW keying trainer.
+#
+# It records, decodes, grades and draws, entirely in the browser. Everything
+# under app/src is the product; app/test holds three test tiers and the
+# recordings they run against.
 
 .DEFAULT_GOAL := help
 
 .PHONY: help
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_\\:-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN{FS="## "}{t=$$1; sub(/:[ \t].*$$/,"",t); gsub(/\\/,"",t); \
+			printf "  \033[36m%-14s\033[0m %s\n", t, $$2}'
 
-$(BIN)/python: ## (internal) create the virtualenv
-	$(PYTHON) -m venv $(VENV)
-	$(BIN)/pip install --upgrade pip >/dev/null
-
-.PHONY: venv
-venv: $(BIN)/python ## Create the virtualenv
+node_modules: package.json ## (internal) install JS dependencies
+	npm install
+	@touch node_modules
 
 .PHONY: dev
-dev: venv ## Editable install + test deps into the venv
-	$(BIN)/pip install -e ".[test]" || $(BIN)/pip install -e . pytest
+dev: node_modules ## Run the app with hot reload at localhost:5173
+	npm run dev
+
+.PHONY: build
+build: node_modules ## Build the app into dist/
+	npm run build
+
+# Two ways to look at it, and the difference is whether it moves under you.
+# `serve` is a snapshot: dist/ as it was last built, unaffected by edits to the
+# source until you ask for a new one. `dev` is the opposite and `serve:latest`
+# is the bridge — rebuild, then serve the result.
+.PHONY: serve
+serve: ## Serve the last build at localhost:4173
+	@test -f dist/index.html || { echo "No build in dist/ — run 'make serve:latest'"; exit 1; }
+	npm run preview
+
+.PHONY: serve\:latest
+serve\:latest: build ## Build, then serve it at localhost:4173
+	npm run preview
+
+.PHONY: browsers
+browsers: node_modules ## Download the browser the third test tier needs (once)
+	npx playwright install chromium
+
+# ---- tests ---------------------------------------------------------------- #
 
 .PHONY: test
-test: dev ## Run the round-trip test suite
-	$(BIN)/python -m pytest -q
+test: node_modules ## Pure + DOM test tiers
+	npm test
 
-.PHONY: demo
-demo: dev ## Decode a synthesized signal end-to-end
-	$(BIN)/cw-decode --demo "CQ CQ DE W1AW K" --demo-wpm 22 --demo-farnsworth 13
+.PHONY: test-browser
+test-browser: node_modules ## The real-Chromium tier (needs `make browsers`)
+	npm run test:browser
 
-.PHONY: install
-install: venv ## Install into the venv and expose `cw-decode` on your PATH
-	$(BIN)/pip install -e .
-	mkdir -p $(LOCALBIN)
-	ln -sf "$(abspath $(BIN)/cw-decode)" "$(LOCALBIN)/cw-decode"
-	@echo ""
-	@echo "Installed: $(LOCALBIN)/cw-decode -> $(abspath $(BIN)/cw-decode)"
-	@command -v cw-decode >/dev/null 2>&1 \
-		&& echo "Ready: run  cw-decode ~/some/file.wav" \
-		|| echo "NOTE: add $(LOCALBIN) to your PATH, then run  cw-decode <file>"
+.PHONY: test-all
+test-all: test test-browser ## Every tier, including the browser one
 
-.PHONY: uninstall
-uninstall: ## Remove the global symlink
-	rm -f "$(LOCALBIN)/cw-decode"
-	@echo "Removed $(LOCALBIN)/cw-decode (venv left intact; 'make clean' to remove it)"
+.PHONY: lock
+lock: node_modules ## Re-record what the DSP says about clean audio (deliberate!)
+	@echo "→ re-recording app/test/lock/clean-path.json"
+	npm run lock --silent
+	@echo "✓ recorded. Review the diff: it is a diff in what users get."
+
+.PHONY: typecheck
+typecheck: node_modules ## Typecheck without emitting
+	npm run typecheck
+
+# ---- housekeeping --------------------------------------------------------- #
 
 .PHONY: clean
-clean: ## Remove the venv and build artifacts
-	rm -rf $(VENV) build dist src/*.egg-info *.egg-info
+clean: ## Remove build output and node_modules
+	rm -rf dist node_modules

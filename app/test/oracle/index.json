@@ -1,0 +1,10 @@
+{
+ "cases": [
+  "cq-ab1cd-20wpm-k3ng.json",
+  "cq-de-w7yfr.json",
+  "synth-farnsworth.json",
+  "synth-fast.json",
+  "synth-letter-drill.json",
+  "synth-prosigns.json"
+ ]
+}

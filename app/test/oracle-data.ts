@@ -1,0 +1,27 @@
+/* The oracle cases as static imports.
+ *
+ * Generated from the dumps in test/oracle — do not edit by hand.
+ *
+ * The pure tier could read these off disk, but the browser tier cannot:
+ * there is no node:fs there, and reaching for it took down the whole file
+ * before a single test ran. A static import works in both, and Vite inlines
+ * the JSON at build time so there is no fetch to wait on either.
+ */
+
+import type { OracleCase } from "./oracle";
+
+import cq_ab1cd_20wpm_k3ng from "./oracle/cq-ab1cd-20wpm-k3ng.json";
+import cq_de_w7yfr from "./oracle/cq-de-w7yfr.json";
+import synth_farnsworth from "./oracle/synth-farnsworth.json";
+import synth_fast from "./oracle/synth-fast.json";
+import synth_letter_drill from "./oracle/synth-letter-drill.json";
+import synth_prosigns from "./oracle/synth-prosigns.json";
+
+export const ORACLE_CASES: OracleCase[] = [
+  cq_ab1cd_20wpm_k3ng as unknown as OracleCase,
+  cq_de_w7yfr as unknown as OracleCase,
+  synth_farnsworth as unknown as OracleCase,
+  synth_fast as unknown as OracleCase,
+  synth_letter_drill as unknown as OracleCase,
+  synth_prosigns as unknown as OracleCase,
+];

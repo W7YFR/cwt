@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="CWT">
+  <!-- A dit and a dah: the letter A, and the two things everything else here
+       is made of. Proportioned the way the chart draws them — 1 unit, 1 unit
+       of gap, 3 units — so the icon is a small piece of the thing it opens.
+
+       No background, so it sits on a browser tab of either color. The tiles
+       with a ground of their own are the PNGs, where a transparent icon would
+       be composited onto whatever the platform felt like. -->
+  <style>
+    .mark { fill: #1f6feb; }
+    @media (prefers-color-scheme: dark) { .mark { fill: #6aa9ff; } }
+  </style>
+  <g class="mark">
+    <rect x="4" y="20" width="8" height="8" rx="2.5"/>
+    <rect x="20" y="20" width="24" height="8" rx="2.5"/>
+  </g>
+</svg>

@@ -1,0 +1,1382 @@
+/* Dark-first, because this is a signal-analysis view and the blocks read best
+   against a dark ground; light mode swaps the ground and keeps the grade hues. */
+:root {
+  --bg: #12151a;
+  --panel: #1a1f27;
+  --panel-2: #222937;
+  --line: #2e3644;
+  --ink: #e6eaf0;
+  --ink-dim: #97a3b6;
+  --ink-faint: #66708a;
+  --you: #6aa9ff;
+  --tgt: #8b95a7;
+  --ok: #3fb950;
+  --warn: #d29922;
+  --bad: #f4564a;
+  --ghost: #4b5566;
+  /* Rests are not graded, so they get a hue outside the green/amber/red scale
+     entirely — nothing about a rest is good or bad, it just isn't spacing. */
+  --rest: #a371f7;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Height of a control: a button, a select, a text box, a slider. One number,
+     so unlike controls sitting beside each other share a center line. */
+  --control-h: 31px;
+  /* Height of a full-width band — the header, and anything that appears in
+     place of it or above it. */
+  --band-h: 60px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --panel-2: #eef1f5;
+    --line: #d5dae2;
+    --ink: #1a1f27;
+    --ink-dim: #5a6577;
+    --ink-faint: #8b95a7;
+    --you: #1f6feb;
+    --tgt: #8b95a7;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --bad: #cf222e;
+    --ghost: #c2c9d4;
+    --rest: #8250df;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+header {
+  min-height: var(--band-h);
+  display: flex;
+  flex-wrap: wrap;
+  /* Centered, not baseline-aligned. Baseline alignment drops the scores a
+     pixel the moment a recording starts, because the running clock's first
+     baseline sits differently from a button's — a one-pixel twitch under
+     numbers you are trying to read. Nothing in this row shares a baseline
+     worth keeping: the brand is a drawing and the scores are their own
+     block. */
+  align-items: center;
+  gap: 8px 20px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+.src {
+  color: var(--ink-dim);
+  font-weight: 400;
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 0;
+  /* Its own full-width row at the foot of the header, so no length of name can
+     move anything above it. A name with no spaces still has to wrap rather
+     than widen the page. */
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* The name in the header, which is also the way back to the start. Styled as
+   a word rather than as a button so it reads as the title it is, but it is a
+   real <button> underneath — a clickable <h1> that is not focusable is a
+   control only a mouse can reach. */
+.brand { display: flex; align-items: center; gap: 10px; }
+.brandmark {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--you);
+  cursor: pointer;
+  /* The header row lines its contents up on the baseline; a drawing has no
+     baseline worth aligning to, so it centers on the row instead. */
+  align-self: center;
+}
+.brandmark:hover, .brandmark:focus-visible { color: var(--ink); border-color: transparent; }
+
+/* The drawing at header size. Fitted to the row *height*, because that is what
+   is fixed here — the hero on the landing screen is fitted to the page width
+   instead, which is why the two have different calcs rather than one shared
+   one. The drawings are 4 to 11 rows tall, so a single font size would make
+   the short ones tiny and push the tall ones out of the row. */
+.brandmark .art {
+  display: block;
+  white-space: pre;
+  font-family: var(--mono);
+  line-height: 1;
+  font-size: calc(var(--brand-h, 26px) / var(--rows, 6));
+}
+
+/* Record again without leaving the review. */
+/* A fixed height, so starting and stopping a recording cannot resize the
+   header. The two states hold different controls and the taller of them would
+   otherwise push everything below it down. */
+.recordbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+}
+.recordbar .hint { white-space: nowrap; }
+.recordbar button { font-size: 12px; padding: 5px 10px; }
+/* A button that is only its icon. Square, so Record and Open read as a pair
+   rather than as two differently-shaped things that happen to sit together. */
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+.recordbar .iconbtn { padding: 0; }
+/* A disabled icon button has one glyph to dim where a word button has a whole
+   phrase, so the shared 45% opacity reads as merely quiet rather than as off.
+   This one flattens instead: no longer standing proud of the band, its glyph
+   dropped to the faintest ink, and `not-allowed` under the pointer — which is
+   also the cursor that invites the hover the explanation is waiting behind. */
+.iconbtn:disabled {
+  opacity: 1;
+  /* Flush with the band it sits in rather than sunk below it: an available
+     button stands a shade proud of the header, and taking that away is enough
+     to stop it reading as one. Dropping all the way to the page background
+     made a hole. */
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+/* The record dot is colored in its own right, so opacity is the only thing
+   that reaches it. */
+.iconbtn:disabled .recdot { opacity: .35; }
+/* The landing screen stacks these; here they sit in a header row. */
+.recordbar.recording { flex-direction: row; }
+.recordbar .reclight { font-size: 14px; }
+.recordbar .reclight .dot { width: 9px; height: 9px; }
+/* The lead-in count. Blue while you wait, green once the cursor is moving —
+   the same pair the calibration wizard uses, and for the same reason. */
+.recordbar .reclight[data-state="waiting"] { color: var(--you); }
+.recordbar .reclight[data-state="sending"] { color: var(--ok); }
+.recordbar .meter { width: 90px; height: 6px; }
+.recordbar select { font-size: 12px; padding: 4px 26px 4px 6px; background-position: right 9px center; }
+
+/* A band of its own, left-aligned, always.
+ *
+ * These used to be pushed to the right of the header with `margin-left:auto`,
+ * which worked when that row held a brand and a record button. It now also
+ * holds a device picker, a calibration picker and a cog, and the numbers were
+ * landing wherever those left room — a different place on every screen, which
+ * is the one thing a row of figures read at a glance must not do.
+ *
+ * A band rather than another line of the header, because inside it they were
+ * also vertically off-center: the line above set the padding and the figures
+ * took what was left. Their own section has its own symmetric padding and
+ * nothing else in it to negotiate with. */
+.scoresrow {
+  display: flex;
+  align-items: center;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.scores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+.score { display: flex; align-items: baseline; gap: 6px; }
+/* An action among readings, so it sits apart from them and at the far end. */
+.scores { width: 100%; }
+.droprun { margin-left: auto; font-size: 12px; }
+.score b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.score span { color: var(--ink-dim); font-size: 12px; }
+.score.ok b { color: var(--ok); }
+.score.warn b { color: var(--warn); }
+.score.bad b { color: var(--bad); }
+/* Nothing recorded yet. Dashed rather than zeroed: a zero is a reading. */
+.score.none b { color: var(--ink-faint); }
+
+/* The next character, in type you can read without looking at it.
+ *
+ * A band of its own above the chart rather than a corner of it: at speed the
+ * chart is small, moving type in exactly the place you cannot look, and the
+ * point of this is that a glance is enough. */
+/* Three rows: what is coming, then the character, then the time to it. Side by
+   side the letter and the countdown competed for the same glance; stacked, the
+   letter is what you see and the number is what you check. */
+.flashcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 20px auto 10px;
+  padding: 10px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  transition: background-color 90ms linear, border-color 90ms linear;
+  min-height: 150px;
+  min-width: 150px;
+  box-sizing: border-box;
+}
+.fcletter {
+  font-family: var(--mono);
+  font-size: 54px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  min-width: 2ch;
+  text-align: center;
+}
+.fcclock {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--you);
+  min-width: 5ch;
+  text-align: center;
+}
+.fclabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+/* The word being sent, spelled out under the timing.
+   Letter-spaced so the letters read as separate things to be sent rather than
+   as a word to be read — and a fixed width per letter keeps the row from
+   shifting sideways as each one turns. */
+.fcword {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1px;
+  max-width: 18ch;
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--ink-dim);
+}
+.fcword span {
+  width: 1.1ch;
+  text-align: center;
+  transition: color 90ms linear;
+}
+/* Passed. Green rather than dimmed, because what it marks is the one thing on
+   the card that is already true. */
+.fcword span.done { color: var(--ok); font-weight: 700; }
+
+/* On the beat. Bright, brief, and where your eye already is — the whole
+   argument against flashing the page instead. */
+.flashcard.now {
+  background: var(--you);
+  border-color: var(--you);
+}
+.flashcard.now .fcletter,
+.flashcard.now .fcclock,
+.flashcard.now .fclabel { color: #fff; }
+/* Against the lit background the dim gray vanishes and the green stops
+   reading as green, so both go to the flash's own contrast for its duration.
+   Which letters are done still shows — by weight rather than by hue. */
+.flashcard.now .fcword { color: rgba(255, 255, 255, .65); }
+.flashcard.now .fcword span.done { color: #fff; }
+
+/* A strobe is not the only way to say "now". Same information, held rather
+   than flashed, for anyone who has asked the system not to animate. */
+@media (prefers-reduced-motion: reduce) {
+  .flashcard { transition: none; }
+  .flashcard.now {
+    background: var(--panel);
+    border-color: var(--you);
+    box-shadow: inset 0 0 0 2px var(--you);
+  }
+  .flashcard.now .fcletter,
+  .flashcard.now .fcclock { color: var(--you); }
+  .fcword span { transition: none; }
+  .flashcard.now .fcword { color: var(--ink-dim); }
+  .flashcard.now .fcword span.done { color: var(--ok); }
+  .flashcard.now .fclabel { color: var(--ink-dim); }
+}
+
+/* The chart's own controls, in a strip above it. Not styled as the panel the
+   grading controls are: they belong to the picture, not to the numbers. */
+.viewcontrols {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 22px;
+  padding: 0 0 10px;
+}
+
+/* ---- controls ---------------------------------------------------------- */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+/* Two bands, and that is the whole of the alignment scheme.
+ *
+ * A caption of fixed height on top, a control band of fixed height below, and
+ * every group built the same way — so a select, a slider, a checkbox, a text
+ * box and a row of buttons all sit on one center line however tall each one
+ * naturally is. Left to their own heights they do not: a text input is half
+ * again the height of a slider, and a row that mixes them ends up with
+ * everything at a slightly different level and no single thing to blame. */
+.group { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
+.group.grow { flex: 1 1 260px; }
+.group label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+/* The caption band. */
+.group > label:not(.check):not(.field) {
+  height: 15px;
+  line-height: 15px;
+  flex: 0 0 auto;
+}
+/* The control band. `margin-top: auto` is what drops a group with no caption —
+   the transport, a bare checkbox — onto the same line as the ones that have
+   one, rather than centering it across both bands. */
+.group > :not(label),
+.group > label.check,
+.group > label.field {
+  min-height: var(--control-h);
+  flex: 0 0 auto;
+}
+.group > label.check,
+.group > label.field,
+.group.transport { margin-top: auto; }
+/* A readout must never change width. The groups are sized by their content and
+   the intended-message field absorbs the slack, so a reading that gains a digit
+   drags the whole control row with it — the caption there wraps and unwraps as
+   the number beside it grows. Dragging a slider made that twitch once; zooming
+   with the wheel made it constant.
+   The numbers are right-aligned into a fixed field by the padding app.js puts
+   on them, which needs `pre` to survive HTML whitespace collapsing. Monospace
+   and tabular figures are what make that padding exact. Same end as .clock, by
+   the means a value with a unit stuck to it allows. */
+.group output {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+  flex: 0 0 auto;
+}
+/* A checkbox sits on the same baseline as its words, not above them like the
+   sliders' captions do, so the whole label is one click target. */
+.group label.check {
+  align-items: center;
+  cursor: pointer;
+}
+/* A label beside its box rather than above it, in a row of captions above
+   theirs. It is a caption all the same, so it is set like one — without this
+   it inherits the wizard's larger body size and reads as a different kind of
+   thing from the two checkboxes next to it. */
+.group .field .fieldname,
+.group .field .unit { font-size: inherit; letter-spacing: inherit; }
+.group label.check input { accent-color: var(--you); margin: 0; }
+.hint { text-transform: none; letter-spacing: 0; color: var(--ink-faint); }
+
+/* Sized to the control band rather than to its own track, so its center line
+   is the same one a text box's is. */
+input[type=range] { width: 100%; accent-color: var(--you); margin: 0; height: var(--control-h); }
+/* A slider with a button beside it. The slider takes the slack; `min-width: 0`
+   because a flex item won't shrink below its intrinsic width without it, which
+   would push the button out of the group. */
+.sliderow { display: flex; gap: 8px; align-items: center; min-height: var(--control-h); }
+.sliderow input[type=range] { flex: 1 1 auto; min-width: 0; }
+.sliderow button { flex: 0 0 auto; padding: 3px 8px; font-size: 11px; }
+/* Every box that takes typing, including the number ones — which this selector
+   used to miss, so they came out in the platform's own chrome and font in the
+   middle of rows of these. */
+input[type=text], input[type=number], select {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+input[type=text]:focus, input[type=number]:focus, select:focus {
+  outline: 2px solid var(--you);
+  outline-offset: -1px;
+}
+/* Not the box's own mono, and a size down: a placeholder is a note about the
+   box rather than a sample of what goes in it, and the proportional face fits
+   a sentence where the monospace one would run out of room. */
+input[type=text]::placeholder {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* The chevron is ours rather than the platform's.
+   A native select ignores padding-right when it places its own arrow, so the
+   arrow ends up against the border however much room the box is given. Drawing
+   it means it sits where it is told, and matches the rest of the chrome. Two
+   copies because an SVG in a background image cannot inherit currentColor, so
+   the theme has to swap the whole thing. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2397a3b6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 10px 6px;
+}
+@media (prefers-color-scheme: light) {
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235a6577' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+}
+
+.transport { flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
+.controls, .viewcontrols { align-items: stretch; }
+button {
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--you); }
+button:disabled { opacity: .45; cursor: default; }
+.ico {
+  display: inline-block;
+  width: 1.2em;
+  font-style: normal;
+  text-align: left;
+}
+button.play { border-left: 3px solid var(--you); }
+button.play.alt { border-left-color: var(--tgt); }
+button.on { background: var(--you); border-color: var(--you); color: #fff; }
+button.alt.on { background: var(--tgt); border-color: var(--tgt); }
+/* Fixed width, not min-width: the text changes every frame while playing, and
+   anything elastic here shoves the rest of the control bar sideways. Tabular
+   figures keep the digits from jittering within it. */
+.clock {
+  font-family: var(--mono);
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+  width: 7ch;
+  text-align: right;
+  overflow: hidden;
+}
+
+/* ---- canvas ------------------------------------------------------------ */
+.canvas-wrap { padding: 14px 20px 4px; }
+
+/* The canvas is always exactly the container's width and does its own
+   scrolling, so there's no native scrollbar to clash with the dark panel — and
+   the view can follow the playhead instead of letting it slide off-screen. */
+.plot {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+canvas { display: block; touch-action: none; }
+canvas.grabbing { cursor: grabbing; }
+/* Over a run's name in the gutter, which picks that row up. */
+canvas.picking { cursor: pointer; }
+
+.tip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 6px 20px rgb(0 0 0 / .35);
+  max-width: 280px;
+}
+
+.belowplot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  margin: 8px 0 0;
+}
+.legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  margin: 0;
+}
+.downloads { display: flex; gap: 8px; flex-wrap: wrap; }
+.downloads button { padding: 5px 10px; font-size: 12px; }
+.sw {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  margin-left: 8px;
+}
+.sw:first-child { margin-left: 0; }
+.sw.ok { background: var(--ok); }
+.sw.warn { background: var(--warn); }
+.sw.bad { background: var(--bad); }
+.sw.ghost { background: transparent; border: 1px dashed var(--ghost); }
+.sw.rest { background: var(--rest); }
+
+/* A class name you can hover for what the class means. Marked, because a
+   tooltip nobody knows is there explains nothing. */
+.report td.why {
+  cursor: help;
+  text-decoration: underline dotted var(--ink-faint);
+  text-underline-offset: 3px;
+}
+
+/* ---- report ------------------------------------------------------------ */
+.report {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+  padding: 14px 20px 28px;
+  align-items: start;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+  font-weight: 600;
+}
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td {
+  text-align: right;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+th { color: var(--ink-dim); font-weight: 500; font-size: 11px; }
+td:first-child, th:first-child { text-align: left; font-family: var(--mono); }
+tr:last-child td { border-bottom: 0; }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+
+/* Playable values in the deviations table: click yours, then the target. */
+td.play { cursor: pointer; user-select: none; }
+td.play:hover {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 4px;
+}
+/* Match the outline to the track the canvas lights up on hover, so the cell
+   and the highlighted stretch read as one thing. */
+td.play[data-side="you"]:hover { box-shadow: inset 0 0 0 1px var(--you); }
+td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
+
+.diff { font-family: var(--mono); font-size: 13px; line-height: 1.8; word-break: break-word; }
+.diff .eq { color: var(--ink); }
+.diff .er {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 16%, transparent);
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+.note { color: var(--ink-dim); font-size: 12px; margin: 8px 0 0; }
+.empty { color: var(--ok); }
+
+/* ---- app shell ---------------------------------------------------------- */
+/* Added for the browser app. Everything above this line is the review page's
+   own styling, carried over unchanged so the chart looks the same as it did. */
+
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+.app { position: relative; display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ---- landing ------------------------------------------------------------ */
+.landing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Centered when it fits, top-aligned when it does not — `center` on its own
+     would push the top of an over-tall page off the screen, out of reach. */
+  justify-content: safe center;
+  gap: 22px;
+  padding: 40px 20px;
+  text-align: center;
+}
+/* The wordmark: one of sixteen drawings of CWT, with the same three letters
+   keyed underneath. Three things make the art art, and it falls apart without
+   any of them — a monospace face, `white-space: pre`, and `line-height: 1` so
+   consecutive rows touch instead of being separated by a stripe of background.
+
+   The size is derived rather than fixed, because the drawings run from 20 to 68
+   columns wide and one font size would leave half of them either tiny or off
+   the side of the screen. `--cols` comes from the component; 0.6em is the
+   advance of a cell in every face in the mono stack, near enough. The result is
+   that they all land at about the same width, and all of them shrink with the
+   viewport rather than overflowing it. */
+/* The reserve: tall enough for whichever drawing turns up, so reloading the
+   page does not move everything below it. Centered within, so a short drawing
+   sits where a tall one would rather than clinging to the top of the box. */
+.landing .wordmark {
+  margin: 0;
+  /* The room a drawing gets. Both bounds matter: width alone let a tall
+     drawing run to 330 pixels and push the controls off the bottom of a short
+     window, and a height budget in vh means a short window spends less of
+     itself on a logo. Everything else here follows from these two. */
+  --wm-w: min(90vw, 640px);
+  --wm-h: clamp(64px, 17vh, 176px);
+  /* Part of the box, so they are named where the box height adds them on. */
+  --wm-morse-gap: 16px;
+  --wm-morse-line: 20px;
+}
+
+/* A box of a fixed height, holding the drawing and the keyed line centered
+   together. Fixed because the drawings are 4 to 11 rows tall and every reload
+   brings a different one: a box that hugged its contents would move the whole
+   page up and down as the roll changed. A min-height on the heading is not
+   enough either — the drawing's own height is rows times a fractional font
+   size, so a rounded-up pixel can push past it and move the page by one.
+   Nothing the drawing does can change this box. */
+.landing .wordmark > .artbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wm-morse-gap);
+  height: calc(var(--wm-h) + var(--wm-morse-gap) + var(--wm-morse-line));
+}
+.landing .wordmark .art {
+  display: block;
+  white-space: pre;
+  font-family: var(--mono);
+  /* Scaled to fit the box in whichever direction runs out first. 0.6em is the
+     advance of a monospace cell in every face in the stack, near enough, so
+     `cols / 0.6` is the drawing's width in ems and `rows` is its height. A
+     wide drawing hits the width bound, a tall one hits the height bound, and
+     either way it lands inside. */
+  font-size: min(
+    calc(var(--wm-w) / var(--cols, 30) / 0.6),
+    calc(var(--wm-h) / var(--rows, 6))
+  );
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--you);
+}
+.landing .wordmark .morse {
+  font-family: var(--mono);
+  /* Sized and spaced to read as keying rather than as debris under the art. */
+  font-size: 15px;
+  font-weight: 400;
+  /* Pinned, because the reserve arithmetic counts on it. */
+  line-height: var(--wm-morse-line);
+  letter-spacing: .3em;
+  /* The trailing letter-space would otherwise push the line off-center. */
+  text-indent: .3em;
+  color: var(--ink-dim);
+}
+.landing .lede {
+  color: var(--ink-dim);
+  max-width: 52ch;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.landing .ways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  width: 100%;
+  max-width: 780px;
+}
+/* Across both of the other two, because it is not a third way in — it is what
+   the other two are for. */
+.way.practice { flex: 1 1 100%; }
+.way.practice button { max-width: 382px }
+
+.way {
+  flex: 1 1 320px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.way h2 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+.way p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
+.way .big {
+  font-size: 15px;
+  padding: 11px 22px;
+  border-radius: 8px;
+  width: 100%;
+}
+.way.drop.over { border-color: var(--you); background: var(--panel-2); }
+
+.intended-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 520px;
+  text-align: left;
+}
+/* A question, not a field label. Set as small uppercase tracking it read as
+   one more caption on a screen full of them and got skipped — and without it
+   the grading has only the decode to compare against, which is a meaningless
+   100% for accuracy. */
+.intended-field label {
+  font-size: 16px;
+  color: var(--ink);
+  text-align: center;
+}
+.intended-field input { width: 100%; }
+.intended-field .hint { text-transform: none; letter-spacing: 0; font-size: 12px; }
+
+/* ---- a dialog over the page ---------------------------------------------- */
+
+/* Dimmed rather than blacked out: what the dialog is about is the thing behind
+   it, and the session you are replacing is worth still being able to see. */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 10, 14, .66);
+}
+.dialog {
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .45);
+}
+.dialog h2 { margin: 0; font-size: 18px; }
+.dialog > .hint { margin: 0 0 4px; font-size: 12px; line-height: 1.5; }
+.dialog > label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.dialog textarea:focus {
+  outline: 2px solid var(--you);
+  outline-offset: -1px;
+}
+.dialog textarea::placeholder {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.dialog .speeds { display: flex; gap: 16px; flex-wrap: wrap; }
+.dialog .speeds .group { flex: 1 1 160px; }
+.dialog .speeds input { width: 100%; }
+.dialog .confirm { margin-top: 6px; }
+
+/* ---- recording ---------------------------------------------------------- */
+.recording {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.reclight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  /* The reading is padded to a constant five characters; `pre` is what makes
+     the padding survive to the screen, and tabular figures are what keep the
+     digits themselves from shifting within it. */
+  white-space: pre;
+}
+/* Red whatever the button around it is doing, including disabled — a record
+   button that grays its own dot stops looking like one. */
+.recdot { color: var(--bad); }
+
+.reclight .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bad);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) {
+  .reclight .dot { animation: none; }
+}
+.meter {
+  width: 260px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.meter i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  transition: width 80ms linear;
+}
+.meter i.hot { background: var(--bad); }
+
+.rowbuttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+/* ---- messages ----------------------------------------------------------- */
+/* The same band as the header, and the same height.
+ *
+ * A banner is a strip that appears without warning, above a page somebody is
+ * already reading. Sized to its own words it is a different height every time
+ * and a different height from everything else on screen, so the page jumps by
+ * some unpredictable amount as it arrives. One band height, centered, and the
+ * jump is at least the same one every time — and looks like a row of the
+ * chrome rather than something wedged into it. */
+.banner {
+  margin: 0;
+  padding: 10px 20px;
+  min-height: var(--band-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+/* Inside the wizard it is a notice in a column, not a band across a page. */
+.calibrate .banner { min-height: 0; display: block; }
+.banner.error { background: color-mix(in srgb, var(--bad) 14%, var(--panel)); color: var(--ink); }
+.banner.warn { background: color-mix(in srgb, var(--warn) 14%, var(--panel)); color: var(--ink); }
+.banner.info { background: var(--panel-2); color: var(--ink-dim); }
+
+/* Shown while a drag carrying files is anywhere over the window. Covers the
+   page rather than marking a target on it, because the whole page is the
+   target — a rectangle to aim at would be saying the opposite. Never
+   interactive: it must not eat the drop it is advertising. */
+.dropveil {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  box-shadow: inset 0 0 0 3px var(--you);
+}
+.dropveil p {
+  margin: 0;
+  padding: 14px 22px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--you);
+  color: var(--ink);
+  font-size: 15px;
+  max-width: 42ch;
+  text-align: center;
+  line-height: 1.5;
+}
+/* Nothing will be taken. Not an error — you have done nothing wrong by
+   dragging — so it steps back to the ordinary outline rather than going red. */
+.dropveil.closed { box-shadow: inset 0 0 0 3px var(--line); }
+.dropveil.closed p {
+  border-color: var(--line);
+  color: var(--ink-dim);
+}
+
+.busy {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  gap: 10px;
+}
+
+/* A quiet link-shaped button, for "start over" and the like. */
+button.link {
+  background: none;
+  border: none;
+  color: var(--ink-dim);
+  padding: 4px 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+button.link:hover:not(:disabled) { color: var(--ink); border-color: transparent; }
+
+/* The one action in a group that the rest lead up to. */
+button.primary { border-color: var(--you); color: var(--ink); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- the calibration wizard --------------------------------------------- */
+
+/* Deliberately one thing at a time. The person doing this has a paddle in one
+   hand and is reading from across a desk, so the prompt is large, the
+   countdown is unmissable, and nothing else is on screen competing with
+   either. */
+.calibrate {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 16px;
+  padding: 32px 20px;
+  text-align: center;
+}
+.calibrate h2 { margin: 0; font-size: 20px; }
+.calibrate .lede { color: var(--ink-dim); max-width: 52ch; margin: 0; line-height: 1.6; }
+.calibrate .group { align-items: center; min-width: 220px; }
+.calibrate .group input { text-align: center; }
+
+/* A labeled control. `row` puts the name beside the input rather than above
+   it, which is what a single short field wants — "Keyer speed" stacked over a
+   two-character box is three lines of screen for one number. */
+.field { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.field.row { flex-direction: row; align-items: center; gap: 10px; }
+.field .fieldname { font-size: 13px; color: var(--ink-dim); }
+.field.row input { width: 5em; text-align: center; }
+
+
+/* What the sequence is, before any of it is asked for. Left-aligned inside a
+   centered column: a numbered list you read down wants a straight left edge,
+   and centering the items makes the order hard to follow. */
+.calibrate .preamble { display: flex; flex-direction: column; gap: 12px; }
+.calibrate .preamble p { margin: 0; }
+.calibrate .drilllist {
+  margin: 0;
+  padding-left: 22px;
+  text-align: left;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.calibrate .drilllist .hint { display: block; }
+.calibrate .banner { border: 1px solid var(--line); border-radius: 8px; max-width: 52ch; }
+
+.calibrate .prompt {
+  font-size: clamp(22px, 4vw, 34px);
+  line-height: 1.2;
+  max-width: 22ch;
+}
+/* A rest is not a drill, and looking different is how somebody glancing up
+   knows to take their hand off the paddle. */
+.calibrate .prompt.rest { color: var(--ink-faint); font-weight: 400; }
+
+/* The prompt area, on fixed rows.
+ *
+ * Each step says a different amount, and letting the column find its own
+ * height meant the clock moved up and down the screen every few seconds while
+ * somebody was trying to read it. The rows are sized for the tallest thing
+ * each one holds, so the countdown lands in the same place all the way
+ * through and only the words inside change. */
+.calibrate .stage {
+  width: 100%;
+  display: grid;
+  grid-template-rows: minmax(86px, auto) minmax(148px, auto) minmax(62px, auto);
+  align-items: center;
+  justify-items: center;
+  gap: 12px;
+}
+
+.calibrate .countdown {
+  font-family: var(--mono);
+  font-size: 44px;
+  font-variant-numeric: tabular-nums;
+  color: var(--you);
+  line-height: 1;
+}
+/* Blue means hold off, green means send — read out of the corner of an eye by
+   somebody looking at a paddle rather than at the screen. The rest's countdown
+   is counting toward something and stays blue; a drill's is counting through
+   it, and the cued drill alternates between the two on every beat. */
+.calibrate .countdown[data-state="sending"] { color: var(--ok); }
+/* The called cue, bigger on the beat than the wait before it. */
+.calibrate .countdown.cue.now {
+  font-size: 60px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+/* On a rest the clock is counting toward something rather than through it, so
+   it says which. */
+.calibrate .cdlabel {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+/* What you are about to be asked to do, while nothing is being asked of you.
+   Given a panel of its own because during a rest it is the only thing on the
+   screen worth reading. */
+.calibrate .upnext {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 46ch;
+}
+.calibrate .upnext .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.calibrate .upnext strong { font-size: clamp(17px, 2.4vw, 22px); line-height: 1.25; }
+.calibrate .upnext .lede { font-size: 14px; }
+.calibrate .meter { width: min(60vw, 320px); }
+
+.calibrate .readout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 26px;
+  margin: 0;
+}
+.calibrate .readout > div { display: flex; flex-direction: column; gap: 3px; }
+.calibrate .readout dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+.calibrate .readout dd { margin: 0; font-size: 15px; }
+
+.verdict.clean, .verdict.good { color: var(--ok); }
+.verdict.marginal { color: var(--warn); }
+.verdict.unusable { color: var(--bad); }
+.verdict.unknown { color: var(--ink-faint); }
+
+/* The closing message, decoded through the profile just measured. The only
+   part of a calibration somebody can check with their own eyes. */
+/* Hearing each drill back. Worth having on a refusal above all: "the drills
+   disagree" becomes obvious the moment the dah drill plays somebody's dits. */
+.calibrate .sections {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.calibrate .sections .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.calibrate .sections .ico { margin-right: 6px; font-style: normal; }
+
+.calibrate .readback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 46ch;
+}
+.calibrate .readback strong {
+  font-family: var(--mono);
+  font-size: clamp(16px, 2.6vw, 22px);
+  letter-spacing: .06em;
+  word-break: break-word;
+}
+
+/* The advice, which is the point of the screen — see dsp/quality.ts, where
+   placement outranks every number this page prints. */
+.privacy { font-size: 12px; color: var(--ink-faint); margin: 4px 0 0; }
+
+/* Last line on every screen. Pushed to the bottom by the app's own column, so
+   it sits under short pages rather than floating in the middle of them. */
+.colophon {
+  margin-top: auto;
+  padding: 16px 20px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* What was asked for and what came back, above the arithmetic about them.
+   Monospaced and on their own lines: these are call signs and the point is
+   comparing them character by character. */
+/* A grid, not a stack of flex rows: the values have to start at the same x or
+   two call signs meant to be compared character by character do not line up,
+   and the column would be set by whichever label happened to be longest. */
+.texts {
+  margin: 0 0 8px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 5px 12px;
+  align-items: baseline;
+}
+/* The wrappers exist for the markup's sake; the grid wants the dt and dd. */
+.texts > div { display: contents; }
+.texts dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+.texts dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  word-break: break-word;
+}
+/* The tally is prose, not a message to be compared character by character. */
+.texts dd.plain { font-family: inherit; font-size: 12px; color: var(--ink-dim); }
+
+/* Configuration, and the way in to it.
+ *
+ * Positioned against the app rather than against either screen, so it lands in
+ * the same place on both — a control that moves between screens is one
+ * somebody has to look for twice. Above the header's own stacking so it stays
+ * clickable over it. */
+.cog {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  z-index: 5;
+  font-size: 27px;
+  line-height: 1;
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--ink-dim);
+}
+.cog:hover { color: var(--ink); border-color: var(--line); }
+
+.settings {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 28px 20px;
+  max-width: 780px;
+  margin: 0 auto;
+  width: 100%;
+}
+.setshead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings h2 { margin: 0; font-size: 20px; }
+.settings h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-dim); }
+.settings .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
+.callist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.callist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.calmeta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.calmeta .hint { font-size: 12px; }
+.confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.confirm .hint { max-width: 30ch; text-align: right; }
+button.danger { border-color: var(--bad); color: var(--bad); }
+
+/* Overriding the measurement. Below the preview, because a slider whose
+   effect you cannot see is guesswork with extra steps. */
+.advanced { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.advanced .advbody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 46ch;
+}
+.advanced .advbody input[type="range"] { width: 180px; }
+.advanced .sliderow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+/* The typed value and its unit read as one control, so the unit sits inside
+   the field's frame rather than floating beside it. */
+.numfield { display: inline-flex; align-items: baseline; gap: 4px; }
+.numfield input { width: 5.5em; text-align: right; }
+.numfield .unit { font-size: 12px; color: var(--ink-dim); }
+.field.row .unit { font-size: 12px; color: var(--ink-dim); }
+.viewcontrols .field.row input { width: 4.5em; }
+.viewcontrols .group { min-width: 0; }
+.advanced .hint { margin: 0; }
+
+/* The two charts, one above the other and the same width, because the whole
+   point is reading one against the other. */
+.calpreview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 900px;
+}
+.calchart { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.calchart .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.calchart .plot { overflow-x: auto; }
+.calibrate .field input { min-width: 2ch; text-align: center; }
+
+.calibrate .advice { color: var(--ink); max-width: 46ch; }
+
+/* Whether this microphone has been measured, said out loud.
+   A panel rather than a line of controls, because it is the one thing on the
+   landing screen that silently changes every number the review will report —
+   see ui/Landing.tsx. */
+.calstatus {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.calstatus .calstate {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.calstatus .calstate b { font-weight: 600; }
+.calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+/* Not the recording light: this one does not blink, and its color is the
+   whole message. */
+.calstatus .dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ghost);
+  transform: translateY(-1px);
+}
+.calstatus.ok .dot { background: var(--ok); }
+.calstatus.warn .dot { background: var(--warn); }
+.calstatus.none .dot { background: var(--warn); }
+.calstatus .hint { margin: 0; font-size: 12px; line-height: 1.5; }
+/* The button spans the panel. It is the only thing in here to do when nothing
+   has been calibrated, and a button sized to its own text reads as an aside. */
+.calactions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.calactions select { flex: 1 1 160px; min-width: 0; }
+.calactions button { flex: 1 1 100%; justify-content: center; }
+/* Once there is a calibration the panel has two things in it, and the pair
+   share the width rather than stacking. */
+.calactions select ~ button { flex: 0 1 auto; }
+
+/* The same fact, in the room the review header has for it. */
+.calchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.calchip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.calchip.ok .dot { background: var(--ok); }
+
+/* The same fact, but changeable: on the review the audio is in hand, so
+   choosing a calibration re-reads the recording rather than only setting what
+   the next one will use. */
+.calpick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.calpick .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.calpick.ok .dot { background: var(--ok); }
+.calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
+.calpick .hint { font-size: 11px; }

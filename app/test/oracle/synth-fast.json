@@ -1,0 +1,4891 @@
+{
+ "name": "synth-fast",
+ "expected": "PARIS PARIS PARIS",
+ "charWpm": 35,
+ "farnsworthWpm": 35,
+ "dspRate": 8000,
+ "toneHz": 600.0685904659251,
+ "segments": [
+  [
+   0,
+   0.102875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.245625
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.245625
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.097125
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.108375
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.039875
+  ],
+  [
+   1,
+   0.028625
+  ],
+  [
+   0,
+   0.10725
+  ]
+ ],
+ "grading": {
+  "measured": {
+   "unitSec": 0.0305,
+   "charWpm": 39.34426229508197,
+   "farnsworthWpm": 36.76752202221371,
+   "ditDahSplit": 0.062875,
+   "elementCharSplit": 0.061,
+   "charWordSplit": 0.180625,
+   "charGapSec": 0.108375,
+   "wordGapSec": 0.252875
+  },
+  "ref": {
+   "unitSec": 0.03428571428571429,
+   "charWpm": 35,
+   "farnsworthWpm": 35,
+   "ditDahSplit": 0.06857142857142857,
+   "elementCharSplit": 0.06857142857142857,
+   "charWordSplit": 0.17142857142857143,
+   "charGapSec": 0.10285714285714287,
+   "wordGapSec": 0.24000000000000002
+  },
+  "rests": {
+   "timeline": {
+    "text": "PARIS PARIS PARIS",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.102875,
+      "t1": 0.1315,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.1315,
+      "t1": 0.171375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.171375,
+      "t1": 0.2685,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.2685,
+      "t1": 0.308375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.308375,
+      "t1": 0.4055,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.4055,
+      "t1": 0.445375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.445375,
+      "t1": 0.47400000000000003,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.47400000000000003,
+      "t1": 0.5823750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "P"
+     },
+     {
+      "t0": 0.5823750000000001,
+      "t1": 0.6110000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.6110000000000001,
+      "t1": 0.6508750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.6508750000000001,
+      "t1": 0.7480000000000001,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.7480000000000001,
+      "t1": 0.8563750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PA"
+     },
+     {
+      "t0": 0.8563750000000001,
+      "t1": 0.8850000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.8850000000000001,
+      "t1": 0.9248750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.9248750000000001,
+      "t1": 1.022,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.022,
+      "t1": 1.0618750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.0618750000000001,
+      "t1": 1.0905,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.0905,
+      "t1": 1.1988750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PAR"
+     },
+     {
+      "t0": 1.1988750000000001,
+      "t1": 1.2275,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.2275,
+      "t1": 1.2673750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2673750000000001,
+      "t1": 1.296,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.296,
+      "t1": 1.404375,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARI"
+     },
+     {
+      "t0": 1.404375,
+      "t1": 1.4329999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.4329999999999998,
+      "t1": 1.472875,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.472875,
+      "t1": 1.5014999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5014999999999998,
+      "t1": 1.541375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.541375,
+      "t1": 1.5699999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5699999999999998,
+      "t1": 1.8156249999999998,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "PARIS"
+     },
+     {
+      "t0": 1.8156249999999998,
+      "t1": 1.8442499999999997,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.8442499999999997,
+      "t1": 1.8841249999999998,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.8841249999999998,
+      "t1": 1.9812499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.9812499999999997,
+      "t1": 2.0211249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0211249999999996,
+      "t1": 2.1182499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.1182499999999997,
+      "t1": 2.1581249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1581249999999996,
+      "t1": 2.1867499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1867499999999995,
+      "t1": 2.2951249999999996,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS P"
+     },
+     {
+      "t0": 2.2951249999999996,
+      "t1": 2.3237499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3237499999999995,
+      "t1": 2.3636249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3636249999999994,
+      "t1": 2.4607499999999995,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.4607499999999995,
+      "t1": 2.5691249999999997,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PA"
+     },
+     {
+      "t0": 2.5691249999999997,
+      "t1": 2.5977499999999996,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.5977499999999996,
+      "t1": 2.6376249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.6376249999999994,
+      "t1": 2.7347499999999996,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.7347499999999996,
+      "t1": 2.7746249999999995,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.7746249999999995,
+      "t1": 2.8032499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.8032499999999994,
+      "t1": 2.9116249999999995,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 2.9116249999999995,
+      "t1": 2.9402499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.9402499999999994,
+      "t1": 2.9801249999999992,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.9801249999999992,
+      "t1": 3.008749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.008749999999999,
+      "t1": 3.1171249999999993,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 3.1171249999999993,
+      "t1": 3.145749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.145749999999999,
+      "t1": 3.185624999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.185624999999999,
+      "t1": 3.214249999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.214249999999999,
+      "t1": 3.254124999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.254124999999999,
+      "t1": 3.2827499999999987,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.2827499999999987,
+      "t1": 3.5283749999999987,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ARIS PARIS"
+     },
+     {
+      "t0": 3.5283749999999987,
+      "t1": 3.5569999999999986,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.5569999999999986,
+      "t1": 3.5968749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.5968749999999985,
+      "t1": 3.6939999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.6939999999999986,
+      "t1": 3.7338749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.7338749999999985,
+      "t1": 3.8309999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.8309999999999986,
+      "t1": 3.8708749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.8708749999999985,
+      "t1": 3.8994999999999984,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.8994999999999984,
+      "t1": 4.0078749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "IS PARIS P"
+     },
+     {
+      "t0": 4.0078749999999985,
+      "t1": 4.036499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.036499999999998,
+      "t1": 4.076374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.076374999999999,
+      "t1": 4.173499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.173499999999999,
+      "t1": 4.2818749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "S PARIS PA"
+     },
+     {
+      "t0": 4.2818749999999985,
+      "t1": 4.310499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.310499999999998,
+      "t1": 4.350374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.350374999999999,
+      "t1": 4.447499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.447499999999999,
+      "t1": 4.487374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.487374999999999,
+      "t1": 4.515999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.515999999999999,
+      "t1": 4.624374999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 4.624374999999999,
+      "t1": 4.652999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.652999999999999,
+      "t1": 4.692874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.692874999999999,
+      "t1": 4.721499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.721499999999999,
+      "t1": 4.829874999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 4.829874999999999,
+      "t1": 4.8584999999999985,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.8584999999999985,
+      "t1": 4.898374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.898374999999999,
+      "t1": 4.926999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.926999999999999,
+      "t1": 4.966874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.966874999999999,
+      "t1": 4.995499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 0.102875,
+      "t1": 0.47400000000000003,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 0.5823750000000001,
+      "t1": 0.7480000000000001,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 0.8563750000000001,
+      "t1": 1.0905,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 1.1988750000000001,
+      "t1": 1.296,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.404375,
+      "t1": 1.5699999999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 1.8156249999999998,
+      "t1": 2.1867499999999995,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 2.2951249999999996,
+      "t1": 2.4607499999999995,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 2.5691249999999997,
+      "t1": 2.8032499999999994,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 2.9116249999999995,
+      "t1": 3.008749999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 3.1171249999999993,
+      "t1": 3.2827499999999987,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 3.5283749999999987,
+      "t1": 3.8994999999999984,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 4.0078749999999985,
+      "t1": 4.173499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 4.2818749999999985,
+      "t1": 4.515999999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 4.624374999999999,
+      "t1": 4.721499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 4.829874999999999,
+      "t1": 4.995499999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargetedTimeline": {
+    "text": "PARIS PARIS PARIS",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.102875,
+      "t1": 0.1315,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.1315,
+      "t1": 0.171375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.171375,
+      "t1": 0.2685,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.2685,
+      "t1": 0.308375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.308375,
+      "t1": 0.4055,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.4055,
+      "t1": 0.445375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.445375,
+      "t1": 0.47400000000000003,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.47400000000000003,
+      "t1": 0.5823750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "P"
+     },
+     {
+      "t0": 0.5823750000000001,
+      "t1": 0.6110000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.6110000000000001,
+      "t1": 0.6508750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.6508750000000001,
+      "t1": 0.7480000000000001,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.7480000000000001,
+      "t1": 0.8563750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PA"
+     },
+     {
+      "t0": 0.8563750000000001,
+      "t1": 0.8850000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.8850000000000001,
+      "t1": 0.9248750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.9248750000000001,
+      "t1": 1.022,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.022,
+      "t1": 1.0618750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.0618750000000001,
+      "t1": 1.0905,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.0905,
+      "t1": 1.1988750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PAR"
+     },
+     {
+      "t0": 1.1988750000000001,
+      "t1": 1.2275,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.2275,
+      "t1": 1.2673750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2673750000000001,
+      "t1": 1.296,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.296,
+      "t1": 1.404375,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARI"
+     },
+     {
+      "t0": 1.404375,
+      "t1": 1.4329999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.4329999999999998,
+      "t1": 1.472875,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.472875,
+      "t1": 1.5014999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5014999999999998,
+      "t1": 1.541375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.541375,
+      "t1": 1.5699999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5699999999999998,
+      "t1": 1.8156249999999998,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "PARIS"
+     },
+     {
+      "t0": 1.8156249999999998,
+      "t1": 1.8442499999999997,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.8442499999999997,
+      "t1": 1.8841249999999998,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.8841249999999998,
+      "t1": 1.9812499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.9812499999999997,
+      "t1": 2.0211249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0211249999999996,
+      "t1": 2.1182499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.1182499999999997,
+      "t1": 2.1581249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1581249999999996,
+      "t1": 2.1867499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1867499999999995,
+      "t1": 2.2951249999999996,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS P"
+     },
+     {
+      "t0": 2.2951249999999996,
+      "t1": 2.3237499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3237499999999995,
+      "t1": 2.3636249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3636249999999994,
+      "t1": 2.4607499999999995,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.4607499999999995,
+      "t1": 2.5691249999999997,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PA"
+     },
+     {
+      "t0": 2.5691249999999997,
+      "t1": 2.5977499999999996,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.5977499999999996,
+      "t1": 2.6376249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.6376249999999994,
+      "t1": 2.7347499999999996,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.7347499999999996,
+      "t1": 2.7746249999999995,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.7746249999999995,
+      "t1": 2.8032499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.8032499999999994,
+      "t1": 2.9116249999999995,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 2.9116249999999995,
+      "t1": 2.9402499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.9402499999999994,
+      "t1": 2.9801249999999992,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.9801249999999992,
+      "t1": 3.008749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.008749999999999,
+      "t1": 3.1171249999999993,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 3.1171249999999993,
+      "t1": 3.145749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.145749999999999,
+      "t1": 3.185624999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.185624999999999,
+      "t1": 3.214249999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.214249999999999,
+      "t1": 3.254124999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.254124999999999,
+      "t1": 3.2827499999999987,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.2827499999999987,
+      "t1": 3.5283749999999987,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ARIS PARIS"
+     },
+     {
+      "t0": 3.5283749999999987,
+      "t1": 3.5569999999999986,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.5569999999999986,
+      "t1": 3.5968749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.5968749999999985,
+      "t1": 3.6939999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.6939999999999986,
+      "t1": 3.7338749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.7338749999999985,
+      "t1": 3.8309999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.8309999999999986,
+      "t1": 3.8708749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.8708749999999985,
+      "t1": 3.8994999999999984,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.8994999999999984,
+      "t1": 4.0078749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "IS PARIS P"
+     },
+     {
+      "t0": 4.0078749999999985,
+      "t1": 4.036499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.036499999999998,
+      "t1": 4.076374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.076374999999999,
+      "t1": 4.173499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.173499999999999,
+      "t1": 4.2818749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "S PARIS PA"
+     },
+     {
+      "t0": 4.2818749999999985,
+      "t1": 4.310499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.310499999999998,
+      "t1": 4.350374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.350374999999999,
+      "t1": 4.447499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.447499999999999,
+      "t1": 4.487374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.487374999999999,
+      "t1": 4.515999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.515999999999999,
+      "t1": 4.624374999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 4.624374999999999,
+      "t1": 4.652999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.652999999999999,
+      "t1": 4.692874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.692874999999999,
+      "t1": 4.721499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.721499999999999,
+      "t1": 4.829874999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 4.829874999999999,
+      "t1": 4.8584999999999985,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.8584999999999985,
+      "t1": 4.898374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.898374999999999,
+      "t1": 4.926999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.926999999999999,
+      "t1": 4.966874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.966874999999999,
+      "t1": 4.995499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 0.102875,
+      "t1": 0.47400000000000003,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 0.5823750000000001,
+      "t1": 0.7480000000000001,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 0.8563750000000001,
+      "t1": 1.0905,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 1.1988750000000001,
+      "t1": 1.296,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.404375,
+      "t1": 1.5699999999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 1.8156249999999998,
+      "t1": 2.1867499999999995,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 2.2951249999999996,
+      "t1": 2.4607499999999995,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 2.5691249999999997,
+      "t1": 2.8032499999999994,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 2.9116249999999995,
+      "t1": 3.008749999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 3.1171249999999993,
+      "t1": 3.2827499999999987,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 3.5283749999999987,
+      "t1": 3.8994999999999984,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 4.0078749999999985,
+      "t1": 4.173499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 4.2818749999999985,
+      "t1": 4.515999999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 4.624374999999999,
+      "t1": 4.721499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 4.829874999999999,
+      "t1": 4.995499999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargeted": 0,
+   "analysis": {
+    "tolerance": 0.3,
+    "withinTolFrac": 1.0,
+    "nPauses": 0,
+    "stats": [
+     {
+      "name": "dit",
+      "n": 30,
+      "meanUnits": 0.8348958333333335,
+      "stdUnits": 2.220446049250313e-16,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "dah",
+      "n": 12,
+      "meanUnits": 2.8328124999999997,
+      "stdUnits": 0.0,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "element-gap",
+      "n": 27,
+      "meanUnits": 1.1630208333333334,
+      "stdUnits": 0.0,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "char-gap",
+      "n": 12,
+      "meanUnits": 3.1609374999999997,
+      "stdUnits": 0.0,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "word-gap",
+      "n": 2,
+      "meanUnits": 7.1640625,
+      "stdUnits": 0.0,
+      "targetUnits": 7.0
+     }
+    ],
+    "deviations": []
+   }
+  },
+  "noRests": {
+   "timeline": {
+    "text": "PARIS PARIS PARIS",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.102875,
+      "t1": 0.1315,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.1315,
+      "t1": 0.171375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.171375,
+      "t1": 0.2685,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.2685,
+      "t1": 0.308375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.308375,
+      "t1": 0.4055,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.4055,
+      "t1": 0.445375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.445375,
+      "t1": 0.47400000000000003,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.47400000000000003,
+      "t1": 0.5823750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "P"
+     },
+     {
+      "t0": 0.5823750000000001,
+      "t1": 0.6110000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.6110000000000001,
+      "t1": 0.6508750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.6508750000000001,
+      "t1": 0.7480000000000001,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.7480000000000001,
+      "t1": 0.8563750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PA"
+     },
+     {
+      "t0": 0.8563750000000001,
+      "t1": 0.8850000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.8850000000000001,
+      "t1": 0.9248750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.9248750000000001,
+      "t1": 1.022,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.022,
+      "t1": 1.0618750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.0618750000000001,
+      "t1": 1.0905,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.0905,
+      "t1": 1.1988750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PAR"
+     },
+     {
+      "t0": 1.1988750000000001,
+      "t1": 1.2275,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.2275,
+      "t1": 1.2673750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2673750000000001,
+      "t1": 1.296,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.296,
+      "t1": 1.404375,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARI"
+     },
+     {
+      "t0": 1.404375,
+      "t1": 1.4329999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.4329999999999998,
+      "t1": 1.472875,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.472875,
+      "t1": 1.5014999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5014999999999998,
+      "t1": 1.541375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.541375,
+      "t1": 1.5699999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5699999999999998,
+      "t1": 1.8156249999999998,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "PARIS"
+     },
+     {
+      "t0": 1.8156249999999998,
+      "t1": 1.8442499999999997,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.8442499999999997,
+      "t1": 1.8841249999999998,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.8841249999999998,
+      "t1": 1.9812499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.9812499999999997,
+      "t1": 2.0211249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0211249999999996,
+      "t1": 2.1182499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.1182499999999997,
+      "t1": 2.1581249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1581249999999996,
+      "t1": 2.1867499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1867499999999995,
+      "t1": 2.2951249999999996,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS P"
+     },
+     {
+      "t0": 2.2951249999999996,
+      "t1": 2.3237499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3237499999999995,
+      "t1": 2.3636249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3636249999999994,
+      "t1": 2.4607499999999995,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.4607499999999995,
+      "t1": 2.5691249999999997,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PA"
+     },
+     {
+      "t0": 2.5691249999999997,
+      "t1": 2.5977499999999996,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.5977499999999996,
+      "t1": 2.6376249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.6376249999999994,
+      "t1": 2.7347499999999996,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.7347499999999996,
+      "t1": 2.7746249999999995,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.7746249999999995,
+      "t1": 2.8032499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.8032499999999994,
+      "t1": 2.9116249999999995,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 2.9116249999999995,
+      "t1": 2.9402499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.9402499999999994,
+      "t1": 2.9801249999999992,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.9801249999999992,
+      "t1": 3.008749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.008749999999999,
+      "t1": 3.1171249999999993,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 3.1171249999999993,
+      "t1": 3.145749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.145749999999999,
+      "t1": 3.185624999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.185624999999999,
+      "t1": 3.214249999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.214249999999999,
+      "t1": 3.254124999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.254124999999999,
+      "t1": 3.2827499999999987,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.2827499999999987,
+      "t1": 3.5283749999999987,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ARIS PARIS"
+     },
+     {
+      "t0": 3.5283749999999987,
+      "t1": 3.5569999999999986,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.5569999999999986,
+      "t1": 3.5968749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.5968749999999985,
+      "t1": 3.6939999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.6939999999999986,
+      "t1": 3.7338749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.7338749999999985,
+      "t1": 3.8309999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.8309999999999986,
+      "t1": 3.8708749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.8708749999999985,
+      "t1": 3.8994999999999984,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.8994999999999984,
+      "t1": 4.0078749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "IS PARIS P"
+     },
+     {
+      "t0": 4.0078749999999985,
+      "t1": 4.036499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.036499999999998,
+      "t1": 4.076374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.076374999999999,
+      "t1": 4.173499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.173499999999999,
+      "t1": 4.2818749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "S PARIS PA"
+     },
+     {
+      "t0": 4.2818749999999985,
+      "t1": 4.310499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.310499999999998,
+      "t1": 4.350374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.350374999999999,
+      "t1": 4.447499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.447499999999999,
+      "t1": 4.487374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.487374999999999,
+      "t1": 4.515999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.515999999999999,
+      "t1": 4.624374999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 4.624374999999999,
+      "t1": 4.652999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.652999999999999,
+      "t1": 4.692874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.692874999999999,
+      "t1": 4.721499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.721499999999999,
+      "t1": 4.829874999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 4.829874999999999,
+      "t1": 4.8584999999999985,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.8584999999999985,
+      "t1": 4.898374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.898374999999999,
+      "t1": 4.926999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.926999999999999,
+      "t1": 4.966874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.966874999999999,
+      "t1": 4.995499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 0.102875,
+      "t1": 0.47400000000000003,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 0.5823750000000001,
+      "t1": 0.7480000000000001,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 0.8563750000000001,
+      "t1": 1.0905,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 1.1988750000000001,
+      "t1": 1.296,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.404375,
+      "t1": 1.5699999999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 1.8156249999999998,
+      "t1": 2.1867499999999995,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 2.2951249999999996,
+      "t1": 2.4607499999999995,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 2.5691249999999997,
+      "t1": 2.8032499999999994,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 2.9116249999999995,
+      "t1": 3.008749999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 3.1171249999999993,
+      "t1": 3.2827499999999987,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 3.5283749999999987,
+      "t1": 3.8994999999999984,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 4.0078749999999985,
+      "t1": 4.173499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 4.2818749999999985,
+      "t1": 4.515999999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 4.624374999999999,
+      "t1": 4.721499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 4.829874999999999,
+      "t1": 4.995499999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargetedTimeline": {
+    "text": "PARIS PARIS PARIS",
+    "duration": 0.0,
+    "blocks": [
+     {
+      "t0": 0.102875,
+      "t1": 0.1315,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.1315,
+      "t1": 0.171375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.171375,
+      "t1": 0.2685,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.2685,
+      "t1": 0.308375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.308375,
+      "t1": 0.4055,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.4055,
+      "t1": 0.445375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.445375,
+      "t1": 0.47400000000000003,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.47400000000000003,
+      "t1": 0.5823750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "P"
+     },
+     {
+      "t0": 0.5823750000000001,
+      "t1": 0.6110000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.6110000000000001,
+      "t1": 0.6508750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.6508750000000001,
+      "t1": 0.7480000000000001,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 0.7480000000000001,
+      "t1": 0.8563750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PA"
+     },
+     {
+      "t0": 0.8563750000000001,
+      "t1": 0.8850000000000001,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 0.8850000000000001,
+      "t1": 0.9248750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 0.9248750000000001,
+      "t1": 1.022,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.022,
+      "t1": 1.0618750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.0618750000000001,
+      "t1": 1.0905,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.0905,
+      "t1": 1.1988750000000001,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PAR"
+     },
+     {
+      "t0": 1.1988750000000001,
+      "t1": 1.2275,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.2275,
+      "t1": 1.2673750000000001,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.2673750000000001,
+      "t1": 1.296,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.296,
+      "t1": 1.404375,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARI"
+     },
+     {
+      "t0": 1.404375,
+      "t1": 1.4329999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.4329999999999998,
+      "t1": 1.472875,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.472875,
+      "t1": 1.5014999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5014999999999998,
+      "t1": 1.541375,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.541375,
+      "t1": 1.5699999999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.5699999999999998,
+      "t1": 1.8156249999999998,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "PARIS"
+     },
+     {
+      "t0": 1.8156249999999998,
+      "t1": 1.8442499999999997,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 1.8442499999999997,
+      "t1": 1.8841249999999998,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 1.8841249999999998,
+      "t1": 1.9812499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 1.9812499999999997,
+      "t1": 2.0211249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.0211249999999996,
+      "t1": 2.1182499999999997,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.1182499999999997,
+      "t1": 2.1581249999999996,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.1581249999999996,
+      "t1": 2.1867499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.1867499999999995,
+      "t1": 2.2951249999999996,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS P"
+     },
+     {
+      "t0": 2.2951249999999996,
+      "t1": 2.3237499999999995,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.3237499999999995,
+      "t1": 2.3636249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.3636249999999994,
+      "t1": 2.4607499999999995,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.4607499999999995,
+      "t1": 2.5691249999999997,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PA"
+     },
+     {
+      "t0": 2.5691249999999997,
+      "t1": 2.5977499999999996,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.5977499999999996,
+      "t1": 2.6376249999999994,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.6376249999999994,
+      "t1": 2.7347499999999996,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 2.7347499999999996,
+      "t1": 2.7746249999999995,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.7746249999999995,
+      "t1": 2.8032499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.8032499999999994,
+      "t1": 2.9116249999999995,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 2.9116249999999995,
+      "t1": 2.9402499999999994,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 2.9402499999999994,
+      "t1": 2.9801249999999992,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 2.9801249999999992,
+      "t1": 3.008749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.008749999999999,
+      "t1": 3.1171249999999993,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 3.1171249999999993,
+      "t1": 3.145749999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.145749999999999,
+      "t1": 3.185624999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.185624999999999,
+      "t1": 3.214249999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.214249999999999,
+      "t1": 3.254124999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.254124999999999,
+      "t1": 3.2827499999999987,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.2827499999999987,
+      "t1": 3.5283749999999987,
+      "kind": "word-gap",
+      "units": 7.1640625,
+      "targetUnits": 7.0,
+      "targetKind": "word-gap",
+      "context": "ARIS PARIS"
+     },
+     {
+      "t0": 3.5283749999999987,
+      "t1": 3.5569999999999986,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.5569999999999986,
+      "t1": 3.5968749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.5968749999999985,
+      "t1": 3.6939999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.6939999999999986,
+      "t1": 3.7338749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.7338749999999985,
+      "t1": 3.8309999999999986,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 3.8309999999999986,
+      "t1": 3.8708749999999985,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 3.8708749999999985,
+      "t1": 3.8994999999999984,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 3.8994999999999984,
+      "t1": 4.0078749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "IS PARIS P"
+     },
+     {
+      "t0": 4.0078749999999985,
+      "t1": 4.036499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.036499999999998,
+      "t1": 4.076374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.076374999999999,
+      "t1": 4.173499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.173499999999999,
+      "t1": 4.2818749999999985,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "S PARIS PA"
+     },
+     {
+      "t0": 4.2818749999999985,
+      "t1": 4.310499999999998,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.310499999999998,
+      "t1": 4.350374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.350374999999999,
+      "t1": 4.447499999999999,
+      "kind": "dah",
+      "units": 2.8328124999999997,
+      "targetUnits": 3.0,
+      "targetKind": "dah",
+      "context": ""
+     },
+     {
+      "t0": 4.447499999999999,
+      "t1": 4.487374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.487374999999999,
+      "t1": 4.515999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.515999999999999,
+      "t1": 4.624374999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PAR"
+     },
+     {
+      "t0": 4.624374999999999,
+      "t1": 4.652999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.652999999999999,
+      "t1": 4.692874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.692874999999999,
+      "t1": 4.721499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.721499999999999,
+      "t1": 4.829874999999999,
+      "kind": "char-gap",
+      "units": 3.1609374999999997,
+      "targetUnits": 3.0,
+      "targetKind": "char-gap",
+      "context": "PARIS PARI"
+     },
+     {
+      "t0": 4.829874999999999,
+      "t1": 4.8584999999999985,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.8584999999999985,
+      "t1": 4.898374999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.898374999999999,
+      "t1": 4.926999999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     },
+     {
+      "t0": 4.926999999999999,
+      "t1": 4.966874999999999,
+      "kind": "element-gap",
+      "units": 1.1630208333333334,
+      "targetUnits": 1.0,
+      "targetKind": "element-gap",
+      "context": ""
+     },
+     {
+      "t0": 4.966874999999999,
+      "t1": 4.995499999999999,
+      "kind": "dit",
+      "units": 0.8348958333333333,
+      "targetUnits": 1.0,
+      "targetKind": "dit",
+      "context": ""
+     }
+    ],
+    "chars": [
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 0.102875,
+      "t1": 0.47400000000000003,
+      "nBlocks": 7,
+      "leadGapKind": null
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 0.5823750000000001,
+      "t1": 0.7480000000000001,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 0.8563750000000001,
+      "t1": 1.0905,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 1.1988750000000001,
+      "t1": 1.296,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 1.404375,
+      "t1": 1.5699999999999998,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 1.8156249999999998,
+      "t1": 2.1867499999999995,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 2.2951249999999996,
+      "t1": 2.4607499999999995,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 2.5691249999999997,
+      "t1": 2.8032499999999994,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 2.9116249999999995,
+      "t1": 3.008749999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 3.1171249999999993,
+      "t1": 3.2827499999999987,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "P",
+      "pattern": ".--.",
+      "t0": 3.5283749999999987,
+      "t1": 3.8994999999999984,
+      "nBlocks": 7,
+      "leadGapKind": "word-gap"
+     },
+     {
+      "char": "A",
+      "pattern": ".-",
+      "t0": 4.0078749999999985,
+      "t1": 4.173499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "R",
+      "pattern": ".-.",
+      "t0": 4.2818749999999985,
+      "t1": 4.515999999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "I",
+      "pattern": "..",
+      "t0": 4.624374999999999,
+      "t1": 4.721499999999999,
+      "nBlocks": 3,
+      "leadGapKind": "char-gap"
+     },
+     {
+      "char": "S",
+      "pattern": "...",
+      "t0": 4.829874999999999,
+      "t1": 4.995499999999999,
+      "nBlocks": 5,
+      "leadGapKind": "char-gap"
+     }
+    ]
+   },
+   "retargeted": 0,
+   "analysis": {
+    "tolerance": 0.3,
+    "withinTolFrac": 1.0,
+    "nPauses": 0,
+    "stats": [
+     {
+      "name": "dit",
+      "n": 30,
+      "meanUnits": 0.8348958333333335,
+      "stdUnits": 2.220446049250313e-16,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "dah",
+      "n": 12,
+      "meanUnits": 2.8328124999999997,
+      "stdUnits": 0.0,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "element-gap",
+      "n": 27,
+      "meanUnits": 1.1630208333333334,
+      "stdUnits": 0.0,
+      "targetUnits": 1.0
+     },
+     {
+      "name": "char-gap",
+      "n": 12,
+      "meanUnits": 3.1609374999999997,
+      "stdUnits": 0.0,
+      "targetUnits": 3.0
+     },
+     {
+      "name": "word-gap",
+      "n": 2,
+      "meanUnits": 7.1640625,
+      "stdUnits": 0.0,
+      "targetUnits": 7.0
+     }
+    ],
+    "deviations": []
+   }
+  },
+  "ideal": {
+   "text": "PARIS PARIS PARIS",
+   "duration": 4.9028571428571475,
+   "blocks": [
+    {
+     "t0": 0.0,
+     "t1": 0.03428571428571429,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.03428571428571429,
+     "t1": 0.06857142857142857,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.06857142857142857,
+     "t1": 0.17142857142857143,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.17142857142857143,
+     "t1": 0.2057142857142857,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.2057142857142857,
+     "t1": 0.3085714285714286,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.3085714285714286,
+     "t1": 0.3428571428571429,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.3428571428571429,
+     "t1": 0.3771428571428572,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.3771428571428572,
+     "t1": 0.4800000000000001,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.4800000000000001,
+     "t1": 0.5142857142857143,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.5142857142857143,
+     "t1": 0.5485714285714286,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.5485714285714286,
+     "t1": 0.6514285714285715,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.6514285714285715,
+     "t1": 0.7542857142857143,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.7542857142857143,
+     "t1": 0.7885714285714286,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.7885714285714286,
+     "t1": 0.8228571428571428,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.8228571428571428,
+     "t1": 0.9257142857142857,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 0.9257142857142857,
+     "t1": 0.96,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 0.96,
+     "t1": 0.9942857142857142,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 0.9942857142857142,
+     "t1": 1.097142857142857,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.097142857142857,
+     "t1": 1.1314285714285712,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.1314285714285712,
+     "t1": 1.1657142857142855,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.1657142857142855,
+     "t1": 1.1999999999999997,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.1999999999999997,
+     "t1": 1.3028571428571425,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.3028571428571425,
+     "t1": 1.3371428571428567,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.3371428571428567,
+     "t1": 1.371428571428571,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.371428571428571,
+     "t1": 1.4057142857142852,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.4057142857142852,
+     "t1": 1.4399999999999995,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.4399999999999995,
+     "t1": 1.4742857142857138,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.4742857142857138,
+     "t1": 1.7142857142857137,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.7142857142857137,
+     "t1": 1.748571428571428,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 1.748571428571428,
+     "t1": 1.7828571428571423,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.7828571428571423,
+     "t1": 1.8857142857142852,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 1.8857142857142852,
+     "t1": 1.9199999999999995,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 1.9199999999999995,
+     "t1": 2.0228571428571422,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 2.0228571428571422,
+     "t1": 2.0571428571428565,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.0571428571428565,
+     "t1": 2.0914285714285707,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.0914285714285707,
+     "t1": 2.1942857142857135,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.1942857142857135,
+     "t1": 2.2285714285714278,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.2285714285714278,
+     "t1": 2.262857142857142,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.262857142857142,
+     "t1": 2.3657142857142848,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 2.3657142857142848,
+     "t1": 2.4685714285714275,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.4685714285714275,
+     "t1": 2.502857142857142,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.502857142857142,
+     "t1": 2.537142857142856,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.537142857142856,
+     "t1": 2.639999999999999,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 2.639999999999999,
+     "t1": 2.674285714285713,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.674285714285713,
+     "t1": 2.7085714285714273,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.7085714285714273,
+     "t1": 2.81142857142857,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.81142857142857,
+     "t1": 2.8457142857142843,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.8457142857142843,
+     "t1": 2.8799999999999986,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 2.8799999999999986,
+     "t1": 2.914285714285713,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 2.914285714285713,
+     "t1": 3.0171428571428556,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.0171428571428556,
+     "t1": 3.05142857142857,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.05142857142857,
+     "t1": 3.085714285714284,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.085714285714284,
+     "t1": 3.1199999999999983,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.1199999999999983,
+     "t1": 3.1542857142857126,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.1542857142857126,
+     "t1": 3.188571428571427,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.188571428571427,
+     "t1": 3.428571428571427,
+     "kind": "word-gap",
+     "units": 7.0,
+     "targetUnits": 7.0,
+     "targetKind": "word-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.428571428571427,
+     "t1": 3.4628571428571413,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.4628571428571413,
+     "t1": 3.4971428571428556,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.4971428571428556,
+     "t1": 3.5999999999999983,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 3.5999999999999983,
+     "t1": 3.6342857142857126,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.6342857142857126,
+     "t1": 3.7371428571428553,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 3.7371428571428553,
+     "t1": 3.7714285714285696,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.7714285714285696,
+     "t1": 3.805714285714284,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.805714285714284,
+     "t1": 3.9085714285714266,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.9085714285714266,
+     "t1": 3.942857142857141,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 3.942857142857141,
+     "t1": 3.977142857142855,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 3.977142857142855,
+     "t1": 4.079999999999998,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.079999999999998,
+     "t1": 4.1828571428571415,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.1828571428571415,
+     "t1": 4.217142857142856,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.217142857142856,
+     "t1": 4.251428571428571,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.251428571428571,
+     "t1": 4.354285714285714,
+     "kind": "dah",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "dah",
+     "context": ""
+    },
+    {
+     "t0": 4.354285714285714,
+     "t1": 4.388571428571429,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.388571428571429,
+     "t1": 4.4228571428571435,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.4228571428571435,
+     "t1": 4.525714285714287,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.525714285714287,
+     "t1": 4.560000000000001,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.560000000000001,
+     "t1": 4.594285714285716,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.594285714285716,
+     "t1": 4.628571428571431,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.628571428571431,
+     "t1": 4.731428571428574,
+     "kind": "char-gap",
+     "units": 3.0,
+     "targetUnits": 3.0,
+     "targetKind": "char-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.731428571428574,
+     "t1": 4.765714285714289,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.765714285714289,
+     "t1": 4.800000000000003,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.800000000000003,
+     "t1": 4.834285714285718,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    },
+    {
+     "t0": 4.834285714285718,
+     "t1": 4.868571428571433,
+     "kind": "element-gap",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "element-gap",
+     "context": ""
+    },
+    {
+     "t0": 4.868571428571433,
+     "t1": 4.9028571428571475,
+     "kind": "dit",
+     "units": 1.0,
+     "targetUnits": 1.0,
+     "targetKind": "dit",
+     "context": ""
+    }
+   ],
+   "chars": [
+    {
+     "char": "P",
+     "pattern": ".--.",
+     "t0": 0.0,
+     "t1": 0.3771428571428572,
+     "nBlocks": 7,
+     "leadGapKind": null
+    },
+    {
+     "char": "A",
+     "pattern": ".-",
+     "t0": 0.4800000000000001,
+     "t1": 0.6514285714285715,
+     "nBlocks": 3,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "R",
+     "pattern": ".-.",
+     "t0": 0.7542857142857143,
+     "t1": 0.9942857142857142,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "I",
+     "pattern": "..",
+     "t0": 1.097142857142857,
+     "t1": 1.1999999999999997,
+     "nBlocks": 3,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "S",
+     "pattern": "...",
+     "t0": 1.3028571428571425,
+     "t1": 1.4742857142857138,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "P",
+     "pattern": ".--.",
+     "t0": 1.7142857142857137,
+     "t1": 2.0914285714285707,
+     "nBlocks": 7,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "A",
+     "pattern": ".-",
+     "t0": 2.1942857142857135,
+     "t1": 2.3657142857142848,
+     "nBlocks": 3,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "R",
+     "pattern": ".-.",
+     "t0": 2.4685714285714275,
+     "t1": 2.7085714285714273,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "I",
+     "pattern": "..",
+     "t0": 2.81142857142857,
+     "t1": 2.914285714285713,
+     "nBlocks": 3,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "S",
+     "pattern": "...",
+     "t0": 3.0171428571428556,
+     "t1": 3.188571428571427,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "P",
+     "pattern": ".--.",
+     "t0": 3.428571428571427,
+     "t1": 3.805714285714284,
+     "nBlocks": 7,
+     "leadGapKind": "word-gap"
+    },
+    {
+     "char": "A",
+     "pattern": ".-",
+     "t0": 3.9085714285714266,
+     "t1": 4.079999999999998,
+     "nBlocks": 3,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "R",
+     "pattern": ".-.",
+     "t0": 4.1828571428571415,
+     "t1": 4.4228571428571435,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "I",
+     "pattern": "..",
+     "t0": 4.525714285714287,
+     "t1": 4.628571428571431,
+     "nBlocks": 3,
+     "leadGapKind": "char-gap"
+    },
+    {
+     "char": "S",
+     "pattern": "...",
+     "t0": 4.731428571428574,
+     "t1": 4.9028571428571475,
+     "nBlocks": 5,
+     "leadGapKind": "char-gap"
+    }
+   ]
+  },
+  "comparison": {
+   "expected": "PARIS PARIS PARIS",
+   "decoded": "PARIS PARIS PARIS",
+   "accuracy": 1.0,
+   "nExpected": 17,
+   "substitutions": 0,
+   "insertions": 0,
+   "deletions": 0,
+   "diff": "PARIS PARIS PARIS"
+  }
+ },
+ "synth": {
+  "text": "PARIS PARIS PARIS",
+  "wpm": 35,
+  "farnsworthWpm": 35,
+  "rate": 8000,
+  "nSamples": 40822,
+  "absSum": 10421.6357421875,
+  "head": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   -0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ }
+}

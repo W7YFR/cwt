@@ -1,28 +1,14 @@
-# Virtualenv
-.venv/
-venv/
-env/
-
-# Python bytecode / caches
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Packaging / build artifacts
-build/
+# Build output. dist/ is the built browser app; `npm run build` regenerates it.
 dist/
-*.egg-info/
-*.egg
-.eggs/
-pip-wheel-metadata/
 
-# Test / tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-.tox/
+# Node / browser app
+node_modules/
+.vite/
+*.tsbuildinfo
+
+# Vitest's run output: failure screenshots and attachments, written fresh on
+# every run that fails. Artifacts of a run, not of the project.
+app/.vitest/
 
 # Editor / OS cruft
 .vscode/
@@ -37,5 +23,25 @@ htmlcov/
 *.m4a
 *.aup3
 
+# ...except the test corpus, which is the point. These are machine-keyed
+# recordings of known messages at known speeds, captured through a loopback
+# and a microphone simultaneously, so the loopback file is the answer rather
+# than a second opinion. They cannot be regenerated — they are a particular
+# room on a particular afternoon — and without them the calibration tests do
+# not run at all. Downsampled to 8 kHz mono, which costs nothing measurable
+# and keeps the whole corpus under 10 MB. See app/test/data/README.md.
+!app/test/data/**/*.wav
+
 # ...but DO commit the small real-audio test fixtures
-!tests/data/*.wav
+!app/test/data/*.wav
+
+# Playwright's downloaded browsers live in a user cache, but its reports don't
+playwright-report/
+test-results/
+# The browser test runner creates these per test file whether or not any
+# screenshot is taken; nothing here asserts on images.
+app/test/**/__screenshots__/
+
+# Local scratch
+/data/
+/docs/
