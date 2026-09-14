@@ -170,6 +170,29 @@ export function ReviewScreen({
    * The clock is the recorder's own — `elapsed()` counts captured samples, so
    * the cursor cannot drift from the recording it is pacing, which a wall
    * clock eventually would. */
+  /* While a paced recording runs, the chart is a timeline to follow rather
+     than a report to read.
+     *
+     * The per-character view packs the slots evenly so the columns line up,
+     * which is the one thing you do not want under a cursor: the cursor moves
+     * in real time and that axis does not, so the two disagree about how far
+     * along you are. On the absolute axis a second of silence is a second of
+     * chart, and the cursor and the marks mean the same thing. Afterwards the
+     * opposite is true — what you want then is the comparison, letter against
+     * letter. So it goes out on the way in and comes back on the way out.
+     *
+     * `onChange` is held in a ref because App rebuilds it on every render: as
+     * a dependency it would tear this effect down and run its cleanup between
+     * every pair of frames, which is the two views fighting rather than a view
+     * being set. */
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(() => {
+    if (!rec.recorder || !settings.paceCursor) return;
+    onChangeRef.current({ view: "absolute" });
+    return () => onChangeRef.current({ view: "per-char" });
+  }, [rec.recorder, settings.paceCursor]);
+
   /** Where the target's first character begins.
    *
    * The count-in is measured backwards from here, not from zero: what the

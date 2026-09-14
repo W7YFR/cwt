@@ -15,7 +15,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeWav } from "@/audio/wav";
 import { decodeAudioFile } from "@/dsp";
 import { FLASH_LEAD_DEFAULT_MS, PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
-import { MIC_SOURCE, analyzeClip, blankTake, type AnalyzeOptions } from "@/io/take";
+import {
+  MIC_SOURCE,
+  analyzeClip,
+  blankTake,
+  isBlankTake,
+  type AnalyzeOptions,
+} from "@/io/take";
 import { profileForSource, type Profile } from "@/io/profiles";
 import {
   forgetCurrentTake,
@@ -65,6 +71,14 @@ export interface TakeState {
    * the operator's fist free to vary; switching the profile under one
    * recording holds all three fixed by construction. */
   recalibrate(profile: Profile | null): Promise<void>;
+  /** Practice at whatever speed the keyer was last said to be set to.
+   *
+   * Called on the way back from the calibration wizard, which is where that
+   * speed gets stated. A recording already on screen keeps its own — the speed
+   * there is what the take is graded against and changing it would re-grade
+   * somebody's work behind their back — so this only moves a session that has
+   * nothing recorded in it yet. */
+  adoptKeyerSpeed(): void;
   /** Throw the recording away and stay here, ready to make another.
    *
    * Not the same as `clear`, which leaves the review entirely. This keeps the
@@ -83,8 +97,16 @@ export interface TakeState {
  * app. */
 function restorePrefs(base: ReviewSettings): ReviewSettings {
   const p = loadPrefs();
+  /* The keyer's own speed, when it has been stated. Calibration asks for it
+     because the measurement needs it, but it is a fact about the equipment
+     rather than about that one wizard — so having told the app the paddle is
+     set to 25, being handed a review that assumes 20 is the app forgetting
+     something it was told. Both speeds, or naming the character speed alone
+     would introduce a Farnsworth gap nobody asked for. */
+  const keyer = p.keyerWpm && p.keyerWpm > 0 ? p.keyerWpm : null;
   return {
     ...base,
+    ...(keyer ? { charWpm: keyer, farnsworthWpm: keyer } : {}),
     tolerance: p.tolerance ?? base.tolerance,
     gainDb: p.gainDb ?? base.gainDb,
     collapseRests: p.collapseRests ?? base.collapseRests,
@@ -289,6 +311,14 @@ export function useTake(): TakeState {
     void rememberTake({ take: next, audio, settings: kept });
   }, []);
 
+  const adoptKeyerSpeed = useCallback(() => {
+    const keyer = loadPrefs().keyerWpm;
+    if (!keyer || !(keyer > 0)) return;
+    const take = loadedRef.current?.take;
+    if (take && !isBlankTake(take)) return;
+    setSettings({ charWpm: keyer, farnsworthWpm: keyer });
+  }, [setSettings]);
+
   const reset = useCallback((overrides: Partial<ReviewSettings> = {}) => {
     /* Overrides, because this is reached from two places that know different
        things. From the review it keeps the session exactly as it is; from the
@@ -333,5 +363,16 @@ export function useTake(): TakeState {
     [loaded, settings],
   );
 
-  return { loaded, settings, review, setSettings, load, adopt, recalibrate, reset, clear };
+  return {
+    loaded,
+    settings,
+    review,
+    setSettings,
+    load,
+    adopt,
+    recalibrate,
+    adoptKeyerSpeed,
+    reset,
+    clear,
+  };
 }

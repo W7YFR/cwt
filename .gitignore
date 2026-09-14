@@ -22,6 +22,10 @@ node_modules/
 .vite/
 *.tsbuildinfo
 
+# Vitest's run output: failure screenshots and attachments, written fresh on
+# every run that fails. Artifacts of a run, not of the project.
+app/.vitest/
+
 # Test / tooling caches
 .pytest_cache/
 .mypy_cache/

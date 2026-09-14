@@ -250,8 +250,16 @@ export function App(): React.ReactElement {
             setProfiles(loadProfiles());
             setProfileId(saved.id);
             setCalibrating(false);
+            take.adoptKeyerSpeed();
           }}
-          onClose={() => setCalibrating(false)}
+          /* Both ways out, because the speed is stated when the wizard starts
+             recording rather than when it saves a profile. Leaving without a
+             usable profile still means the paddle was named, and the practice
+             that follows is at that speed either way. */
+          onClose={() => {
+            setCalibrating(false);
+            take.adoptKeyerSpeed();
+          }}
         />
       ) : take.loaded && take.review ? (
         <ReviewScreen
