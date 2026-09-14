@@ -104,6 +104,12 @@ export const FLASH_CUE_HELP =
   "is a cue you react to — and reacting to a cue is a different skill from " +
   "keeping time, which is why neither is on by default.";
 
+export const WORD_PREVIEW_HELP =
+  "Spell the word being sent under the card, turning each letter green as it " +
+  "passes. The card shows one character at a time, which says nothing about " +
+  "where a word ends — and the gap between words is a decision you make, not " +
+  "one the keyer makes for you.";
+
 export const FLASH_LEAD_HELP =
   "How far ahead of the beat the card lights. Reacting to something you see " +
   "takes time, so a cue that fires exactly on the beat leaves you late by that " +

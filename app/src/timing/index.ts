@@ -105,6 +105,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     flashCard: false,
     flashCue: true,
     flashLeadMs: FLASH_LEAD_DEFAULT_MS,
+    wordPreview: false,
     gainDb: 0,
     view: "per-char",
     ppu: 12,

@@ -192,8 +192,9 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   border-radius: 12px;
   background: var(--panel);
   transition: background-color 90ms linear, border-color 90ms linear;
-  height: 150px;
-  width: 150px;
+  min-height: 150px;
+  min-width: 150px;
+  box-sizing: border-box;
 }
 .fcletter {
   font-family: var(--mono);
@@ -218,6 +219,30 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   letter-spacing: .08em;
   color: var(--ink-dim);
 }
+/* The word being sent, spelled out under the timing.
+   Letter-spaced so the letters read as separate things to be sent rather than
+   as a word to be read — and a fixed width per letter keeps the row from
+   shifting sideways as each one turns. */
+.fcword {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1px;
+  max-width: 18ch;
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--ink-dim);
+}
+.fcword span {
+  width: 1.1ch;
+  text-align: center;
+  transition: color 90ms linear;
+}
+/* Passed. Green rather than dimmed, because what it marks is the one thing on
+   the card that is already true. */
+.fcword span.done { color: var(--ok); font-weight: 700; }
+
 /* On the beat. Bright, brief, and where your eye already is — the whole
    argument against flashing the page instead. */
 .flashcard.now {
@@ -227,6 +252,11 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .flashcard.now .fcletter,
 .flashcard.now .fcclock,
 .flashcard.now .fclabel { color: #fff; }
+/* Against the lit background the dim gray vanishes and the green stops
+   reading as green, so both go to the flash's own contrast for its duration.
+   Which letters are done still shows — by weight rather than by hue. */
+.flashcard.now .fcword { color: rgba(255, 255, 255, .65); }
+.flashcard.now .fcword span.done { color: #fff; }
 
 /* A strobe is not the only way to say "now". Same information, held rather
    than flashed, for anyone who has asked the system not to animate. */
@@ -239,6 +269,9 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   }
   .flashcard.now .fcletter,
   .flashcard.now .fcclock { color: var(--you); }
+  .fcword span { transition: none; }
+  .flashcard.now .fcword { color: var(--ink-dim); }
+  .flashcard.now .fcword span.done { color: var(--ok); }
   .flashcard.now .fclabel { color: var(--ink-dim); }
 }
 

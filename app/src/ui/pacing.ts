@@ -11,6 +11,7 @@
  */
 
 import type { Timeline } from "@/types";
+import { opensWord } from "@/timing/timeline";
 
 /** One character, and the moment on the recorder's clock it should be sent. */
 export interface Beat {
@@ -52,4 +53,52 @@ export function pacedEnd(
   const last = ideal.chars[ideal.chars.length - 1];
   if (!last) return null;
   return leadSec + (last.t1 - pacedStart(ideal)) + afterSec;
+}
+
+/** One word of the target, as a span of beats.
+ *
+ * Indices rather than times, because the card already knows which beat is next
+ * and asking "which word is that in" is the whole question. `beatsFor` maps
+ * `ideal.chars` one to one and in order, so a beat index is a character index
+ * and the two can be lined up without searching. */
+export interface Word {
+  /** Index of this word's first beat. */
+  readonly from: number;
+  /** One past the last, so `to - from` is its length. */
+  readonly to: number;
+  readonly chars: readonly string[];
+}
+
+/** The target split into words, in order.
+ *
+ * A word break is a word gap or a pause in front of a character — the same
+ * rule the chart highlights by. The first character always opens one, having
+ * nothing in front of it to be separated from. */
+export function wordsFor(ideal: Timeline): Word[] {
+  const out: Word[] = [];
+  ideal.chars.forEach((c, i) => {
+    const last = out[out.length - 1];
+    if (!last || opensWord(c)) {
+      out.push({ from: i, to: i + 1, chars: [c.char] });
+    } else {
+      out[out.length - 1] = {
+        from: last.from,
+        to: i + 1,
+        chars: [...last.chars, c.char],
+      };
+    }
+  });
+  return out;
+}
+
+/** Which word a beat belongs to, or -1.
+ *
+ * Past the end returns the last word rather than -1: when every character has
+ * been sent the word you were on is still the word you were on, and blanking
+ * the preview at the final letter would take it away exactly as it completes. */
+export function wordAt(words: readonly Word[], beat: number): number {
+  if (words.length === 0) return -1;
+  if (beat < 0) return -1;
+  const i = words.findIndex((w) => beat < w.to);
+  return i === -1 ? words.length - 1 : i;
 }

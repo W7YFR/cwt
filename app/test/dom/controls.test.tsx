@@ -262,6 +262,20 @@ describe("controls", () => {
     expect(screen.getByLabelText(/flash lead/i)).toBeTruthy();
   });
 
+  it("offers the word preview only with a card to put it under", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderView({ onChange });
+    expect(screen.queryByLabelText(/word preview/i)).toBeNull();
+
+    /* It hangs off the card rather than off the cue: it is something to read,
+       not something to react to, so the flash being off is no reason to
+       withhold it. */
+    rerender(view({ flashCard: true, flashCue: false }, onChange));
+    await user.click(screen.getByLabelText(/word preview/i));
+    expect(onChange).toHaveBeenCalledWith({ wordPreview: true });
+  });
+
   it("offers the pacing cursor, off unless asked for", async () => {
     /* A practice aid rather than a way of reading the chart, so it is opt-in —
        and it sits with the other things that change what is on screen rather

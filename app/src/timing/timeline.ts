@@ -11,6 +11,23 @@ import type { Block, BlockKind, Char, Segment, Timeline, Timing } from "@/types"
 import { median } from "@/dsp/segments";
 import { CHAR_TO_MORSE, decodePattern, keyableSymbols } from "@/morse";
 
+/** Does this character open a word?
+ *
+ * Read off `targetKind`, so the words are the ones the intended text has and
+ * not the ones an overlong gap made the decoder see. A `pause` counts: the
+ * sender stopped, and whatever follows starts a word even though the stop
+ * itself is not graded as spacing.
+ *
+ * Lives here, with the code that decides a gap IS a word gap, because three
+ * places now ask the question — the chart's highlight, the audio window, and
+ * the flash card's word preview — and three copies of it would eventually
+ * disagree about where a word begins.
+ */
+export function opensWord(ch: Char | null | undefined): boolean {
+  const g = ch?.leadGap;
+  return !!g && (g.targetKind === "word-gap" || g.targetKind === "pause");
+}
+
 /** A silence shorter than this many nominal word gaps is always spacing, never
  *  a rest — the floor under REST_OUTLIER, so a wide word gap in otherwise tight
  *  sending can't be written off as a stop. */

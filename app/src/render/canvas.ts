@@ -173,7 +173,7 @@ export function createChart(
       ppu: input.settings.ppu,
       durationSec: input.review.take.durationSec,
       leadSec,
-      // The same runway either side: it is the room a centred playhead needs
+      // The same runway either side: it is the room a centered playhead needs
       // to keep moving at both ends, and one number is one thing to get wrong.
       tailSec: leadSec,
     });
@@ -470,7 +470,7 @@ export function createChart(
         const v = viewport();
         const cx = timeToX(layout, next.t, next.side);
         if (follow === "centered") {
-          /* Dead centre, always — including before the first character and
+          /* Dead center, always — including before the first character and
              after the last, where the clamp would otherwise park the view and
              let the playhead drift across it. With the card above holding your
              eye at the middle of the screen, the mark you are about to make

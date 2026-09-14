@@ -9,6 +9,7 @@
 import type { BlockKind, Char, Review, Slot } from "@/types";
 import { PLAY_PAD } from "./geometry";
 import { gapWidth, slotSpan, type Layout } from "./layout";
+import { opensWord } from "@/timing/timeline";
 
 export type Side = "you" | "tgt";
 
@@ -23,16 +24,6 @@ function charAt(slots: readonly Slot[], side: Side, i: number): Char | null {
   const s = slots[i];
   if (!s) return null;
   return side === "you" ? s.actual : s.ideal;
-}
-
-/** Does this character open a word?
- *
- * Read off `targetKind`, so the words are the ones the intended text has and
- * not the ones an overlong gap made the decoder see — the same basis the row's
- * own class comes from. */
-function opensWord(ch: Char | null): boolean {
-  const g = ch?.leadGap;
-  return !!g && (g.targetKind === "word-gap" || g.targetKind === "pause");
 }
 
 /** The slot range a deviation is about, scoped to the class being graded.

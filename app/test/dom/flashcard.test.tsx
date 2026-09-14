@@ -8,7 +8,7 @@
 
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { act, render, screen, cleanup } from "@testing-library/react";
-import { FlashCard, type Beat } from "@/ui/FlashCard";
+import { FlashCard, type Beat, type Word } from "@/ui/FlashCard";
 import { FLASH_SEC } from "@/render/geometry";
 
 /* The card reads the clock on its own animation frames and writes straight to
@@ -33,6 +33,12 @@ const BEATS: Beat[] = [
   { char: "K", at: 6 },
 ];
 
+/* "CQ K" — two words, so the preview has a boundary to cross. */
+const WORDS: Word[] = [
+  { from: 0, to: 2, chars: ["C", "Q"] },
+  { from: 2, to: 3, chars: ["K"] },
+];
+
 const letter = () => screen.getByTestId("flashcard-letter").textContent;
 const clock = () => screen.getByTestId("flashcard-clock").textContent;
 const lit = () => screen.getByTestId("flashcard").classList.contains("now");
@@ -51,6 +57,7 @@ function mount(over: Partial<React.ComponentProps<typeof FlashCard>> = {}) {
       cue
       leadSec={0.2}
       elapsed={() => now}
+      words={[]}
       {...over}
     />,
   );
@@ -142,3 +149,71 @@ describe("the flash card", () => {
     expect(lit()).toBe(false);
   });
 });
+
+describe("the word preview", () => {
+  const spelled = () =>
+    Array.from(screen.getByTestId("flashcard-word").children).map((el) => ({
+      ch: el.textContent,
+      done: el.classList.contains("done"),
+    }));
+  const text = () => spelled().map((s) => s.ch).join("");
+  const green = () =>
+    spelled().filter((s) => s.done).map((s) => s.ch).join("");
+
+  it("is not there at all unless asked for", () => {
+    mount();
+    expect(screen.queryByTestId("flashcard-word")).toBeNull();
+  });
+
+  it("spells the word the next character is in", () => {
+    const card = mount({ words: WORDS });
+    card.at(0);
+    expect(text()).toBe("CQ");
+  });
+
+  it("greens each letter once it has been passed", () => {
+    const card = mount({ words: WORDS });
+    card.at(0);
+    expect(green()).toBe("");
+    // The C is due at 3. A moment after, it has been sent.
+    card.at(3.2);
+    expect(green()).toBe("C");
+    card.at(4.2);
+    expect(green()).toBe("CQ");
+  });
+
+  it("holds a finished word before swapping in the next one", () => {
+    /* Q is due at 4 and K at 6, so the changeover is at 5. Before it you can
+       see the word you just finished, complete — which is the one thing the
+       last letter of a word could never show if the preview followed the next
+       character instead of the nearest one. */
+    const card = mount({ words: WORDS });
+    card.at(4.2);
+    expect(text()).toBe("CQ");
+    expect(green()).toBe("CQ");
+
+    card.at(5.4);
+    expect(text()).toBe("K");
+    expect(green()).toBe("");
+
+    card.at(6.1);
+    expect(green()).toBe("K");
+  });
+
+  it("keeps the last word up, finished, after the message ends", () => {
+    /* Taking it away at the final character would blank the preview exactly
+       as it completes — the one moment it has something to show. */
+    const card = mount({ words: WORDS });
+    card.at(99);
+    expect(letter()).toBe("\u00b7");
+    expect(text()).toBe("K");
+    expect(green()).toBe("K");
+  });
+
+  it("shows the first word, unstarted, before anything is recording", () => {
+    mount({ words: WORDS, elapsed: null });
+    expect(text()).toBe("CQ");
+    expect(green()).toBe("");
+  });
+});
+

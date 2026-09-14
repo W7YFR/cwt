@@ -373,6 +373,7 @@ export interface Prefs {
   flashCard?: boolean;
   flashCue?: boolean;
   flashLeadMs?: number;
+  wordPreview?: boolean;
 }
 
 export function loadPrefs(): Prefs {

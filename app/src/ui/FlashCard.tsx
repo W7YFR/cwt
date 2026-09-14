@@ -22,9 +22,10 @@
 
 import { useEffect, useRef } from "react";
 import { FLASH_SEC } from "@/render/geometry";
-import type { Beat } from "./pacing";
+import type { Beat, Word } from "./pacing";
+import { wordAt } from "./pacing";
 
-export type { Beat };
+export type { Beat, Word };
 
 export interface FlashCardProps {
   readonly beats: readonly Beat[];
@@ -34,6 +35,8 @@ export interface FlashCardProps {
   readonly leadSec: number;
   /** The recorder's clock while one is running, or null when nothing is. */
   readonly elapsed: (() => number) | null;
+  /** The target's words, for the preview row. Empty means don't show one. */
+  readonly words: readonly Word[];
 }
 
 /** Shown when there is no character to show: no message, or the last one sent. */
@@ -44,12 +47,60 @@ export function FlashCard({
   cue,
   leadSec,
   elapsed,
+  words,
 }: FlashCardProps): React.ReactElement {
   const root = useRef<HTMLDivElement>(null);
   const letter = useRef<HTMLDivElement>(null);
   const clock = useRef<HTMLDivElement>(null);
+  const word = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    /* The preview's own state, kept out of React for the same reason the rest
+       of the card is: `done` changes on every beat and the word changes on
+       every word, and neither is worth a re-render of the screen behind it.
+       Both start impossible so the first frame always paints. */
+    let shownWord = -1;
+    let shownDone = -1;
+
+    /** Spell a word, green as far as `next`.
+     *
+     * `next` is the index of the character not yet due, so every letter before
+     * it has been sent — which makes the count of green letters and the index
+     * of the next one the same number.
+     *
+     * Which word to spell is a separate question, and `near` answers it: the
+     * character nearest in time, which inside a word is the same word either
+     * way and at a boundary is the interesting case. Following `next` there
+     * would swap in the coming word the instant the last letter of the old one
+     * passed — so the last letter of every word would go green in the same
+     * frame it disappeared, and you would never see a word complete. Following
+     * the nearest instead holds the finished word through the first half of the
+     * gap and previews the next through the second half. */
+    const spell = (next: number, near: number) => {
+      const el = word.current;
+      if (!el) return;
+      const wi = wordAt(words, near);
+      if (wi !== shownWord) {
+        shownWord = wi;
+        shownDone = -1;
+        el.textContent = "";
+        for (const ch of words[wi]?.chars ?? []) {
+          const span = document.createElement("span");
+          span.textContent = ch;
+          el.append(span);
+        }
+      }
+      const w = words[wi];
+      const done = w ? Math.min(Math.max(next - w.from, 0), w.chars.length) : 0;
+      if (done !== shownDone) {
+        shownDone = done;
+        const kids = el.children;
+        for (let k = 0; k < kids.length; k++) {
+          kids[k]!.classList.toggle("done", k < done);
+        }
+      }
+    };
+
     const set = (ch: string, time: string, lit: boolean) => {
       if (letter.current && letter.current.textContent !== ch) {
         letter.current.textContent = ch;
@@ -64,6 +115,7 @@ export function FlashCard({
        you can see what you are about to be asked for before starting. */
     if (!elapsed) {
       set(beats[0]?.char ?? NOTHING, "—", false);
+      spell(0, 0);
       return;
     }
 
@@ -83,6 +135,11 @@ export function FlashCard({
       } else {
         set(NOTHING, "—", false);
       }
+      /* Nearer the character just sent than the one coming? Then that is
+         where you are. Only the boundary between two words can be affected. */
+      const prev = beats[i - 1];
+      const near = prev && next && t - prev.at < next.at - t ? i - 1 : i;
+      spell(i, near);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -90,7 +147,7 @@ export function FlashCard({
       cancelAnimationFrame(raf);
       root.current?.classList.remove("now");
     };
-  }, [beats, cue, elapsed, leadSec]);
+  }, [beats, cue, elapsed, leadSec, words]);
 
   return (
     /* Stacked, with the countdown under the letter it belongs to. Side by
@@ -104,6 +161,17 @@ export function FlashCard({
       <div className="fcclock" ref={clock} data-testid="flashcard-clock">
         —
       </div>
+      {/* Under the timing, and only when there is a word to show. The card
+          says what is next; this says where next SITS — which letter of which
+          word, and so how near the end of it you are. A card alone cannot say
+          that, and the spacing decision at a word boundary is the operator's.
+
+          Deliberately childless here: the effect owns what is inside it, and
+          giving React children of its own to reconcile against spans it did
+          not create is how stale letters would survive a re-render. */}
+      {words.length > 0 && (
+        <div className="fcword" ref={word} data-testid="flashcard-word" />
+      )}
     </section>
   );
 }

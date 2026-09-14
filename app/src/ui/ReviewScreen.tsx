@@ -21,7 +21,7 @@ import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
 import { Controls, ViewControls } from "./Controls";
 import { FlashCard } from "./FlashCard";
-import { beatsFor, pacedEnd, pacedStart } from "./pacing";
+import { beatsFor, pacedEnd, pacedStart, wordsFor, type Word } from "./pacing";
 import { Cog, RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
@@ -73,6 +73,10 @@ function saveBlob(blob: Blob, filename: string): void {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
+
+/** One array, so "no preview" is a stable prop and not a fresh identity on
+ *  every render — the card's effect restarts whenever `words` changes. */
+const EMPTY_WORDS: readonly Word[] = [];
 
 export function ReviewScreen({
   loaded,
@@ -266,6 +270,11 @@ export function ReviewScreen({
     () => beatsFor(review.ideal, settings.paceLeadSec),
     [review.ideal, settings.paceLeadSec],
   );
+
+  /* The words behind the preview. Derived from the target rather than from
+     `settings.expected`, so the split is the timeline's own — the same gaps
+     the chart highlights by, not a second opinion from splitting a string. */
+  const words = useMemo(() => wordsFor(review.ideal), [review.ideal]);
 
   /* Handed as a getter rather than as a number: the card reads the clock on
      its own frames and writes straight to the DOM, so nothing here re-renders
@@ -494,6 +503,7 @@ export function ReviewScreen({
           cue={settings.flashCue}
           leadSec={settings.flashLeadMs / 1000}
           elapsed={liveClock}
+          words={settings.wordPreview ? words : EMPTY_WORDS}
         />
       )}
 

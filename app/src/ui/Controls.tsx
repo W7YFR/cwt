@@ -20,6 +20,7 @@ import {
   FLASH_CARD_HELP,
   FLASH_CUE_HELP,
   FLASH_LEAD_HELP,
+  WORD_PREVIEW_HELP,
   GAIN_HELP,
   PACE_CURSOR_HELP,
   PACE_LEAD_HELP,
@@ -361,6 +362,20 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
               onChange={(e) => onChange({ flashCue: e.target.checked })}
             />{" "}
             Flash cue
+          </label>
+        </div>
+      )}
+
+      {s.flashCard && (
+        <div className="group">
+          <label className="check" title={WORD_PREVIEW_HELP}>
+            <input
+              type="checkbox"
+              id="word-preview"
+              checked={s.wordPreview}
+              onChange={(e) => onChange({ wordPreview: e.target.checked })}
+            />{" "}
+            Word preview
           </label>
         </div>
       )}

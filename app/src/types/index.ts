@@ -295,6 +295,9 @@ export interface ReviewSettings {
   /** How far ahead of the beat the flash fires, milliseconds — your reaction
    *  time, which is yours. */
   flashLeadMs: number;
+  /** Spell the word being sent under the card, greening each letter as it
+   *  passes. The card alone says nothing about where a word ends. */
+  wordPreview: boolean;
   gainDb: number;
   view: ViewMode;
   ppu: number;
