@@ -29,11 +29,11 @@ app/.vitest/
 # than a second opinion. They cannot be regenerated — they are a particular
 # room on a particular afternoon — and without them the calibration tests do
 # not run at all. Downsampled to 8 kHz mono, which costs nothing measurable
-# and keeps the whole corpus under 10 MB. See tests/data/README.md.
-!tests/data/**/*.wav
+# and keeps the whole corpus under 10 MB. See app/test/data/README.md.
+!app/test/data/**/*.wav
 
 # ...but DO commit the small real-audio test fixtures
-!tests/data/*.wav
+!app/test/data/*.wav
 
 # Playwright's downloaded browsers live in a user cache, but its reports don't
 playwright-report/

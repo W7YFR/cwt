@@ -30,7 +30,7 @@ import { decodeTake, makeTake, scoreAgainst, type Impairments } from "../impair"
 import { DATA_DIR } from "../oracle-fs";
 import { estimateTiming, buildTimeline } from "@/timing";
 
-const LOCKFILE = resolve(DATA_DIR, "../..", "app/test/lock/robustness.json");
+const LOCKFILE = resolve(DATA_DIR, "../lock", "robustness.json");
 const RECORDING = process.env.LOCK_RECORD === "1";
 
 const TEXT = "CQ DE W1AW";

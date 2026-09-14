@@ -19,7 +19,7 @@ import { CLEAN_WAVS, read, readSynth, type Reading } from "../lock";
 import { oracleCasesFromDisk, DATA_DIR } from "../oracle-fs";
 import { normalizePeak, readWav } from "../wav";
 
-const LOCKFILE = resolve(DATA_DIR, "../..", "app/test/lock/clean-path.json");
+const LOCKFILE = resolve(DATA_DIR, "../lock", "clean-path.json");
 const RECORDING = process.env.LOCK_RECORD === "1";
 
 /* Collected at module scope so the case list exists before the lockfile does —

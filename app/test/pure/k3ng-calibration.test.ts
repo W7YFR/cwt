@@ -43,7 +43,7 @@ const FILE: Record<string, (tag: string) => string> = {
   cq: (t) => `${ROOT}/cq-de-w7yfr/k3ng-${t}-cq-de-w7yfr-15wpm.wav`,
 };
 
-/* Large and not committed — see tests/data/README. Skip when absent so a
+/* Large and not committed — see app/test/data/README. Skip when absent so a
    fresh clone does not look broken. */
 const HAVE = existsSync(FILE.dits!("virtual")) && existsSync(FILE.dahs!("webcam"));
 

@@ -45,7 +45,7 @@ const MARKS = 31;
 
 const file = (tag: string) => `${ROOT}/ft710-sweep-close-${tag}.wav`;
 
-/* The calibration corpora are large and not committed — see tests/data/README.
+/* The calibration corpora are large and not committed — see app/test/data/README.
    Skip rather than fail when they are not on this machine, so a fresh clone
    does not look broken. */
 const HAVE = existsSync(file("virtual")) && existsSync(file("webcam"));

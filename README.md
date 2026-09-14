@@ -231,7 +231,7 @@ lives in the third tier rather than behind a mock convincing enough to lie.
 ### What the tests are held to
 
 Two recorded references, at two different standards, over a corpus of real
-recordings in `tests/data`.
+recordings in `app/test/data`.
 
 - **The oracle** (`app/test/oracle/`) holds decoding and grading to numbers
   derived independently. Grading must match **exactly**, to 1e-9, fed the same

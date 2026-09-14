@@ -42,7 +42,7 @@ const file = (kind: string, tag: string) =>
     ? `${ROOT}/silence/ft710-silence-${tag}.wav`
     : `${ROOT}/${kind}/ft710-${kind}-${tag}-15wpm.wav`;
 
-/* Large and not committed — see tests/data/README. */
+/* Large and not committed — see app/test/data/README. */
 const HAVE = existsSync(file("dits", "virtual")) && existsSync(file("dahs", "webcam"));
 
 function marksOf(path: string, calibration?: Calibration): number[] {

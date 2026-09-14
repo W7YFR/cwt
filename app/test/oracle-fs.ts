@@ -26,7 +26,7 @@ function findUp(rel: string): string {
 }
 
 const ORACLE_DIR = findUp("app/test/oracle");
-export const DATA_DIR = findUp("tests/data");
+export const DATA_DIR = findUp("app/test/data");
 
 /** Every case named in the dump's own index. */
 export function oracleCasesFromDisk(): OracleCase[] {
