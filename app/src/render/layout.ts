@@ -14,6 +14,7 @@
 
 import type { Block, Char, Review, Slot, ViewMode } from "@/types";
 import { PAD_X, REST_W, SLOT_GAP } from "./geometry";
+import { planColumns, type ColumnPlan } from "./columns";
 
 /** Breakpoints of a piecewise time->x map, as [seconds, contentX] pairs. */
 export type AxisMap = Array<readonly [number, number]>;
@@ -70,6 +71,67 @@ export function charWidth(ch: Char | null | undefined, ppu: number): number {
   return u * ppu;
 }
 
+/** The per-character column axis, measured at one zoom.
+ *
+ * Every run on screen is laid out against this rather than against its own
+ * slots, which is what makes the rows line up — see render/columns.ts for why
+ * a column belongs to the target and not to any one attempt.
+ *
+ * A column is as wide as the widest thing any run puts in it, which is the
+ * same rule the two-track layout always used between a decode and the target;
+ * it just has more than two things to take the widest of now. */
+export interface ColumnMetrics {
+  readonly plan: ColumnPlan;
+  /** Left edge of each column, gap included, in content pixels. */
+  readonly x: readonly number[];
+  readonly gapW: readonly number[];
+  readonly bodyW: readonly number[];
+  /** Total content width, including both margins. */
+  readonly width: number;
+}
+
+/** Measure the columns a set of runs share.
+ *
+ * Given one run this reproduces the layout exactly as it was before there were
+ * several: every slot is its own column, in order, as wide as the wider of the
+ * decode and the target. That is not a coincidence to be grateful for — it is
+ * the reason there is one code path here rather than a single-run case and a
+ * stacked case drifting apart. */
+export function measureColumns(
+  runs: readonly (readonly Slot[])[],
+  ppu: number,
+): ColumnMetrics {
+  const plan = planColumns(runs);
+  const n = plan.columns.length;
+  const gapW = new Array<number>(n).fill(0);
+  const bodyW = new Array<number>(n).fill(0);
+
+  runs.forEach((slots, r) => {
+    const at = plan.at[r]!;
+    slots.forEach((slot, i) => {
+      const c = at[i]!;
+      gapW[c] = Math.max(
+        gapW[c]!,
+        gapWidth(slot.actual?.leadGap, ppu),
+        gapWidth(slot.ideal?.leadGap, ppu),
+      );
+      bodyW[c] = Math.max(
+        bodyW[c]!,
+        charWidth(slot.actual, ppu),
+        charWidth(slot.ideal, ppu),
+      );
+    });
+  });
+
+  const x: number[] = [];
+  let cur = PAD_X;
+  for (let c = 0; c < n; c++) {
+    x.push(cur);
+    cur += gapW[c]! + bodyW[c]! + SLOT_GAP;
+  }
+  return { plan, x, gapW, bodyW, width: cur + PAD_X };
+}
+
 export interface LayoutOptions {
   readonly view: ViewMode;
   readonly ppu: number;
@@ -83,6 +145,13 @@ export interface LayoutOptions {
    * cannot watch approach is not a count-in. Zero, and everything below is
    * exactly as it was. */
   readonly leadSec?: number;
+  /** The column axis to lay this run out against, and which run it is.
+   *
+   * Omitted for a lone run, which measures its own — the result is the same
+   * either way, and a chart with one attempt on it should not have to know
+   * that stacking exists. */
+  readonly columns?: ColumnMetrics;
+  readonly run?: number;
   /** The same, after the last character.
    *
    * The axis stops at the last mark as surely as it starts at the first, so a
@@ -138,12 +207,20 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
   const maps: { you: AxisMap; tgt: AxisMap } = { you: [], tgt: [] };
 
   if (view === "per-char") {
-    let x = PAD_X;
-    for (const slot of slots) {
+    /* Where the columns are is settled before any one run is laid out — see
+       ColumnMetrics. A run that is on its own measures its own, which comes
+       out identical to the way this was built when a chart could only ever
+       hold one. */
+    const cols = options.columns ?? measureColumns([slots], ppu);
+    const at = cols.plan.at[options.columns ? (options.run ?? 0) : 0] ?? [];
+
+    slots.forEach((slot, i) => {
+      const c = at[i]!;
+      const x = cols.x[c]!;
+      const gapW = cols.gapW[c]!;
+      const bodyW = cols.bodyW[c]!;
       const yg = gapWidth(slot.actual?.leadGap, ppu);
       const tg = gapWidth(slot.ideal?.leadGap, ppu);
-      const gapW = Math.max(yg, tg);
-      const bodyW = Math.max(charWidth(slot.actual, ppu), charWidth(slot.ideal, ppu));
       items.push({
         slot,
         x,
@@ -178,12 +255,11 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
           maps.tgt.push([b.t1, ix]);
         }
       }
-      x += gapW + bodyW + SLOT_GAP;
-    }
+    });
     return withRunway({
       view,
       items,
-      width: x + PAD_X,
+      width: cols.width,
       maps,
       origin: 0,
       breaks: [],

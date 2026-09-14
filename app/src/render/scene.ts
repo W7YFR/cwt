@@ -23,18 +23,13 @@ import {
   OVER_H,
   OVER_MARK_H,
   PAD_R,
-  PLOT_BOTTOM,
   RULER_H,
   ROW_H,
   SCROLL_H,
-  Y_DRIFT,
-  Y_GRADE,
-  Y_TGT_LABEL,
-  Y_YOU_LABEL,
   Y_RULER,
   Y_SCROLL,
-  Y_TGT,
-  Y_YOU,
+  rowsFor,
+  type Rows,
 } from "./geometry";
 import { subLabel } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
@@ -107,6 +102,12 @@ export interface Scene {
   layout: Layout;
   slots: readonly Slot[];
   analysis: Analysis;
+  /** Where the rows sit, for however many attempts are on screen.
+   *
+   * Carried on the scene rather than read from constants because the chart is
+   * a different height with four attempts stacked on it than with one. With
+   * one it is exactly the height it always was — see `rowsFor`. */
+  rows: Rows;
   palette: Palette;
   view: ViewMode;
   tolerance: number;
@@ -151,7 +152,7 @@ function visible(x: number, w: number, scene: Scene): boolean {
 
 export function draw(ctx: Ctx2D, scene: Scene): void {
   const { palette: C, viewport: v } = scene;
-  ctx.clearRect(0, 0, v.viewW, HEIGHT);
+  ctx.clearRect(0, 0, v.viewW, scene.rows.height);
 
   drawFrame(ctx, scene);
 
@@ -159,7 +160,7 @@ export function draw(ctx: Ctx2D, scene: Scene): void {
   // behind the label band instead of over it.
   ctx.save();
   ctx.beginPath();
-  ctx.rect(GUTTER, 0, v.viewW - GUTTER, PLOT_BOTTOM);
+  ctx.rect(GUTTER, 0, v.viewW - GUTTER, scene.rows.plotBottom);
   ctx.clip();
   ctx.translate(GUTTER - scene.scrollX, 0);
   ctx.font = `500 11px ${C.mono}`;
@@ -188,8 +189,8 @@ function drawFrame(ctx: Ctx2D, scene: Scene): void {
   ctx.beginPath();
   ctx.moveTo(GUTTER, Y_RULER + RULER_H - 0.5);
   ctx.lineTo(right, Y_RULER + RULER_H - 0.5);
-  ctx.moveTo(GUTTER, Y_DRIFT + DRIFT_H / 2 + 0.5);
-  ctx.lineTo(right, Y_DRIFT + DRIFT_H / 2 + 0.5);
+  ctx.moveTo(GUTTER, scene.rows.drift + DRIFT_H / 2 + 0.5);
+  ctx.lineTo(right, scene.rows.drift + DRIFT_H / 2 + 0.5);
   ctx.stroke();
 }
 
@@ -244,13 +245,13 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
      text on the outside — the target's above it, yours below — so lighting a
      row means lighting the band from its caption through its marks. */
   if (scene.view === "overlay") {
-    top = Y_TGT_LABEL;
-    h = Y_YOU_LABEL + LABEL_H - Y_TGT_LABEL;
+    top = scene.rows.tgtLabel;
+    h = scene.rows.runs[0]!.label! + LABEL_H - scene.rows.tgtLabel;
   } else if (scene.focus.side === "you") {
-    top = Y_YOU - 2;
+    top = scene.rows.runs[0]!.row - 2;
     h = ROW_H + LABEL_H + 2;
   } else {
-    top = Y_TGT_LABEL;
+    top = scene.rows.tgtLabel;
     h = LABEL_H + ROW_H + 2;
   }
 
@@ -308,7 +309,7 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
        blank says exactly that. */
     ctx.fillStyle = C.ink;
     ctx.font = `600 12px ${C.mono}`;
-    ctx.fillText(slot.ideal ? slot.ideal.char : "·", mid, Y_TGT_LABEL + LABEL_H / 2);
+    ctx.fillText(slot.ideal ? slot.ideal.char : "·", mid, scene.rows.tgtLabel + LABEL_H / 2);
 
     /* Below your row: what came out, and how it differs from the line above.
      *
@@ -320,7 +321,7 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
     const cap = sentCaption(slot, blank);
     ctx.fillStyle = cap.bad ? C.bad : C.ink;
     ctx.font = `600 12px ${C.mono}`;
-    ctx.fillText(cap.text, mid, Y_YOU_LABEL + LABEL_H / 2);
+    ctx.fillText(cap.text, mid, scene.rows.runs[0]!.label! + LABEL_H / 2);
 
     // A word-boundary error is a fault in what was sent, so it is called out
     // beside that row's caption, over the gap that caused it.
@@ -330,7 +331,7 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
       ctx.fillText(
         slot.spaceOp === "del" ? "no space" : "extra space",
         it.x + it.gapW / 2,
-        Y_YOU_LABEL + LABEL_H - 5,
+        scene.rows.runs[0]!.label! + LABEL_H - 5,
       );
     }
 
@@ -344,20 +345,20 @@ function drawPerChar(ctx: Ctx2D, scene: Scene): void {
       ctx.strokeStyle = C.line;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(bx - 0.5, Y_TGT + 2);
-      ctx.lineTo(bx - 0.5, Y_YOU + ROW_H - 2);
+      ctx.moveTo(bx - 0.5, scene.rows.tgt + 2);
+      ctx.lineTo(bx - 0.5, scene.rows.runs[0]!.row + ROW_H - 2);
       ctx.stroke();
     }
 
-    drawGap(ctx, scene, slot.actual?.leadGap ?? null, it.x, it.youGapW, Y_YOU, false);
-    drawGap(ctx, scene, slot.ideal?.leadGap ?? null, it.x, it.tgtGapW, Y_TGT, true);
+    drawGap(ctx, scene, slot.actual?.leadGap ?? null, it.x, it.youGapW, scene.rows.runs[0]!.row, false);
+    drawGap(ctx, scene, slot.ideal?.leadGap ?? null, it.x, it.tgtGapW, scene.rows.tgt, true);
 
     // A side with no character gets an outlined ghost, so a missed or an extra
     // character reads as a hole rather than as a shifted neighbor.
-    if (slot.actual) drawMarks(ctx, scene, slot.actual, bx, Y_YOU, false);
-    else drawGhost(ctx, scene, bx, it.bodyW, Y_YOU);
-    if (slot.ideal) drawMarks(ctx, scene, slot.ideal, bx, Y_TGT, true);
-    else drawGhost(ctx, scene, bx, it.bodyW, Y_TGT);
+    if (slot.actual) drawMarks(ctx, scene, slot.actual, bx, scene.rows.runs[0]!.row, false);
+    else drawGhost(ctx, scene, bx, it.bodyW, scene.rows.runs[0]!.row);
+    if (slot.ideal) drawMarks(ctx, scene, slot.ideal, bx, scene.rows.tgt, true);
+    else drawGhost(ctx, scene, bx, it.bodyW, scene.rows.tgt);
 
     drawGradeStrip(ctx, scene, slot, bx, it.bodyW);
   }
@@ -384,14 +385,14 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       const g = slot.actual.leadGap;
       const gw = gapWidth(g, ppu);
       if (visible(it.x - gw, gw + w, scene)) {
-        if (g) drawGap(ctx, scene, g, it.x - gw, gw, Y_YOU, false);
-        drawMarks(ctx, scene, slot.actual, it.x, Y_YOU, false);
+        if (g) drawGap(ctx, scene, g, it.x - gw, gw, scene.rows.runs[0]!.row, false);
+        drawMarks(ctx, scene, slot.actual, it.x, scene.rows.runs[0]!.row, false);
         const cap = sentCaption(slot, scene.blank === true);
         ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
         ctx.font = `600 11px ${C.mono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(cap.text, it.x + w / 2, Y_YOU_LABEL + LABEL_H / 2);
+        ctx.fillText(cap.text, it.x + w / 2, scene.rows.runs[0]!.label! + LABEL_H / 2);
       }
     }
     if (slot.ideal && it.ix !== null) {
@@ -399,8 +400,8 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       const ig = slot.ideal.leadGap;
       const igw = gapWidth(ig, ppu);
       if (visible(it.ix - igw, igw + iw, scene)) {
-        if (ig) drawGap(ctx, scene, ig, it.ix - igw, igw, Y_TGT, true);
-        drawMarks(ctx, scene, slot.ideal, it.ix, Y_TGT, true);
+        if (ig) drawGap(ctx, scene, ig, it.ix - igw, igw, scene.rows.tgt, true);
+        drawMarks(ctx, scene, slot.ideal, it.ix, scene.rows.tgt, true);
         /* Labeled too, on this axis. The target row used to go unnamed here
            because there was one caption band and it belonged to the decode —
            but on a wall clock the two rows' characters sit at different x, and
@@ -409,7 +410,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
         ctx.font = `600 11px ${C.mono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(slot.ideal.char, it.ix + iw / 2, Y_TGT_LABEL + LABEL_H / 2);
+        ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
       }
     }
   }
@@ -423,7 +424,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
   const C = scene.palette;
   const u = scene.layout.unitSec;
   const ppu = scene.layout.ppu;
-  const y = Y_TGT + (OVER_H - OVER_MARK_H) / 2;
+  const y = scene.rows.tgt + (OVER_H - OVER_MARK_H) / 2;
 
   const band = (ch: Char, x: number, color: string, alpha: number) => {
     const paint = (bx: number, w: number) => {
@@ -459,7 +460,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
         ctx.font = `600 11px ${C.mono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(slot.ideal.char, it.ix + iw / 2, Y_TGT_LABEL + LABEL_H / 2);
+        ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
       }
     }
   }
@@ -474,7 +475,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     ctx.font = `600 11px ${C.mono}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(cap.text, it.x + w / 2, Y_YOU_LABEL + LABEL_H / 2);
+    ctx.fillText(cap.text, it.x + w / 2, scene.rows.runs[0]!.label! + LABEL_H / 2);
   }
 
   // A leader from each character to where the target put it, so the amount of
@@ -487,7 +488,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     if (!slot.actual || !slot.ideal || it.x === null || it.ix === null) continue;
     if (Math.abs(it.x - it.ix) < 2) continue;
     if (!visible(Math.min(it.x, it.ix), Math.abs(it.x - it.ix), scene)) continue;
-    const ly = Y_TGT + OVER_H - 4;
+    const ly = scene.rows.tgt + OVER_H - 4;
     ctx.beginPath();
     ctx.moveTo(it.ix, ly);
     ctx.lineTo(it.x, ly);
@@ -590,7 +591,7 @@ function drawLead(ctx: Ctx2D, scene: Scene): void {
 
   const C = scene.palette;
   // The target row is the top one in every view, overlay included.
-  const yTop = Y_TGT;
+  const yTop = scene.rows.tgt;
   const mid = yTop + ROW_H / 2;
 
   ctx.strokeStyle = C.you;
@@ -653,7 +654,7 @@ function drawCountIn(ctx: Ctx2D, scene: Scene): void {
      is arriving on a beat. The chart already repaints every frame while the
      cursor is running, so the precision costs nothing; monospaced figures keep
      the width from twitching as the digits change. */
-  ctx.fillText(left.toFixed(1), GUTTER + COUNT_INSET_X, Y_TGT_LABEL + COUNT_INSET_Y);
+  ctx.fillText(left.toFixed(1), GUTTER + COUNT_INSET_X, scene.rows.tgtLabel + COUNT_INSET_Y);
 }
 
 /** One character as a mark on the clock, instead of the dits and dahs in it.
@@ -809,7 +810,7 @@ function drawGradeStrip(
   ctx.font = `600 9px ${scene.palette.mono}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(GRADE_MARK[worst], x + w / 2, Y_GRADE + GRADE_H / 2);
+  ctx.fillText(GRADE_MARK[worst], x + w / 2, scene.rows.runs[0]!.grade + GRADE_H / 2);
 }
 
 /** Cumulative timing drift: how far behind or ahead of the ideal clock you have
@@ -850,7 +851,7 @@ function drawDrift(ctx: Ctx2D, scene: Scene): void {
   scene.driftMax = driftMax;
 
   const half = DRIFT_H / 2 - 8;
-  const mid = Y_DRIFT + DRIFT_H / 2;
+  const mid = scene.rows.drift + DRIFT_H / 2;
   ctx.strokeStyle = scene.palette.you;
   ctx.lineWidth = 1.5;
   for (const run of runs) {
@@ -870,12 +871,12 @@ function drawDrift(ctx: Ctx2D, scene: Scene): void {
 function drawGutter(ctx: Ctx2D, scene: Scene): void {
   const C = scene.palette;
   ctx.fillStyle = C.panel;
-  ctx.fillRect(0, 0, GUTTER, HEIGHT);
+  ctx.fillRect(0, 0, GUTTER, scene.rows.height);
   ctx.strokeStyle = C.line;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(GUTTER - 0.5, RULER_H);
-  ctx.lineTo(GUTTER - 0.5, PLOT_BOTTOM);
+  ctx.lineTo(GUTTER - 0.5, scene.rows.plotBottom);
   ctx.stroke();
 
   ctx.textAlign = "left";
@@ -887,14 +888,14 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
   const rows: Array<[number, string, string]> =
     scene.view === "overlay"
       ? [
-          [Y_TGT + OVER_H / 2 - 9, "TGT", C.tgt],
-          [Y_TGT + OVER_H / 2 + 9, "YOU", C.you],
-          [Y_DRIFT + 7, "DRIFT", C["ink-dim"]],
+          [scene.rows.tgt + OVER_H / 2 - 9, "TGT", C.tgt],
+          [scene.rows.tgt + OVER_H / 2 + 9, "YOU", C.you],
+          [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],
         ]
       : [
-          [Y_TGT + ROW_H / 2, "TGT", C.tgt],
-          [Y_YOU + ROW_H / 2, "YOU", C.you],
-          [Y_DRIFT + 7, "DRIFT", C["ink-dim"]],
+          [scene.rows.tgt + ROW_H / 2, "TGT", C.tgt],
+          [scene.rows.runs[0]!.row + ROW_H / 2, "YOU", C.you],
+          [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],
         ];
   for (const [y, label, color] of rows) {
     ctx.fillStyle = color;
@@ -912,7 +913,7 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
   ctx.fillText(
     `±${driftMax.toFixed(driftMax < 10 ? 1 : 0)}u`,
     4,
-    Y_DRIFT + 20,
+    scene.rows.drift + 20,
   );
 }
 
@@ -931,7 +932,7 @@ export function scrollbarThumb(
 function drawScrollbar(ctx: Ctx2D, scene: Scene): void {
   const th = scrollbarThumb(scene.scrollX, scene.viewport);
   if (!th) return;
-  const y = Y_SCROLL + 4;
+  const y = scene.rows.scroll + 4;
   ctx.fillStyle = scene.palette.line;
   ctx.globalAlpha = 0.5;
   roundRect(ctx, th.trackX, y, th.trackW, 5, 2.5);
@@ -950,7 +951,7 @@ function drawPlayhead(ctx: Ctx2D, scene: Scene): void {
 
   // In overlay both tracks share one band, so the playhead spans all of it.
   const y0 =
-    scene.view === "overlay" ? Y_TGT : scene.playhead.side === "you" ? Y_YOU : Y_TGT;
+    scene.view === "overlay" ? scene.rows.tgt : scene.playhead.side === "you" ? scene.rows.runs[0]!.row : scene.rows.tgt;
   const h = scene.view === "overlay" ? OVER_H : ROW_H;
   ctx.strokeStyle = scene.playhead.side === "you" ? scene.palette.you : scene.palette.ink;
   ctx.lineWidth = PLAYHEAD_W;
@@ -961,21 +962,25 @@ function drawPlayhead(ctx: Ctx2D, scene: Scene): void {
 }
 
 /** The y-bands the two tracks occupy, for hit testing. */
-export function trackBands(view: ViewMode): {
+export function trackBands(
+  view: ViewMode,
+  rows: Rows = rowsFor(1, 0),
+): {
   you: [number, number];
   tgt: [number, number];
 } {
+  const lane = rows.runs[0]!;
   if (view === "overlay") {
     // Split the shared band the way the separate rows are stacked: the target
     // is the upper half, yours the lower.
     return {
-      tgt: [Y_TGT, Y_TGT + OVER_H / 2],
-      you: [Y_TGT + OVER_H / 2, Y_TGT + OVER_H],
+      tgt: [rows.tgt, rows.tgt + OVER_H / 2],
+      you: [rows.tgt + OVER_H / 2, rows.tgt + OVER_H],
     };
   }
   return {
-    you: [Y_YOU, Y_YOU + ROW_H],
-    tgt: [Y_TGT, Y_TGT + ROW_H],
+    you: [lane.row, lane.row + ROW_H],
+    tgt: [rows.tgt, rows.tgt + ROW_H],
   };
 }
 

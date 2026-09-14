@@ -40,6 +40,7 @@ import {
   Y_YOU_LABEL,
   ZOOM_MAX,
   ZOOM_MIN,
+  rowsFor,
 } from "@/render/geometry";
 import type { Review, ViewMode } from "@/types";
 
@@ -58,6 +59,7 @@ function sceneFor(review: Review, view: ViewMode, ppu: number, trackW = 900): Sc
     layout,
     slots: review.slots,
     analysis: review.analysis,
+    rows: rowsFor(1, 0),
     palette: FALLBACK_PALETTE,
     view,
     tolerance: 0.3,

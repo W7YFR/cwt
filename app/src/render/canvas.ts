@@ -20,6 +20,7 @@ import {
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_RATE,
+  rowsFor,
 } from "./geometry";
 import { contextWindow, hitTest, type Focus, type HitResult } from "./focus";
 import { buildLayout, fitZoom, timeToX, xToTime, type Layout } from "./layout";
@@ -138,6 +139,7 @@ export function createChart(
       layout,
       slots: input.review.slots,
       analysis: input.review.analysis,
+      rows: rowsFor(1, 0),
       palette,
       view: input.settings.view,
       tolerance: input.settings.tolerance,
@@ -550,6 +552,7 @@ export function createChart(
         layout: exportLayout,
         slots: input.review.slots,
         analysis: input.review.analysis,
+        rows: rowsFor(1, 0),
         palette,
         view: input.settings.view,
         tolerance: input.settings.tolerance,

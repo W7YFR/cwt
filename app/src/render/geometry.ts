@@ -73,6 +73,73 @@ export const HEIGHT = Y_SCROLL + SCROLL_H;
 /** Where scrollable content ends. */
 export const PLOT_BOTTOM = Y_DRIFT + DRIFT_H;
 
+/** Where one attempt sits. */
+export interface RunRow {
+  /** The OK / ~ / ** strip, above the row it belongs to. */
+  grade: number;
+  /** The marks. */
+  row: number;
+  /** The per-character caption, or null when this run is not the one being
+   *  read in detail. */
+  label: number | null;
+  /** One past the bottom of the whole lane. */
+  bottom: number;
+}
+
+export interface Rows {
+  tgtLabel: number;
+  tgt: number;
+  runs: RunRow[];
+  drift: number;
+  scroll: number;
+  height: number;
+  plotBottom: number;
+}
+
+/** Lay the rows out for a given number of attempts.
+ *
+ * The grade strip belongs to a RUN rather than to the space between two rows.
+ * With one attempt on screen those are the same place and the distinction
+ * never had to be made; with several it does, because each run is graded
+ * against the target separately and a strip between rows would be ambiguous
+ * about which one it was reporting on.
+ *
+ * `captioned` is the run being read in detail — only it gets a band of
+ * per-character text. Six rows of captions is not the comparison anyone is
+ * making, and a run that dropped a letter already says so by leaving a hole in
+ * its column.
+ *
+ * With one captioned run this reproduces the constants above exactly, which is
+ * asserted rather than hoped for: the fixed layout was correct, and stacking
+ * must not quietly move a chart that has nothing stacked on it. */
+export function rowsFor(runs: number, captioned: number): Rows {
+  const tgtLabel = RULER_H;
+  const tgt = tgtLabel + LABEL_H;
+  let y = tgt + ROW_H;
+
+  const lanes: RunRow[] = [];
+  for (let r = 0; r < Math.max(runs, 1); r++) {
+    const grade = y;
+    const row = grade + GRADE_H;
+    const label = r === captioned ? row + ROW_H : null;
+    const bottom = row + ROW_H + (label === null ? 0 : LABEL_H);
+    lanes.push({ grade, row, label, bottom });
+    y = bottom;
+  }
+
+  const drift = y + 6;
+  const scroll = drift + DRIFT_H + 2;
+  return {
+    tgtLabel,
+    tgt,
+    runs: lanes,
+    drift,
+    scroll,
+    height: scroll + SCROLL_H,
+    plotBottom: drift + DRIFT_H,
+  };
+}
+
 /** Overlay superimposes the tracks, so it gets the whole band the two separate
  *  rows and the grade strip would have used. */
 export const OVER_H = Y_YOU + ROW_H - Y_TGT;
