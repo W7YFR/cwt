@@ -559,7 +559,12 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     /* The drill asks for "anything you like", so nothing in the recording says
        what was meant. Without it the chart grades against its own decode,
        which still shows the lengths — with it, it shows them against what was
-       actually intended. */
+       actually intended.
+
+       Asked for, not assumed: the box opens empty even when the session behind
+       this screen is practicing something, because what goes into the drill is
+       decided at the paddle in the moment and a box that arrives filled in is
+       a claim about what was sent rather than a question about it. */
     localStorage.setItem(
       "cwt:prefs",
       JSON.stringify({ expected: "CQ DE W7YFR" }),
@@ -570,12 +575,9 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     await runThrough();
     await screen.findByTestId("outcome");
 
-    // Prefilled from the landing screen: somebody who has typed what they are
-    // practicing has almost certainly just sent it again.
     const box = screen.getByTestId("cal-expected") as HTMLInputElement;
-    expect(box.value).toBe("CQ DE W7YFR");
+    expect(box.value).toBe("");
 
-    await user.clear(box);
     await user.type(box, "w1aw");
     expect(screen.getByTestId("calpreview").dataset.expected).toBe("W1AW");
   });

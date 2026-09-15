@@ -160,11 +160,14 @@ export function Calibrate(props: CalibrateProps): React.ReactElement {
      out of the speakers. */
   const [clip, setClip] = useState<AudioClip | null>(null);
   const [nickname, setNickname] = useState("");
-  /* What the closing message was meant to be. Prefilled from the landing
-     screen, because somebody who has already typed what they are practicing
-     has almost certainly just sent it again. Optional: without it the preview
-     grades against its own decode, which still shows the element lengths. */
-  const [expected, setExpected] = useState(() => loadPrefs().expected ?? "");
+  /* What the closing message was meant to be, and empty until somebody says.
+     Not the message from the session behind this screen: the drill asks for
+     anything you like — a call sign, CQ, your name — decided at the paddle in
+     the moment, so a box arriving pre-filled with something else is a claim
+     about what was sent rather than a question about it. Optional either way:
+     without it the preview grades against its own decode, which still shows
+     the element lengths. */
+  const [expected, setExpected] = useState("");
   /* An offset set by hand, or null for the one that was measured.
      Null rather than seeding it with the measurement, so "has this been
      changed" is a fact about the state and not a floating-point comparison. */
