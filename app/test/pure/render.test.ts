@@ -621,33 +621,25 @@ describe("the pacing cursor's count-in", () => {
 
 describe("fit zoom", () => {
   const { review } = reviewFrom(caseNamed(SLOPPY));
+  /** What the chart would be at a given zoom, for one attempt. */
+  const widthOf = (r: Review, view: ViewMode) => (ppu: number) =>
+    layoutFor(r, view, ppu).width;
 
   it.each(VIEWS)("fills the track in %s without overflowing it", (view) => {
     const trackW = 1200;
-    const ppu = fitZoom(
-      review,
-      { view, durationSec: review.take.durationSec },
-      trackW,
-      ZOOM_MIN,
-      ZOOM_MAX,
-    );
+    const ppu = fitZoom(widthOf(review, view), trackW, ZOOM_MIN, ZOOM_MAX);
     const width = layoutFor(review, view, ppu).width;
     expect(ppu).toBeGreaterThanOrEqual(ZOOM_MIN);
     expect(ppu).toBeLessThanOrEqual(ZOOM_MAX);
-    // Within a slot's padding of the target, and never spilling past it by
-    // more than the rounding to a tenth of a pixel allows.
-    expect(width).toBeLessThanOrEqual(trackW * 1.02);
+    /* Inside the track, not near it. A chart asked to fit and left three
+       pixels over is a scrollbar, and a scrollbar is the one thing the button
+       exists to get rid of. */
+    expect(width).toBeLessThanOrEqual(trackW);
     expect(width).toBeGreaterThan(trackW * 0.8);
   });
 
   it("never goes below the slider's floor for a very long session", () => {
-    const ppu = fitZoom(
-      review,
-      { view: "per-char", durationSec: review.take.durationSec },
-      80, // an absurdly narrow window
-      ZOOM_MIN,
-      ZOOM_MAX,
-    );
+    const ppu = fitZoom(widthOf(review, "per-char"), 80, ZOOM_MIN, ZOOM_MAX);
     expect(ppu).toBe(ZOOM_MIN);
   });
 
@@ -655,14 +647,45 @@ describe("fit zoom", () => {
     // The failure this pins: opening at the slider minimum leaves a short
     // session stranded in a third of the chart.
     const { review: short } = reviewFrom(caseNamed(FARNSWORTH));
-    const ppu = fitZoom(
-      short,
-      { view: "per-char", durationSec: short.take.durationSec },
-      4000,
-      ZOOM_MIN,
-      ZOOM_MAX,
-    );
+    const ppu = fitZoom(widthOf(short, "per-char"), 4000, ZOOM_MIN, ZOOM_MAX);
     expect(ppu).toBeGreaterThan(ZOOM_MIN);
+  });
+
+  it("fits what is drawn, not what one attempt would be on its own", () => {
+    /* The rows of a stack share a column axis, and a column is as wide as the
+       widest run put it — so every lane is wider than its own layout says.
+       Fitting one run's layout measured something that was never on screen and
+       left the chart scrolling after being asked not to. */
+    const runs = [SLOPPY, CLEAN].map(
+      (name) =>
+        reviewFrom(caseNamed(name), {
+          expected: "CQ DE W7YFR",
+          charWpm: 20,
+          farnsworthWpm: 20,
+        }).review,
+    );
+    const trackW = 1200;
+    const stacked = (ppu: number) => {
+      const columns = measureColumns(runs.map((r) => r.slots), ppu);
+      return Math.max(
+        ...runs.map(
+          (r, at) =>
+            buildLayout(r, {
+              view: "per-char",
+              ppu,
+              columns,
+              run: at,
+              durationSec: r.take.durationSec,
+            }).width,
+        ),
+      );
+    };
+    const ppu = fitZoom(stacked, trackW, ZOOM_MIN, ZOOM_MAX);
+    expect(stacked(ppu)).toBeLessThanOrEqual(trackW);
+
+    // And one run's own layout is the narrower measurement — which is why
+    // fitting on it overshot.
+    expect(widthOf(runs[0]!, "per-char")(ppu)).toBeLessThan(stacked(ppu));
   });
 });
 

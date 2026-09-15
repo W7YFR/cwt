@@ -292,6 +292,36 @@ export function createChart(
     rows = rowsFor(lanes.length, selected, input.settings.captionAll);
   }
 
+  /** How wide the chart would be at this zoom — the whole of it.
+   *
+   * The same computation `rebuild` does, at a zoom that is not in force yet.
+   * Every lane, because the extent of a shared axis has to hold all of them,
+   * and through `measureColumns` because in the per-character view a column is
+   * as wide as the widest run put it — a width no single run's own layout
+   * knows about. */
+  function widthAt(ppu: number): number {
+    if (!input) return 0;
+    const stack = stackOf(input);
+    const cols =
+      input.settings.view === "per-char"
+        ? measureColumns(stack.reviews.map((r) => r.slots), ppu)
+        : undefined;
+    let width = 0;
+    for (const at of stack.order) {
+      const review = stack.reviews[at]!;
+      const l = buildLayout(review, {
+        view: input.settings.view,
+        ppu,
+        leadSec,
+        tailSec: leadSec,
+        durationSec: review.take.durationSec,
+        ...(cols ? { columns: cols, run: at } : {}),
+      });
+      width = Math.max(width, l.width);
+    }
+    return width;
+  }
+
   function resize(): void {
     if (destroyed) return;
     const dpr = window.devicePixelRatio || 1;
@@ -673,16 +703,7 @@ export function createChart(
 
     fit() {
       if (!input) return ZOOM_MIN;
-      return fitZoom(
-        input.review,
-        {
-          view: input.settings.view,
-          durationSec: input.review.take.durationSec,
-        },
-        viewport().trackW,
-        ZOOM_MIN,
-        ZOOM_MAX,
-      );
+      return fitZoom(widthAt, viewport().trackW, ZOOM_MIN, ZOOM_MAX);
     },
 
     scrollTo: (x: number) => doScrollTo(x, false),

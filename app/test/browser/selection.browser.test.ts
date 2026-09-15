@@ -15,8 +15,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ReviewScreen } from "@/ui/ReviewScreen";
-import { ROW_H, rowsFor } from "@/render/geometry";
+import { GUTTER, PAD_R, ROW_H, ZOOM_MIN, rowsFor } from "@/render/geometry";
 import { defaultSettings, reviewTake } from "@/timing";
+import { buildLayout, measureColumns } from "@/render/layout";
 import type { ReviewSettings } from "@/types";
 import { caseNamed, takeFrom, CLEAN, SLOPPY } from "../fixture";
 import "@/ui/base.css";
@@ -89,6 +90,9 @@ function mount(over: Partial<ReviewSettings> = {}) {
 
   act(() => root.render(createElement(Harness)));
   return {
+    fit: () => act(() => {
+      host.querySelector<HTMLElement>("#zoom-fit")!.click();
+    }),
     ppu: () => latest.ppu,
     picked: () => picked,
     runs: takes.length,
@@ -158,5 +162,51 @@ describe("showing one attempt or all of them", () => {
        question. */
     const app = mount({ showRuns: "last" });
     expect(app.picked()).toBe(app.runs - 1);
+  });
+});
+
+describe("fitting the chart to the window", () => {
+  /* Wide enough that the fit is a real answer rather than the slider's floor.
+     At 900px this session cannot fit at any zoom the slider offers, and a
+     chart that is already as small as it goes proves nothing about fitting. */
+  const WIDE = 3200;
+
+  /** The width the chart scrolls within, at the zoom now in force.
+   *
+   * Built the way the chart builds it, which is the whole point: the rows of a
+   * stack share a column axis whose columns are as wide as the widest run put
+   * them, so no single run's own layout is the answer. */
+  function contentWidth(ppu: number, runs: number): number {
+    const takes = [SLOPPY, CLEAN].map((name) => takeFrom(caseNamed(name)));
+    const settings = { ...defaultSettings(takes[0]!), expected: TARGET, ppu };
+    const drawn = takes.slice(takes.length - runs).map((t) => reviewTake(t, settings));
+    const columns = measureColumns(drawn.map((r) => r.slots), ppu);
+    return Math.max(
+      ...drawn.map(
+        (r, at) =>
+          buildLayout(r, {
+            view: "per-char",
+            ppu,
+            columns,
+            run: at,
+            durationSec: r.take.durationSec,
+          }).width,
+      ),
+    );
+  }
+
+  const track = () =>
+    host.querySelector("canvas")!.getBoundingClientRect().width - GUTTER - PAD_R;
+
+  it.each([
+    ["every attempt", "all" as const, 2],
+    ["one attempt", "last" as const, 1],
+  ])("leaves nothing to scroll with %s drawn", (_name, showRuns, drawn) => {
+    host.style.width = `${WIDE}px`;
+    const app = mount({ view: "per-char", showRuns });
+    app.fit();
+    // A real fit, not the floor — otherwise this asserts nothing.
+    expect(app.ppu()).toBeGreaterThan(ZOOM_MIN);
+    expect(contentWidth(app.ppu(), drawn)).toBeLessThanOrEqual(track());
   });
 });
