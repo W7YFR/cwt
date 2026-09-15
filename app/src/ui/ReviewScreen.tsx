@@ -60,8 +60,8 @@ export interface ReviewScreenProps {
   /** Saved calibrations, which one is in use, and how to change it.
    *
    * Changing it does two things and both are wanted: it becomes the
-   * calibration the next recording is made under, and the recording on screen
-   * is read again through it. */
+   * calibration the next recording is made under, and every recording already
+   * in the session is read again through it. */
   profiles: readonly Profile[];
   profileId: string | undefined;
   onProfileChange(id: string | undefined): Promise<void> | void;
@@ -185,7 +185,8 @@ export function ReviewScreen({
 
   /* Re-reading is DSP over the samples, not a re-grade of the segments, so it
      costs what the pause after a recording costs rather than what a slider
-     costs. Said on screen while it happens. */
+     costs — once per attempt in the session. Said on screen while it
+     happens. */
   const chooseProfile = useCallback(
     (id: string | undefined) => {
       setRereading(true);

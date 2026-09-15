@@ -8,7 +8,7 @@
  * Worth having because this is the app's best measuring instrument. Comparing
  * two calibrations by recording the same message twice leaves the room, the
  * placement and the operator's fist free to vary; switching the profile under
- * one recording holds all three fixed, and the only variable left is the
+ * a recording holds all three fixed, and the only variable left is the
  * correction.
  */
 
@@ -156,6 +156,69 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
     expect(r.analysis.deviations).toEqual([]);
     // Present, but not a grade anybody earned — the UI dashes it.
     expect(isBlankTake(r.take)).toBe(true);
+  });
+
+  it("reads every attempt in the session again, not just the one on screen", async () => {
+    /* The rows of a session are there to be read against each other. One run
+       corrected and the rest raw are each right on their own and say nothing
+       together — and the runs not being looked at are exactly the ones nobody
+       would think to check. */
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
+    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t2" }));
+    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t3" }));
+    // Looking at the middle one, so neither the first nor the last is the
+    // selected run that would be re-read on its own.
+    act(() => result.current.selectRun(1));
+    const before = result.current.runs.map((r) => r.take.measured.charWpm);
+
+    await act(async () => {
+      await result.current.recalibrate(PROFILE);
+    });
+
+    const runs = result.current.runs;
+    expect(runs).toHaveLength(3);
+    for (const [i, r] of runs.entries()) {
+      expect(r.take.profile?.nickname, `run ${i + 1}`).toBe("shack desk");
+      expect(r.take.measured.charWpm, `run ${i + 1}`).not.toBe(before[i]);
+    }
+    // Still the same three recordings, in the same order.
+    expect(runs.map((r) => r.take.id)).toEqual(["t1", "t2", "t3"]);
+    expect(result.current.selected).toBe(1);
+  });
+
+  it("corrects what a session can carry and leaves alone what it cannot", async () => {
+    /* A session can hold a file — an opened recording is how one begins — and
+       the rule that a file is never corrected is about the recording, not
+       about which one is on screen. Applied per run, so a session with both in
+       it comes out with each read the way its own source allows. */
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.load(clip(), { source: "someone-else.wav", id: "f1" }));
+    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t2" }));
+    const before = result.current.runs.map((r) => r.take.measured.charWpm);
+
+    await act(async () => {
+      await result.current.recalibrate(PROFILE);
+    });
+
+    const [file, mic] = result.current.runs;
+    expect(file!.take.profile ?? null).toBeNull();
+    expect(file!.take.measured.charWpm).toBe(before[0]);
+    expect(mic!.take.profile?.nickname).toBe("shack desk");
+    expect(mic!.take.measured.charWpm).not.toBe(before[1]);
+  });
+
+  it("leaves a session with nothing recorded in it alone", async () => {
+    const { result } = renderHook(() => useTake());
+    act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
+    act(() => result.current.reset());
+
+    await act(async () => {
+      await result.current.recalibrate(PROFILE);
+    });
+
+    expect(isBlankTake(result.current.loaded!.take)).toBe(true);
+    expect(result.current.settings.expected).toBe(SENT);
   });
 
   it("never corrects a file, wherever the request came from", async () => {

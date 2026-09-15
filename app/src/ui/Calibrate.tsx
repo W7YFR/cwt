@@ -398,12 +398,22 @@ export function Calibrate(props: CalibrateProps): React.ReactElement {
         </div>
 
         <LevelMeter level={rec.level} />
-        {/* No way to skip a step and no way to stop early.
-            Every drill is a measurement or the thing a measurement is checked
-            against, so a sequence run halfway produces a refusal rather than a
-            shorter answer — and offering the button implied otherwise. What is
-            left is starting over, and leaving. */}
+        {/* No way to skip a step, and no way to stop early until the last one.
+            The drills before it are each a measurement or the thing a
+            measurement is checked against, so a sequence cut short there
+            produces a refusal rather than a shorter answer.
+
+            The closing message is the exception, and it is the exception
+            because it feeds no measurement: it is where you watch the thing
+            work. Ending it early costs a few seconds of your own message and
+            nothing else, and the alternative is standing there with nothing
+            left to send, waiting out a clock. */}
         <div className="rowbuttons">
+          {step === STEPS.length - 1 && (
+            <button className="primary" data-testid="finish-early" onClick={finish}>
+              Finish
+            </button>
+          )}
           <button onClick={restart}>Restart</button>
           <button className="link" onClick={cancel}>
             cancel

@@ -13,8 +13,9 @@
  * assertions.
  *
  * The sequence is driven by the recorder's clock, which is the only way it can
- * be driven: there is no button that advances a step, because every drill is
- * required. So the mocked recorder's level callback is held onto and the time
+ * be driven: the drills are timed rather than clicked through, so there is no
+ * button that advances a step. The mocked recorder's level callback is held
+ * onto and the time
  * is fed in, which is exactly what the real one does a few times a second.
  * Nothing here schedules anything of its own — the boundaries come from the
  * step list, so the drills can be re-timed without touching this file.
@@ -418,6 +419,35 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     expect(screen.getByTestId("stepcount").dataset.step).toBe("1");
     expect(screen.getByTestId("prompt").dataset.rest).toBe("true");
     expect(screen.getByTestId("upnext").dataset.step).toBe(STEPS[1]!.key);
+  });
+
+  it("lets you end the closing message early, and only that one", async () => {
+    /* The drills before it are each a measurement or the thing a measurement
+       is checked against, so cutting one short would produce a refusal rather
+       than a shorter answer. The message feeds no measurement — it is where
+       you watch the thing work — so there is nothing to be short of once you
+       have run out of things to send. */
+    const user = userEvent.setup();
+    renderWizard();
+    await begin(user);
+    const offered = () => screen.queryByTestId("finish-early") !== null;
+    expect(offered(), "before anything has been measured").toBe(false);
+
+    for (const at of BOUNDS.slice(0, -2)) {
+      await clockTo(at);
+      expect(offered(), `at ${at}s`).toBe(false);
+    }
+
+    // The last step, which is the closing message.
+    await clockTo(BOUNDS[BOUNDS.length - 2]!);
+    expect(screen.getByTestId("stepcount").dataset.step).toBe(String(DRILLS.length));
+    expect(offered()).toBe(true);
+
+    await user.click(screen.getByTestId("finish-early"));
+    // Ended, not abandoned: what was recorded goes off to be measured.
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("outcome")).not.toBeNull();
   });
 
   it("restarts from the lead-in, keeping the device open", async () => {

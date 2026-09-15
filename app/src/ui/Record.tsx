@@ -260,10 +260,10 @@ export function RecordBar({
       {appliesToTake ? (
         /* A picker rather than a label, because the audio is right here and
            reading it again under a different calibration is the same
-           computation that ran when it was recorded. Holding the recording
+           computation that ran when it was recorded. Holding the recordings
            fixed and changing only the correction is the cleanest comparison
            available anywhere in the app — the room, the placement and the fist
-           cannot vary, because it is one recording. */
+           cannot vary, because it is the same audio either way. */
         <span className={`calpick ${active ? "ok" : "none"}`} data-testid="calpick">
           <span className="dot" aria-hidden="true" />
           <select
@@ -297,8 +297,13 @@ export function RecordBar({
               {active ? "Recalibrate" : "Calibrate"}
             </button>
           )}
+          {/* Only while it is happening. Changing the calibration re-reads the
+              recording on screen, which takes long enough to need saying —
+              but a line that is on show the whole time to explain a control
+              nobody has touched yet is a caption, and this row already has as
+              many as it can carry. */}
           <span className="hint" aria-live="polite">
-            {rereading ? "reading it again…" : "applies to this recording"}
+            {rereading ? "re-reading the session…" : ""}
           </span>
         </span>
       ) : (

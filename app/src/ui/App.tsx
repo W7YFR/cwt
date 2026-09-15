@@ -322,8 +322,8 @@ export function App(): React.ReactElement {
           profiles={profiles}
           profileId={profileId}
           /* One control, two effects, both wanted: it is the calibration the
-             next recording will be made under, and the recording on screen is
-             read again through it. */
+             next recording will be made under, and every recording already in
+             the session is read again through it. */
           onConfigure={() => {
             setError(null);
             setConfiguring(true);
