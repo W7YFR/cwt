@@ -30,6 +30,31 @@ export const MIN_DEVIATION_UNITS = 0.4;
 
 export const DEFAULT_TOLERANCE = 0.3;
 
+/** Where a score stops reading as good and starts reading as a problem.
+ *
+ * Here rather than beside either thing that draws one, because two of them do:
+ * the figures under the chart and the per-attempt grades in its gutter. A
+ * stack whose rows called 88% amber while the band below called it green would
+ * be two opinions about one number.
+ *
+ * The two scores are not on the same scale and are not held to the same bar.
+ * Consistency is a fraction of elements inside the tolerance and 90% of them
+ * is keying somebody would be pleased with; accuracy is characters decoded
+ * right, where one wrong character in twenty is already a call sign nobody can
+ * read. */
+export interface ScoreBands {
+  readonly good: number;
+  readonly ok: number;
+}
+export const CONSISTENT_BANDS: ScoreBands = { good: 0.9, ok: 0.75 };
+export const ACCURATE_BANDS: ScoreBands = { good: 0.95, ok: 0.85 };
+
+export type ScoreBand = "ok" | "warn" | "bad";
+
+export function scoreBand(v: number, b: ScoreBands): ScoreBand {
+  return v >= b.good ? "ok" : v >= b.ok ? "warn" : "bad";
+}
+
 /** Grade the keying in `timeline` against the ideal `ref` timing.
  *
  * `timeline` must have been built against `ref` — that is what makes its

@@ -7,12 +7,9 @@
  */
 
 import type { Review, ReviewSettings, Take } from "@/types";
+import { ACCURATE_BANDS, CONSISTENT_BANDS, scoreBand } from "@/timing";
 import { fmtSeconds } from "./format";
 import { isBlankTake } from "@/io/take";
-
-function scoreClass(v: number, good: number, ok: number): string {
-  return v >= good ? "ok" : v >= ok ? "warn" : "bad";
-}
 
 export interface ScoresProps {
   review: Review;
@@ -83,13 +80,13 @@ export function Scores({
 
   return (
     <div className="scores" data-testid="scores" data-blank="false">
-      <div className={`score ${scoreClass(g.withinTolFrac, 0.9, 0.75)}`}>
+      <div className={`score ${scoreBand(g.withinTolFrac, CONSISTENT_BANDS)}`}>
         <b>{Math.round(g.withinTolFrac * 100)}%</b>
         <span>consistent</span>
       </div>
 
       {c && (
-        <div className={`score ${scoreClass(c.accuracy, 0.95, 0.85)}`}>
+        <div className={`score ${scoreBand(c.accuracy, ACCURATE_BANDS)}`}>
           <b>{(c.accuracy * 100).toFixed(1)}%</b>
           <span>accurate</span>
         </div>

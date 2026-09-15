@@ -58,7 +58,15 @@ function sceneFor(review: Review, view: ViewMode, ppu: number, trackW = 900): Sc
   const layout = layoutFor(review, view, ppu);
   const columns = view === "per-char" ? measureColumns([review.slots], ppu) : undefined;
   return {
-    runs: [{ layout, slots: review.slots, analysis: review.analysis, ordinal: 0 }],
+    runs: [
+      {
+        layout,
+        slots: review.slots,
+        analysis: review.analysis,
+        accuracy: review.comparison?.accuracy ?? null,
+        ordinal: 0,
+      },
+    ],
     selected: 0,
     ...(columns ? { columns } : {}),
     layout,

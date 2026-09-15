@@ -270,6 +270,7 @@ export function createChart(
         }),
         slots: review.slots,
         analysis: review.analysis,
+        accuracy: review.comparison?.accuracy ?? null,
         blank: review.take.segments.length === 0,
         ordinal: at,
       } satisfies Lane;
@@ -733,6 +734,7 @@ export function createChart(
             layout: exportLayout,
             slots: input.review.slots,
             analysis: input.review.analysis,
+            accuracy: input.review.comparison?.accuracy ?? null,
             ordinal: 0,
           },
         ],

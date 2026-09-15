@@ -53,6 +53,7 @@ function stack(
       }),
       slots: review.slots,
       analysis: review.analysis,
+      accuracy: review.comparison?.accuracy ?? null,
       ordinal: i,
     };
   });
@@ -316,6 +317,75 @@ describe("drift across a session", () => {
     }
     // And the session's axis is one of theirs rather than something larger.
     expect(shared).toBeGreaterThan(0);
+  });
+});
+
+/* Every attempt's grade, beside the attempt.
+ *
+ * The scores under the chart are about the selected run, so with a stack the
+ * question the stack exists to ask — which of these went better — could only
+ * be answered one row at a time, by clicking each in turn and reading the band
+ * below. These put the answer on the rows.
+ */
+describe("grades in the gutter", () => {
+  const inGutter = (scene: Scene) =>
+    paint(scene)
+      .ofType("fillText")
+      .filter((c) => c.args[0]! < GUTTER)
+      .sort((a, b) => a.args[1]! - b.args[1]!);
+
+  const percents = (scene: Scene) =>
+    inGutter(scene).filter((c) => /^\d+%$/.test(c.text ?? ""));
+
+  it("puts both figures on every attempt", () => {
+    const runs = reviews();
+    // Two scores apiece: consistency, and accuracy against the target.
+    expect(percents(stack(runs)).length).toBe(runs.length * 2);
+  });
+
+  it("drops accuracy when there is no target to be accurate against", () => {
+    /* Grading a decode against itself is a meaningless 100%, which is why the
+       band under the chart leaves the figure out too. */
+    const runs = [SLOPPY, CLEAN].map(
+      (name) =>
+        reviewFrom(caseNamed(name), { expected: "", charWpm: 20, farnsworthWpm: 20 })
+          .review,
+    );
+    expect(percents(stack(runs)).length).toBe(runs.length);
+  });
+
+  it("reads each figure off the attempt whose row it is in", () => {
+    /* The point of the whole thing. Two recordings that decode differently
+       have to come back with different numbers, in the rows they belong to —
+       grades that are right on average and in the wrong rows are worse than
+       none, because the chart is what you would be comparing from. */
+    const runs = reviews();
+    const scene = stack(runs);
+    expect(new Set(percents(scene).map((c) => c.text)).size).toBeGreaterThan(1);
+
+    for (const [r, lane] of scene.runs.entries()) {
+      const top = scene.rows.runs[r]!.row;
+      const mine = percents(scene)
+        .filter((c) => c.args[1]! >= top && c.args[1]! < top + ROW_H)
+        .map((c) => c.text);
+      expect(mine, `run ${r + 1}`).toEqual([
+        `${Math.round(lane.analysis.withinTolFrac * 100)}%`,
+        `${Math.round(lane.accuracy! * 100)}%`,
+      ]);
+    }
+  });
+
+  it("says nothing extra when there is only one attempt", () => {
+    /* The band under the chart is already that run's score, and a second copy
+       of it four pixels from the row is noise. It is also what keeps a single
+       run drawing exactly as it always did. */
+    const runs = reviews();
+    expect(percents(stack([runs[0]!])).length).toBe(0);
+  });
+
+  it("stays out of a view that has no per-attempt rows", () => {
+    const runs = reviews();
+    expect(percents(stack(runs, 0, 4000, "overlay")).length).toBe(0);
   });
 });
 

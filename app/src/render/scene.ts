@@ -31,7 +31,12 @@ import {
   rowsFor,
   type Rows,
 } from "./geometry";
-import { subLabel } from "@/timing";
+import {
+  ACCURATE_BANDS,
+  CONSISTENT_BANDS,
+  scoreBand,
+  subLabel,
+} from "@/timing";
 import { focusSpan, type Focus } from "./focus";
 import {
   gapWidth,
@@ -111,6 +116,10 @@ export interface Lane {
    * name, and the Drop button offer to throw away a recording it did not
    * name. */
   ordinal: number;
+  /** How well this attempt was decoded against the target, or null when there
+   *  is no intended message — grading a decode against itself is a meaningless
+   *  100%, which is why the band under the chart drops the figure too. */
+  accuracy: number | null;
   /** Nothing was recorded into this one, so its row is ghosts and none of
    *  them is a mistake. */
   blank?: boolean;
@@ -1019,6 +1028,16 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
   ctx.textBaseline = "middle";
   ctx.font = `600 10px ${C.mono}`;
 
+  /* Grades in the gutter, and only where they answer something.
+   *
+   * With one attempt on screen the band under the chart is already its score
+   * and a second copy of the same number four pixels from the row it belongs
+   * to is noise. With a stack it is the question being asked — which of these
+   * went better — and the answer was only ever available one row at a time, by
+   * clicking each in turn and reading the band below. The absolute and overlay
+   * views have their own bands and no per-attempt rows to hang these on. */
+  const graded = scene.view !== "overlay" && scene.runs.length > 1;
+
   // In overlay the tracks share one band, so the two names stack as a color key
   // inside it rather than labeling separate rows.
   const rows: Array<[number, string, string]> =
@@ -1038,7 +1057,11 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
           ...scene.runs.map(
             (lane, r) =>
               [
-                scene.rows.runs[r]!.row + ROW_H / 2,
+                /* Centered on its row while the name is the only thing there,
+                   and pushed up to make room when the grades go under it. One
+                   attempt keeps the first case, which is what leaves a single
+                   run drawing exactly as it always has. */
+                scene.rows.runs[r]!.row + (graded ? 9 : ROW_H / 2),
                 scene.runs.length === 1 ? "YOU" : `RUN ${lane.ordinal + 1}`,
                 r === scene.selected
                   ? C.you
@@ -1052,6 +1075,25 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
   for (const [y, label, color] of rows) {
     ctx.fillStyle = color;
     ctx.fillText(label, 4, y);
+  }
+
+  if (graded) {
+    ctx.font = `9px ${C.mono}`;
+    for (const [r, lane] of scene.runs.entries()) {
+      // Nothing was keyed into it, so every figure would be a reading off an
+      // empty recording — the same reason the band below dashes them.
+      if (lane.blank) continue;
+      const top = scene.rows.runs[r]!.row;
+      ctx.fillStyle = C[scoreBand(lane.analysis.withinTolFrac, CONSISTENT_BANDS)];
+      ctx.fillText(`${Math.round(lane.analysis.withinTolFrac * 100)}%`, 4, top + 20);
+      if (lane.accuracy !== null) {
+        // Second, under it, in the order the band below the chart reads: the
+        // one that matters for keying first, then the one that needs a target
+        // to mean anything.
+        ctx.fillStyle = C[scoreBand(lane.accuracy, ACCURATE_BANDS)];
+        ctx.fillText(`${Math.round(lane.accuracy * 100)}%`, 4, top + 29);
+      }
+    }
   }
 
   // The axis bound goes on its own line below the label rather than at the
