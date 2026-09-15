@@ -187,7 +187,19 @@ export function createChart(
   function viewport(): Viewport {
     const viewW = Math.max(host.clientWidth, GUTTER + 40);
     const trackW = Math.max(viewW - GUTTER - PAD_R, 1);
-    const contentW = layout ? layout.width : trackW;
+    /* The widest attempt on screen, not the one being read.
+     *
+     * On the time axes a lane is as wide as its own recording, so taking the
+     * selected lane's width made how far the chart scrolls a property of which
+     * row was picked: selecting a shorter attempt narrowed the content under a
+     * scroll position that was still valid a moment ago, and everything slid
+     * sideways to a clamp. The rows are drawn on one axis and the extent of
+     * that axis has to hold all of them. */
+    const contentW = lanes.length
+      ? Math.max(...lanes.map((l) => l.layout.width))
+      : layout
+        ? layout.width
+        : trackW;
     return { viewW, trackW, contentW, maxScroll: Math.max(0, contentW - trackW) };
   }
 

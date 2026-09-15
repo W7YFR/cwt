@@ -109,6 +109,13 @@ export interface Rows {
  * making, and a run that dropped a letter already says so by leaving a hole in
  * its column.
  *
+ * The band is reserved on every lane all the same, and that is the point of
+ * this being a layout rather than a consequence: selecting a row is a change
+ * of what is highlighted, not of where anything is. Given to the captioned
+ * lane alone, every row under it moved by the height of a caption each time
+ * the selection changed — and the marks you were comparing jumped out from
+ * under the pointer that was about to click the next one.
+ *
  * With one captioned run this reproduces the constants above exactly, which is
  * asserted rather than hoped for: the fixed layout was correct, and stacking
  * must not quietly move a chart that has nothing stacked on it. */
@@ -122,7 +129,7 @@ export function rowsFor(runs: number, captioned: number): Rows {
     const grade = y;
     const row = grade + GRADE_H;
     const label = r === captioned ? row + ROW_H : null;
-    const bottom = row + ROW_H + (label === null ? 0 : LABEL_H);
+    const bottom = row + ROW_H + LABEL_H;
     lanes.push({ grade, row, label, bottom });
     y = bottom;
   }

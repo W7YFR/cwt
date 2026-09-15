@@ -467,16 +467,24 @@ export function ReviewScreen({
      layout, because the fit is measured off the real content — a short session
      stranded in a third of the chart is the one thing a timing chart has no use
      for, and empty pixels tell you nothing. */
-  const fittedId = useRef<string | null>(null);
+  const fitted = useRef<string | null>(null);
+  /* What the fit is about: the attempts on the chart, not the one being read.
+     Keyed on the selected take it re-fitted on every click of a run name —
+     each attempt is a slightly different length, so each got a slightly
+     different zoom, and picking a row to compare moved every mark on the chart
+     including the ones in the rows you were comparing it against.
+     The ids rather than the array: the reviews are rebuilt on every settings
+     change, and re-fitting on a tolerance slider would undo the zoom you just
+     set by hand. */
+  const stackId = stack.map((r) => r.take.id).join(" ");
   useEffect(() => {
-    // Keyed on the take rather than on a bare flag: recording again from this
-    // screen swaps the take under the same chart, and a new session deserves
-    // the same opening fit a first one gets.
-    if (fittedId.current === loaded.take.id || !handle.chart) return;
-    fittedId.current = loaded.take.id;
+    // Recording into the session, or starting a new one, still gets the fit a
+    // first attempt gets — that changes which takes are on the chart.
+    if (fitted.current === stackId || !handle.chart) return;
+    fitted.current = stackId;
     const ppu = handle.chart.fit();
     if (ppu !== settings.ppu) onChange({ ppu });
-  }, [handle, loaded.take.id, onChange, settings.ppu, review]);
+  }, [handle, stackId, onChange, settings.ppu, review]);
 
   const stem = baseName(loaded.take.source);
 
