@@ -8,7 +8,12 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { Controls, ViewControls } from "@/ui/Controls";
+import {
+  ChartSettingsButton,
+  ChartSettingsPanel,
+  Controls,
+  ViewControls,
+} from "@/ui/Controls";
 import { defaultSettings } from "@/timing";
 import { PACE_LEAD_MAX_SEC } from "@/render/geometry";
 import type { ReviewSettings } from "@/types";
@@ -52,12 +57,39 @@ function Harness({
 
 const defaults = () => defaultSettings(takeFrom(caseNamed(SLOPPY)));
 
+/** The pair, as the page has them: the chart's own controls, and the way into
+ *  everything else on the row above. Used for rerenders, where the panel's
+ *  open state has to survive — so the same two components in the same two
+ *  places, every time. */
 function view(over: Partial<ReviewSettings>, onChange: (p: Partial<ReviewSettings>) => void) {
-  return <ViewControls runs={1} settings={{ ...defaults(), ...over }} onChange={onChange} onFit={() => {}} />;
+  const settings = { ...defaults(), ...over };
+  return (
+    <>
+      <ViewControls runs={1} settings={settings} onChange={onChange} onFit={() => {}} />
+      <Panelled runs={1} settings={settings} onChange={onChange} />
+    </>
+  );
 }
 
-/* Most of these controls are behind the cog at the end of the row, so a test
-   that wants one opens it first. */
+/** The button and the band it opens, wired together the way the page wires
+ *  them — the button lives in the header corner and the band under it, with
+ *  the open state between them. */
+function Panelled(props: {
+  settings: ReviewSettings;
+  onChange(patch: Partial<ReviewSettings>): void;
+  runs: number;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ChartSettingsButton open={open} onToggle={() => setOpen((v) => !v)} />
+      {open && <ChartSettingsPanel {...props} />}
+    </>
+  );
+}
+
+/* Most of these controls are behind the cog in the corner, so a test that
+   wants one opens it first. */
 function openPanel() {
   fireEvent.click(screen.getByTestId("panel-toggle"));
 }
@@ -73,13 +105,21 @@ function renderView({
   runs?: number;
   open?: boolean;
 } = {}) {
+  const settings = { ...defaults(), ...over };
+  /* Both, because the page has both: the chart's own controls in their row,
+     and the way into everything else on the row above. They are two components
+     for one question — what is on screen — and testing either alone would miss
+     that the cog outlives the row it used to live on. */
   const rendered = render(
-    <ViewControls
-      runs={runs}
-      settings={{ ...defaults(), ...over }}
-      onChange={onChange}
-      onFit={() => {}}
-    />,
+    <>
+      <ViewControls
+        runs={runs}
+        settings={settings}
+        onChange={onChange}
+        onFit={() => {}}
+      />
+      <Panelled runs={runs} settings={settings} onChange={onChange} />
+    </>,
   );
   if (open) openPanel();
   return rendered;
@@ -90,12 +130,13 @@ function renderView({
 function renderStateful() {
   function Harnessed() {
     const [s, set] = useState<ReviewSettings>({ ...defaults(), paceCursor: true });
+    const onChange = (patch: Partial<ReviewSettings>) =>
+      set((prev) => ({ ...prev, ...patch }));
     return (
-      <ViewControls runs={1}
-        settings={s}
-        onChange={(patch) => set((prev) => ({ ...prev, ...patch }))}
-        onFit={() => {}}
-      />
+      <>
+        <ViewControls runs={1} settings={s} onChange={onChange} onFit={() => {}} />
+        <Panelled runs={1} settings={s} onChange={onChange} />
+      </>
     );
   }
   render(<Harnessed />);
@@ -171,6 +212,27 @@ describe("controls", () => {
     expect(document.activeElement).toBe(box);
     // Nothing left to clear, so nothing offering to.
     expect(screen.queryByTestId("clear-expected")).toBeNull();
+  });
+
+  it("can take the control row away without taking the way back with it", async () => {
+    /* Off is for when the chart is set the way you want it and the page should
+       be nothing but chart. The cog cannot go with it: it is the switch that
+       turned the row off, and a setting you cannot reach is one you cannot
+       undo. */
+    const ids = ["#run-sort", "#view", "#show-runs", "#zoom", "#zoom-fit"];
+    const on = renderView({ runs: 3, open: true });
+    for (const id of ids) expect(on.container.querySelector(id), id).not.toBeNull();
+    on.unmount();
+
+    const off = renderView({
+      runs: 3,
+      open: true,
+      over: { showChartControls: false },
+    });
+    for (const id of ids) expect(off.container.querySelector(id), id).toBeNull();
+    // The way back, and the switch itself.
+    expect(screen.getByTestId("panel-toggle")).toBeTruthy();
+    expect(screen.getByLabelText(/chart controls/i)).toBeTruthy();
   });
 
   it("keeps the axis out and everything else behind the cog", async () => {
@@ -259,6 +321,7 @@ describe("controls", () => {
     const chart = container.querySelector("[data-panel='display']")!;
 
     const boxes = [
+      [/chart controls/i, true, { showChartControls: false }],
       [/^downloads$/i, false, { showDownloads: true }],
       [/^hints$/i, true, { showHints: false }],
       [/advanced grading/i, true, { advancedGrading: false }],

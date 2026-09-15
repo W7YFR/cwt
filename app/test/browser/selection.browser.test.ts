@@ -79,7 +79,6 @@ function mount(over: Partial<ReviewSettings> = {}) {
       profileId: undefined,
       onProfileChange: () => {},
       onDeviceChange: () => {},
-      onConfigure: () => {},
       onCalibrate: () => {},
       onFile: () => {},
       onClear: () => {},

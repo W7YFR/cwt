@@ -45,7 +45,7 @@ import {
   type Profile,
 } from "@/io/profiles";
 import type { AudioClip } from "@/types";
-import { DevicePicker, LevelMeter, RecDot } from "./Record";
+import { Cog, DevicePicker, LevelMeter, RecDot } from "./Record";
 import { APP_NAME } from "./Wordmark";
 import { useRecorder } from "./useRecorder";
 
@@ -139,11 +139,32 @@ export interface CalibrateProps {
   /** Saved and selected — the caller re-reads the store. */
   onSaved(profile: Profile): void;
   onClose(): void;
+  /** Into the configuration screen — the saved calibrations and the recordings
+   *  they were measured from.
+   *
+   * Here and nowhere else: what is behind it is entirely about calibration, so
+   * it belongs on the screen where calibration is being done rather than in
+   * the corner of every screen. */
+  onConfigure(): void;
   /** Injected so a test does not have to mock the clock. */
   now?(): Date;
 }
 
+/** The wizard, with the one way to the configuration screen beside it.
+ *
+ * Wrapped rather than repeated in each of the three things the wizard renders:
+ * the button is the same button whether you are setting up, recording or
+ * reading a result, and putting it in one place is what makes that true. */
 export function Calibrate(props: CalibrateProps): React.ReactElement {
+  return (
+    <>
+      <Cog onClick={props.onConfigure} />
+      <Wizard {...props} />
+    </>
+  );
+}
+
+function Wizard(props: CalibrateProps): React.ReactElement {
   const { onError, onSaved } = props;
   /* Held as text, not as a number.
      Clearing the box to type a new speed sends an empty string through

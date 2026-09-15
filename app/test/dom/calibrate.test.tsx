@@ -140,6 +140,7 @@ function renderWizard(over: Partial<React.ComponentProps<typeof Calibrate>> = {}
     onError: vi.fn(),
     onSaved: vi.fn(),
     onClose: vi.fn(),
+    onConfigure: vi.fn(),
     ...over,
   };
   return { ...render(<Calibrate {...props} />), props };
@@ -845,6 +846,17 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
       expect(screen.getByTestId("advice").textContent).not.toBe("");
       expect(screen.getByTestId("verdict")).toBeTruthy();
     });
+  });
+
+  it("keeps the way into the configuration screen on the screen it is about", async () => {
+    /* What is behind it is the saved calibrations and the recordings they were
+       measured from — entirely about calibration, so it belongs where
+       calibration is done rather than in the corner of every screen. */
+    const user = userEvent.setup();
+    const { props } = renderWizard();
+    await user.click(screen.getByTestId("cog"));
+    expect(props.onConfigure).toHaveBeenCalled();
+    await settled();
   });
 
   it("throws the recording away when canceled", async () => {

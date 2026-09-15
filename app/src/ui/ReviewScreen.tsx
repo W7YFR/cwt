@@ -19,10 +19,10 @@ import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
-import { Controls, ViewControls } from "./Controls";
+import { ChartSettingsButton, ChartSettingsPanel, Controls, ViewControls } from "./Controls";
 import { FlashCard } from "./FlashCard";
 import { beatsFor, pacedEnd, pacedStart, wordsFor, type Word } from "./pacing";
-import { Cog, RecordBar } from "./Record";
+import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
@@ -66,7 +66,6 @@ export interface ReviewScreenProps {
   profileId: string | undefined;
   onProfileChange(id: string | undefined): Promise<void> | void;
   onDeviceChange(id: string | undefined): void;
-  onConfigure(): void;
   /** Into the calibration wizard, and back here afterwards. */
   onCalibrate(): void;
   /** Drop the recording and stay here — see useTake.reset. */
@@ -113,7 +112,6 @@ export function ReviewScreen({
   profileId,
   onProfileChange,
   onDeviceChange,
-  onConfigure,
   onCalibrate,
   onClear,
   onFile,
@@ -124,6 +122,10 @@ export function ReviewScreen({
      while the dialog is up: a key that starts a recording behind an open
      dialog answers a question nobody asked. */
   const [starting, setStarting] = useState(false);
+  /* Whether the chart settings are on show. Not a setting itself: it is where
+     you are looking rather than anything about the chart, and it has no
+     business outliving the page or riding along in a saved report. */
+  const [chartSettings, setChartSettings] = useState(false);
 
   const rec = useRecorder({
     deviceId,
@@ -547,7 +549,11 @@ export function ReviewScreen({
 
   return (
     <>
-      <Cog onClick={onConfigure} />
+      {/* The corner, where the way to configuration used to be. Configuration
+          is about one thing — the microphone — and now sits beside Calibrate
+          where that is decided; this is about the page in front of you, which
+          is what the corner of the page should reach. */}
+      <ChartSettingsButton open={chartSettings} onToggle={() => setChartSettings((v) => !v)} />
       <header>
         <h1 className="brand">
           {/* The name is the way home. Nothing else on this screen is a
@@ -574,7 +580,10 @@ export function ReviewScreen({
           profiles={profiles}
           profileId={profileId}
           onProfileChange={chooseProfile}
-          onCalibrate={onCalibrate}
+          /* Behind the settings button, like everything else that is not the
+             loop. Calibrating is a thing you do once for a microphone and then
+             leave alone, and it sat in the header being rare. */
+          onCalibrate={chartSettings ? onCalibrate : undefined}
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
           leadLeft={leadLeft}
@@ -597,6 +606,27 @@ export function ReviewScreen({
         )}
       </header>
 
+      {chartSettings && (
+        <section className="chartsettings">
+          <ChartSettingsPanel
+            settings={settings}
+            runs={stack.length}
+            onChange={onChange}
+          />
+        </section>
+      )}
+
+      <Controls
+        settings={settings}
+        onChange={onChange}
+        playing={playing}
+        clock={clock}
+        canPlayYou={!blank}
+        onPlayYou={() => void playYou()}
+        onPlayTarget={() => playTarget()}
+        onStop={stop}
+      />
+
       {/* A band of its own rather than a line of the header. In the header the
           figures were vertically off-center — the row above them sets the
           padding and they got whatever was left — and they are the one thing
@@ -610,17 +640,6 @@ export function ReviewScreen({
           runOf={{ at: selected, of: stack.length }}
         />
       </section>
-
-      <Controls
-        settings={settings}
-        onChange={onChange}
-        playing={playing}
-        clock={clock}
-        canPlayYou={!blank}
-        onPlayYou={() => void playYou()}
-        onPlayTarget={() => playTarget()}
-        onStop={stop}
-      />
 
       {/* A row of their own under the controls, rather than tucked beside the
           legend below the chart. What comes out of this screen is a file, and

@@ -107,6 +107,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     advancedGrading: true,
     showDownloads: false,
     showHints: true,
+    showChartControls: true,
     showRuns: "all",
     flashCard: false,
     flashCue: true,

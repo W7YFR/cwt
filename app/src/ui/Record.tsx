@@ -39,13 +39,13 @@ export function RecDot(): React.ReactElement {
 export function Cog({ onClick }: { onClick(): void }): React.ReactElement {
   return (
     <button
-      className="cog"
+      className="iconbtn cornerbtn"
       onClick={onClick}
       title="Configuration"
       aria-label="Configuration"
       data-testid="cog"
     >
-      ⚙
+      <span aria-hidden="true">⚙</span>
     </button>
   );
 }
@@ -192,6 +192,8 @@ export function RecordBar({
   }
 
   const active = profiles.find((p) => p.id === profileId) ?? null;
+  /** The calibrations this recording could be read under. */
+  const choices = profilesFor(profiles, deviceId, profileId);
 
   return (
     <div className="recordbar">
@@ -263,22 +265,31 @@ export function RecordBar({
            computation that ran when it was recorded. Holding the recordings
            fixed and changing only the correction is the cleanest comparison
            available anywhere in the app — the room, the placement and the fist
-           cannot vary, because it is the same audio either way. */
+           cannot vary, because it is the same audio either way.
+
+           No status dot beside it: what that reported is already in the select
+           itself, in words, and a warning color on "No calibration" calls an
+           ordinary state a problem — it is the state every session starts in,
+           and the right one for a path with nothing in it. */
         <span className={`calpick ${active ? "ok" : "none"}`} data-testid="calpick">
-          <span className="dot" aria-hidden="true" />
-          <select
-            aria-label="Calibration"
-            value={profileId ?? ""}
-            disabled={rereading}
-            onChange={(e) => onProfileChange(e.target.value || undefined)}
-          >
-            <option value="">No calibration</option>
-            {profilesFor(profiles, deviceId, profileId).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
-              </option>
-            ))}
-          </select>
+          {/* Only where there is a choice to make. One option is not a
+              decision, and a select offering "No calibration" and nothing else
+              is a control whose every state is the state it is already in. */}
+          {choices.length > 0 && (
+            <select
+              aria-label="Calibration"
+              value={profileId ?? ""}
+              disabled={rereading}
+              onChange={(e) => onProfileChange(e.target.value || undefined)}
+            >
+              <option value="">No calibration</option>
+              {choices.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
+                </option>
+              ))}
+            </select>
+          )}
           {/* The way out of an empty list. Calibrating is reached from the
               landing screen and from the configuration screen, neither of
               which is where you are standing when the picker in front of you

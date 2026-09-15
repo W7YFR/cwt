@@ -146,6 +146,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     advancedGrading: p.advancedGrading ?? base.advancedGrading,
     showDownloads: p.showDownloads ?? base.showDownloads,
     showHints: p.showHints ?? base.showHints,
+    showChartControls: p.showChartControls ?? base.showChartControls,
     showRuns: p.showRuns ?? base.showRuns,
     captionAll: p.captionAll ?? base.captionAll,
     flashCard: p.flashCard ?? base.flashCard,
@@ -172,6 +173,7 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     advancedGrading: prev.advancedGrading,
     showDownloads: prev.showDownloads,
     showHints: prev.showHints,
+    showChartControls: prev.showChartControls,
     showRuns: prev.showRuns,
     captionAll: prev.captionAll,
     flashCard: prev.flashCard,
@@ -209,6 +211,7 @@ export function useTake(): TakeState {
       advancedGrading: true,
       showDownloads: false,
       showHints: true,
+      showChartControls: true,
       showRuns: "all",
       /* Off. One row of text is a caption; six is a wall, and the rows under
          it are the thing being compared. */
@@ -279,6 +282,7 @@ export function useTake(): TakeState {
         advancedGrading: next.advancedGrading,
         showDownloads: next.showDownloads,
         showHints: next.showHints,
+        showChartControls: next.showChartControls,
         showRuns: next.showRuns,
         captionAll: next.captionAll,
         flashCard: next.flashCard,

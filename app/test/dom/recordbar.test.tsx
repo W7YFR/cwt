@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { RecordBar } from "@/ui/Record";
 import type { RecorderHandle } from "@/ui/useRecorder";
+import type { Profile } from "@/io/profiles";
 
 const IDLE: RecorderHandle = {
   devices: [],
@@ -43,6 +44,24 @@ function bar(over: Partial<React.ComponentProps<typeof RecordBar>> = {}) {
   );
 }
 
+/** A saved calibration, so the picker has something to offer. The numbers are
+ *  not what is under test — only that a choice exists. */
+const PROFILE: Profile = {
+  id: "p1",
+  nickname: "shack desk",
+  deviceId: undefined,
+  deviceLabel: undefined,
+  wpm: 20,
+  releaseOffsetSec: 0.003,
+  measuredOffsetSec: 0.003,
+  spreadSec: 0.0005,
+  elements: 90,
+  verdict: "good",
+  decaySec: 0.02,
+  maxWpm: 30,
+  recordedAt: "2026-09-01T10:00:00+00:00",
+};
+
 describe("the record bar in a session", () => {
   it("offers a new session, which is a different act from clearing", () => {
     /* Clear keeps the message and the speeds and drops the recordings; a new
@@ -59,6 +78,29 @@ describe("the record bar in a session", () => {
     bar({ onClear });
     screen.getByTestId("clear-take").click();
     expect(onClear).toHaveBeenCalled();
+  });
+
+  it("offers the calibration picker only when there is a calibration to pick", () => {
+    /* One option is not a decision. Offering "No calibration" and nothing else
+       is a control whose every state is the state it is already in. */
+    const { rerender } = bar({ onCalibrate: () => {} });
+    expect(screen.queryByLabelText(/^calibration$/i)).toBeNull();
+
+    rerender(
+      <RecordBar
+        rec={IDLE}
+        deviceId={undefined}
+        onDeviceChange={() => {}}
+        profiles={[PROFILE]}
+        profileId={undefined}
+        onProfileChange={() => {}}
+        appliesToTake
+        rereading={false}
+        leadLeft={null}
+        onCalibrate={() => {}}
+      />,
+    );
+    expect(screen.getByLabelText(/^calibration$/i)).toBeTruthy();
   });
 
   it("puts the way into calibrating beside the picker that needs it", () => {

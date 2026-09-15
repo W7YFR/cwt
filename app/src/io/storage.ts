@@ -387,6 +387,7 @@ export interface Prefs {
   advancedGrading?: boolean;
   showDownloads?: boolean;
   showHints?: boolean;
+  showChartControls?: boolean;
   showRuns?: "all" | "last";
   captionAll?: boolean;
   flashCard?: boolean;

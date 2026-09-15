@@ -213,3 +213,10 @@ export const SHOW_RUNS_HELP =
   "axis and can be read down a column as well as along a row. The last one " +
   "alone is the loop: send it, look at it, send it again, where the attempts " +
   "behind the one you just made are in the way rather than in the picture.";
+
+export const SHOW_CHART_CONTROLS_HELP =
+  "The row above the chart: the order the rows are in, the axis, which " +
+  "attempts are drawn, and the zoom. On by default. Turning it off is for " +
+  "when the chart is set the way you want it and the page should be nothing " +
+  "but chart \u2014 this cog stays either way, so there is always a way " +
+  "back.";

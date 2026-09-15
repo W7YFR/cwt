@@ -12,7 +12,7 @@ import { MIC_SOURCE } from "@/io/take";
 import { orderProfiles, type Profile } from "@/io/profiles";
 import type { AudioClip } from "@/types";
 import { fmtElapsed } from "./format";
-import { Cog, DevicePicker, LevelMeter, RecDot } from "./Record";
+import { DevicePicker, LevelMeter, RecDot } from "./Record";
 import { Wordmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 import { useRecorder } from "./useRecorder";
@@ -38,7 +38,6 @@ export interface LandingProps {
   profileId: string | undefined;
   onProfileChange(id: string | undefined): void;
   onCalibrate(): void;
-  onConfigure(): void;
   /** Open the review with nothing recorded in it — see useTake.reset. */
   onPractice(): void;
 }
@@ -68,7 +67,6 @@ export function Landing(props: LandingProps): React.ReactElement {
 
   return (
     <div className="landing">
-      <Cog onClick={props.onConfigure} />
       <Wordmark art={visitWordmark()} />
 
       <p className="lede">
@@ -290,7 +288,13 @@ function CalibrationStatus({
             ))}
           </select>
         )}
-        <button className={active ? "" : "primary"} onClick={onCalibrate}>
+        {/* An ordinary border, like every other button. Wearing the accent at
+            rest it had nowhere to go on hover — the color hover moves a border
+            TO was the color it was already — so the one button on this panel
+            was the one that did not answer the pointer. What marks it as the
+            thing to do is the dot and the line above it, which say so in
+            words. */}
+        <button onClick={onCalibrate}>
           {active ? "Recalibrate" : "Calibrate this microphone"}
         </button>
       </div>

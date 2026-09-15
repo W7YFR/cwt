@@ -280,6 +280,10 @@ export function App(): React.ReactElement {
         <Calibrate
           current={profile}
           deviceId={deviceId}
+          onConfigure={() => {
+            setError(null);
+            setConfiguring(true);
+          }}
           onDeviceChange={chooseDevice}
           onError={setError}
           onSaved={(saved) => {
@@ -324,10 +328,6 @@ export function App(): React.ReactElement {
           /* One control, two effects, both wanted: it is the calibration the
              next recording will be made under, and every recording already in
              the session is read again through it. */
-          onConfigure={() => {
-            setError(null);
-            setConfiguring(true);
-          }}
           onCalibrate={() => {
             setError(null);
             setCalibrating(true);
@@ -369,10 +369,6 @@ export function App(): React.ReactElement {
           onCalibrate={() => {
             setError(null);
             setCalibrating(true);
-          }}
-          onConfigure={() => {
-            setError(null);
-            setConfiguring(true);
           }}
           onPractice={() => {
             setError(null);

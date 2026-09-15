@@ -141,7 +141,7 @@ export function Scores({
           clearing are the same act. */}
       {onDrop && runOf && runOf.of > 1 && (
         <button
-          className="droprun"
+          className="iconbtn droprun"
           onClick={onDrop}
           data-testid="drop-run"
           aria-label={`Drop run ${runOf.at + 1}`}

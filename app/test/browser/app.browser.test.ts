@@ -515,28 +515,24 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(inner.top - outer.top).toBeCloseTo(outer.bottom - rule - inner.bottom, 0);
   });
 
-  it("has the same way into configuration from either screen", async () => {
-    /* A control that moves between screens is one somebody has to look for
-       twice, so it is the same component in the same place on both. */
+  it("ends the corner button on the page's own right margin", async () => {
+    /* It is out of flow, so nothing lays it out against the things it sits
+       among — and a few pixels inside or outside the margin every other row
+       keeps reads as a mistake rather than as a difference. Checked against
+       the drop button in the band below it, which is the nearest thing to it
+       on screen and is laid out by the ordinary rules. */
     await served();
     await mount();
-    const onReview = container
-      .querySelector<HTMLElement>("[data-testid='cog']")!
+    const corner = container
+      .querySelector<HTMLElement>("[data-testid='panel-toggle']")!
       .getBoundingClientRect();
-
-    act(() => root!.unmount());
-    root = null;
-    container.remove();
-    container = document.createElement("div");
-    document.body.appendChild(container);
-
-    await mount();
-    const onLanding = container
-      .querySelector<HTMLElement>("[data-testid='cog']")!
+    /* Against the scores' own content box rather than the band around it: the
+       band's edge is the window, and what the corner has to line up with is
+       where the content inside it ends. */
+    const content = container
+      .querySelector<HTMLElement>(".scoresrow .scores")!
       .getBoundingClientRect();
-
-    expect(onLanding.top).toBeCloseTo(onReview.top, 0);
-    expect(onLanding.right).toBeCloseTo(onReview.right, 0);
+    expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
   it("signs every screen", async () => {
@@ -573,7 +569,9 @@ const showDownloads = () => tickSetting("show-downloads");
 
     for (const row of [".controls", ".viewcontrols"]) {
       const groups = [...container.querySelectorAll<HTMLElement>(`${row} > .group`)];
-      expect(groups.length, row).toBeGreaterThan(2);
+      // Two is a row: with one attempt and no stack, the chart's row is the
+      // axis and the zoom and nothing else.
+      expect(groups.length, row).toBeGreaterThanOrEqual(2);
 
       const lines = new Map<number, number[]>();
       for (const g of groups) {

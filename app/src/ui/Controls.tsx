@@ -23,6 +23,7 @@ import {
   FLASH_CUE_HELP,
   FLASH_LEAD_HELP,
   RUN_SCORES_HELP,
+  SHOW_CHART_CONTROLS_HELP,
   SHOW_DOWNLOADS_HELP,
   SHOW_HINTS_HELP,
   SHOW_RUNS_HELP,
@@ -64,29 +65,39 @@ export function Controls(props: ControlsProps): React.ReactElement {
   return (
     <section className="controls">
       <div className="group transport">
-        {/* The icon lives in its own fixed-width span so swapping play/stop
-            cannot change the button's width and shift the row. */}
-        <button
-          className="play"
-          onClick={props.onPlayYou}
-          disabled={!props.canPlayYou}
-          aria-pressed={props.playing === "you"}
-        >
-          <i className="ico">{props.playing === "you" ? "■" : "▶"}</i>
-          Your sending
-        </button>
-        <button
-          className="play alt"
-          onClick={props.onPlayTarget}
-          aria-pressed={props.playing === "tgt"}
-        >
-          <i className="ico">{props.playing === "tgt" ? "■" : "▶"}</i>
-          Target
-        </button>
-        <button onClick={props.onStop} disabled={!props.playing} aria-label="Stop">
-          ■
-        </button>
-        <span className="clock">{fmtSeconds(props.clock ?? 0)}</span>
+        {/* Captioned like every other group. Without one it was the only thing
+            on the row with nothing above it, and it had to be dropped onto the
+            control band by hand to line up with the rest. */}
+        <span className="caption">Audio</span>
+        {/* The controls in a row of their own inside the group, so the caption
+            can sit above them. The group is a column of two bands like every
+            other; what makes this one different is that its control band holds
+            four things rather than one. */}
+        <div className="transportrow">
+          {/* The icon lives in its own fixed-width span so swapping play/stop
+              cannot change the button's width and shift the row. */}
+          <button
+            className="play"
+            onClick={props.onPlayYou}
+            disabled={!props.canPlayYou}
+            aria-pressed={props.playing === "you"}
+          >
+            <i className="ico">{props.playing === "you" ? "■" : "▶"}</i>
+            Your sending
+          </button>
+          <button
+            className="play alt"
+            onClick={props.onPlayTarget}
+            aria-pressed={props.playing === "tgt"}
+          >
+            <i className="ico">{props.playing === "tgt" ? "■" : "▶"}</i>
+            Target
+          </button>
+          <button onClick={props.onStop} disabled={!props.playing} aria-label="Stop">
+            ■
+          </button>
+          <span className="clock">{fmtSeconds(props.clock ?? 0)}</span>
+        </div>
       </div>
 
       <div className="group">
@@ -253,6 +264,15 @@ function NumberField({
         min={min}
         max={max}
         step={step}
+        /* Sized by the widest number it can hold, so a field in seconds and a
+           field in milliseconds are not the same box with three empty digits
+           in one of them.
+           The digits in `ch`, and everything that is not a digit in `em`:
+           border-box means the width has to cover the padding and the border,
+           and the browser draws its own spinner inside the field on top of
+           that. Counted in characters alone, the allowance came out smaller
+           than the furniture and the number itself had nowhere to go. */
+        style={{ width: `calc(${String(max).length}ch + 3em)` }}
         value={text ?? String(value)}
         aria-label={`${name} in ${unit === "s" ? "seconds" : "milliseconds"}`}
         onChange={(e) => {
@@ -269,14 +289,17 @@ function NumberField({
   );
 }
 
-export interface ViewControlsProps {
+export interface ChartSettingsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
-  onFit(): void;
   /** How many attempts are in the session. With one there is nothing to
    *  order, and a control for arranging a single row is a control for
    *  nothing. */
   runs: number;
+}
+
+export interface ViewControlsProps extends ChartSettingsProps {
+  onFit(): void;
 }
 
 /** How the chart is drawn, next to the chart.
@@ -287,114 +310,134 @@ export interface ViewControlsProps {
  * exactly where it was. Mixed into one row of nine controls, the two kinds
  * were indistinguishable, and a zoom slider sitting beside a tolerance slider
  * implies they are the same sort of thing. */
-export function ViewControls(props: ViewControlsProps): React.ReactElement {
+export function ViewControls(props: ViewControlsProps): React.ReactElement | null {
   const { settings: s, onChange } = props;
-  /* Whether the rest of the settings are on show. Not a setting itself: it is
-     where you are looking rather than anything about the chart, and it has no
-     business outliving the page or riding along in a saved report. */
-  const [open, setOpen] = useState(false);
+  /* Gone entirely rather than emptied, so the chart moves up into the room the
+     row was taking. A section that renders nothing still holds its own margins,
+     and a strip of blank page above a chart reads as something that failed to
+     load. */
+  if (!s.showChartControls) return null;
   return (
     <section className="viewcontrols">
-      {props.runs > 1 && (
+        {props.runs > 1 && (
+          <div className="group">
+            <label htmlFor="run-sort" title={RUN_SORT_HELP}>
+              Sort
+            </label>
+            <select
+              id="run-sort"
+              value={s.runSort}
+              onChange={(e) => onChange({ runSort: e.target.value as RunSort })}
+            >
+              {RUN_SORTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="group">
-          <label htmlFor="run-sort" title={RUN_SORT_HELP}>
-            Sort
-          </label>
+          <label htmlFor="view">View</label>
           <select
-            id="run-sort"
-            value={s.runSort}
-            onChange={(e) => onChange({ runSort: e.target.value as RunSort })}
+            id="view"
+            value={s.view}
+            onChange={(e) => onChange({ view: e.target.value as ViewMode })}
           >
-            {RUN_SORTS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
+            <option value="per-char">Per character</option>
+            <option value="absolute">Absolute time</option>
+            <option value="overlay">Overlay</option>
           </select>
         </div>
-      )}
 
-      <div className="group">
-        <label htmlFor="view">View</label>
-        <select
-          id="view"
-          value={s.view}
-          onChange={(e) => onChange({ view: e.target.value as ViewMode })}
-        >
-          <option value="per-char">Per character</option>
-          <option value="absolute">Absolute time</option>
-          <option value="overlay">Overlay</option>
-        </select>
-      </div>
+        {/* Next to the axis, because it is the same kind of question: not what
+            is graded, but what is on screen to read. Only with a stack — with
+            one attempt "all" and "the last one" are the same row. */}
+        {props.runs > 1 && (
+          <div className="group">
+            <label htmlFor="show-runs" title={SHOW_RUNS_HELP}>
+              Show
+            </label>
+            <select
+              id="show-runs"
+              value={s.showRuns}
+              onChange={(e) =>
+                onChange({ showRuns: e.target.value as ReviewSettings["showRuns"] })
+              }
+            >
+              <option value="all">All runs</option>
+              <option value="last">Last run</option>
+            </select>
+          </div>
+        )}
 
-      {/* Next to the axis, because it is the same kind of question: not what
-          is graded, but what is on screen to read. Only with a stack — with
-          one attempt "all" and "the last one" are the same row. */}
-      {props.runs > 1 && (
         <div className="group">
-          <label htmlFor="show-runs" title={SHOW_RUNS_HELP}>
-            Show
+          <label htmlFor="zoom" title={ZOOM_HELP}>
+            Zoom <output id="zoom-out">{fmtPpu(s.ppu)}</output>
           </label>
-          <select
-            id="show-runs"
-            value={s.showRuns}
-            onChange={(e) =>
-              onChange({ showRuns: e.target.value as ReviewSettings["showRuns"] })
-            }
-          >
-            <option value="all">All runs</option>
-            <option value="last">Last run</option>
-          </select>
+          {/* The button is a sibling of the label, not inside it: a label may not
+              contain another labelable element. */}
+          <div className="sliderow">
+            <input
+              type="range"
+              id="zoom"
+              min={ZOOM_MIN}
+              max={ZOOM_MAX}
+              step={1}
+              value={s.ppu}
+              onChange={(e) => onChange({ ppu: Number(e.target.value) })}
+            />
+            <button
+              id="zoom-fit"
+              onClick={props.onFit}
+              title="Zoom so the session fills the width — what the chart does when it opens"
+            >
+              Fit
+            </button>
+          </div>
         </div>
-      )}
 
-      <div className="group">
-        <label htmlFor="zoom" title={ZOOM_HELP}>
-          Zoom <output id="zoom-out">{fmtPpu(s.ppu)}</output>
-        </label>
-        {/* The button is a sibling of the label, not inside it: a label may not
-            contain another labelable element. */}
-        <div className="sliderow">
-          <input
-            type="range"
-            id="zoom"
-            min={ZOOM_MIN}
-            max={ZOOM_MAX}
-            step={1}
-            value={s.ppu}
-            onChange={(e) => onChange({ ppu: Number(e.target.value) })}
-          />
-          <button
-            id="zoom-fit"
-            onClick={props.onFit}
-            title="Zoom so the session fills the width — what the chart does when it opens"
-          >
-            Fit
-          </button>
-        </div>
-      </div>
+    </section>
+  );
+}
 
-      {/* One way in to the rest, rather than eleven more controls on the line.
-          Zoom, the axis and the row order are adjusted while looking at the
-          chart and stay out; everything else is set once and left, and having
-          it all on show meant the row wrapped into three and the things you
-          reach for constantly moved every time a conditional checkbox
-          appeared. */}
-      <div className="group panels">
-        <button
-          className="viewcog"
-          data-testid="panel-toggle"
-          aria-pressed={open}
-          aria-controls="view-panel"
-          aria-label="More chart settings"
-          title="More chart settings"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span aria-hidden="true">⚙</span>
-        </button>
-      </div>
+/** The way in: the button in the corner of the header.
+ *
+ * In the header rather than on a row of controls, because every row of
+ * controls on this page can be switched off — and a way in that goes away with
+ * the thing it switched off is a setting nobody can undo. The corner is also
+ * the one place that does not move as the page fills and empties. */
+export function ChartSettingsButton({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle(): void;
+}): React.ReactElement {
+  return (
+    <button
+      className="iconbtn cornerbtn"
+      data-testid="panel-toggle"
+      aria-pressed={open}
+      aria-controls="view-panel"
+      aria-label="Chart settings"
+      title="Chart settings"
+      onClick={onToggle}
+    >
+      <span aria-hidden="true">⚙</span>
+    </button>
+  );
+}
 
-      {open && (
+/** Everything the rows have no space for, in a band under the header.
+ *
+ * Three groups, named: how the chart is drawn, what else is on the page, and
+ * what runs while you send. Without the names it is one heap of a dozen
+ * checkboxes, and half of them do nothing to the chart in front of you. */
+export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElement {
+  const { settings: s, onChange } = props;
+  return (
         <div className="viewpanel" id="view-panel">
           <div className="panelrow" data-panel="display">
             <span className="uplabel">Chart display</span>
@@ -558,6 +601,18 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
             <span className="uplabel">Also show</span>
             <div className="panelgroups">
               <div className="group">
+                <label className="check" title={SHOW_CHART_CONTROLS_HELP}>
+                  <input
+                    type="checkbox"
+                    id="show-chart-controls"
+                    checked={s.showChartControls}
+                    onChange={(e) => onChange({ showChartControls: e.target.checked })}
+                  />{" "}
+                  Chart controls
+                </label>
+              </div>
+
+              <div className="group">
                 <label className="check" title={SHOW_DOWNLOADS_HELP}>
                   <input
                     type="checkbox"
@@ -595,8 +650,5 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
             </div>
           </div>
         </div>
-      )}
-
-    </section>
   );
 }

@@ -292,6 +292,13 @@ export interface ReviewSettings {
    * Only ever drawn with a stack on screen — with one attempt the band under
    * the chart is already its score. */
   runScores: boolean;
+  /** Keep the row of chart controls on screen: the row order, the axis, which
+   *  attempts are drawn, and the zoom.
+   *
+   * On by default. Off is for when the chart is set the way you want it and
+   * every pixel of the page should be the chart — the cog stays whatever this
+   * says, or there would be no way back. */
+  showChartControls: boolean;
   /** Show the notes under the chart: what clicking and scrolling do, and
    *  which keys work.
    *
