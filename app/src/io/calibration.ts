@@ -23,6 +23,7 @@ import {
   assessSetup,
   calibrationIsUsable,
   correctsNothing,
+  drillsAgree,
   measureCalibration,
   pairDrills,
   segmentsFrom,
@@ -178,6 +179,13 @@ export interface CalibrationRun {
    * profile that corrects nothing is worth knowing about and not worth
    * storing. See `correctsNothing`. */
   readonly nothingToCorrect: boolean;
+  /** Whether the two drills measured the same thing.
+   *
+   * What separates the two ways of having no correction to store: elements
+   * arriving the length they were sent, or a measurement too scattered to say
+   * anything. Always true on a refusal, where there is no measurement to
+   * scatter. */
+  readonly drillsAgreed: boolean;
   /** What went wrong, as a code. Null when nothing did. */
   readonly reason: CalibrationProblem | null;
   /** The same thing in the operator's terms. */
@@ -334,6 +342,7 @@ export function analyzeCalibration(
     quality,
     usable: false,
     nothingToCorrect: false,
+    drillsAgreed: true,
     reason,
     problem,
     advice,
@@ -400,18 +409,31 @@ export function analyzeCalibration(
   }
 
   const nothing = correctsNothing(calibration);
+  /* Two ways to arrive at no correction, and they are opposite findings. The
+     drills agreeing on nothing is the best result the wizard has; the drills
+     disagreeing so widely that no number can be taken from them is a reason to
+     record it again. Told apart by how far apart the drills landed — see
+     drillsAgree. */
+  const agreed = drillsAgree(calibration);
   return {
     sections,
     calibration,
     quality,
     usable: true,
     nothingToCorrect: nothing,
+    drillsAgreed: agreed,
     reason: null,
     problem: null,
-    advice: nothing
-      ? "Your keying is arriving at the length it was sent — nothing is being " +
-        "added to your elements, so there is nothing to take back off. Record " +
-        "as you are."
+    /* The setup advice in every case, including the one where there is no
+       correction to make: a path can add nothing to the length of an element
+       and still have a tail long enough to put a ceiling on your speed, and
+       those are the two halves of the same question. Saying only "nothing to
+       correct" there left somebody limited to 14 wpm with nothing on screen
+       about it. What the drills found is the headline's business. */
+    advice: nothing && !agreed
+      ? "Record it again, holding each paddle down for the whole drill and " +
+        "leaving the keyer's speed alone between the two. " +
+        setupAdvice(quality)
       : setupAdvice(quality),
     readback: readbackOf(samples, rate, sections, calibration),
   };

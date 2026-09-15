@@ -18,11 +18,12 @@ import { existsSync } from "node:fs";
 import { DATA_DIR } from "../oracle-fs";
 import { normalizePeak, readWav } from "../wav";
 import { DRILLS, analyzeCalibration, playablesOf } from "@/io/calibration";
-import { correctsNothing } from "@/dsp";
+import { correctsNothing, drillsAgree } from "@/dsp";
 import {
   PROBE,
   assessSetup,
   measureCalibration,
+  setupAdvice,
   pairDrills,
   segmentsFrom,
   splitSections,
@@ -178,15 +179,42 @@ describe.skipIf(!HAVE)("a calibration recording", () => {
       );
     });
 
-    it("says so in its advice rather than describing a correction", () => {
+    it("still says what the path does, having found nothing to take off it", () => {
+      /* A path can add nothing to the length of an element and still have a
+         tail long enough to put a ceiling on the speed it can carry — two
+         halves of the same question. Answering only the first left somebody
+         limited to 14 wpm with nothing on screen about it. */
       const wav = load(`${DATA_DIR}/ft710-close/ft710-sweep-close-virtual.wav`);
       const run = analyzeCalibration(wav.samples, wav.rate, WPM);
-      // Not the wording — that its advice is its own, and not the one a
-      // measured correction gets.
+      expect(run.advice).toBe(setupAdvice(run.quality));
+    });
+
+    it("tells a path that adds nothing apart from a measurement that says nothing", () => {
+      /* Both come back with no correction to store and they are opposite
+         findings: one is the best result there is, the other is a reason to
+         record it again. Told apart by whether the two drills landed in the
+         same place. */
+      const clean = load(`${DATA_DIR}/ft710-close/ft710-sweep-close-virtual.wav`);
+      const cleanRun = analyzeCalibration(clean.samples, clean.rate, WPM);
+      expect(cleanRun.nothingToCorrect).toBe(true);
+      expect(cleanRun.drillsAgreed).toBe(true);
+
       const mic = load(CLOSE);
-      expect(run.advice).not.toBe(
-        analyzeCalibration(mic.samples, mic.rate, WPM).advice,
-      );
+      expect(analyzeCalibration(mic.samples, mic.rate, WPM).drillsAgreed).toBe(true);
+
+      /* Scattered: no offset to speak of, and drills a fifth of a dit apart.
+         `correctsNothing` cannot tell this from the loopback above — that is
+         the whole reason for the second question. */
+      const scattered = { wpm: WPM, elements: 37, releaseOffsetSec: 0, spreadSec: 0.0154 };
+      expect(correctsNothing(scattered)).toBe(true);
+      expect(drillsAgree(scattered)).toBe(false);
+    });
+
+    it("scales what counts as agreement with the speed it was keyed at", () => {
+      // A twentieth of a dit, so the same disagreement is fatal slowly and
+      // worse quickly rather than being a fixed number of milliseconds.
+      expect(drillsAgree({ wpm: 15, elements: 40, releaseOffsetSec: 0, spreadSec: 0.003 })).toBe(true);
+      expect(drillsAgree({ wpm: 30, elements: 40, releaseOffsetSec: 0, spreadSec: 0.003 })).toBe(false);
     });
 
     it("treats an offset inside the noise as nothing, whatever its size", () => {

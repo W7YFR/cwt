@@ -577,12 +577,54 @@ interface ResultProps {
   onClose(): void;
 }
 
+/* The setup verdict names what the path does to the END of an element — how
+   long a release takes to fall quiet — which is a different question from
+   whether a correction was measured. "Clean" is renamed here because on this
+   screen "nothing to correct" is the headline's job and two of them side by
+   side read as one finding said twice. */
 const VERDICT_LABEL: Record<string, string> = {
-  clean: "Nothing to correct",
+  clean: "No tail at all",
   good: "Good",
   marginal: "Marginal",
   unusable: "Not usable",
   unknown: "Could not tell",
+};
+
+/** What came of the recording, as one of four answers.
+ *
+ * The screen used to carry this across four places — a headline, a verdict
+ * word, a paragraph at the bottom and which buttons were on offer — and the
+ * question it is actually asked is "did that work". So it is decided once,
+ * here, and everything below says the same thing. */
+export type Outcome = "failed" | "noisy" | "clean" | "measured";
+
+/** Which of the four a run is.
+ *
+ * Exported because it is the whole of the screen's logic and the only part of
+ * it worth pinning: two of the four are reachable from the corpus and the
+ * other two are not, so the mapping is checked here rather than by finding a
+ * recording that misbehaves in the right way. */
+export function outcomeOf(run: CalibrationRun): Outcome {
+  if (!run.usable) return "failed";
+  if (run.calibration && !correctsNothing(run.calibration)) return "measured";
+  return run.drillsAgreed ? "clean" : "noisy";
+}
+
+const HEADLINE: Record<Outcome, string> = {
+  failed: "Couldn't measure it",
+  noisy: "The drills didn't agree",
+  clean: "Nothing to correct",
+  measured: "Measured",
+};
+
+/** Whether this outcome is one to be pleased about, for the color. Three
+ *  states rather than two: nothing to correct is as good as it gets, and a
+ *  measurement you cannot use is not the same as one that failed. */
+const TONE: Record<Outcome, "ok" | "warn" | "bad"> = {
+  failed: "bad",
+  noisy: "warn",
+  clean: "ok",
+  measured: "ok",
 };
 
 /** Hearing the recording back, a section at a time.
@@ -766,41 +808,57 @@ function Result(props: ResultProps): React.ReactElement {
      that deliberately dialing one in on the Advanced panel turns saving back
      on — and dialing it back to nothing turns it off again. */
   const nothing = !run.calibration || correctsNothing(run.calibration);
-  const canSave = run.usable && !nothing;
-  /* "Great" rather than "Good" when the drills found nothing to correct: the
-     tail verdict describes what the setup does to a release, and this says
-     the elements are arriving at the length they were sent, which is more
-     than the tail alone can tell you. Only where the tail agrees — a setup
-     the decay calls marginal is not great whatever the drills say. */
-  const verdictLabel =
-    nothing && (run.quality.verdict === "clean" || run.quality.verdict === "good")
-      ? "Great"
-      : (VERDICT_LABEL[run.quality.verdict] ?? run.quality.verdict);
+  const outcome = outcomeOf(run);
+  const canSave = outcome === "measured";
+  const verdictLabel = VERDICT_LABEL[run.quality.verdict] ?? run.quality.verdict;
+  /* One sentence saying what the headline means in this recording's own
+     numbers, because the headline alone is a category and the numbers below
+     are evidence without a claim attached to them. */
+  const meaning =
+    outcome === "failed"
+      ? run.problem
+      : outcome === "measured"
+        ? "There is a correction here worth storing. Saved, every recording from this setup is read through it."
+        : outcome === "clean"
+          ? "Your elements are arriving the length they were sent, so there is nothing to take back off."
+          : `The two drills landed ${ms(run.calibration!.spreadSec)} apart, so there is no single number to take from them.`;
 
   return (
     <div className="calibrate result">
-      <h2
+      {/* One block, at the top, answering the only question anybody brings to
+          this screen: did that work, and what do I do now. What it concluded,
+          what that means in this recording's numbers, and what to do about it
+          — in that order, and nowhere else on the page. Everything below is
+          evidence for it rather than more findings to weigh. */}
+      <div
+        className="outcome"
         data-testid="outcome"
+        data-outcome={outcome}
+        data-tone={TONE[outcome]}
+        // Kept alongside: "did it measure anything" and "is there anything to
+        // store" are still the two facts the rest of the screen branches on.
         data-usable={String(run.usable)}
         data-nothing={String(nothing && run.usable)}
       >
-        {!run.usable
-          ? "Something's not working"
-          : nothing
-            ? "Nothing to correct"
-            : "Measured"}
-      </h2>
+        <h2>{HEADLINE[outcome]}</h2>
+        {meaning && (
+          <p className="meaning" role={outcome === "failed" ? "alert" : undefined}
+             data-reason={run.reason ?? ""}>
+            {meaning}
+          </p>
+        )}
+        <p className="lede advice" data-testid="advice">{run.advice}</p>
+      </div>
 
-      {run.problem && (
-        <p className="banner error" role="alert" data-reason={run.reason ?? ""}>
-          {run.problem}
-        </p>
-      )}
-
+      {/* Captioned, because these are about the path between your keyer and the
+          decoder — what it does to the end of an element — and unlabeled under
+          a headline about the calibration they read as a second opinion on it.
+          A setup can be marginal and still have nothing to correct. */}
+      <span className="uplabel">What your setup does</span>
       <dl className="readout">
         {told && (
           <div>
-            <dt>Setup</dt>
+            <dt>Verdict</dt>
             <dd
               className={`verdict ${run.quality.verdict}`}
               data-testid="verdict"
@@ -818,7 +876,10 @@ function Result(props: ResultProps): React.ReactElement {
         )}
         {Number.isFinite(run.quality.maxWpm) && (
           <div>
-            <dt title={CAL_MAXWPM_HELP}>Max WPM</dt>
+            {/* "Good to 18 wpm" is the sentence somebody wants; "Max WPM 18"
+                is the same number filed under a heading they have to turn back
+                into one. */}
+            <dt title={CAL_MAXWPM_HELP}>Good to</dt>
             <dd>{run.quality.maxWpm} wpm</dd>
           </div>
         )}
@@ -882,8 +943,6 @@ function Result(props: ResultProps): React.ReactElement {
           onChange={props.onOffsetSec}
         />
       )}
-
-      <p className="lede advice">{run.advice}</p>
 
       {canSave ? (
         <>

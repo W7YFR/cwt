@@ -185,3 +185,41 @@ export function calibrationIsUsable(c: Calibration): boolean {
 export function correctsNothing(c: Calibration): boolean {
   return !(c.releaseOffsetSec > c.spreadSec);
 }
+
+/** How closely the drills have to agree for their silence to be a finding.
+ *
+ * A twentieth of a dit at the speed they were keyed at. */
+const AGREEMENT_FRAC = 0.05;
+
+/** Did the two drills measure the same thing?
+ *
+ * `correctsNothing` asks whether an offset is bigger than the noise it came
+ * from, and answers no in two opposite situations: a path that adds nothing,
+ * and a measurement too scattered to say anything at all. Both come back with
+ * no correction to store, and they want opposite words — one is the best
+ * result there is, the other is a reason to record it again.
+ *
+ * This separates them, and the corpus separates on it by more than an order of
+ * magnitude either side:
+ *
+ * | setup                          | drills disagree by | of a dit |
+ * |--------------------------------|--------------------|----------|
+ * | loopback, ft710 sweep          | 0.63 ms            | 0.008    |
+ * | loopback, k3ng drills          | 0.50 ms            | 0.006    |
+ * | webcam a few inches away       | 1.00 ms            | 0.013    |
+ * | webcam at four feet            | 0.38 ms            | 0.005    |
+ * | a paddle that did not stay put | 15.4 ms            | 0.19     |
+ *
+ * Note that the far webcam agrees with itself as closely as any of them: a bad
+ * room is not the same thing as a scattered measurement, and it is the drills
+ * not matching each other — a paddle released mid-drill, a keyer changing
+ * speed, one drill sent at the wrong speed — that this is about. Which is why
+ * the answer is "record it again" rather than "move the microphone".
+ *
+ * Looser than `calibrationIsUsable`'s quarter of a dit, and deliberately: that
+ * one decides whether a correction may be stored, and this one decides whether
+ * the absence of a correction may be reported as good news. */
+export function drillsAgree(c: Calibration): boolean {
+  if (!(c.wpm > 0)) return false;
+  return c.spreadSec <= AGREEMENT_FRAC * (1.2 / c.wpm);
+}

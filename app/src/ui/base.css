@@ -1139,6 +1139,41 @@ button.primary { border-color: var(--you); color: var(--ink); }
 .calibrate .upnext .lede { font-size: 14px; }
 .calibrate .meter { width: min(60vw, 320px); }
 
+/* The answer, in one block, at the top.
+ *
+ * What it concluded, what that means in this recording's numbers, and what to
+ * do — read in that order without moving your eyes anywhere else. The screen
+ * carried those three across a headline, a verdict word, a paragraph at the
+ * bottom and a choice of buttons, which is four places to look before knowing
+ * whether the thing worked. */
+.calibrate .outcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 56ch;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  /* The tone reads off the top edge rather than off the text: a whole block of
+     colored words is harder to read than black ones, and a rule above the
+     headline is visible before the headline has been. */
+  border-top: 3px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.calibrate .outcome[data-tone="ok"] { border-top-color: var(--ok); }
+.calibrate .outcome[data-tone="warn"] { border-top-color: var(--warn); }
+.calibrate .outcome[data-tone="bad"] { border-top-color: var(--bad); }
+/* The claim, set as the sentence the headline is short for. Full-strength ink
+   against the advice below it, which is the next thing to do rather than the
+   finding itself. */
+.calibrate .outcome .meaning {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.calibrate .outcome .advice { margin: 0; }
+
 .calibrate .readout {
   display: flex;
   flex-wrap: wrap;
@@ -1154,6 +1189,17 @@ button.primary { border-color: var(--you); color: var(--ink); }
   color: var(--ink-dim);
 }
 .calibrate .readout dd { margin: 0; font-size: 15px; }
+
+/* The caption over the setup figures. Same treatment the other groups on this
+   screen get, so "what your setup does" and "what I heard" read as two shelves
+   of the same cabinet. */
+.calibrate > .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+  margin-bottom: -6px;
+}
 
 .verdict.clean, .verdict.good { color: var(--ok); }
 .verdict.marginal { color: var(--warn); }

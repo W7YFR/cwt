@@ -25,7 +25,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BOUNDS, Calibrate, STEPS, TOTAL_SEC } from "@/ui/Calibrate";
+import { BOUNDS, Calibrate, STEPS, TOTAL_SEC, outcomeOf } from "@/ui/Calibrate";
+import type { CalibrationRun } from "@/io/calibration";
 import { DRILLS, cueCount } from "@/io/calibration";
 import { loadProfiles, activeProfile } from "@/io/profiles";
 import { DATA_DIR } from "../oracle-fs";
@@ -772,6 +773,77 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
 
       await user.click(screen.getByRole("button", { name: /save and use it/i }));
       expect(loadProfiles()[0]!.releaseOffsetSec).toBeCloseTo(0.006, 6);
+    });
+  });
+
+  describe("saying whether it worked", () => {
+    /* One question is brought to this screen: did that work, and what do I do
+       now. The answer used to be spread across a headline, a verdict word, a
+       paragraph at the bottom and which buttons were on offer — four places to
+       look, two of which could disagree. */
+    const runLike = (over: Partial<CalibrationRun>): CalibrationRun =>
+      ({
+        sections: [],
+        calibration: { wpm: 15, elements: 40, releaseOffsetSec: 0, spreadSec: 0.0002 },
+        quality: { verdict: "good", decaySec: 0.01, maxWpm: 30 },
+        usable: true,
+        nothingToCorrect: true,
+        drillsAgreed: true,
+        reason: null,
+        problem: null,
+        advice: "",
+        readback: null,
+        ...over,
+      }) as CalibrationRun;
+
+    it("tells the four answers apart", () => {
+      expect(outcomeOf(runLike({ usable: false, calibration: null }))).toBe("failed");
+      // A correction bigger than the noise it came from: something to store.
+      expect(
+        outcomeOf(
+          runLike({
+            calibration: { wpm: 15, elements: 40, releaseOffsetSec: 0.0028, spreadSec: 0.001 },
+          }),
+        ),
+      ).toBe("measured");
+      // Nothing to store, and the two reasons for that are opposite findings.
+      expect(outcomeOf(runLike({ drillsAgreed: true }))).toBe("clean");
+      expect(outcomeOf(runLike({ drillsAgreed: false }))).toBe("noisy");
+    });
+
+    it("puts what it concluded, what it means and what to do in one block", async () => {
+      const user = userEvent.setup();
+      stop.mockImplementation(() => Promise.resolve(clip(LOOPBACK)));
+      renderWizard();
+      await begin(user);
+      await runThrough();
+
+      const outcome = await screen.findByTestId("outcome");
+      expect(outcome.dataset.outcome).toBe("clean");
+      // Not a failure, and the block says which by its tone as well as its
+      // words — read before the words are.
+      expect(outcome.dataset.tone).toBe("ok");
+      // All three live together rather than at opposite ends of the page.
+      expect(outcome.querySelector("h2")!.textContent).not.toBe("");
+      expect(outcome.querySelector(".meaning")!.textContent).not.toBe("");
+      expect(outcome).toContainElement(screen.getByTestId("advice"));
+    });
+
+    it("still says what the path does when there is nothing to take off it", async () => {
+      /* The gap this closes: a setup can add nothing to the length of an
+         element and still have a tail that caps the speed it carries. Told
+         only "nothing to correct", somebody stays at a ceiling nobody
+         mentioned. */
+      const user = userEvent.setup();
+      stop.mockImplementation(() => Promise.resolve(clip(LOOPBACK)));
+      renderWizard();
+      await begin(user);
+      await runThrough();
+      await screen.findByTestId("outcome");
+
+      // The advice is the setup's, not a restatement of the headline.
+      expect(screen.getByTestId("advice").textContent).not.toBe("");
+      expect(screen.getByTestId("verdict")).toBeTruthy();
     });
   });
 
