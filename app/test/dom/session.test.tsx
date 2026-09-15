@@ -76,6 +76,43 @@ describe("a practice session", () => {
     expect(targets[0]).toBe(targets[1]);
   });
 
+  it("re-grades every attempt when the speed or the tolerance changes", () => {
+    /* A setting is about the session, not about the row you happen to be
+       reading. Applied to one run and not the rest, the rows stop being
+       comparable — which is the only reason to stack them. */
+    const { result } = renderHook(() => useTake());
+    record(result, SLOPPY, "r1");
+    record(result, CLEAN, "r2");
+    // The first run, so the second is one nobody is looking at.
+    act(() => result.current.selectRun(0));
+
+    act(() => result.current.setSettings({ charWpm: 20, farnsworthWpm: 20, tolerance: 0.3 }));
+    const before = result.current.reviews.map((r) => ({
+      unit: r.ref.unitSec,
+      within: r.analysis.withinTolFrac,
+    }));
+
+    act(() => result.current.setSettings({ charWpm: 28, farnsworthWpm: 14 }));
+    const speeds = result.current.reviews;
+    for (const [i, r] of speeds.entries()) {
+      expect(r.ref.charWpm, `run ${i + 1}`).toBe(28);
+      expect(r.ref.farnsworthWpm, `run ${i + 1}`).toBe(14);
+      expect(r.ref.unitSec, `run ${i + 1}`).not.toBe(before[i]!.unit);
+    }
+
+    act(() => result.current.setSettings({ tolerance: 0.05 }));
+    for (const [i, r] of result.current.reviews.entries()) {
+      // A tighter window cannot let more through than a loose one did.
+      expect(r.analysis.withinTolFrac, `run ${i + 1}`).toBeLessThanOrEqual(
+        before[i]!.within,
+      );
+    }
+    // And it moved for the run nobody selected, not only for the one on screen.
+    expect(result.current.reviews[1]!.analysis.withinTolFrac).toBeLessThan(
+      before[1]!.within,
+    );
+  });
+
   it("reads whichever attempt is picked", () => {
     const { result } = renderHook(() => useTake());
     record(result, SLOPPY, "r1");

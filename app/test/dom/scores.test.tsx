@@ -39,9 +39,11 @@ describe("dropping a run from the scores", () => {
 
   it("names the attempt it will throw away", () => {
     /* Counted the way the chart counts, which is the order it was recorded in
-       — so the button and the row it refers to cannot disagree. */
+       — so the button and the row it refers to cannot disagree. In its name
+       rather than its text: the button is an icon, and the name is what it is
+       called for anyone who cannot see one. */
     band({ runOf: { at: 2, of: 4 } });
-    expect(screen.getByTestId("drop-run").textContent).toContain("3");
+    expect(screen.getByTestId("drop-run").getAttribute("aria-label")).toContain("3");
   });
 
   it("throws it away when asked", () => {

@@ -13,8 +13,9 @@
  * assertions.
  *
  * The sequence is driven by the recorder's clock, which is the only way it can
- * be driven: there is no button that advances a step, because every drill is
- * required. So the mocked recorder's level callback is held onto and the time
+ * be driven: the drills are timed rather than clicked through, so there is no
+ * button that advances a step. The mocked recorder's level callback is held
+ * onto and the time
  * is fed in, which is exactly what the real one does a few times a second.
  * Nothing here schedules anything of its own — the boundaries come from the
  * step list, so the drills can be re-timed without touching this file.
@@ -24,7 +25,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BOUNDS, Calibrate, STEPS, TOTAL_SEC } from "@/ui/Calibrate";
+import { BOUNDS, Calibrate, STEPS, TOTAL_SEC, outcomeOf } from "@/ui/Calibrate";
+import type { CalibrationRun } from "@/io/calibration";
 import { DRILLS, cueCount } from "@/io/calibration";
 import { loadProfiles, activeProfile } from "@/io/profiles";
 import { DATA_DIR } from "../oracle-fs";
@@ -138,6 +140,7 @@ function renderWizard(over: Partial<React.ComponentProps<typeof Calibrate>> = {}
     onError: vi.fn(),
     onSaved: vi.fn(),
     onClose: vi.fn(),
+    onConfigure: vi.fn(),
     ...over,
   };
   return { ...render(<Calibrate {...props} />), props };
@@ -420,6 +423,35 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     expect(screen.getByTestId("upnext").dataset.step).toBe(STEPS[1]!.key);
   });
 
+  it("lets you end the closing message early, and only that one", async () => {
+    /* The drills before it are each a measurement or the thing a measurement
+       is checked against, so cutting one short would produce a refusal rather
+       than a shorter answer. The message feeds no measurement — it is where
+       you watch the thing work — so there is nothing to be short of once you
+       have run out of things to send. */
+    const user = userEvent.setup();
+    renderWizard();
+    await begin(user);
+    const offered = () => screen.queryByTestId("finish-early") !== null;
+    expect(offered(), "before anything has been measured").toBe(false);
+
+    for (const at of BOUNDS.slice(0, -2)) {
+      await clockTo(at);
+      expect(offered(), `at ${at}s`).toBe(false);
+    }
+
+    // The last step, which is the closing message.
+    await clockTo(BOUNDS[BOUNDS.length - 2]!);
+    expect(screen.getByTestId("stepcount").dataset.step).toBe(String(DRILLS.length));
+    expect(offered()).toBe(true);
+
+    await user.click(screen.getByTestId("finish-early"));
+    // Ended, not abandoned: what was recorded goes off to be measured.
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("outcome")).not.toBeNull();
+  });
+
   it("restarts from the lead-in, keeping the device open", async () => {
     const user = userEvent.setup();
     renderWizard();
@@ -453,12 +485,16 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
 
     for (let i = 0; i < STEPS.length; i++) {
       const step = STEPS[i]!;
-      /* A rest is always "hold off". An uncued drill is always "send". The
-         cued one opens on "hold off" too — there is a cue to wait for — and
-         flips on the beat, which is the whole reason it exists. */
-      const want = step.rest || step.cueSec ? "waiting" : "sending";
+      // A rest is always "hold off". A drill is always "send" the moment it
+      // begins — the cued one included, because its first cue is the drill
+      // beginning.
+      const want = step.rest ? "waiting" : "sending";
       expect(state(), step.key).toBe(want);
       if (step.cueSec) {
+        // And back to holding off between beats, which is the whole reason it
+        // alternates rather than inventing a third thing.
+        await clockTo(BOUNDS[i - 1]! + step.cueSec * 0.6);
+        expect(state(), `${step.key} between beats`).toBe("waiting");
         await clockTo(BOUNDS[i - 1]! + step.cueSec);
         expect(state(), `${step.key} on the beat`).toBe("sending");
       }
@@ -479,33 +515,51 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     const user = userEvent.setup();
     renderWizard();
     await begin(user);
-    await clockTo(at);
 
-    // Before the first call there is something to wait for, not a cue already
-    // missed by the time it has been read.
-    expect(screen.getByTestId("cue").dataset.cue).toBe("wait");
+    /* The rest in front of it is the count into the first dit, and says so.
+       It is the same wait either way — the drill just does not spend an
+       interval of its own repeating it. */
+    await clockTo(at - 1);
+    expect(screen.getByTestId("countdown").dataset.state).toBe("waiting");
+    expect(screen.getByTestId("countdown").querySelector(".cdlabel")!.textContent)
+      .toMatch(/dit/i);
 
     const calls = cueCount(drill);
     for (let n = 1; n <= calls; n++) {
-      await clockTo(at + n * every);
+      // The first call is the drill beginning, so the nth lands n-1 intervals
+      // in rather than n.
+      await clockTo(at + (n - 1) * every);
       const cue = screen.getByTestId("cue");
       expect(cue.dataset.cue, `cue ${n}`).toBe("now");
-      expect(cue.dataset.fired).toBe(String(n));
+      expect(cue.dataset.fired, `cue ${n}`).toBe(String(n));
 
       // Between calls it goes back to counting toward the next one.
       if (n < calls) {
-        await clockTo(at + n * every + every * 0.6);
+        await clockTo(at + (n - 1) * every + every * 0.6);
         expect(screen.getByTestId("cue").dataset.cue, `between ${n}`).toBe("wait");
       }
     }
 
     /* After the last one the call stays up for the rest of the drill rather
        than reverting to a countdown for a dit that is never coming. That
-       trailing second is why the drill runs a second past its last cue: a cue
-       that vanishes as you act on it is one you are always slightly late
-       for. */
-    await clockTo(at + calls * every + (drill.seconds - calls * every) * 0.9);
+       trailing second is why the drill runs on past its last cue: a cue that
+       vanishes as you act on it is one you are always slightly late for. */
+    const last = (calls - 1) * every;
+    await clockTo(at + last + (drill.seconds - last) * 0.9);
     expect(screen.getByTestId("cue").dataset.cue).toBe("now");
+  });
+
+  it("fits another release into the isolated drill by starting on the first one", async () => {
+    /* The releases are what the setup verdict is measured from and three is
+       the minimum to judge anything, so the interval freed at the head of the
+       drill is worth a whole extra one. */
+    const drill = DRILLS.find((d) => d.cueSec)!;
+    const calls = cueCount(drill);
+    expect(calls).toBeGreaterThanOrEqual(3);
+    // Every cue inside the drill, and room left after the last for the dit to
+    // be sent and its tail measured.
+    expect((calls - 1) * drill.cueSec!).toBeLessThan(drill.seconds);
+    expect(drill.seconds - (calls - 1) * drill.cueSec!).toBeGreaterThanOrEqual(1);
   });
 
   it("shows the closing message drawn, raw and corrected", async () => {
@@ -529,7 +583,12 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     /* The drill asks for "anything you like", so nothing in the recording says
        what was meant. Without it the chart grades against its own decode,
        which still shows the lengths — with it, it shows them against what was
-       actually intended. */
+       actually intended.
+
+       Asked for, not assumed: the box opens empty even when the session behind
+       this screen is practicing something, because what goes into the drill is
+       decided at the paddle in the moment and a box that arrives filled in is
+       a claim about what was sent rather than a question about it. */
     localStorage.setItem(
       "cwt:prefs",
       JSON.stringify({ expected: "CQ DE W7YFR" }),
@@ -540,12 +599,9 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     await runThrough();
     await screen.findByTestId("outcome");
 
-    // Prefilled from the landing screen: somebody who has typed what they are
-    // practicing has almost certainly just sent it again.
     const box = screen.getByTestId("cal-expected") as HTMLInputElement;
-    expect(box.value).toBe("CQ DE W7YFR");
+    expect(box.value).toBe("");
 
-    await user.clear(box);
     await user.type(box, "w1aw");
     expect(screen.getByTestId("calpreview").dataset.expected).toBe("W1AW");
   });
@@ -719,6 +775,88 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
       await user.click(screen.getByRole("button", { name: /save and use it/i }));
       expect(loadProfiles()[0]!.releaseOffsetSec).toBeCloseTo(0.006, 6);
     });
+  });
+
+  describe("saying whether it worked", () => {
+    /* One question is brought to this screen: did that work, and what do I do
+       now. The answer used to be spread across a headline, a verdict word, a
+       paragraph at the bottom and which buttons were on offer — four places to
+       look, two of which could disagree. */
+    const runLike = (over: Partial<CalibrationRun>): CalibrationRun =>
+      ({
+        sections: [],
+        calibration: { wpm: 15, elements: 40, releaseOffsetSec: 0, spreadSec: 0.0002 },
+        quality: { verdict: "good", decaySec: 0.01, maxWpm: 30 },
+        usable: true,
+        nothingToCorrect: true,
+        drillsAgreed: true,
+        reason: null,
+        problem: null,
+        advice: "",
+        readback: null,
+        ...over,
+      }) as CalibrationRun;
+
+    it("tells the four answers apart", () => {
+      expect(outcomeOf(runLike({ usable: false, calibration: null }))).toBe("failed");
+      // A correction bigger than the noise it came from: something to store.
+      expect(
+        outcomeOf(
+          runLike({
+            calibration: { wpm: 15, elements: 40, releaseOffsetSec: 0.0028, spreadSec: 0.001 },
+          }),
+        ),
+      ).toBe("measured");
+      // Nothing to store, and the two reasons for that are opposite findings.
+      expect(outcomeOf(runLike({ drillsAgreed: true }))).toBe("clean");
+      expect(outcomeOf(runLike({ drillsAgreed: false }))).toBe("noisy");
+    });
+
+    it("puts what it concluded, what it means and what to do in one block", async () => {
+      const user = userEvent.setup();
+      stop.mockImplementation(() => Promise.resolve(clip(LOOPBACK)));
+      renderWizard();
+      await begin(user);
+      await runThrough();
+
+      const outcome = await screen.findByTestId("outcome");
+      expect(outcome.dataset.outcome).toBe("clean");
+      // Not a failure, and the block says which by its tone as well as its
+      // words — read before the words are.
+      expect(outcome.dataset.tone).toBe("ok");
+      // All three live together rather than at opposite ends of the page.
+      expect(outcome.querySelector("h2")!.textContent).not.toBe("");
+      expect(outcome.querySelector(".meaning")!.textContent).not.toBe("");
+      expect(outcome).toContainElement(screen.getByTestId("advice"));
+    });
+
+    it("still says what the path does when there is nothing to take off it", async () => {
+      /* The gap this closes: a setup can add nothing to the length of an
+         element and still have a tail that caps the speed it carries. Told
+         only "nothing to correct", somebody stays at a ceiling nobody
+         mentioned. */
+      const user = userEvent.setup();
+      stop.mockImplementation(() => Promise.resolve(clip(LOOPBACK)));
+      renderWizard();
+      await begin(user);
+      await runThrough();
+      await screen.findByTestId("outcome");
+
+      // The advice is the setup's, not a restatement of the headline.
+      expect(screen.getByTestId("advice").textContent).not.toBe("");
+      expect(screen.getByTestId("verdict")).toBeTruthy();
+    });
+  });
+
+  it("keeps the way into the configuration screen on the screen it is about", async () => {
+    /* What is behind it is the saved calibrations and the recordings they were
+       measured from — entirely about calibration, so it belongs where
+       calibration is done rather than in the corner of every screen. */
+    const user = userEvent.setup();
+    const { props } = renderWizard();
+    await user.click(screen.getByTestId("cog"));
+    expect(props.onConfigure).toHaveBeenCalled();
+    await settled();
   });
 
   it("throws the recording away when canceled", async () => {

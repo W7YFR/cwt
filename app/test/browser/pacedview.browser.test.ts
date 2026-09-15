@@ -118,7 +118,7 @@ function mount(over: Partial<ReviewSettings> & { runs?: number }) {
       profileId: undefined,
       onProfileChange: () => {},
       onDeviceChange: () => {},
-      onConfigure: () => {},
+      onCalibrate: () => {},
       onFile: () => {},
       onClear: () => {},
       onNewSession: () => {},

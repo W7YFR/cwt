@@ -104,15 +104,23 @@ export interface Rows {
  * against the target separately and a strip between rows would be ambiguous
  * about which one it was reporting on.
  *
- * `captioned` is the run being read in detail — only it gets a band of
- * per-character text. Six rows of captions is not the comparison anyone is
- * making, and a run that dropped a letter already says so by leaving a hole in
- * its column.
+ * `captioned` is the run being read in detail, and by default only it gets a
+ * band of per-character text: six rows of captions is not the comparison most
+ * people are making, and a run that dropped a letter already says so by
+ * leaving a hole in its column. `all` is for when it is — reading what every
+ * attempt came out as, rather than how they line up.
+ *
+ * The band is reserved on every lane all the same, and that is the point of
+ * this being a layout rather than a consequence: selecting a row is a change
+ * of what is highlighted, not of where anything is. Given to the captioned
+ * lane alone, every row under it moved by the height of a caption each time
+ * the selection changed — and the marks you were comparing jumped out from
+ * under the pointer that was about to click the next one.
  *
  * With one captioned run this reproduces the constants above exactly, which is
  * asserted rather than hoped for: the fixed layout was correct, and stacking
  * must not quietly move a chart that has nothing stacked on it. */
-export function rowsFor(runs: number, captioned: number): Rows {
+export function rowsFor(runs: number, captioned: number, all = false): Rows {
   const tgtLabel = RULER_H;
   const tgt = tgtLabel + LABEL_H;
   let y = tgt + ROW_H;
@@ -121,8 +129,8 @@ export function rowsFor(runs: number, captioned: number): Rows {
   for (let r = 0; r < Math.max(runs, 1); r++) {
     const grade = y;
     const row = grade + GRADE_H;
-    const label = r === captioned ? row + ROW_H : null;
-    const bottom = row + ROW_H + (label === null ? 0 : LABEL_H);
+    const label = all || r === captioned ? row + ROW_H : null;
+    const bottom = row + ROW_H + LABEL_H;
     lanes.push({ grade, row, label, bottom });
     y = bottom;
   }

@@ -48,18 +48,43 @@ describe("the row geometry", () => {
     }
   });
 
-  it("gives a caption band to the run being read and to no other", () => {
+  it("writes a caption on the run being read and on no other", () => {
     const rows = rowsFor(4, 2);
     expect(rows.runs.map((r) => r.label !== null)).toEqual([false, false, true, false]);
-    // An uncaptioned lane is shorter by exactly the band it does without.
-    expect(rows.runs[0]!.bottom - rows.runs[0]!.grade).toBe(GRADE_H + ROW_H);
-    expect(rows.runs[2]!.bottom - rows.runs[2]!.grade).toBe(GRADE_H + ROW_H + LABEL_H);
+  });
+
+  it("keeps every lane the same height, captioned or not", () => {
+    /* Selecting a row changes what is highlighted, not where anything is.
+       Reserved only where a caption was written, every row under the selection
+       moved by the height of one each time it changed — so the marks you were
+       comparing jumped out from under the pointer about to click the next
+       row. */
+    const lane = GRADE_H + ROW_H + LABEL_H;
+    for (const at of [0, 1, 2, 3]) {
+      const rows = rowsFor(4, at);
+      for (const [r, run] of rows.runs.entries()) {
+        expect(run.bottom - run.grade, `run ${r + 1} with ${at + 1} selected`).toBe(lane);
+      }
+    }
+  });
+
+  it("lays the whole chart out the same way whichever run is selected", () => {
+    const shape = (at: number) => {
+      const rows = rowsFor(4, at);
+      return {
+        rows: rows.runs.map((r) => [r.grade, r.row, r.bottom]),
+        drift: rows.drift,
+        height: rows.height,
+      };
+    };
+    expect(shape(1)).toEqual(shape(0));
+    expect(shape(3)).toEqual(shape(0));
   });
 
   it("grows the chart by a lane for every attempt, and nothing else", () => {
     const one = rowsFor(1, 0);
     const two = rowsFor(2, 0);
-    expect(two.height - one.height).toBe(GRADE_H + ROW_H);
+    expect(two.height - one.height).toBe(GRADE_H + ROW_H + LABEL_H);
     // The drift plot and the scrollbar keep their order under the lanes.
     expect(two.drift).toBeGreaterThan(two.runs[1]!.bottom);
     expect(two.scroll).toBeGreaterThan(two.plotBottom - 1);

@@ -187,7 +187,19 @@ export function createChart(
   function viewport(): Viewport {
     const viewW = Math.max(host.clientWidth, GUTTER + 40);
     const trackW = Math.max(viewW - GUTTER - PAD_R, 1);
-    const contentW = layout ? layout.width : trackW;
+    /* The widest attempt on screen, not the one being read.
+     *
+     * On the time axes a lane is as wide as its own recording, so taking the
+     * selected lane's width made how far the chart scrolls a property of which
+     * row was picked: selecting a shorter attempt narrowed the content under a
+     * scroll position that was still valid a moment ago, and everything slid
+     * sideways to a clamp. The rows are drawn on one axis and the extent of
+     * that axis has to hold all of them. */
+    const contentW = lanes.length
+      ? Math.max(...lanes.map((l) => l.layout.width))
+      : layout
+        ? layout.width
+        : trackW;
     return { viewW, trackW, contentW, maxScroll: Math.max(0, contentW - trackW) };
   }
 
@@ -223,6 +235,7 @@ export function createChart(
       driftMax,
       leadSec,
       charMarkers: input.settings.charMarkers,
+      runScores: input.settings.runScores,
     };
     return s;
   }
@@ -270,12 +283,43 @@ export function createChart(
         }),
         slots: review.slots,
         analysis: review.analysis,
+        accuracy: review.comparison?.accuracy ?? null,
         blank: review.take.segments.length === 0,
         ordinal: at,
       } satisfies Lane;
     });
     layout = lanes[selected]!.layout;
-    rows = rowsFor(lanes.length, selected);
+    rows = rowsFor(lanes.length, selected, input.settings.captionAll);
+  }
+
+  /** How wide the chart would be at this zoom — the whole of it.
+   *
+   * The same computation `rebuild` does, at a zoom that is not in force yet.
+   * Every lane, because the extent of a shared axis has to hold all of them,
+   * and through `measureColumns` because in the per-character view a column is
+   * as wide as the widest run put it — a width no single run's own layout
+   * knows about. */
+  function widthAt(ppu: number): number {
+    if (!input) return 0;
+    const stack = stackOf(input);
+    const cols =
+      input.settings.view === "per-char"
+        ? measureColumns(stack.reviews.map((r) => r.slots), ppu)
+        : undefined;
+    let width = 0;
+    for (const at of stack.order) {
+      const review = stack.reviews[at]!;
+      const l = buildLayout(review, {
+        view: input.settings.view,
+        ppu,
+        leadSec,
+        tailSec: leadSec,
+        durationSec: review.take.durationSec,
+        ...(cols ? { columns: cols, run: at } : {}),
+      });
+      width = Math.max(width, l.width);
+    }
+    return width;
   }
 
   function resize(): void {
@@ -659,16 +703,7 @@ export function createChart(
 
     fit() {
       if (!input) return ZOOM_MIN;
-      return fitZoom(
-        input.review,
-        {
-          view: input.settings.view,
-          durationSec: input.review.take.durationSec,
-        },
-        viewport().trackW,
-        ZOOM_MIN,
-        ZOOM_MAX,
-      );
+      return fitZoom(widthAt, viewport().trackW, ZOOM_MIN, ZOOM_MAX);
     },
 
     scrollTo: (x: number) => doScrollTo(x, false),
@@ -733,6 +768,7 @@ export function createChart(
             layout: exportLayout,
             slots: input.review.slots,
             analysis: input.review.analysis,
+            accuracy: input.review.comparison?.accuracy ?? null,
             ordinal: 0,
           },
         ],

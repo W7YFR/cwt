@@ -433,22 +433,31 @@ export function slotSpan(
  * collapsed rest is a fixed sliver whatever the scale. That fixed part means
  * the obvious guess — scale by how much room is left over — always undershoots,
  * so this converges from below without ever overshooting. A few passes and it
- * is inside a tenth of a pixel. */
+ * is inside a tenth of a pixel.
+ *
+ * `widthAt` rather than a review, because what has to fit is whatever the
+ * chart is about to draw, and that is more than one attempt's layout: the rows
+ * of a stack share a column axis whose columns are as wide as the widest run
+ * put them, and the scrollable extent is the widest lane. Fitting one run's
+ * own layout measured something that was never on screen, and left the chart
+ * scrolling after being asked not to. */
 export function fitZoom(
-  review: Review,
-  options: Omit<LayoutOptions, "ppu">,
+  widthAt: (ppu: number) => number,
   trackW: number,
   min: number,
   max: number,
 ): number {
   let ppu = min;
   for (let i = 0; i < 8; i++) {
-    const layout = buildLayout(review, { ...options, ppu });
-    if (!(layout.width > 0)) break;
-    const next = Math.max(min, Math.min(max, (ppu * trackW) / layout.width));
+    const width = widthAt(ppu);
+    if (!(width > 0)) break;
+    const next = Math.max(min, Math.min(max, (ppu * trackW) / width));
     const settled = Math.abs(next - ppu) < 0.05;
     ppu = next;
     if (settled) break;
   }
-  return Math.round(ppu * 10) / 10;
+  /* Down to the tenth, never up. The slider moves in tenths, and rounding to
+     the nearest one can land a hair over the track — a scrollbar for three
+     pixels of content, on a chart that was just asked to fit. */
+  return Math.max(min, Math.floor(ppu * 10) / 10);
 }

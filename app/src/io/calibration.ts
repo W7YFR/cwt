@@ -23,6 +23,7 @@ import {
   assessSetup,
   calibrationIsUsable,
   correctsNothing,
+  drillsAgree,
   measureCalibration,
   pairDrills,
   segmentsFrom,
@@ -59,12 +60,22 @@ export interface Drill {
   readonly cueSec?: number;
 }
 
+/** Room left after the last cue of a drill, in seconds.
+ *
+ * A cue that vanishes as you act on it is one you are always slightly late
+ * for, and the release it asks for needs quiet after it to be measured at all.
+ * So the drill runs on past its last cue rather than ending on it. */
+const CUE_TAIL_SEC = 1;
+
 /** When a drill is cued, how many cues it gets.
  *
- * The first lands one interval in, so there is something to wait for rather
- * than a cue you have already missed by the time you have read it. */
+ * The first lands as the drill begins. The rest in front of it has already
+ * counted down to that moment, so holding you an interval longer with nothing
+ * to do is a wait you have just had — and the pause the splitter needs is the
+ * rest itself, not the head of the drill. */
 export function cueCount(drill: Drill): number {
-  return drill.cueSec ? Math.floor(drill.seconds / drill.cueSec) : 0;
+  if (!drill.cueSec) return 0;
+  return Math.floor((drill.seconds - CUE_TAIL_SEC) / drill.cueSec) + 1;
 }
 
 /** Quiet between drills. Not dead time: it is what the splitter finds the
@@ -83,10 +94,9 @@ export const REST_SEC = 4;
  *     from 2 seconds up is within 0.15 ms — a fifth of a percent of a dit.
  *     Four seconds is generous.
  *   - The isolated drill needs three releases to be judged at all, which at
- *     two seconds apart is five seconds of recording. Four cues two seconds
- *     apart gives four releases, and the drill runs a second past the last one
- *     so the cue is still on screen when the dit is sent rather than vanishing
- *     as the rest begins.
+ *     two seconds apart is five seconds of recording. Nine seconds holds five
+ *     cues two seconds apart, counting the one that lands as the drill starts,
+ *     and leaves a second past the last of them — see CUE_TAIL_SEC.
  *
  * There is deliberately no silence drill. One was asked for and nothing ever
  * read it: the noise floor is not an input to any measurement here, and the
@@ -169,6 +179,13 @@ export interface CalibrationRun {
    * profile that corrects nothing is worth knowing about and not worth
    * storing. See `correctsNothing`. */
   readonly nothingToCorrect: boolean;
+  /** Whether the two drills measured the same thing.
+   *
+   * What separates the two ways of having no correction to store: elements
+   * arriving the length they were sent, or a measurement too scattered to say
+   * anything. Always true on a refusal, where there is no measurement to
+   * scatter. */
+  readonly drillsAgreed: boolean;
   /** What went wrong, as a code. Null when nothing did. */
   readonly reason: CalibrationProblem | null;
   /** The same thing in the operator's terms. */
@@ -325,6 +342,7 @@ export function analyzeCalibration(
     quality,
     usable: false,
     nothingToCorrect: false,
+    drillsAgreed: true,
     reason,
     problem,
     advice,
@@ -391,18 +409,31 @@ export function analyzeCalibration(
   }
 
   const nothing = correctsNothing(calibration);
+  /* Two ways to arrive at no correction, and they are opposite findings. The
+     drills agreeing on nothing is the best result the wizard has; the drills
+     disagreeing so widely that no number can be taken from them is a reason to
+     record it again. Told apart by how far apart the drills landed — see
+     drillsAgree. */
+  const agreed = drillsAgree(calibration);
   return {
     sections,
     calibration,
     quality,
     usable: true,
     nothingToCorrect: nothing,
+    drillsAgreed: agreed,
     reason: null,
     problem: null,
-    advice: nothing
-      ? "Your keying is arriving at the length it was sent — nothing is being " +
-        "added to your elements, so there is nothing to take back off. Record " +
-        "as you are."
+    /* The setup advice in every case, including the one where there is no
+       correction to make: a path can add nothing to the length of an element
+       and still have a tail long enough to put a ceiling on your speed, and
+       those are the two halves of the same question. Saying only "nothing to
+       correct" there left somebody limited to 14 wpm with nothing on screen
+       about it. What the drills found is the headline's business. */
+    advice: nothing && !agreed
+      ? "Record it again, holding each paddle down for the whole drill and " +
+        "leaving the keyer's speed alone between the two. " +
+        setupAdvice(quality)
       : setupAdvice(quality),
     readback: readbackOf(samples, rate, sections, calibration),
   };

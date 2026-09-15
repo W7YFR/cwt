@@ -56,7 +56,7 @@ export function Report({
        send" would be pointing at nothing. */
     const hasTarget = review.ideal.chars.length > 0;
     return (
-      <section className="report">
+      <section className="report" data-testid="report">
         <div className="card">
           <h2>Nothing recorded yet</h2>
           <p
@@ -66,9 +66,13 @@ export function Report({
           >
             {hasTarget ? (
               <>
+                {/* No promise about where the grading turns up: this card is
+                    the one part of the report that shows whether or not the
+                    grading tables are switched on, so it cannot point at
+                    something that may not be there. */}
                 The target above is what you are about to send. Hear it with{" "}
                 <b>Target</b>, set the speeds and the tolerance you want to be
-                held to, then record — the grading appears here.
+                held to, then record.
               </>
             ) : (
               <>
@@ -85,7 +89,7 @@ export function Report({
   }
 
   return (
-    <section className="report">
+    <section className="report" data-testid="report">
       <div className="card">
         <h2>Element &amp; spacing</h2>
         <table>

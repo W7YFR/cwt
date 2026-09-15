@@ -81,17 +81,24 @@ export interface TakeState {
   /** Adopt a Take somebody else already analyzed — see io/bundle.ts, and the
    *  restore path in ui/App.tsx. */
   adopt(take: Take, audio: ArrayBuffer, options?: AdoptOptions): void;
-  /** Read the loaded recording again under a different calibration.
+  /** Read every recording in the session again under a different calibration.
    *
-   * The same computation that ran when it was recorded, on the same audio,
+   * The same computation that ran when each was recorded, on the same audio,
    * with one input changed — so it is a re-analysis and not a re-grading.
    * Everything downstream of the segments already re-grades on every settings
-   * change; this is the one input that lives upstream of them.
+   * change, across the whole session; this is the one input that lives
+   * upstream of them, so it has to be applied the same way.
+   *
+   * The whole session rather than the attempt being looked at, because the
+   * rows of a session are meant to be read against each other. One run read
+   * through the new correction and the rest through the old are still each
+   * correct on their own, and comparing them says nothing about anybody's
+   * sending.
    *
    * It is also the most useful measuring tool in the app. Recording the same
    * message twice to compare calibrations leaves the room, the placement and
-   * the operator's fist free to vary; switching the profile under one
-   * recording holds all three fixed by construction. */
+   * the operator's fist free to vary; switching the profile under a recording
+   * holds all three fixed by construction. */
   recalibrate(profile: Profile | null): Promise<void>;
   /** Practice at whatever speed the keyer was last said to be set to.
    *
@@ -135,6 +142,13 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
     charMarkers: p.charMarkers ?? base.charMarkers,
+    runScores: p.runScores ?? base.runScores,
+    advancedGrading: p.advancedGrading ?? base.advancedGrading,
+    showDownloads: p.showDownloads ?? base.showDownloads,
+    showHints: p.showHints ?? base.showHints,
+    showChartControls: p.showChartControls ?? base.showChartControls,
+    showRuns: p.showRuns ?? base.showRuns,
+    captionAll: p.captionAll ?? base.captionAll,
     flashCard: p.flashCard ?? base.flashCard,
     flashCue: p.flashCue ?? base.flashCue,
     flashLeadMs: p.flashLeadMs ?? base.flashLeadMs,
@@ -155,6 +169,13 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
     charMarkers: prev.charMarkers,
+    runScores: prev.runScores,
+    advancedGrading: prev.advancedGrading,
+    showDownloads: prev.showDownloads,
+    showHints: prev.showHints,
+    showChartControls: prev.showChartControls,
+    showRuns: prev.showRuns,
+    captionAll: prev.captionAll,
     flashCard: prev.flashCard,
     flashCue: prev.flashCue,
     flashLeadMs: prev.flashLeadMs,
@@ -181,6 +202,20 @@ export function useTake(): TakeState {
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
       charMarkers: false,
+      /* On, because it is what a stack is for: several attempts side by side
+         and which went better readable without clicking through them. */
+      runScores: true,
+      /* On until turned off. A hint nobody has seen cannot be asked for, and
+         the tables are the answer to "why" — which is the next question after
+         a score you did not like. */
+      advancedGrading: true,
+      showDownloads: false,
+      showHints: true,
+      showChartControls: true,
+      showRuns: "all",
+      /* Off. One row of text is a caption; six is a wall, and the rows under
+         it are the thing being compared. */
+      captionAll: false,
       flashCard: false,
       flashCue: true,
       flashLeadMs: FLASH_LEAD_DEFAULT_MS,
@@ -243,6 +278,13 @@ export function useTake(): TakeState {
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
         charMarkers: next.charMarkers,
+        runScores: next.runScores,
+        advancedGrading: next.advancedGrading,
+        showDownloads: next.showDownloads,
+        showHints: next.showHints,
+        showChartControls: next.showChartControls,
+        showRuns: next.showRuns,
+        captionAll: next.captionAll,
         flashCard: next.flashCard,
         flashCue: next.flashCue,
         flashLeadMs: next.flashLeadMs,
@@ -348,60 +390,77 @@ export function useTake(): TakeState {
     [],
   );
 
-  const recalibrate = useCallback(async (profile: Profile | null) => {
-    const current = loadedRef.current;
-    if (!current) return;
-    const take = current.take;
-    /* A file is never corrected, wherever the request came from. It was made
-       somewhere else — possibly by somebody else, possibly through a loopback
-       with nothing in the path at all — and applying this machine's
-       calibration to it would quietly alter numbers that were already
-       measured. */
-    const applied = profileForSource(profile, take.source === MIC_SOURCE);
+  const rereadOne = useCallback(
+    async (entry: LoadedTake, profile: Profile | null): Promise<LoadedTake> => {
+      // A session waiting for its first recording. No audio, nothing to read.
+      if (isBlankTake(entry.take)) return entry;
+      const take = entry.take;
+      /* A file is never corrected, wherever the request came from. It was made
+         somewhere else — possibly by somebody else, possibly through a loopback
+         with nothing in the path at all — and applying this machine's
+         calibration to it would quietly alter numbers that were already
+         measured. Decided per run, because a session can hold a file. */
+      const applied = profileForSource(profile, take.source === MIC_SOURCE);
 
-    /* Coming back from a reload there are no samples in memory, only the wav
-       that was stored. It decodes to the same audio the take was measured
-       from, because what gets stored is the trimmed clip. */
-    const clip: AudioClip = current.clip.samples.length
-      ? current.clip
-      : await decodeAudioFile(current.data!.slice(0));
+      /* Coming back from a reload there are no samples in memory, only the wav
+         that was stored. It decodes to the same audio the take was measured
+         from, because what gets stored is the trimmed clip. */
+      const clip: AudioClip = entry.clip.samples.length
+        ? entry.clip
+        : await decodeAudioFile(entry.data!.slice(0));
 
-    const { take: next } = analyzeClip(clip, {
-      source: take.source,
-      expected: take.expected,
-      expectedSource: take.expectedSource,
-      // Not re-detected: the tone did not change, and letting it wander would
-      // make this a different measurement rather than the same one under a
-      // different calibration.
-      toneHz: take.toneHz,
-      ...(take.target.explicit
-        ? { targetWpm: take.target.charWpm, targetFarnsworth: take.target.farnsworthWpm }
-        : {}),
-      // Already trimmed when it was first analyzed; trimming again would move
-      // every time in the take by whatever it found.
-      trim: false,
-      now: take.recordedAt,
-      id: take.id,
-      profile: applied,
-    });
+      const { take: next } = analyzeClip(clip, {
+        source: take.source,
+        expected: take.expected,
+        expectedSource: take.expectedSource,
+        // Not re-detected: the tone did not change, and letting it wander would
+        // make this a different measurement rather than the same one under a
+        // different calibration.
+        toneHz: take.toneHz,
+        ...(take.target.explicit
+          ? { targetWpm: take.target.charWpm, targetFarnsworth: take.target.farnsworthWpm }
+          : {}),
+        // Already trimmed when it was first analyzed; trimming again would move
+        // every time in the take by whatever it found.
+        trim: false,
+        now: take.recordedAt,
+        id: take.id,
+        profile: applied,
+      });
 
-    // Same recording, same identity — not a new entry in the history each
-    // time somebody tries a different profile.
-    const reread: LoadedTake = { take: next, clip: current.clip, data: current.data };
-    setRuns((prev) => {
-      const out = prev.map((r) => (r.take.id === take.id ? reread : r));
-      runsRef.current = out;
-      return out;
-    });
-    /* And the same settings. Zoom, tolerance, speeds and intended text belong
-       to the person looking, not to the analysis, and resetting them here
-       would punish exactly the comparison this exists for. */
-    const kept = settingsRef.current;
-    const audio = current.data
-      ? new Blob([current.data])
-      : encodeWav(clip.samples, clip.rate);
-    void rememberTake({ take: next, audio, settings: kept });
-  }, []);
+      /* And the same settings. Zoom, tolerance, speeds and intended text belong
+         to the person looking, not to the analysis, and resetting them here
+         would punish exactly the comparison this exists for. */
+      const audio = entry.data
+        ? new Blob([entry.data])
+        : encodeWav(clip.samples, clip.rate);
+      void rememberTake({ take: next, audio, settings: settingsRef.current });
+
+      // Same recording, same identity — not a new entry in the history each
+      // time somebody tries a different profile.
+      return { take: next, clip: entry.clip, data: entry.data };
+    },
+    [],
+  );
+
+  const recalibrate = useCallback(
+    async (profile: Profile | null) => {
+      const before = runsRef.current;
+      if (before.length === 0) return;
+      const reread = await Promise.all(before.map((e) => rereadOne(e, profile)));
+
+      /* Matched by id rather than swapped in wholesale. Reading a session again
+         is the slowest thing on this screen, and a recording that finished
+         while it ran would be dropped by an array captured before it existed. */
+      const byId = new Map(reread.map((r) => [r.take.id, r] as const));
+      setRuns((prev) => {
+        const out = prev.map((r) => byId.get(r.take.id) ?? r);
+        runsRef.current = out;
+        return out;
+      });
+    },
+    [rereadOne],
+  );
 
   const adoptSession = useCallback(
     (entries: readonly StoredRun[], at: number) => {

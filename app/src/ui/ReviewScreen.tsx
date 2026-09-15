@@ -19,10 +19,10 @@ import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
-import { Controls, ViewControls } from "./Controls";
+import { ChartSettingsButton, ChartSettingsPanel, Controls, ViewControls } from "./Controls";
 import { FlashCard } from "./FlashCard";
 import { beatsFor, pacedEnd, pacedStart, wordsFor, type Word } from "./pacing";
-import { Cog, RecordBar } from "./Record";
+import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
@@ -60,13 +60,14 @@ export interface ReviewScreenProps {
   /** Saved calibrations, which one is in use, and how to change it.
    *
    * Changing it does two things and both are wanted: it becomes the
-   * calibration the next recording is made under, and the recording on screen
-   * is read again through it. */
+   * calibration the next recording is made under, and every recording already
+   * in the session is read again through it. */
   profiles: readonly Profile[];
   profileId: string | undefined;
   onProfileChange(id: string | undefined): Promise<void> | void;
   onDeviceChange(id: string | undefined): void;
-  onConfigure(): void;
+  /** Into the calibration wizard, and back here afterwards. */
+  onCalibrate(): void;
   /** Drop the recording and stay here — see useTake.reset. */
   onClear(): void;
   /** Open a recording from disk — the same path a dropped file takes. */
@@ -111,12 +112,21 @@ export function ReviewScreen({
   profileId,
   onProfileChange,
   onDeviceChange,
-  onConfigure,
+  onCalibrate,
   onClear,
   onFile,
   onNewSession,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
+  /* Declared before the recorder because the recorder's R key is turned off
+     while the dialog is up: a key that starts a recording behind an open
+     dialog answers a question nobody asked. */
+  const [starting, setStarting] = useState(false);
+  /* Whether the chart settings are on show. Not a setting itself: it is where
+     you are looking rather than anything about the chart, and it has no
+     business outliving the page or riding along in a saved report. */
+  const [chartSettings, setChartSettings] = useState(false);
+
   const rec = useRecorder({
     deviceId,
     onClip: useCallback(
@@ -124,6 +134,7 @@ export function ReviewScreen({
       [onAudio],
     ),
     onError,
+    startKey: !starting,
   });
 
   const [focus, setFocus] = useState<Focus | null>(null);
@@ -134,7 +145,6 @@ export function ReviewScreen({
      works without one — that is the point of it — but everything that reads
      the recording has to say so rather than act on an empty one. */
   const blank = isBlankTake(loaded.take);
-  const [starting, setStarting] = useState(false);
 
   /* What the chart shows while a recording is running: the target, the cursor,
      and one empty row for what is arriving.
@@ -161,14 +171,28 @@ export function ReviewScreen({
       ),
     [settings, loaded.take.toneHz],
   );
-  const shown = recording ? [incoming] : stack;
-  const shownAt = recording ? 0 : selected;
+  /* The same reduction the cursor gets, asked for rather than imposed: one
+     row, and it is the attempt just made. */
+  const lastOnly = !recording && settings.showRuns === "last" && stack.length > 1;
+  const last = stack.length - 1;
+  const shown = recording ? [incoming] : lastOnly ? [stack[last]!] : stack;
+  const shownAt = recording || lastOnly ? 0 : selected;
   /* Where each attempt's row goes. Session indices throughout — sorting moves
      rows, and nothing else in here has to know that it did. */
   const order = useMemo(
-    () => (recording ? [0] : runOrder(stack, settings.runSort)),
-    [recording, stack, settings.runSort],
+    () => (recording || lastOnly ? [0] : runOrder(stack, settings.runSort)),
+    [recording, lastOnly, stack, settings.runSort],
   );
+
+  /* And the rest of the page reads the same attempt the chart is drawing.
+     Everything below the chart is about the selected run, so showing the last
+     one while the scores and the report describe another would be two answers
+     to one question. Moving the selection rather than teaching each of them a
+     second way to find its subject. */
+  useEffect(() => {
+    if (!lastOnly || last < 0 || selected === last) return;
+    onSelectRun(last);
+  }, [lastOnly, last, selected, onSelectRun]);
   const [rereading, setRereading] = useState(false);
   /* Seconds left of the lead-in, or null when no cursor is running. Whole
      numbers only: this is state, and updating it every frame would re-render
@@ -177,7 +201,8 @@ export function ReviewScreen({
 
   /* Re-reading is DSP over the samples, not a re-grade of the segments, so it
      costs what the pause after a recording costs rather than what a slider
-     costs. Said on screen while it happens. */
+     costs — once per attempt in the session. Said on screen while it
+     happens. */
   const chooseProfile = useCallback(
     (id: string | undefined) => {
       setRereading(true);
@@ -458,16 +483,24 @@ export function ReviewScreen({
      layout, because the fit is measured off the real content — a short session
      stranded in a third of the chart is the one thing a timing chart has no use
      for, and empty pixels tell you nothing. */
-  const fittedId = useRef<string | null>(null);
+  const fitted = useRef<string | null>(null);
+  /* What the fit is about: the attempts on the chart, not the one being read.
+     Keyed on the selected take it re-fitted on every click of a run name —
+     each attempt is a slightly different length, so each got a slightly
+     different zoom, and picking a row to compare moved every mark on the chart
+     including the ones in the rows you were comparing it against.
+     The ids rather than the array: the reviews are rebuilt on every settings
+     change, and re-fitting on a tolerance slider would undo the zoom you just
+     set by hand. */
+  const stackId = stack.map((r) => r.take.id).join(" ");
   useEffect(() => {
-    // Keyed on the take rather than on a bare flag: recording again from this
-    // screen swaps the take under the same chart, and a new session deserves
-    // the same opening fit a first one gets.
-    if (fittedId.current === loaded.take.id || !handle.chart) return;
-    fittedId.current = loaded.take.id;
+    // Recording into the session, or starting a new one, still gets the fit a
+    // first attempt gets — that changes which takes are on the chart.
+    if (fitted.current === stackId || !handle.chart) return;
+    fitted.current = stackId;
     const ppu = handle.chart.fit();
     if (ppu !== settings.ppu) onChange({ ppu });
-  }, [handle, loaded.take.id, onChange, settings.ppu, review]);
+  }, [handle, stackId, onChange, settings.ppu, review]);
 
   const stem = baseName(loaded.take.source);
 
@@ -516,7 +549,11 @@ export function ReviewScreen({
 
   return (
     <>
-      <Cog onClick={onConfigure} />
+      {/* The corner, where the way to configuration used to be. Configuration
+          is about one thing — the microphone — and now sits beside Calibrate
+          where that is decided; this is about the page in front of you, which
+          is what the corner of the page should reach. */}
+      <ChartSettingsButton open={chartSettings} onToggle={() => setChartSettings((v) => !v)} />
       <header>
         <h1 className="brand">
           {/* The name is the way home. Nothing else on this screen is a
@@ -543,6 +580,10 @@ export function ReviewScreen({
           profiles={profiles}
           profileId={profileId}
           onProfileChange={chooseProfile}
+          /* Behind the settings button, like everything else that is not the
+             loop. Calibrating is a thing you do once for a microphone and then
+             leave alone, and it sat in the header being rare. */
+          onCalibrate={chartSettings ? onCalibrate : undefined}
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
           leadLeft={leadLeft}
@@ -565,6 +606,27 @@ export function ReviewScreen({
         )}
       </header>
 
+      {chartSettings && (
+        <section className="chartsettings">
+          <ChartSettingsPanel
+            settings={settings}
+            runs={stack.length}
+            onChange={onChange}
+          />
+        </section>
+      )}
+
+      <Controls
+        settings={settings}
+        onChange={onChange}
+        playing={playing}
+        clock={clock}
+        canPlayYou={!blank}
+        onPlayYou={() => void playYou()}
+        onPlayTarget={() => playTarget()}
+        onStop={stop}
+      />
+
       {/* A band of its own rather than a line of the header. In the header the
           figures were vertically off-center — the row above them sets the
           padding and they got whatever was left — and they are the one thing
@@ -579,16 +641,46 @@ export function ReviewScreen({
         />
       </section>
 
-      <Controls
-        settings={settings}
-        onChange={onChange}
-        playing={playing}
-        clock={clock}
-        canPlayYou={!blank}
-        onPlayYou={() => void playYou()}
-        onPlayTarget={() => playTarget()}
-        onStop={stop}
-      />
+      {/* A row of their own under the controls, rather than tucked beside the
+          legend below the chart. What comes out of this screen is a file, and
+          a way out of the app does not belong in the small print of how to
+          read the chart. Asked for, though: it is an occasional act, and four
+          buttons across the page is a standing invitation to something you do
+          rarely. */}
+      {settings.showDownloads && (
+        <div className="downloads">
+          {/* The two that describe a recording are only offered when there is
+              one. The target's audio and the chart are both renderable from
+              the message and the speeds alone. */}
+          <button
+            onClick={() => void downloadYou()}
+            disabled={blank}
+            title="The recording, as made"
+          >
+            ↓ Your audio
+          </button>
+          <button
+            onClick={() => void downloadTarget()}
+            title="Perfect keying of the intended message, rendered at the current speed"
+          >
+            ↓ Target audio
+          </button>
+          <button
+            onClick={downloadPng}
+            title="The whole analysis, not just the visible part"
+          >
+            ↓ Chart PNG
+          </button>
+          <button
+            onClick={downloadJson}
+            disabled={blank}
+            title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
+          >
+            ↓ JSON report
+          </button>
+          <span className="hint">{status}</span>
+        </div>
+      )}
 
       {starting && (
         <NewSession
@@ -644,58 +736,51 @@ export function ReviewScreen({
         />
 
         <div className="belowplot">
+          {/* The key and the instructions on separate lines. Run together they
+              were one paragraph that wrapped wherever the window happened to
+              put it, and the last swatch dropped to the next line on its own —
+              a key reads as a set, and a set with one member below the others
+              reads as two things. */}
           <p className="legend">
             <span className="sw ok" /> within tolerance
             <span className="sw warn" /> up to 2&times; off
             <span className="sw bad" /> worse
             <span className="sw ghost" /> missing
             <span className="sw rest" /> rest (not graded)
-            &nbsp;·&nbsp; click a character to hear it, a gap to hear it between
-            what it separates &nbsp;·&nbsp; click the ruler to seek
-            &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll to pan
-            (the view follows playback)
           </p>
-          <div className="downloads">
-            {/* The three that describe a recording are only offered when
-                there is one. The target's audio and the chart are both
-                renderable from the message and the speeds alone. */}
-            <button
-              onClick={() => void downloadYou()}
-              disabled={blank}
-              title="The recording, as made"
-            >
-              ↓ Your audio
-            </button>
-            <button
-              onClick={() => void downloadTarget()}
-              title="Perfect keying of the intended message, rendered at the current speed"
-            >
-              ↓ Target audio
-            </button>
-            <button
-              onClick={downloadPng}
-              title="The whole analysis, not just the visible part"
-            >
-              ↓ Chart PNG
-            </button>
-            <button
-              onClick={downloadJson}
-              disabled={blank}
-              title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
-            >
-              ↓ JSON report
-            </button>
-            <span className="hint">{status}</span>
-          </div>
+          {settings.showHints && (
+            <>
+              <p className="legend howto">
+                click a character to hear it, a gap to hear it between what it
+                separates &nbsp;·&nbsp; click the ruler to seek &nbsp;·&nbsp;
+                scroll to zoom &nbsp;·&nbsp; drag or shift-scroll to pan (the
+                view follows playback)
+              </p>
+              {/* The recording transport, which is otherwise only discoverable
+                  by pressing a key and seeing what happens. R carries both
+                  halves of one idea — go, from here — so it starts a take and
+                  starts a running one over, and the legend says so rather than
+                  naming half of what the key does. */}
+              <p className="legend keys" data-testid="hotkeys">
+                <kbd>R</kbd> record/restart &nbsp;·&nbsp; <kbd>Enter</kbd> finish
+                &nbsp;·&nbsp; <kbd>Esc</kbd> cancel
+              </p>
+            </>
+          )}
         </div>
       </section>
 
-      <Report
-        review={review}
-        tolerance={settings.tolerance}
-        onPlayDeviation={playDeviation}
-        onFocus={setFocus}
-      />
+      {/* The tables, when they are asked for. With nothing recorded the card
+          is not grading at all — it is what to do next — so it stays either
+          way; there is nothing yet for a switch about depth to be about. */}
+      {(blank || settings.advancedGrading) && (
+        <Report
+          review={review}
+          tolerance={settings.tolerance}
+          onPlayDeviation={playDeviation}
+          onFocus={setFocus}
+        />
+      )}
     </>
   );
 }

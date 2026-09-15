@@ -287,6 +287,50 @@ export interface ReviewSettings {
   paceLeadSec: number;
   /** Draw each character as one marker rather than as its dits and dahs. */
   charMarkers: boolean;
+  /** Put each attempt's two scores in the gutter beside its name.
+   *
+   * Only ever drawn with a stack on screen — with one attempt the band under
+   * the chart is already its score. */
+  runScores: boolean;
+  /** Keep the row of chart controls on screen: the row order, the axis, which
+   *  attempts are drawn, and the zoom.
+   *
+   * On by default. Off is for when the chart is set the way you want it and
+   * every pixel of the page should be the chart — the cog stays whatever this
+   * says, or there would be no way back. */
+  showChartControls: boolean;
+  /** Show the notes under the chart: what clicking and scrolling do, and
+   *  which keys work.
+   *
+   * On by default — a hint nobody has seen yet cannot be asked for — and off
+   * once you know, which is when a permanent instruction becomes furniture. */
+  showHints: boolean;
+  /** Which attempts the chart draws: every one, or only the most recent.
+   *
+   * "Last" is for the loop rather than the comparison — send it, look at it,
+   * send it again — where the rows behind the one you just made are in the
+   * way rather than in the picture. */
+  showRuns: "all" | "last";
+  /** Offer the four download buttons.
+   *
+   * Off by default. Getting a file out is an occasional act — archiving a
+   * session, sending one to somebody — and a row of four buttons across the
+   * page is a permanent invitation to something you do rarely. */
+  showDownloads: boolean;
+  /** Show the grading tables under the chart: the per-class breakdown, what to
+   *  work on next, and the comparison against the intended text.
+   *
+   * Off by default. They are the deepest thing on the page and the slowest to
+   * read, and the two figures in the scores band answer "how did that go" on
+   * their own. */
+  advancedGrading: boolean;
+  /** Caption every attempt with what it decoded to, rather than only the one
+   *  being read.
+   *
+   * The band is reserved on every row either way, so this costs no height —
+   * what it costs is a page of text where you may only have wanted one row
+   * of it. */
+  captionAll: boolean;
   /** Show the next character to send, large, with a countdown to it. */
   flashCard: boolean;
   /** Flash that card on the beat. Separate from showing it: the card is a

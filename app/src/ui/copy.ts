@@ -169,3 +169,54 @@ export const CAL_CORRECTION_HELP =
   "length of the recording never changes — only the boundary between them. " +
   "Measured by holding a paddle at a speed you state: the keyer supplies the " +
   "true element length, so the difference is what your setup is adding.";
+
+export const RUN_SCORES_HELP =
+  "Each attempt's two scores in the gutter beside its name \u2014 how much of " +
+  "it landed inside the tolerance, and how much of it decoded to the target. " +
+  "It is what a stack is for: which attempt went better, readable without " +
+  "clicking through them one at a time. Only ever drawn with more than one " +
+  "attempt on screen, since with one the figures under the chart are already " +
+  "its score.";
+
+export const CAPTION_ALL_HELP =
+  "Caption every attempt with what it came out as, rather than only the one " +
+  "being read. The band is reserved on every row either way, so nothing moves " +
+  "\u2014 what you get is a page of text where the rows themselves are usually " +
+  "the thing being compared, and what you get for it is reading every " +
+  "attempt's decode at once.";
+
+export const ADVANCED_GRADING_HELP =
+  "The three tables under the chart: every class of element and gap with its " +
+  "jitter, the deviations worth working on next, and what came out against " +
+  "what you meant. Off by default \u2014 they are the deepest thing on the page " +
+  "and the slowest to read, and the two figures in the scores band answer " +
+  "\u201chow did that go\u201d without them. Turn them on when the answer is " +
+  "\u201cnot well\u201d and the question becomes why.";
+
+export const SHOW_DOWNLOADS_HELP =
+  "The row of download buttons: your audio, the target rendered at the speeds " +
+  "now set, the whole chart as a PNG, and every number on the page as JSON. " +
+  "Off by default \u2014 getting a file out is an occasional act, and four " +
+  "buttons across the page is a standing invitation to something you do " +
+  "rarely.";
+
+export const SHOW_HINTS_HELP =
+  "The two notes under the chart: what clicking, scrolling and dragging do, " +
+  "and which keys work. On until you turn them off \u2014 a hint nobody has " +
+  "seen cannot be asked for, and a permanent instruction is furniture once " +
+  "you know it. The color key stays either way: that is a legend rather than " +
+  "an instruction, and it is read every time.";
+
+export const SHOW_RUNS_HELP =
+  "Whether the chart draws every attempt in the session or only the most " +
+  "recent. All of them is the comparison \u2014 the rows share one column " +
+  "axis and can be read down a column as well as along a row. The last one " +
+  "alone is the loop: send it, look at it, send it again, where the attempts " +
+  "behind the one you just made are in the way rather than in the picture.";
+
+export const SHOW_CHART_CONTROLS_HELP =
+  "The row above the chart: the order the rows are in, the axis, which " +
+  "attempts are drawn, and the zoom. On by default. Turning it off is for " +
+  "when the chart is set the way you want it and the page should be nothing " +
+  "but chart \u2014 this cog stays either way, so there is always a way " +
+  "back.";

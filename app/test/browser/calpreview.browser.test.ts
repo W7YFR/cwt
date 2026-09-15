@@ -49,6 +49,7 @@ function runOver(samples: Float32Array, offsetSec: number): CalibrationRun {
     },
     usable: true,
     nothingToCorrect: false,
+    drillsAgreed: true,
     reason: null,
     problem: null,
     advice: "",

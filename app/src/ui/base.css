@@ -123,10 +123,10 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 30px;
+  min-height: var(--control-h);
 }
 .recordbar .hint { white-space: nowrap; }
-.recordbar button { font-size: 12px; padding: 5px 10px; }
+.recordbar button { font-size: 12px; padding: 0 10px; }
 /* A button that is only its icon. Square, so Record and Open read as a pair
    rather than as two differently-shaped things that happen to sit together. */
 .iconbtn {
@@ -198,7 +198,19 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .score { display: flex; align-items: baseline; gap: 6px; }
 /* An action among readings, so it sits apart from them and at the far end. */
 .scores { width: 100%; }
-.droprun { margin-left: auto; font-size: 12px; }
+/* Square and icon-only — see `.iconbtn`, which it wears — so it reads as one
+   action at the end of a row of readings rather than as a sentence competing
+   with them. Quiet until it is under the pointer: it throws a recording away,
+   and a red button standing permanently beside your scores reads as a warning
+   about the scores. */
+.droprun {
+  margin-left: auto;
+  color: var(--ink-dim);
+}
+/* The border is what every other button changes on hover, and it is enough.
+   The glyph staying put is also what keeps this one from flashing red at you
+   for passing over it. */
+.droprun:hover:not(:disabled) { border-color: var(--bad); }
 .score b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .score span { color: var(--ink-dim); font-size: 12px; }
 .score.ok b { color: var(--ok); }
@@ -319,6 +331,77 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   gap: 8px 22px;
   padding: 0 0 10px;
 }
+/* The way into the chart settings: the corner of the header, and a button like
+   the other icon buttons rather than a bare glyph. Out of flow, so the row it
+   sits in keeps the height it would have had — the header is a fixed band and
+   an extra item in it would push the page down.
+
+   Lined up with the record controls beside it: the header pads by 14 and the
+   band is `--control-h` tall, so a square of the same height at the same
+   offset shares their center line. */
+/* The corner of the page: the chart settings on the review, the configuration
+   screen on the wizard. One square icon button like every other, out of flow
+   so the band it sits over keeps the height it would have had.
+   At the page's own right margin — the same 20px the header and the scores row
+   pad by — so this and the drop button in the row below end on one line rather
+   than a few pixels apart, which reads as a mistake rather than a difference. */
+.cornerbtn {
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  z-index: 5;
+  /* A shade over the 14px the other icon buttons set. The gear is drawn with
+     teeth and an eye and carries far more air inside its em than an arrow or a
+     dot does, so at the same type size it reads smaller than they do. Matched
+     by eye, which is the only thing that can match it. */
+  font-size: 17px;
+  color: var(--ink-dim);
+}
+/* Open reads as held down rather than as colored in: it is a place you are,
+   not a setting that is on. */
+.cornerbtn[aria-pressed="true"] {
+  border-color: var(--you);
+  color: var(--ink);
+  background: var(--panel);
+}
+
+/* The band the corner button opens, under the header and above everything the
+   settings in it are about. */
+.chartsettings {
+  padding: 10px 20px 12px;
+  border-bottom: 1px solid var(--line);
+}
+/* A band of its own under the row. `100%` on a wrapping flex row is what puts
+   it there — it cannot share a line with anything, whatever the window is
+   doing, so opening it never rearranges the row above. */
+.viewpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Two rows, each named. Without the names this is one heap of eleven
+   checkboxes again — what makes it readable is that half of them do nothing
+   to the chart in front of you and say so. */
+.viewpanel .panelrow { display: flex; flex-direction: column; gap: 4px; }
+.viewpanel .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.viewpanel .panelgroups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 22px;
+}
+/* Sized by their words, so the gap between them is the gap and nothing else.
+   `.group` carries a 130px floor for the control row, where a caption over a
+   slider needs the room; here every group is one checkbox and its label, and
+   the floor turned the space between them into a function of how long each
+   label happened to be. */
+.viewpanel .group { min-width: 0; }
+
 
 /* ---- controls ---------------------------------------------------------- */
 .controls {
@@ -338,7 +421,11 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
  * again the height of a slider, and a row that mixes them ends up with
  * everything at a slightly different level and no single thing to blame. */
 .group { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
-.group.grow { flex: 1 1 260px; }
+/* Its own line, always. It is the only control here whose content is a
+   sentence somebody typed, it is the widest thing on the row, and sharing a
+   line it was what everything else's width was negotiated against. */
+.group.grow { flex: 1 1 100%; }
+.group .caption,
 .group label {
   font-size: 11px;
   text-transform: uppercase;
@@ -348,24 +435,28 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   gap: 6px;
   align-items: baseline;
 }
-/* The caption band. */
+/* The caption band. A span as well as a label: a group of buttons has no one
+   control for a label to point at, and a label pointing at nothing is worse
+   for a screen reader than a word that admits it is only a heading. */
+.group > .caption,
 .group > label:not(.check):not(.field) {
   height: 15px;
   line-height: 15px;
   flex: 0 0 auto;
 }
 /* The control band. `margin-top: auto` is what drops a group with no caption —
-   the transport, a bare checkbox — onto the same line as the ones that have
-   one, rather than centering it across both bands. */
-.group > :not(label),
+   a bare checkbox — onto the same line as the ones that have one, rather than
+   centering it across both bands. Anything with a caption must NOT have it:
+   the caption already fills the band above, and pushing the control down again
+   drops it a whole band below its neighbors. */
+.group > :not(label):not(.caption),
 .group > label.check,
 .group > label.field {
   min-height: var(--control-h);
   flex: 0 0 auto;
 }
 .group > label.check,
-.group > label.field,
-.group.transport { margin-top: auto; }
+.group > label.field { margin-top: auto; }
 /* A readout must never change width. The groups are sized by their content and
    the intended-message field absorbs the slack, so a reading that gains a digit
    drags the whole control row with it — the caption there wraps and unwraps as
@@ -432,6 +523,37 @@ input[type=text]::placeholder {
   color: var(--ink-faint);
 }
 
+/* A box with a button living inside its right edge. The wrapper takes the
+   group's control band and the input stretches to fill it, so the field keeps
+   the same center line as every slider and select in the row. The padding is
+   what stops the text running under the glyph — the button is out of flow, so
+   nothing else reserves that space. */
+.clearable { position: relative; display: flex; }
+.clearable input[type=text] { flex: 1 1 auto; min-width: 0; padding-right: 28px; }
+/* Inside the border rather than on top of it: inset by the 1px the box's own
+   edge occupies, so the focus outline still draws an unbroken frame. Given no
+   border or fill of its own it reads as an adornment of the field, which is
+   what it is, rather than as a second control crowding the first. */
+.clearable .clearbtn {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  height: auto;
+  width: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0 5px 5px 0;
+  background: none;
+  color: var(--ink-faint);
+  line-height: 0;
+}
+.clearable .clearbtn:hover:not(:disabled) { color: var(--ink); border-color: transparent; }
+.clearable .clearbtn:focus-visible { outline: 2px solid var(--you); outline-offset: -2px; }
+
 /* The chevron is ours rather than the platform's.
    A native select ignores padding-right when it places its own arrow, so the
    arrow ends up against the border however much room the box is given. Drawing
@@ -451,14 +573,22 @@ select {
   select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235a6577' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 }
 
-.transport { flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
+/* A column of two bands like every other group; the row is inside it. */
+.transport { min-width: 0; }
+.transportrow { display: flex; flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
 .controls, .viewcontrols { align-items: stretch; }
+/* One height for every button on the page, the same one the inputs, selects
+   and sliders are given. Left to their own devices a word button, an icon
+   button and a button in a denser row come out three different heights, and a
+   row that mixes them has nothing to blame the misalignment on. Padding sets
+   the width; the height is stated. */
 button {
   background: var(--panel-2);
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 7px 12px;
+  height: var(--control-h);
+  padding: 0 12px;
   font: inherit;
   font-size: 13px;
   cursor: pointer;
@@ -478,13 +608,19 @@ button.alt.on { background: var(--tgt); border-color: var(--tgt); }
 /* Fixed width, not min-width: the text changes every frame while playing, and
    anything elastic here shoves the rest of the control bar sideways. Tabular
    figures keep the digits from jittering within it. */
+/* Centered on the buttons beside it. A flex item with a width is blockified,
+   and the group gives every child the control band's height — so left as a
+   plain span its digits sat at the top of a 31px box while the buttons were
+   centered in theirs. */
 .clock {
   font-family: var(--mono);
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   width: 7ch;
-  text-align: right;
   overflow: hidden;
 }
 
@@ -522,10 +658,9 @@ canvas.picking { cursor: pointer; }
 
 .belowplot {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 20px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   margin: 8px 0 0;
 }
 .legend {
@@ -537,7 +672,34 @@ canvas.picking { cursor: pointer; }
   font-size: 12px;
   margin: 0;
 }
-.downloads { display: flex; gap: 8px; flex-wrap: wrap; }
+/* The how-to, under the key rather than run on from it. Quieter, because it
+   is read once and the key is read every time. */
+.legend.howto { color: var(--ink-faint); }
+.legend.keys { color: var(--ink-faint); gap: 4px; }
+/* A key, drawn as one. The mono face and the border are what separate "press
+   R" from the letter R in a sentence, which matters most for the single
+   letter — "R record" in running text reads as a typo. */
+.legend kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+/* Their own row under the controls, starting where every other row on this
+   page starts. The same left edge as the controls above and the chart below,
+   so the page has one margin rather than three. */
+.downloads {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+}
 .downloads button { padding: 5px 10px; font-size: 12px; }
 .sw {
   display: inline-block;
@@ -732,7 +894,10 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 /* Across both of the other two, because it is not a third way in — it is what
    the other two are for. */
 .way.practice { flex: 1 1 100%; }
-.way.practice button { max-width: 382px }
+/* Equal halves. Grown from a basis of their own content, the card holding a
+   device picker came out wider than the one holding a sentence — a difference
+   in width that says nothing, between two things offered as alternatives. */
+.landing .ways > .way:not(.practice) { flex: 1 1 0; min-width: min(320px, 100%); }
 
 .way {
   flex: 1 1 320px;
@@ -753,11 +918,30 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   color: var(--ink-dim);
 }
 .way p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
-.way .big {
-  font-size: 15px;
-  padding: 11px 22px;
+/* The ways in. One width between them, so three buttons doing the same kind of
+   thing on one screen read as three of a kind rather than as a hierarchy
+   nobody intended — the widest was the one in the widest card, which is an
+   accident of layout rather than a claim about importance. */
+.way .big, .calibrate .big {
+  font-size: 14px;
   border-radius: 8px;
   width: 100%;
+  max-width: 320px;
+}
+/* Taller than the page's one button height, and the one place that is worth
+   it: these are the whole of what the first screen asks, on a screen with room
+   to ask it. Everywhere else a button sits on a band of controls, where being
+   taller than its neighbors is a misalignment rather than an emphasis. */
+.way .big {
+  font-size: 15px;
+  height: auto;
+  padding: 11px 22px;
+}
+/* The picker above the button it feeds. Same width, because two controls
+   stacked on one card and doing one job should not be two widths. */
+.way select {
+  width: 100%;
+  max-width: 320px;
 }
 .way.drop.over { border-color: var(--you); background: var(--panel-2); }
 
@@ -965,10 +1149,13 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 }
 
 /* A quiet link-shaped button, for "start over" and the like. */
+/* A link is words, not a control: it sits in running text and takes the height
+   of the line it is on, where every other button states one. */
 button.link {
   background: none;
   border: none;
   color: var(--ink-dim);
+  height: auto;
   padding: 4px 2px;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1012,7 +1199,11 @@ button.primary { border-color: var(--you); color: var(--ink); }
    it, which is what a single short field wants — "Keyer speed" stacked over a
    two-character box is three lines of screen for one number. */
 .field { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.field.row { flex-direction: row; align-items: center; gap: 10px; }
+/* The unit belongs to the number and the name does not, so they do not get the
+   same gap. Set to the tighter one and the name pushed back out: "2" and "s"
+   ten pixels apart read as two things on a row rather than as one reading. */
+.field.row { flex-direction: row; align-items: center; gap: 4px; }
+.field.row .fieldname { margin-right: 6px; }
 .field .fieldname { font-size: 13px; color: var(--ink-dim); }
 .field.row input { width: 5em; text-align: center; }
 
@@ -1109,6 +1300,41 @@ button.primary { border-color: var(--you); color: var(--ink); }
 .calibrate .upnext .lede { font-size: 14px; }
 .calibrate .meter { width: min(60vw, 320px); }
 
+/* The answer, in one block, at the top.
+ *
+ * What it concluded, what that means in this recording's numbers, and what to
+ * do — read in that order without moving your eyes anywhere else. The screen
+ * carried those three across a headline, a verdict word, a paragraph at the
+ * bottom and a choice of buttons, which is four places to look before knowing
+ * whether the thing worked. */
+.calibrate .outcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 56ch;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  /* The tone reads off the top edge rather than off the text: a whole block of
+     colored words is harder to read than black ones, and a rule above the
+     headline is visible before the headline has been. */
+  border-top: 3px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.calibrate .outcome[data-tone="ok"] { border-top-color: var(--ok); }
+.calibrate .outcome[data-tone="warn"] { border-top-color: var(--warn); }
+.calibrate .outcome[data-tone="bad"] { border-top-color: var(--bad); }
+/* The claim, set as the sentence the headline is short for. Full-strength ink
+   against the advice below it, which is the next thing to do rather than the
+   finding itself. */
+.calibrate .outcome .meaning {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.calibrate .outcome .advice { margin: 0; }
+
 .calibrate .readout {
   display: flex;
   flex-wrap: wrap;
@@ -1124,6 +1350,17 @@ button.primary { border-color: var(--you); color: var(--ink); }
   color: var(--ink-dim);
 }
 .calibrate .readout dd { margin: 0; font-size: 15px; }
+
+/* The caption over the setup figures. Same treatment the other groups on this
+   screen get, so "what your setup does" and "what I heard" read as two shelves
+   of the same cabinet. */
+.calibrate > .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+  margin-bottom: -6px;
+}
 
 .verdict.clean, .verdict.good { color: var(--ok); }
 .verdict.marginal { color: var(--warn); }
@@ -1216,20 +1453,6 @@ button.primary { border-color: var(--you); color: var(--ink); }
  * the same place on both — a control that moves between screens is one
  * somebody has to look for twice. Above the header's own stacking so it stays
  * clickable over it. */
-.cog {
-  position: absolute;
-  top: 10px;
-  right: 16px;
-  z-index: 5;
-  font-size: 27px;
-  line-height: 1;
-  padding: 4px 8px;
-  background: none;
-  border: 1px solid transparent;
-  color: var(--ink-dim);
-}
-.cog:hover { color: var(--ink); border-color: var(--line); }
-
 .settings {
   flex: 1;
   display: flex;
@@ -1321,6 +1544,14 @@ button.danger { border-color: var(--bad); color: var(--bad); }
   border-radius: 8px;
   background: var(--panel-2);
 }
+/* On the landing card, the same width as the button above it. Sized to its own
+   contents it came out narrower than everything it sits under, which reads as
+   a panel that failed to fill rather than as one that was meant to be small. */
+.way .calstatus {
+  width: 100%;
+  max-width: 320px;
+  box-sizing: border-box;
+}
 .calstatus .calstate {
   margin: 0;
   display: flex;
@@ -1328,6 +1559,17 @@ button.danger { border-color: var(--bad); color: var(--bad); }
   gap: 8px;
   font-size: 13px;
 }
+/* Centered under the panel's own width rather than starting at its left edge:
+   the card above it is a column of centered things, and one line beginning at
+   the margin reads as belonging to something else. The dot rides with the
+   words, which is the point of it. */
+.way .calstatus .calstate { justify-content: center; }
+/* Sized by its own words, like the line above it, rather than stretched to the
+   panel. The panel keeps the width every other control on the card has; what
+   is inside it is two centered runs of text, and a button filling the box
+   under a line that does not read as the wrong one being emphasized. */
+.way .calactions { justify-content: center; }
+.way .calactions button { flex: 0 0 auto; }
 .calstatus .calstate b { font-weight: 600; }
 .calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 /* Not the recording light: this one does not blink, and its color is the
@@ -1371,12 +1613,19 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .calpick {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  /* The record bar's own gap. This is a group inside that row, but nothing
+     about it reads as a group — it is a select and a button, sitting among
+     other selects and buttons — so a tighter gap here just made one pair of
+     neighbors closer than the rest for no reason anybody could see. */
+  gap: 10px;
   font-size: 12px;
   color: var(--ink-dim);
   white-space: nowrap;
 }
-.calpick .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
-.calpick.ok .dot { background: var(--ok); }
 .calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
 .calpick .hint { font-size: 11px; }
+/* Smaller than the buttons in the bar it sits in, because it belongs to the
+   picker beside it rather than to the row of actions — Record and New session
+   are what this header is for, and a third button their size would read as a
+   third thing of the same weight. */
+.recordbar .calpick .cal { font-size: 11px; padding: 3px 8px; }

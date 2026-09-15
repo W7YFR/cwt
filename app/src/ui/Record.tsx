@@ -39,13 +39,13 @@ export function RecDot(): React.ReactElement {
 export function Cog({ onClick }: { onClick(): void }): React.ReactElement {
   return (
     <button
-      className="cog"
+      className="iconbtn cornerbtn"
       onClick={onClick}
       title="Configuration"
       aria-label="Configuration"
       data-testid="cog"
     >
-      ⚙
+      <span aria-hidden="true">⚙</span>
     </button>
   );
 }
@@ -137,6 +137,9 @@ export interface RecordBarProps {
   onFile?: ((file: File) => void) | undefined;
   /** False once the session has something in it — see the title below. */
   canOpenFile?: boolean | undefined;
+  /** Into the calibration wizard. Beside the picker, because the picker is
+   *  where you find out you have nothing to pick. */
+  onCalibrate?: (() => void) | undefined;
 }
 
 /** Record another, without leaving the review. */
@@ -154,6 +157,7 @@ export function RecordBar({
   onNewSession,
   onFile,
   canOpenFile = true,
+  onCalibrate,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -188,6 +192,8 @@ export function RecordBar({
   }
 
   const active = profiles.find((p) => p.id === profileId) ?? null;
+  /** The calibrations this recording could be read under. */
+  const choices = profilesFor(profiles, deviceId, profileId);
 
   return (
     <div className="recordbar">
@@ -225,7 +231,7 @@ export function RecordBar({
         onClick={() => void rec.start()}
         disabled={rec.busy}
         aria-label="Record another"
-        title="Record another"
+        title="Record another — or press R"
       >
         <RecDot />
       </button>
@@ -256,27 +262,59 @@ export function RecordBar({
       {appliesToTake ? (
         /* A picker rather than a label, because the audio is right here and
            reading it again under a different calibration is the same
-           computation that ran when it was recorded. Holding the recording
+           computation that ran when it was recorded. Holding the recordings
            fixed and changing only the correction is the cleanest comparison
            available anywhere in the app — the room, the placement and the fist
-           cannot vary, because it is one recording. */
+           cannot vary, because it is the same audio either way.
+
+           No status dot beside it: what that reported is already in the select
+           itself, in words, and a warning color on "No calibration" calls an
+           ordinary state a problem — it is the state every session starts in,
+           and the right one for a path with nothing in it. */
         <span className={`calpick ${active ? "ok" : "none"}`} data-testid="calpick">
-          <span className="dot" aria-hidden="true" />
-          <select
-            aria-label="Calibration"
-            value={profileId ?? ""}
-            disabled={rereading}
-            onChange={(e) => onProfileChange(e.target.value || undefined)}
-          >
-            <option value="">No calibration</option>
-            {profilesFor(profiles, deviceId, profileId).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
-              </option>
-            ))}
-          </select>
+          {/* Only where there is a choice to make. One option is not a
+              decision, and a select offering "No calibration" and nothing else
+              is a control whose every state is the state it is already in. */}
+          {choices.length > 0 && (
+            <select
+              aria-label="Calibration"
+              value={profileId ?? ""}
+              disabled={rereading}
+              onChange={(e) => onProfileChange(e.target.value || undefined)}
+            >
+              <option value="">No calibration</option>
+              {choices.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
+                </option>
+              ))}
+            </select>
+          )}
+          {/* The way out of an empty list. Calibrating is reached from the
+              landing screen and from the configuration screen, neither of
+              which is where you are standing when the picker in front of you
+              says there is nothing to apply. */}
+          {onCalibrate && (
+            <button
+              className="cal"
+              data-testid="calibrate"
+              onClick={onCalibrate}
+              title={
+                active
+                  ? `Measure this microphone again — in use: ${active.nickname}`
+                  : "Measure this microphone, so your timing is yours and not the sound path's"
+              }
+            >
+              {active ? "Recalibrate" : "Calibrate"}
+            </button>
+          )}
+          {/* Only while it is happening. Changing the calibration re-reads the
+              recording on screen, which takes long enough to need saying —
+              but a line that is on show the whole time to explain a control
+              nobody has touched yet is a caption, and this row already has as
+              many as it can carry. */}
           <span className="hint" aria-live="polite">
-            {rereading ? "reading it again…" : "applies to this recording"}
+            {rereading ? "re-reading the session…" : ""}
           </span>
         </span>
       ) : (

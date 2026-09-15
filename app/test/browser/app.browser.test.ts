@@ -218,12 +218,100 @@ describe("the app", () => {
     await served();
     await mount();
 
-    // The header, the chart, and the report — the three things that together
-    // mean the whole pipeline ran.
+    // The header, the grade and the chart — the three things that together
+    // mean the whole pipeline ran. Not the grading tables: those are behind
+    // Advanced grading and off unless asked for, so their absence says
+    // nothing about whether the recording came back.
     expect(container.querySelector(".brandmark")).not.toBeNull();
     expect(container.textContent).toContain("consistent");
     expect(container.querySelector("canvas")).not.toBeNull();
-    expect(container.textContent).toContain("Element & spacing");
+    expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"))
+      .toBe("false");
+  });
+
+/** Tick a box in the chart settings panel, opening the panel if it is shut.
+ *
+ * Only if: the cog is a toggle, so opening one that is already open closes it
+ * and takes the box being reached for with it. */
+async function tickSetting(id: string): Promise<void> {
+  const cog = () => container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+  if (cog().getAttribute("aria-pressed") !== "true") {
+    await act(async () => cog().click());
+  }
+  await act(async () => container.querySelector<HTMLInputElement>(`#${id}`)!.click());
+}
+
+const showDownloads = () => tickSetting("show-downloads");
+
+  it("shows the grading tables only when they are asked for", async () => {
+    /* They are the deepest thing on the page and the slowest to read, and the
+       scores band answers "how did that go" without them. Driven through the
+       real control rather than through a settings object, because what is
+       being checked is that the switch reaches the tables. */
+    await served();
+    await mount();
+    const report = () => container.querySelector("[data-testid='report']");
+    // On to begin with: they are the answer to "why", which is the next
+    // question after a score you did not like.
+    expect(report()).not.toBeNull();
+    expect(report()!.textContent).toContain("Element & spacing");
+
+    await tickSetting("advanced-grading");
+    expect(report()).toBeNull();
+
+    await tickSetting("advanced-grading");
+    expect(report()).not.toBeNull();
+  });
+
+  it("takes the hints away without taking the key with them", async () => {
+    /* The color key is a legend and is read every time; the two notes under it
+       are instructions, and an instruction is furniture once you know it. */
+    await served();
+    await mount();
+    const howto = () => container.querySelector(".legend.howto");
+    const keys = () => container.querySelector("[data-testid='hotkeys']");
+    expect(howto()).not.toBeNull();
+    expect(keys()).not.toBeNull();
+
+    await tickSetting("show-hints");
+    expect(howto()).toBeNull();
+    expect(keys()).toBeNull();
+    // The swatches stay: that is what the colors on the chart mean.
+    expect(container.querySelector(".legend .sw")).not.toBeNull();
+  });
+
+  it("says which keys work, since a key is otherwise found by pressing it", async () => {
+    /* R above all: it is what you press to go again, and the review is where
+       you are standing when you decide to. The other two are on the record bar
+       while a take is running, but a legend that named only one key would read
+       as the only one there is. */
+    await served();
+    await mount();
+    const keys = container.querySelector("[data-testid='hotkeys']")!;
+    expect([...keys.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual([
+      "R",
+      "Enter",
+      "Esc",
+    ]);
+  });
+
+  it("offers the downloads only when they are asked for", async () => {
+    /* Getting a file out is an occasional act, and four buttons across the
+       page is a standing invitation to something you do rarely. */
+    await served();
+    await mount();
+    const row = () => container.querySelector(".downloads");
+    expect(row()).toBeNull();
+
+    await showDownloads();
+    expect(row()).not.toBeNull();
+    // All four, and where the rest of the page starts rather than off to the
+    // right on a margin of its own.
+    expect(row()!.querySelectorAll("button")).toHaveLength(4);
+    const left = (el: Element) => el.getBoundingClientRect().left;
+    expect(left(row()!.querySelector("button")!)).toBeLessThan(
+      left(container.querySelector("canvas")!) + 40,
+    );
   });
 
   it("actually rasterizes the chart, rather than leaving a blank canvas", async () => {
@@ -427,28 +515,24 @@ describe("the app", () => {
     expect(inner.top - outer.top).toBeCloseTo(outer.bottom - rule - inner.bottom, 0);
   });
 
-  it("has the same way into configuration from either screen", async () => {
-    /* A control that moves between screens is one somebody has to look for
-       twice, so it is the same component in the same place on both. */
+  it("ends the corner button on the page's own right margin", async () => {
+    /* It is out of flow, so nothing lays it out against the things it sits
+       among — and a few pixels inside or outside the margin every other row
+       keeps reads as a mistake rather than as a difference. Checked against
+       the drop button in the band below it, which is the nearest thing to it
+       on screen and is laid out by the ordinary rules. */
     await served();
     await mount();
-    const onReview = container
-      .querySelector<HTMLElement>("[data-testid='cog']")!
+    const corner = container
+      .querySelector<HTMLElement>("[data-testid='panel-toggle']")!
       .getBoundingClientRect();
-
-    act(() => root!.unmount());
-    root = null;
-    container.remove();
-    container = document.createElement("div");
-    document.body.appendChild(container);
-
-    await mount();
-    const onLanding = container
-      .querySelector<HTMLElement>("[data-testid='cog']")!
+    /* Against the scores' own content box rather than the band around it: the
+       band's edge is the window, and what the corner has to line up with is
+       where the content inside it ends. */
+    const content = container
+      .querySelector<HTMLElement>(".scoresrow .scores")!
       .getBoundingClientRect();
-
-    expect(onLanding.top).toBeCloseTo(onReview.top, 0);
-    expect(onLanding.right).toBeCloseTo(onReview.right, 0);
+    expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
   it("signs every screen", async () => {
@@ -485,7 +569,9 @@ describe("the app", () => {
 
     for (const row of [".controls", ".viewcontrols"]) {
       const groups = [...container.querySelectorAll<HTMLElement>(`${row} > .group`)];
-      expect(groups.length, row).toBeGreaterThan(2);
+      // Two is a row: with one attempt and no stack, the chart's row is the
+      // axis and the zoom and nothing else.
+      expect(groups.length, row).toBeGreaterThanOrEqual(2);
 
       const lines = new Map<number, number[]>();
       for (const g of groups) {
@@ -584,6 +670,34 @@ describe("the app", () => {
     expect(loadPrefs().expected).toBe("CQ TEST DE W7YFR");
   });
 
+  it("sits the clear adornment on the field's center line", async () => {
+    /* Real layout, because that is the only place this can go wrong: the
+       button is out of flow inside the box, so nothing in the markup says
+       where it lands. Measured rather than eyeballed — riding a few pixels
+       high is exactly the kind of thing that survives a screenshot. */
+    await served();
+    await mount();
+
+    const box = container.querySelector<HTMLInputElement>("#expected")!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    await act(async () => {
+      setter.call(box, "CQ TEST DE W7YFR");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const button = container.querySelector<HTMLElement>("[data-testid='clear-expected']")!;
+    const field = box.getBoundingClientRect();
+    const glyph = button.querySelector("svg")!.getBoundingClientRect();
+    const mid = (r: DOMRect) => r.top + r.height / 2;
+    expect(Math.abs(mid(glyph) - mid(field))).toBeLessThanOrEqual(1);
+    // And inside the box's right edge rather than over or past it.
+    expect(glyph.right).toBeLessThan(field.right);
+    expect(glyph.left).toBeGreaterThan(field.left);
+  });
+
   describe("clearing the recording", () => {
     /* The loop this is for: set the message and the speeds, hear the target,
        send it, look at how it went, wipe it, send it again. Wiping keeps the
@@ -628,6 +742,9 @@ describe("the app", () => {
     it("offers nothing that would act on a recording that is not there", async () => {
       await served();
       await mount();
+      // The download buttons are among the things being checked and are off
+      // unless asked for, so ask.
+      await showDownloads();
       await act(async () => clear().click());
 
       // Matched on the accessible name as well as the text, since some of
