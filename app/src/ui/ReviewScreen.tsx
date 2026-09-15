@@ -67,6 +67,8 @@ export interface ReviewScreenProps {
   onProfileChange(id: string | undefined): Promise<void> | void;
   onDeviceChange(id: string | undefined): void;
   onConfigure(): void;
+  /** Into the calibration wizard, and back here afterwards. */
+  onCalibrate(): void;
   /** Drop the recording and stay here — see useTake.reset. */
   onClear(): void;
   /** Open a recording from disk — the same path a dropped file takes. */
@@ -112,11 +114,17 @@ export function ReviewScreen({
   onProfileChange,
   onDeviceChange,
   onConfigure,
+  onCalibrate,
   onClear,
   onFile,
   onNewSession,
   onBack,
 }: ReviewScreenProps): React.ReactElement {
+  /* Declared before the recorder because the recorder's R key is turned off
+     while the dialog is up: a key that starts a recording behind an open
+     dialog answers a question nobody asked. */
+  const [starting, setStarting] = useState(false);
+
   const rec = useRecorder({
     deviceId,
     onClip: useCallback(
@@ -124,6 +132,7 @@ export function ReviewScreen({
       [onAudio],
     ),
     onError,
+    startKey: !starting,
   });
 
   const [focus, setFocus] = useState<Focus | null>(null);
@@ -134,7 +143,6 @@ export function ReviewScreen({
      works without one — that is the point of it — but everything that reads
      the recording has to say so rather than act on an empty one. */
   const blank = isBlankTake(loaded.take);
-  const [starting, setStarting] = useState(false);
 
   /* What the chart shows while a recording is running: the target, the cursor,
      and one empty row for what is arriving.
@@ -543,6 +551,7 @@ export function ReviewScreen({
           profiles={profiles}
           profileId={profileId}
           onProfileChange={chooseProfile}
+          onCalibrate={onCalibrate}
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
           leadLeft={leadLeft}

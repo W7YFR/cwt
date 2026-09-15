@@ -129,10 +129,25 @@ describe("controls", () => {
     const user = userEvent.setup();
     const seen: ReviewSettings[] = [];
     render(<Harness onSettings={(s) => seen.push(s)} />);
-    const box = screen.getByLabelText(/Intended message/i);
+    const box = screen.getByRole("textbox", { name: /Intended message/i });
     await user.clear(box);
     await user.type(box, "cq de w7yfr");
     expect(seen.at(-1)?.expected).toBe("CQ DE W7YFR");
+  });
+
+  it("clears the intended message from inside the box, and offers to only when there is something to clear", async () => {
+    const user = userEvent.setup();
+    const seen: ReviewSettings[] = [];
+    render(<Harness initial={{ expected: "CQ DE W7YFR" }} onSettings={(s) => seen.push(s)} />);
+    const box = screen.getByRole("textbox", { name: /Intended message/i }) as HTMLInputElement;
+
+    await user.click(screen.getByTestId("clear-expected"));
+    expect(seen.at(-1)?.expected).toBe("");
+    // The caret lands where you would type the replacement, which is the
+    // reason to reach for this rather than select-all and delete.
+    expect(document.activeElement).toBe(box);
+    // Nothing left to clear, so nothing offering to.
+    expect(screen.queryByTestId("clear-expected")).toBeNull();
   });
 
   it("disables stop when nothing is playing and enables it when something is", () => {
@@ -189,7 +204,7 @@ describe("controls", () => {
     const { rerender } = render(
       <Controls {...common} settings={{ ...base, expected: "" }} />,
     );
-    const box = screen.getByLabelText(/Intended message/i) as HTMLInputElement;
+    const box = screen.getByRole("textbox", { name: /Intended message/i }) as HTMLInputElement;
     // Worth saying at all: with nothing here the accuracy figure is graded
     // against the decoder's own reading and reads as a tautology.
     expect(box.placeholder).not.toBe("");

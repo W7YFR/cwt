@@ -26,6 +26,13 @@ export interface UseRecorderOptions {
   /** A finished recording, at the level it was captured. */
   onClip(clip: AudioClip): void;
   onError(message: string): void;
+  /** Whether R starts a recording when none is running.
+   *
+   * Off unless asked for. The calibration wizard drives the recorder itself,
+   * on its own schedule, so a key that starts one behind its back would have
+   * nothing to do with what is on screen. The two screens that offer a record
+   * button turn it on, and there the key and the button mean the same thing. */
+  startKey?: boolean | undefined;
 }
 
 export interface RecorderHandle {
@@ -48,8 +55,16 @@ export interface RecorderHandle {
   discard(): Promise<void>;
 }
 
+/** An R meant as a command: no modifiers, and not typed into a control. */
+function bareR(ev: KeyboardEvent): boolean {
+  if (ev.key !== "r" && ev.key !== "R") return false;
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return false;
+  const tag = (ev.target as HTMLElement | null)?.tagName;
+  return tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT";
+}
+
 export function useRecorder(options: UseRecorderOptions): RecorderHandle {
-  const { deviceId, onClip, onError } = options;
+  const { deviceId, onClip, onError, startKey = false } = options;
   const [devices, setDevices] = useState<InputDevice[]>([]);
   const [needPermission, setNeedPermission] = useState(false);
   const [recorder, setRecorder] = useState<Recorder | null>(null);
@@ -147,43 +162,50 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     setElapsed(0);
   }, [recorder]);
 
-  /* Enter finishes the take, Escape throws it away, R starts it over — while
-   * recording, and not otherwise.
+  /* R is the recording key: it starts one, and while one is running it starts
+   * that one over. One key for one idea — "go, from here" — so there is
+   * nothing to remember about which state you are in.
    *
-   * Enter and Escape fire from anywhere, including a text field, which is the
-   * one place the usual "skip it if a control has focus" guard would get
+   * Enter finishes the take and Escape throws it away, while recording and not
+   * otherwise. Those two fire from anywhere, including a text field, which is
+   * the one place the usual "skip it if a control has focus" guard would get
    * wrong. You type what you are about to send, then key it; your hand is on
    * the paddle, not the mouse, and the intended-message box is very likely
    * still focused. Making you click a button to stop would mean the last
    * second of every recording is you reaching for the mouse.
    *
-   * R is different, and gets the guard those two do without. It is a letter:
-   * bound unconditionally it would throw away the take the moment somebody
-   * typed an R into the intended-message box — which is a word away in "CQ DE
+   * R gets the guard those two do without. It is a letter: bound
+   * unconditionally it would start or wreck a take the moment somebody typed
+   * an R into the intended-message box — which is a word away in "CQ DE
    * W7YFR". Modifiers are left alone too, or this would swallow the browser's
    * own reload. */
   useEffect(() => {
-    if (!recorder) return;
+    if (!recorder && !startKey) return;
     const onKey = (ev: KeyboardEvent) => {
       // Mid-composition Enter is committing an IME candidate, not a command.
       if (ev.isComposing) return;
+      if (!recorder) {
+        // Busy is a recording being analyzed — the same state that disables
+        // the button this key stands in for.
+        if (!bareR(ev) || busy) return;
+        ev.preventDefault();
+        void start();
+        return;
+      }
       if (ev.key === "Enter") {
         ev.preventDefault();
         void finish();
       } else if (ev.key === "Escape") {
         ev.preventDefault();
         void discard();
-      } else if (ev.key === "r" || ev.key === "R") {
-        if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-        const tag = (ev.target as HTMLElement | null)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      } else if (bareR(ev)) {
         ev.preventDefault();
         restart();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [discard, finish, recorder, restart]);
+  }, [busy, discard, finish, recorder, restart, start, startKey]);
 
   return {
     devices,

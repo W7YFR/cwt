@@ -199,9 +199,9 @@ describe("the landing screen", () => {
     expect(restart).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves those keys alone when there is nothing being recorded", async () => {
-    // Otherwise Escape and Enter would be doing something invisible on a page
-    // that is mostly a text field.
+  it("leaves Enter and Escape alone when there is nothing being recorded", async () => {
+    // Otherwise they would be doing something invisible on a page that is
+    // mostly a text field. R is the exception, and has its own test below.
     const start = vi.spyOn(mic, "startRecording");
     renderLanding();
     await settled();
@@ -210,6 +210,41 @@ describe("the landing screen", () => {
       fireEvent.keyDown(document, { key: "Escape" });
     });
     expect(start).not.toHaveBeenCalled();
+  });
+
+  it("starts a recording on R, under the same guard that starting one over gets", async () => {
+    /* One key for one idea: R goes, from here. Nothing to remember about
+       which state you are in — it starts a take, and starts a running one
+       over. The guard has to hold either way, because the box you are most
+       likely typing into is a call sign away from an R. */
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue({
+      getTracks: () => [],
+    });
+    const start = vi.spyOn(mic, "startRecording").mockResolvedValue({
+      elapsed: () => 0,
+      peek: () => new Float32Array(0),
+      stop: vi.fn(),
+      cancel: vi.fn(),
+      restart: vi.fn(),
+    });
+    renderLanding();
+    await settled();
+
+    const field = screen.getByLabelText(/going to send/i);
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "r" });
+    });
+    expect(start, "R in a text field").not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "r", metaKey: true });
+    });
+    expect(start, "the browser keeps its own reload").not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "r" });
+    });
+    expect(start).toHaveBeenCalledTimes(1);
   });
 
   it("offers both ways in, with recording first", async () => {

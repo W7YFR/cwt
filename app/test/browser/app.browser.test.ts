@@ -584,6 +584,34 @@ describe("the app", () => {
     expect(loadPrefs().expected).toBe("CQ TEST DE W7YFR");
   });
 
+  it("sits the clear adornment on the field's center line", async () => {
+    /* Real layout, because that is the only place this can go wrong: the
+       button is out of flow inside the box, so nothing in the markup says
+       where it lands. Measured rather than eyeballed — riding a few pixels
+       high is exactly the kind of thing that survives a screenshot. */
+    await served();
+    await mount();
+
+    const box = container.querySelector<HTMLInputElement>("#expected")!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    await act(async () => {
+      setter.call(box, "CQ TEST DE W7YFR");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const button = container.querySelector<HTMLElement>("[data-testid='clear-expected']")!;
+    const field = box.getBoundingClientRect();
+    const glyph = button.querySelector("svg")!.getBoundingClientRect();
+    const mid = (r: DOMRect) => r.top + r.height / 2;
+    expect(Math.abs(mid(glyph) - mid(field))).toBeLessThanOrEqual(1);
+    // And inside the box's right edge rather than over or past it.
+    expect(glyph.right).toBeLessThan(field.right);
+    expect(glyph.left).toBeGreaterThan(field.left);
+  });
+
   describe("clearing the recording", () => {
     /* The loop this is for: set the message and the speeds, hear the target,
        send it, look at how it went, wipe it, send it again. Wiping keeps the

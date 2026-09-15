@@ -60,6 +60,27 @@ describe("the record bar in a session", () => {
     screen.getByTestId("clear-take").click();
     expect(onClear).toHaveBeenCalled();
   });
+
+  it("puts the way into calibrating beside the picker that needs it", () => {
+    /* The picker is where you find out you have nothing to pick. Without this
+       the only ways in are the landing screen and the configuration screen,
+       neither of which is where you are standing when you notice. */
+    const onCalibrate = vi.fn();
+    const { container } = bar({ onCalibrate });
+    const button = screen.getByTestId("calibrate");
+    // Inside the picker rather than out in the row of session actions: it is
+    // about the control next to it, not about the session.
+    expect(container.querySelector("[data-testid='calpick']")).toContainElement(button);
+    button.click();
+    expect(onCalibrate).toHaveBeenCalled();
+  });
+
+  it("does not offer calibrating against a recording that cannot use it", () => {
+    // An opened file is read exactly as recorded — there is no picker there,
+    // so there is nothing for the button to sit beside.
+    bar({ onCalibrate: () => {}, appliesToTake: false });
+    expect(screen.queryByTestId("calibrate")).toBeNull();
+  });
 });
 
 /* Opening a file from the bar.

@@ -157,16 +157,50 @@ export function Controls(props: ControlsProps): React.ReactElement {
             text that appears and disappears next to a label has to wrap
             somewhere the label does not. Inside the box it has a whole row to
             itself and clips instead of reflowing the row above it. */}
-        <input
-          type="text"
-          id="expected"
-          spellCheck={false}
-          autoComplete="off"
-          placeholder="The source of truth to grade against"
-          value={s.expected}
-          ref={expected.ref}
-          onChange={expected.onChange}
-        />
+        {/* The clear button sits inside the box's right edge rather than
+            beside it: this group is the one that absorbs the row's slack, and
+            a button next to the field would take the room back from the only
+            thing that wanted it. */}
+        <div className="clearable">
+          <input
+            type="text"
+            id="expected"
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="The source of truth to grade against"
+            value={s.expected}
+            ref={expected.ref}
+            onChange={expected.onChange}
+          />
+          {s.expected !== "" && (
+            <button
+              type="button"
+              className="clearbtn"
+              data-testid="clear-expected"
+              aria-label="Clear intended message"
+              title="Clear"
+              onClick={() => {
+                onChange({ expected: "" });
+                expected.ref.current?.focus();
+              }}
+            >
+              {/* Drawn rather than typed. A glyph is placed by the font's
+                  own metrics — its ink sits above the baseline, not on the
+                  center line of the box around it — so an × centered as text
+                  reads as riding high in the field. A shape centers on the
+                  geometry. */}
+              <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false">
+                <path
+                  d="M3.2 3.2 L8.8 8.8 M8.8 3.2 L3.2 8.8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
     </section>

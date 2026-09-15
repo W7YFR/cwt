@@ -137,6 +137,9 @@ export interface RecordBarProps {
   onFile?: ((file: File) => void) | undefined;
   /** False once the session has something in it — see the title below. */
   canOpenFile?: boolean | undefined;
+  /** Into the calibration wizard. Beside the picker, because the picker is
+   *  where you find out you have nothing to pick. */
+  onCalibrate?: (() => void) | undefined;
 }
 
 /** Record another, without leaving the review. */
@@ -154,6 +157,7 @@ export function RecordBar({
   onNewSession,
   onFile,
   canOpenFile = true,
+  onCalibrate,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -225,7 +229,7 @@ export function RecordBar({
         onClick={() => void rec.start()}
         disabled={rec.busy}
         aria-label="Record another"
-        title="Record another"
+        title="Record another — or press R"
       >
         <RecDot />
       </button>
@@ -275,6 +279,24 @@ export function RecordBar({
               </option>
             ))}
           </select>
+          {/* The way out of an empty list. Calibrating is reached from the
+              landing screen and from the configuration screen, neither of
+              which is where you are standing when the picker in front of you
+              says there is nothing to apply. */}
+          {onCalibrate && (
+            <button
+              className="cal"
+              data-testid="calibrate"
+              onClick={onCalibrate}
+              title={
+                active
+                  ? `Measure this microphone again — in use: ${active.nickname}`
+                  : "Measure this microphone, so your timing is yours and not the sound path's"
+              }
+            >
+              {active ? "Recalibrate" : "Calibrate"}
+            </button>
+          )}
           <span className="hint" aria-live="polite">
             {rereading ? "reading it again…" : "applies to this recording"}
           </span>

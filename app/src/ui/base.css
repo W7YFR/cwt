@@ -432,6 +432,36 @@ input[type=text]::placeholder {
   color: var(--ink-faint);
 }
 
+/* A box with a button living inside its right edge. The wrapper takes the
+   group's control band and the input stretches to fill it, so the field keeps
+   the same center line as every slider and select in the row. The padding is
+   what stops the text running under the glyph — the button is out of flow, so
+   nothing else reserves that space. */
+.clearable { position: relative; display: flex; }
+.clearable input[type=text] { flex: 1 1 auto; min-width: 0; padding-right: 28px; }
+/* Inside the border rather than on top of it: inset by the 1px the box's own
+   edge occupies, so the focus outline still draws an unbroken frame. Given no
+   border or fill of its own it reads as an adornment of the field, which is
+   what it is, rather than as a second control crowding the first. */
+.clearable .clearbtn {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0 5px 5px 0;
+  background: none;
+  color: var(--ink-faint);
+  line-height: 0;
+}
+.clearable .clearbtn:hover:not(:disabled) { color: var(--ink); border-color: transparent; }
+.clearable .clearbtn:focus-visible { outline: 2px solid var(--you); outline-offset: -2px; }
+
 /* The chevron is ours rather than the platform's.
    A native select ignores padding-right when it places its own arrow, so the
    arrow ends up against the border however much room the box is given. Drawing
@@ -1380,3 +1410,8 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .calpick.ok .dot { background: var(--ok); }
 .calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
 .calpick .hint { font-size: 11px; }
+/* Smaller than the buttons in the bar it sits in, because it belongs to the
+   picker beside it rather than to the row of actions — Record and New session
+   are what this header is for, and a third button their size would read as a
+   third thing of the same weight. */
+.recordbar .calpick .cal { font-size: 11px; padding: 3px 8px; }

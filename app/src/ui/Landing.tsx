@@ -55,6 +55,7 @@ export function Landing(props: LandingProps): React.ReactElement {
       [onAudio],
     ),
     onError,
+    startKey: true,
   });
 
   if (rec.busy) {
@@ -131,7 +132,11 @@ export function Landing(props: LandingProps): React.ReactElement {
                 value={props.deviceId}
                 onChange={props.onDeviceChange}
               />
-              <button className="big" onClick={() => void rec.start()}>
+              <button
+                className="big"
+                onClick={() => void rec.start()}
+                title="Start recording — or press R"
+              >
                 <RecDot /> Start recording
               </button>
               <CalibrationStatus
