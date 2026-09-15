@@ -198,7 +198,21 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .score { display: flex; align-items: baseline; gap: 6px; }
 /* An action among readings, so it sits apart from them and at the far end. */
 .scores { width: 100%; }
-.droprun { margin-left: auto; font-size: 12px; }
+/* Square and icon-only, so it reads as one action at the end of a row of
+   readings rather than as a sentence competing with them. Quiet until it is
+   under the pointer: it throws a recording away, and a red button standing
+   permanently beside your scores reads as a warning about the scores. */
+.droprun {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--ink-dim);
+}
+.droprun:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
 .score b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .score span { color: var(--ink-dim); font-size: 12px; }
 .score.ok b { color: var(--ok); }
@@ -319,6 +333,56 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   gap: 8px 22px;
   padding: 0 0 10px;
 }
+/* The way to the rest of the settings: last on the row and pushed to its far
+   end, out of the path of the controls that are used constantly. */
+.group.panels { display: flex; flex-direction: row; margin-left: auto; }
+.viewcontrols .viewcog {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-dim);
+}
+/* Open reads as held down rather than as colored in: it is a place you are,
+   not a setting that is on, and the treatment `button.on` gets would have it
+   outranking the axis controls beside it. */
+.viewcontrols .viewcog[aria-pressed="true"] {
+  border-color: var(--you);
+  color: var(--ink);
+  background: var(--panel);
+}
+/* A band of its own under the row. `100%` on a wrapping flex row is what puts
+   it there — it cannot share a line with anything, whatever the window is
+   doing, so opening it never rearranges the row above. */
+.viewpanel {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--line);
+}
+/* Two rows, each named. Without the names this is one heap of eleven
+   checkboxes again — what makes it readable is that half of them do nothing
+   to the chart in front of you and say so. */
+.viewpanel .panelrow { display: flex; flex-direction: column; gap: 4px; }
+.viewpanel .uplabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.viewpanel .panelgroups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 22px;
+}
 
 /* ---- controls ---------------------------------------------------------- */
 .controls {
@@ -365,6 +429,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 }
 .group > label.check,
 .group > label.field,
+.group.panels,
 .group.transport { margin-top: auto; }
 /* A readout must never change width. The groups are sized by their content and
    the intended-message field absorbs the slack, so a reading that gains a digit
@@ -552,10 +617,9 @@ canvas.picking { cursor: pointer; }
 
 .belowplot {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 20px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   margin: 8px 0 0;
 }
 .legend {
@@ -567,7 +631,34 @@ canvas.picking { cursor: pointer; }
   font-size: 12px;
   margin: 0;
 }
-.downloads { display: flex; gap: 8px; flex-wrap: wrap; }
+/* The how-to, under the key rather than run on from it. Quieter, because it
+   is read once and the key is read every time. */
+.legend.howto { color: var(--ink-faint); }
+.legend.keys { color: var(--ink-faint); gap: 4px; }
+/* A key, drawn as one. The mono face and the border are what separate "press
+   R" from the letter R in a sentence, which matters most for the single
+   letter — "R record" in running text reads as a typo. */
+.legend kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+/* Their own row under the controls, starting where every other row on this
+   page starts. The same left edge as the controls above and the chart below,
+   so the page has one margin rather than three. */
+.downloads {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+}
 .downloads button { padding: 5px 10px; font-size: 12px; }
 .sw {
   display: inline-block;

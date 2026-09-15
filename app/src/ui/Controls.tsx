@@ -15,11 +15,17 @@ import { useCallback, useState } from "react";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
 import {
+  ADVANCED_GRADING_HELP,
+  CAPTION_ALL_HELP,
   CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
   FLASH_CARD_HELP,
   FLASH_CUE_HELP,
   FLASH_LEAD_HELP,
+  RUN_SCORES_HELP,
+  SHOW_DOWNLOADS_HELP,
+  SHOW_HINTS_HELP,
+  SHOW_RUNS_HELP,
   RUN_SORT_HELP,
   WORD_PREVIEW_HELP,
   GAIN_HELP,
@@ -283,6 +289,10 @@ export interface ViewControlsProps {
  * implies they are the same sort of thing. */
 export function ViewControls(props: ViewControlsProps): React.ReactElement {
   const { settings: s, onChange } = props;
+  /* Whether the rest of the settings are on show. Not a setting itself: it is
+     where you are looking rather than anything about the chart, and it has no
+     business outliving the page or riding along in a saved report. */
+  const [open, setOpen] = useState(false);
   return (
     <section className="viewcontrols">
       {props.runs > 1 && (
@@ -317,6 +327,27 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
         </select>
       </div>
 
+      {/* Next to the axis, because it is the same kind of question: not what
+          is graded, but what is on screen to read. Only with a stack — with
+          one attempt "all" and "the last one" are the same row. */}
+      {props.runs > 1 && (
+        <div className="group">
+          <label htmlFor="show-runs" title={SHOW_RUNS_HELP}>
+            Show
+          </label>
+          <select
+            id="show-runs"
+            value={s.showRuns}
+            onChange={(e) =>
+              onChange({ showRuns: e.target.value as ReviewSettings["showRuns"] })
+            }
+          >
+            <option value="all">All runs</option>
+            <option value="last">Last run</option>
+          </select>
+        </div>
+      )}
+
       <div className="group">
         <label htmlFor="zoom" title={ZOOM_HELP}>
           Zoom <output id="zoom-out">{fmtPpu(s.ppu)}</output>
@@ -343,117 +374,229 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement {
         </div>
       </div>
 
-      <div className="group">
-        <label className="check" title={COLLAPSE_RESTS_HELP}>
-          <input
-            type="checkbox"
-            checked={s.collapseRests}
-            onChange={(e) => onChange({ collapseRests: e.target.checked })}
-          />{" "}
-          Collapse rests
-        </label>
+      {/* One way in to the rest, rather than eleven more controls on the line.
+          Zoom, the axis and the row order are adjusted while looking at the
+          chart and stay out; everything else is set once and left, and having
+          it all on show meant the row wrapped into three and the things you
+          reach for constantly moved every time a conditional checkbox
+          appeared. */}
+      <div className="group panels">
+        <button
+          className="viewcog"
+          data-testid="panel-toggle"
+          aria-pressed={open}
+          aria-controls="view-panel"
+          aria-label="More chart settings"
+          title="More chart settings"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span aria-hidden="true">⚙</span>
+        </button>
       </div>
 
-      <div className="group">
-        <label className="check" title={CHAR_MARKERS_HELP}>
-          <input
-            type="checkbox"
-            id="char-markers"
-            checked={s.charMarkers}
-            onChange={(e) => onChange({ charMarkers: e.target.checked })}
-          />{" "}
-          Character markers
-        </label>
-      </div>
+      {open && (
+        <div className="viewpanel" id="view-panel">
+          <div className="panelrow" data-panel="display">
+            <span className="uplabel">Chart display</span>
+            <div className="panelgroups">
+              <div className="group">
+                <label className="check" title={COLLAPSE_RESTS_HELP}>
+                  <input
+                    type="checkbox"
+                    checked={s.collapseRests}
+                    onChange={(e) => onChange({ collapseRests: e.target.checked })}
+                  />{" "}
+                  Collapse rests
+                </label>
+              </div>
 
-      <div className="group">
-        <label className="check" title={PACE_CURSOR_HELP}>
-          <input
-            type="checkbox"
-            id="pace-cursor"
-            checked={s.paceCursor}
-            onChange={(e) => onChange({ paceCursor: e.target.checked })}
-          />{" "}
-          Pacing cursor
-        </label>
-      </div>
+              <div className="group">
+                <label className="check" title={CHAR_MARKERS_HELP}>
+                  <input
+                    type="checkbox"
+                    id="char-markers"
+                    checked={s.charMarkers}
+                    onChange={(e) => onChange({ charMarkers: e.target.checked })}
+                  />{" "}
+                  Marks only
+                </label>
+              </div>
 
-      {/* Only with the cursor on. A count-in for a cursor that is not running
-          is a setting for nothing, and it would be one more control in a row
-          that is already busy. */}
-      {s.paceCursor && (
-        <div className="group">
-          <NumberField
-            id="pace-lead"
-            name="Delay start"
-            unit="s"
-            help={PACE_LEAD_HELP}
-            value={s.paceLeadSec}
-            min={PACE_LEAD_MIN_SEC}
-            max={PACE_LEAD_MAX_SEC}
-            step={1}
-            onChange={(v) => onChange({ paceLeadSec: v })}
-          />
+              {/* Both only with a stack. With one attempt on screen the scores
+                  would repeat the band under the chart, and there is no "every
+                  row" to caption. */}
+              {props.runs > 1 && (
+                <>
+                  <div className="group">
+                    <label className="check" title={RUN_SCORES_HELP}>
+                      <input
+                        type="checkbox"
+                        id="run-scores"
+                        checked={s.runScores}
+                        onChange={(e) => onChange({ runScores: e.target.checked })}
+                      />{" "}
+                      Scores
+                    </label>
+                  </div>
+
+                  <div className="group">
+                    <label className="check" title={CAPTION_ALL_HELP}>
+                      <input
+                        type="checkbox"
+                        id="caption-all"
+                        checked={s.captionAll}
+                        onChange={(e) => onChange({ captionAll: e.target.checked })}
+                      />{" "}
+                      Decode all
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="panelrow" data-panel="practice">
+            <span className="uplabel">Practice aids</span>
+            <div className="panelgroups">
+              <div className="group">
+                <label className="check" title={PACE_CURSOR_HELP}>
+                  <input
+                    type="checkbox"
+                    id="pace-cursor"
+                    checked={s.paceCursor}
+                    onChange={(e) => onChange({ paceCursor: e.target.checked })}
+                  />{" "}
+                  Pacing cursor
+                </label>
+              </div>
+
+              {/* Only with the cursor on. A count-in for a cursor that is not
+                  running is a setting for nothing. */}
+              {s.paceCursor && (
+                <div className="group">
+                  <NumberField
+                    id="pace-lead"
+                    name="Delay start"
+                    unit="s"
+                    help={PACE_LEAD_HELP}
+                    value={s.paceLeadSec}
+                    min={PACE_LEAD_MIN_SEC}
+                    max={PACE_LEAD_MAX_SEC}
+                    step={1}
+                    onChange={(v) => onChange({ paceLeadSec: v })}
+                  />
+                </div>
+              )}
+
+              <div className="group">
+                <label className="check" title={FLASH_CARD_HELP}>
+                  <input
+                    type="checkbox"
+                    id="flash-card"
+                    checked={s.flashCard}
+                    onChange={(e) => onChange({ flashCard: e.target.checked })}
+                  />{" "}
+                  Flash card
+                </label>
+              </div>
+
+              {/* All three only with the card up — a cue for something not on
+                  screen, a lead on a cue that never fires, and a word preview
+                  under a card that is not there, are settings for nothing. */}
+              {s.flashCard && (
+                <div className="group">
+                  <label className="check" title={FLASH_CUE_HELP}>
+                    <input
+                      type="checkbox"
+                      id="flash-cue"
+                      checked={s.flashCue}
+                      onChange={(e) => onChange({ flashCue: e.target.checked })}
+                    />{" "}
+                    Flash cue
+                  </label>
+                </div>
+              )}
+
+              {s.flashCard && (
+                <div className="group">
+                  <label className="check" title={WORD_PREVIEW_HELP}>
+                    <input
+                      type="checkbox"
+                      id="word-preview"
+                      checked={s.wordPreview}
+                      onChange={(e) => onChange({ wordPreview: e.target.checked })}
+                    />{" "}
+                    Word preview
+                  </label>
+                </div>
+              )}
+
+              {s.flashCard && s.flashCue && (
+                <div className="group">
+                  <NumberField
+                    id="flash-lead"
+                    name="Flash lead"
+                    unit="ms"
+                    help={FLASH_LEAD_HELP}
+                    value={s.flashLeadMs}
+                    min={FLASH_LEAD_MIN_MS}
+                    max={FLASH_LEAD_MAX_MS}
+                    step={10}
+                    onChange={(v) => onChange({ flashLeadMs: v })}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Not the chart: these two put a whole block on the page or take it
+              away, which is a different kind of decision from how the marks
+              above are drawn. Grouped by that rather than by what they happen
+              to contain — a row of buttons and three tables have nothing else
+              in common. */}
+          <div className="panelrow" data-panel="extras">
+            <span className="uplabel">Also show</span>
+            <div className="panelgroups">
+              <div className="group">
+                <label className="check" title={SHOW_DOWNLOADS_HELP}>
+                  <input
+                    type="checkbox"
+                    id="show-downloads"
+                    checked={s.showDownloads}
+                    onChange={(e) => onChange({ showDownloads: e.target.checked })}
+                  />{" "}
+                  Downloads
+                </label>
+              </div>
+
+              <div className="group">
+                <label className="check" title={SHOW_HINTS_HELP}>
+                  <input
+                    type="checkbox"
+                    id="show-hints"
+                    checked={s.showHints}
+                    onChange={(e) => onChange({ showHints: e.target.checked })}
+                  />{" "}
+                  Hints
+                </label>
+              </div>
+
+              <div className="group">
+                <label className="check" title={ADVANCED_GRADING_HELP}>
+                  <input
+                    type="checkbox"
+                    id="advanced-grading"
+                    checked={s.advancedGrading}
+                    onChange={(e) => onChange({ advancedGrading: e.target.checked })}
+                  />{" "}
+                  Advanced grading
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="group">
-        <label className="check" title={FLASH_CARD_HELP}>
-          <input
-            type="checkbox"
-            id="flash-card"
-            checked={s.flashCard}
-            onChange={(e) => onChange({ flashCard: e.target.checked })}
-          />{" "}
-          Flash card
-        </label>
-      </div>
-
-      {/* Both only with the card up — a cue for something not on screen, and a
-          lead on a cue that never fires, are settings for nothing. */}
-      {s.flashCard && (
-        <div className="group">
-          <label className="check" title={FLASH_CUE_HELP}>
-            <input
-              type="checkbox"
-              id="flash-cue"
-              checked={s.flashCue}
-              onChange={(e) => onChange({ flashCue: e.target.checked })}
-            />{" "}
-            Flash cue
-          </label>
-        </div>
-      )}
-
-      {s.flashCard && (
-        <div className="group">
-          <label className="check" title={WORD_PREVIEW_HELP}>
-            <input
-              type="checkbox"
-              id="word-preview"
-              checked={s.wordPreview}
-              onChange={(e) => onChange({ wordPreview: e.target.checked })}
-            />{" "}
-            Word preview
-          </label>
-        </div>
-      )}
-
-      {s.flashCard && s.flashCue && (
-        <div className="group">
-          <NumberField
-            id="flash-lead"
-            name="Flash lead"
-            unit="ms"
-            help={FLASH_LEAD_HELP}
-            value={s.flashLeadMs}
-            min={FLASH_LEAD_MIN_MS}
-            max={FLASH_LEAD_MAX_MS}
-            step={10}
-            onChange={(v) => onChange({ flashLeadMs: v })}
-          />
-        </div>
-      )}
     </section>
   );
 }

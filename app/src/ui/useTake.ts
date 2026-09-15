@@ -142,6 +142,12 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
     charMarkers: p.charMarkers ?? base.charMarkers,
+    runScores: p.runScores ?? base.runScores,
+    advancedGrading: p.advancedGrading ?? base.advancedGrading,
+    showDownloads: p.showDownloads ?? base.showDownloads,
+    showHints: p.showHints ?? base.showHints,
+    showRuns: p.showRuns ?? base.showRuns,
+    captionAll: p.captionAll ?? base.captionAll,
     flashCard: p.flashCard ?? base.flashCard,
     flashCue: p.flashCue ?? base.flashCue,
     flashLeadMs: p.flashLeadMs ?? base.flashLeadMs,
@@ -162,6 +168,12 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
     charMarkers: prev.charMarkers,
+    runScores: prev.runScores,
+    advancedGrading: prev.advancedGrading,
+    showDownloads: prev.showDownloads,
+    showHints: prev.showHints,
+    showRuns: prev.showRuns,
+    captionAll: prev.captionAll,
     flashCard: prev.flashCard,
     flashCue: prev.flashCue,
     flashLeadMs: prev.flashLeadMs,
@@ -188,6 +200,19 @@ export function useTake(): TakeState {
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
       charMarkers: false,
+      /* On, because it is what a stack is for: several attempts side by side
+         and which went better readable without clicking through them. */
+      runScores: true,
+      /* On until turned off. A hint nobody has seen cannot be asked for, and
+         the tables are the answer to "why" — which is the next question after
+         a score you did not like. */
+      advancedGrading: true,
+      showDownloads: false,
+      showHints: true,
+      showRuns: "all",
+      /* Off. One row of text is a caption; six is a wall, and the rows under
+         it are the thing being compared. */
+      captionAll: false,
       flashCard: false,
       flashCue: true,
       flashLeadMs: FLASH_LEAD_DEFAULT_MS,
@@ -250,6 +275,12 @@ export function useTake(): TakeState {
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
         charMarkers: next.charMarkers,
+        runScores: next.runScores,
+        advancedGrading: next.advancedGrading,
+        showDownloads: next.showDownloads,
+        showHints: next.showHints,
+        showRuns: next.showRuns,
+        captionAll: next.captionAll,
         flashCard: next.flashCard,
         flashCue: next.flashCue,
         flashLeadMs: next.flashLeadMs,

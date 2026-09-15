@@ -13,7 +13,7 @@ import { recordingCtx } from "../recording-ctx";
 import { caseNamed, reviewFrom, CLEAN, SLOPPY } from "../fixture";
 import { draw, type Lane, type Scene } from "@/render/scene";
 import { buildLayout, measureColumns } from "@/render/layout";
-import { GUTTER, PAD_R, ROW_H, rowsFor } from "@/render/geometry";
+import { GUTTER, LABEL_H, PAD_R, ROW_H, rowsFor } from "@/render/geometry";
 import { FALLBACK_PALETTE } from "@/render/theme";
 import type { Review, ViewMode } from "@/types";
 
@@ -375,6 +375,16 @@ describe("grades in the gutter", () => {
     }
   });
 
+  it("can be turned off", () => {
+    const runs = reviews();
+    const on = stack(runs);
+    expect(percents({ ...on, runScores: false })).toEqual([]);
+    // And the names stay, because that is not what was switched off.
+    expect(
+      inGutter({ ...on, runScores: false }).filter((c) => /^RUN /.test(c.text ?? "")),
+    ).toHaveLength(runs.length);
+  });
+
   it("says nothing extra when there is only one attempt", () => {
     /* The band under the chart is already that run's score, and a second copy
        of it four pixels from the row is noise. It is also what keeps a single
@@ -386,6 +396,46 @@ describe("grades in the gutter", () => {
   it("stays out of a view that has no per-attempt rows", () => {
     const runs = reviews();
     expect(percents(stack(runs, 0, 4000, "overlay")).length).toBe(0);
+  });
+});
+
+/* Captioning every attempt, rather than the one being read.
+ *
+ * The band is reserved on every row whichever way this is set — that is what
+ * keeps picking a row from moving the rows under it — so this changes what is
+ * written and nothing about where anything sits.
+ */
+describe("captions on every row", () => {
+  /** How many of the caption bands on offer actually got text written in one.
+   *
+   * By band rather than by count of characters: what is being asked is how
+   * many attempts are captioned, and the runs decode differently so their
+   * captions are not the same length. */
+  const rowsWritten = (all: boolean) => {
+    const runs = reviews();
+    const scene: Scene = { ...stack(runs), rows: rowsFor(runs.length, 0, all) };
+    const text = paint(scene)
+      .ofType("fillText")
+      .filter((c) => c.args[0]! >= GUTTER);
+    return scene.rows.runs.filter(
+      (r) =>
+        r.label !== null &&
+        text.some((c) => c.args[1]! >= r.label! && c.args[1]! <= r.label! + LABEL_H),
+    ).length;
+  };
+
+  it("writes one row of text by default and all of them when asked", () => {
+    expect(rowsWritten(false)).toBe(1);
+    expect(rowsWritten(true)).toBe(2);
+  });
+
+  it("reserves the band either way, so nothing moves when it changes", () => {
+    const one = rowsFor(4, 2, false);
+    const all = rowsFor(4, 2, true);
+    expect(all.runs.map((r) => [r.grade, r.row, r.bottom])).toEqual(
+      one.runs.map((r) => [r.grade, r.row, r.bottom]),
+    );
+    expect(all.height).toBe(one.height);
   });
 });
 

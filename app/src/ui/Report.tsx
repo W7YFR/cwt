@@ -56,7 +56,7 @@ export function Report({
        send" would be pointing at nothing. */
     const hasTarget = review.ideal.chars.length > 0;
     return (
-      <section className="report">
+      <section className="report" data-testid="report">
         <div className="card">
           <h2>Nothing recorded yet</h2>
           <p
@@ -85,7 +85,7 @@ export function Report({
   }
 
   return (
-    <section className="report">
+    <section className="report" data-testid="report">
       <div className="card">
         <h2>Element &amp; spacing</h2>
         <table>

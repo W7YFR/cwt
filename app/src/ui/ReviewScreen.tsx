@@ -169,14 +169,28 @@ export function ReviewScreen({
       ),
     [settings, loaded.take.toneHz],
   );
-  const shown = recording ? [incoming] : stack;
-  const shownAt = recording ? 0 : selected;
+  /* The same reduction the cursor gets, asked for rather than imposed: one
+     row, and it is the attempt just made. */
+  const lastOnly = !recording && settings.showRuns === "last" && stack.length > 1;
+  const last = stack.length - 1;
+  const shown = recording ? [incoming] : lastOnly ? [stack[last]!] : stack;
+  const shownAt = recording || lastOnly ? 0 : selected;
   /* Where each attempt's row goes. Session indices throughout — sorting moves
      rows, and nothing else in here has to know that it did. */
   const order = useMemo(
-    () => (recording ? [0] : runOrder(stack, settings.runSort)),
-    [recording, stack, settings.runSort],
+    () => (recording || lastOnly ? [0] : runOrder(stack, settings.runSort)),
+    [recording, lastOnly, stack, settings.runSort],
   );
+
+  /* And the rest of the page reads the same attempt the chart is drawing.
+     Everything below the chart is about the selected run, so showing the last
+     one while the scores and the report describe another would be two answers
+     to one question. Moving the selection rather than teaching each of them a
+     second way to find its subject. */
+  useEffect(() => {
+    if (!lastOnly || last < 0 || selected === last) return;
+    onSelectRun(last);
+  }, [lastOnly, last, selected, onSelectRun]);
   const [rereading, setRereading] = useState(false);
   /* Seconds left of the lead-in, or null when no cursor is running. Whole
      numbers only: this is state, and updating it every frame would re-render
@@ -608,6 +622,47 @@ export function ReviewScreen({
         onStop={stop}
       />
 
+      {/* A row of their own under the controls, rather than tucked beside the
+          legend below the chart. What comes out of this screen is a file, and
+          a way out of the app does not belong in the small print of how to
+          read the chart. Asked for, though: it is an occasional act, and four
+          buttons across the page is a standing invitation to something you do
+          rarely. */}
+      {settings.showDownloads && (
+        <div className="downloads">
+          {/* The two that describe a recording are only offered when there is
+              one. The target's audio and the chart are both renderable from
+              the message and the speeds alone. */}
+          <button
+            onClick={() => void downloadYou()}
+            disabled={blank}
+            title="The recording, as made"
+          >
+            ↓ Your audio
+          </button>
+          <button
+            onClick={() => void downloadTarget()}
+            title="Perfect keying of the intended message, rendered at the current speed"
+          >
+            ↓ Target audio
+          </button>
+          <button
+            onClick={downloadPng}
+            title="The whole analysis, not just the visible part"
+          >
+            ↓ Chart PNG
+          </button>
+          <button
+            onClick={downloadJson}
+            disabled={blank}
+            title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
+          >
+            ↓ JSON report
+          </button>
+          <span className="hint">{status}</span>
+        </div>
+      )}
+
       {starting && (
         <NewSession
           expected={settings.expected}
@@ -662,58 +717,51 @@ export function ReviewScreen({
         />
 
         <div className="belowplot">
+          {/* The key and the instructions on separate lines. Run together they
+              were one paragraph that wrapped wherever the window happened to
+              put it, and the last swatch dropped to the next line on its own —
+              a key reads as a set, and a set with one member below the others
+              reads as two things. */}
           <p className="legend">
             <span className="sw ok" /> within tolerance
             <span className="sw warn" /> up to 2&times; off
             <span className="sw bad" /> worse
             <span className="sw ghost" /> missing
             <span className="sw rest" /> rest (not graded)
-            &nbsp;·&nbsp; click a character to hear it, a gap to hear it between
-            what it separates &nbsp;·&nbsp; click the ruler to seek
-            &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll to pan
-            (the view follows playback)
           </p>
-          <div className="downloads">
-            {/* The three that describe a recording are only offered when
-                there is one. The target's audio and the chart are both
-                renderable from the message and the speeds alone. */}
-            <button
-              onClick={() => void downloadYou()}
-              disabled={blank}
-              title="The recording, as made"
-            >
-              ↓ Your audio
-            </button>
-            <button
-              onClick={() => void downloadTarget()}
-              title="Perfect keying of the intended message, rendered at the current speed"
-            >
-              ↓ Target audio
-            </button>
-            <button
-              onClick={downloadPng}
-              title="The whole analysis, not just the visible part"
-            >
-              ↓ Chart PNG
-            </button>
-            <button
-              onClick={downloadJson}
-              disabled={blank}
-              title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
-            >
-              ↓ JSON report
-            </button>
-            <span className="hint">{status}</span>
-          </div>
+          {settings.showHints && (
+            <>
+              <p className="legend howto">
+                click a character to hear it, a gap to hear it between what it
+                separates &nbsp;·&nbsp; click the ruler to seek &nbsp;·&nbsp;
+                scroll to zoom &nbsp;·&nbsp; drag or shift-scroll to pan (the
+                view follows playback)
+              </p>
+              {/* The recording transport, which is otherwise only discoverable
+                  by pressing a key and seeing what happens. R carries both
+                  halves of one idea — go, from here — so it starts a take and
+                  starts a running one over, and the legend says so rather than
+                  naming half of what the key does. */}
+              <p className="legend keys" data-testid="hotkeys">
+                <kbd>R</kbd> record/restart &nbsp;·&nbsp; <kbd>Enter</kbd> finish
+                &nbsp;·&nbsp; <kbd>Esc</kbd> cancel
+              </p>
+            </>
+          )}
         </div>
       </section>
 
-      <Report
-        review={review}
-        tolerance={settings.tolerance}
-        onPlayDeviation={playDeviation}
-        onFocus={setFocus}
-      />
+      {/* The tables, when they are asked for. With nothing recorded the card
+          is not grading at all — it is what to do next — so it stays either
+          way; there is nothing yet for a switch about depth to be about. */}
+      {(blank || settings.advancedGrading) && (
+        <Report
+          review={review}
+          tolerance={settings.tolerance}
+          onPlayDeviation={playDeviation}
+          onFocus={setFocus}
+        />
+      )}
     </>
   );
 }

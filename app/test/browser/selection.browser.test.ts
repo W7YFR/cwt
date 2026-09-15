@@ -41,12 +41,13 @@ const TARGET = "CQ DE W7YFR";
 
 /** The review screen driven the way App drives it: the selected index decides
  *  which attempt is loaded, which is what made picking a row re-fit. */
-function mount() {
+function mount(over: Partial<ReviewSettings> = {}) {
   const takes = [SLOPPY, CLEAN].map((name) => takeFrom(caseNamed(name)));
   let latest: ReviewSettings = {
     ...defaultSettings(takes[0]!),
     expected: TARGET,
     view: "absolute",
+    ...over,
   };
   let picked = 0;
 
@@ -87,7 +88,17 @@ function mount() {
   }
 
   act(() => root.render(createElement(Harness)));
-  return { ppu: () => latest.ppu, picked: () => picked, runs: takes.length };
+  return {
+    ppu: () => latest.ppu,
+    picked: () => picked,
+    runs: takes.length,
+    rows: () => {
+      // One lane per attempt drawn, read off the height the chart sized itself
+      // to rather than counted out of the markup — the rows are painted.
+      const h = host.querySelector("canvas")!.getBoundingClientRect().height;
+      return Math.round((h - rowsFor(1, 0).height) / (rowsFor(2, 0).height - rowsFor(1, 0).height)) + 1;
+    },
+  };
 }
 
 /** Click a run's name in the gutter, which is how a row is picked. */
@@ -131,3 +142,21 @@ describe("picking a row out of a stack", () => {
    height cannot catch that on its own: exactly one lane wears the caption
    however the selection moves, so the chart came to the same height while
    every row under the selection sat somewhere else. */
+
+describe("showing one attempt or all of them", () => {
+  it("draws every attempt by default and just the newest when asked", () => {
+    /* All of them is the comparison — one column axis, readable down a column
+       as well as along a row. The last one alone is the loop: send it, look at
+       it, send it again, where the attempts behind it are in the way. */
+    expect(mount().rows()).toBe(2);
+    expect(mount({ showRuns: "last" }).rows()).toBe(1);
+  });
+
+  it("reads the attempt it is drawing", () => {
+    /* Everything under the chart is about the selected run, so drawing the
+       last one while the scores describe another would be two answers to one
+       question. */
+    const app = mount({ showRuns: "last" });
+    expect(app.picked()).toBe(app.runs - 1);
+  });
+});

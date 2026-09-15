@@ -141,6 +141,8 @@ export interface Scene {
   /** Draw each character as a fixed-width marker at the moment it starts,
    *  rather than as its own dits and dahs. See `drawCharMarker`. */
   charMarkers?: boolean;
+  /** Put each attempt's scores in the gutter beside its name. */
+  runScores?: boolean;
   /** Count-in reserved in front of the first character, in seconds. Absent or
    *  zero outside a paced recording — see `LayoutOptions.leadSec`. */
   leadSec?: number;
@@ -1036,7 +1038,8 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
    * went better — and the answer was only ever available one row at a time, by
    * clicking each in turn and reading the band below. The absolute and overlay
    * views have their own bands and no per-attempt rows to hang these on. */
-  const graded = scene.view !== "overlay" && scene.runs.length > 1;
+  const graded =
+    scene.runScores !== false && scene.view !== "overlay" && scene.runs.length > 1;
 
   // In overlay the tracks share one band, so the two names stack as a color key
   // inside it rather than labeling separate rows.

@@ -144,9 +144,24 @@ export function Scores({
           className="droprun"
           onClick={onDrop}
           data-testid="drop-run"
-          title="Throw this attempt away and keep the others"
+          aria-label={`Drop run ${runOf.at + 1}`}
+          title={`Throw run ${runOf.at + 1} away and keep the others`}
         >
-          Drop run {runOf.at + 1}
+          {/* Drawn rather than typed: no system font carries a trash can that
+              can be relied on to look like one, and the emoji that do are a
+              different color and weight from everything around them. Which run
+              it will throw away moves to the name, where a screen reader finds
+              it and a pointer finds it as a tooltip. */}
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+            <path
+              d="M2.5 4.5h11M6.5 4.5V3a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8v1.5M4 4.5l.7 8.3a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4.5M6.6 7v4M9.4 7v4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
       )}
     </div>

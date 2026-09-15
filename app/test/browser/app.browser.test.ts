@@ -218,12 +218,100 @@ describe("the app", () => {
     await served();
     await mount();
 
-    // The header, the chart, and the report — the three things that together
-    // mean the whole pipeline ran.
+    // The header, the grade and the chart — the three things that together
+    // mean the whole pipeline ran. Not the grading tables: those are behind
+    // Advanced grading and off unless asked for, so their absence says
+    // nothing about whether the recording came back.
     expect(container.querySelector(".brandmark")).not.toBeNull();
     expect(container.textContent).toContain("consistent");
     expect(container.querySelector("canvas")).not.toBeNull();
-    expect(container.textContent).toContain("Element & spacing");
+    expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"))
+      .toBe("false");
+  });
+
+/** Tick a box in the chart settings panel, opening the panel if it is shut.
+ *
+ * Only if: the cog is a toggle, so opening one that is already open closes it
+ * and takes the box being reached for with it. */
+async function tickSetting(id: string): Promise<void> {
+  const cog = () => container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+  if (cog().getAttribute("aria-pressed") !== "true") {
+    await act(async () => cog().click());
+  }
+  await act(async () => container.querySelector<HTMLInputElement>(`#${id}`)!.click());
+}
+
+const showDownloads = () => tickSetting("show-downloads");
+
+  it("shows the grading tables only when they are asked for", async () => {
+    /* They are the deepest thing on the page and the slowest to read, and the
+       scores band answers "how did that go" without them. Driven through the
+       real control rather than through a settings object, because what is
+       being checked is that the switch reaches the tables. */
+    await served();
+    await mount();
+    const report = () => container.querySelector("[data-testid='report']");
+    // On to begin with: they are the answer to "why", which is the next
+    // question after a score you did not like.
+    expect(report()).not.toBeNull();
+    expect(report()!.textContent).toContain("Element & spacing");
+
+    await tickSetting("advanced-grading");
+    expect(report()).toBeNull();
+
+    await tickSetting("advanced-grading");
+    expect(report()).not.toBeNull();
+  });
+
+  it("takes the hints away without taking the key with them", async () => {
+    /* The color key is a legend and is read every time; the two notes under it
+       are instructions, and an instruction is furniture once you know it. */
+    await served();
+    await mount();
+    const howto = () => container.querySelector(".legend.howto");
+    const keys = () => container.querySelector("[data-testid='hotkeys']");
+    expect(howto()).not.toBeNull();
+    expect(keys()).not.toBeNull();
+
+    await tickSetting("show-hints");
+    expect(howto()).toBeNull();
+    expect(keys()).toBeNull();
+    // The swatches stay: that is what the colors on the chart mean.
+    expect(container.querySelector(".legend .sw")).not.toBeNull();
+  });
+
+  it("says which keys work, since a key is otherwise found by pressing it", async () => {
+    /* R above all: it is what you press to go again, and the review is where
+       you are standing when you decide to. The other two are on the record bar
+       while a take is running, but a legend that named only one key would read
+       as the only one there is. */
+    await served();
+    await mount();
+    const keys = container.querySelector("[data-testid='hotkeys']")!;
+    expect([...keys.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual([
+      "R",
+      "Enter",
+      "Esc",
+    ]);
+  });
+
+  it("offers the downloads only when they are asked for", async () => {
+    /* Getting a file out is an occasional act, and four buttons across the
+       page is a standing invitation to something you do rarely. */
+    await served();
+    await mount();
+    const row = () => container.querySelector(".downloads");
+    expect(row()).toBeNull();
+
+    await showDownloads();
+    expect(row()).not.toBeNull();
+    // All four, and where the rest of the page starts rather than off to the
+    // right on a margin of its own.
+    expect(row()!.querySelectorAll("button")).toHaveLength(4);
+    const left = (el: Element) => el.getBoundingClientRect().left;
+    expect(left(row()!.querySelector("button")!)).toBeLessThan(
+      left(container.querySelector("canvas")!) + 40,
+    );
   });
 
   it("actually rasterizes the chart, rather than leaving a blank canvas", async () => {
@@ -656,6 +744,9 @@ describe("the app", () => {
     it("offers nothing that would act on a recording that is not there", async () => {
       await served();
       await mount();
+      // The download buttons are among the things being checked and are off
+      // unless asked for, so ask.
+      await showDownloads();
       await act(async () => clear().click());
 
       // Matched on the accessible name as well as the text, since some of

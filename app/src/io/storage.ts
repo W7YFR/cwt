@@ -383,6 +383,12 @@ export interface Prefs {
   paceCursor?: boolean;
   paceLeadSec?: number;
   charMarkers?: boolean;
+  runScores?: boolean;
+  advancedGrading?: boolean;
+  showDownloads?: boolean;
+  showHints?: boolean;
+  showRuns?: "all" | "last";
+  captionAll?: boolean;
   flashCard?: boolean;
   flashCue?: boolean;
   flashLeadMs?: number;

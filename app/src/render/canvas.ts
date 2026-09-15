@@ -235,6 +235,7 @@ export function createChart(
       driftMax,
       leadSec,
       charMarkers: input.settings.charMarkers,
+      runScores: input.settings.runScores,
     };
     return s;
   }
@@ -288,7 +289,7 @@ export function createChart(
       } satisfies Lane;
     });
     layout = lanes[selected]!.layout;
-    rows = rowsFor(lanes.length, selected);
+    rows = rowsFor(lanes.length, selected, input.settings.captionAll);
   }
 
   function resize(): void {
