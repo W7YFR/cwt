@@ -369,8 +369,15 @@ export function Calibrate(props: CalibrateProps): React.ReactElement {
                 <strong>{shown.title}</strong>
                 <p className="lede">{shown.body}</p>
               </div>
+              {/* A cued drill's first cue is the drill starting, so this rest
+                  is the count into it. Saying "starts in" and then calling for
+                  a dit on the same beat asks somebody to read two things in
+                  the moment they are meant to be sending. */}
               <div className="countdown" aria-live="polite" data-testid="countdown" data-state="waiting">
-                <span className="cdlabel">starts in</span> {left}s
+                <span className="cdlabel">
+                  {shown.cueSec ? "first dit in" : "starts in"}
+                </span>{" "}
+                {left}s
               </div>
             </>
           ) : (
@@ -522,8 +529,11 @@ export function Cue({
 }): React.ReactElement {
   const every = drill.cueSec ?? 0;
   const total = cueCount(drill);
-  const fired = every > 0 ? Math.floor(Math.max(into, 0) / every) : 0;
-  const calling = fired >= 1 && into - fired * every < CALL_SEC;
+  /* Cues land at 0, every, 2×every… so the first one is the drill starting.
+     One-based: `fired` is how many have been called, and on the first frame
+     of the drill that is already one. */
+  const fired = every > 0 ? Math.floor(Math.max(into, 0) / every) + 1 : 0;
+  const calling = fired >= 1 && into - (fired - 1) * every < CALL_SEC;
   const waiting = fired + 1 <= total;
   const now = calling || !waiting;
 
@@ -542,7 +552,7 @@ export function Cue({
       ) : (
         <>
           <span className="cdlabel">dit in</span>{" "}
-          {Math.max(1, Math.ceil((fired + 1) * every - into))}s
+          {Math.max(1, Math.ceil(fired * every - into))}s
         </>
       )}
     </div>

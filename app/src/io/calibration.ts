@@ -59,12 +59,22 @@ export interface Drill {
   readonly cueSec?: number;
 }
 
+/** Room left after the last cue of a drill, in seconds.
+ *
+ * A cue that vanishes as you act on it is one you are always slightly late
+ * for, and the release it asks for needs quiet after it to be measured at all.
+ * So the drill runs on past its last cue rather than ending on it. */
+const CUE_TAIL_SEC = 1;
+
 /** When a drill is cued, how many cues it gets.
  *
- * The first lands one interval in, so there is something to wait for rather
- * than a cue you have already missed by the time you have read it. */
+ * The first lands as the drill begins. The rest in front of it has already
+ * counted down to that moment, so holding you an interval longer with nothing
+ * to do is a wait you have just had — and the pause the splitter needs is the
+ * rest itself, not the head of the drill. */
 export function cueCount(drill: Drill): number {
-  return drill.cueSec ? Math.floor(drill.seconds / drill.cueSec) : 0;
+  if (!drill.cueSec) return 0;
+  return Math.floor((drill.seconds - CUE_TAIL_SEC) / drill.cueSec) + 1;
 }
 
 /** Quiet between drills. Not dead time: it is what the splitter finds the
@@ -83,10 +93,9 @@ export const REST_SEC = 4;
  *     from 2 seconds up is within 0.15 ms — a fifth of a percent of a dit.
  *     Four seconds is generous.
  *   - The isolated drill needs three releases to be judged at all, which at
- *     two seconds apart is five seconds of recording. Four cues two seconds
- *     apart gives four releases, and the drill runs a second past the last one
- *     so the cue is still on screen when the dit is sent rather than vanishing
- *     as the rest begins.
+ *     two seconds apart is five seconds of recording. Nine seconds holds five
+ *     cues two seconds apart, counting the one that lands as the drill starts,
+ *     and leaves a second past the last of them — see CUE_TAIL_SEC.
  *
  * There is deliberately no silence drill. One was asked for and nothing ever
  * read it: the noise floor is not an input to any measurement here, and the

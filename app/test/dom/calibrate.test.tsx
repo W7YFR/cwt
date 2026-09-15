@@ -483,12 +483,16 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
 
     for (let i = 0; i < STEPS.length; i++) {
       const step = STEPS[i]!;
-      /* A rest is always "hold off". An uncued drill is always "send". The
-         cued one opens on "hold off" too — there is a cue to wait for — and
-         flips on the beat, which is the whole reason it exists. */
-      const want = step.rest || step.cueSec ? "waiting" : "sending";
+      // A rest is always "hold off". A drill is always "send" the moment it
+      // begins — the cued one included, because its first cue is the drill
+      // beginning.
+      const want = step.rest ? "waiting" : "sending";
       expect(state(), step.key).toBe(want);
       if (step.cueSec) {
+        // And back to holding off between beats, which is the whole reason it
+        // alternates rather than inventing a third thing.
+        await clockTo(BOUNDS[i - 1]! + step.cueSec * 0.6);
+        expect(state(), `${step.key} between beats`).toBe("waiting");
         await clockTo(BOUNDS[i - 1]! + step.cueSec);
         expect(state(), `${step.key} on the beat`).toBe("sending");
       }
@@ -509,33 +513,51 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     const user = userEvent.setup();
     renderWizard();
     await begin(user);
-    await clockTo(at);
 
-    // Before the first call there is something to wait for, not a cue already
-    // missed by the time it has been read.
-    expect(screen.getByTestId("cue").dataset.cue).toBe("wait");
+    /* The rest in front of it is the count into the first dit, and says so.
+       It is the same wait either way — the drill just does not spend an
+       interval of its own repeating it. */
+    await clockTo(at - 1);
+    expect(screen.getByTestId("countdown").dataset.state).toBe("waiting");
+    expect(screen.getByTestId("countdown").querySelector(".cdlabel")!.textContent)
+      .toMatch(/dit/i);
 
     const calls = cueCount(drill);
     for (let n = 1; n <= calls; n++) {
-      await clockTo(at + n * every);
+      // The first call is the drill beginning, so the nth lands n-1 intervals
+      // in rather than n.
+      await clockTo(at + (n - 1) * every);
       const cue = screen.getByTestId("cue");
       expect(cue.dataset.cue, `cue ${n}`).toBe("now");
-      expect(cue.dataset.fired).toBe(String(n));
+      expect(cue.dataset.fired, `cue ${n}`).toBe(String(n));
 
       // Between calls it goes back to counting toward the next one.
       if (n < calls) {
-        await clockTo(at + n * every + every * 0.6);
+        await clockTo(at + (n - 1) * every + every * 0.6);
         expect(screen.getByTestId("cue").dataset.cue, `between ${n}`).toBe("wait");
       }
     }
 
     /* After the last one the call stays up for the rest of the drill rather
        than reverting to a countdown for a dit that is never coming. That
-       trailing second is why the drill runs a second past its last cue: a cue
-       that vanishes as you act on it is one you are always slightly late
-       for. */
-    await clockTo(at + calls * every + (drill.seconds - calls * every) * 0.9);
+       trailing second is why the drill runs on past its last cue: a cue that
+       vanishes as you act on it is one you are always slightly late for. */
+    const last = (calls - 1) * every;
+    await clockTo(at + last + (drill.seconds - last) * 0.9);
     expect(screen.getByTestId("cue").dataset.cue).toBe("now");
+  });
+
+  it("fits another release into the isolated drill by starting on the first one", async () => {
+    /* The releases are what the setup verdict is measured from and three is
+       the minimum to judge anything, so the interval freed at the head of the
+       drill is worth a whole extra one. */
+    const drill = DRILLS.find((d) => d.cueSec)!;
+    const calls = cueCount(drill);
+    expect(calls).toBeGreaterThanOrEqual(3);
+    // Every cue inside the drill, and room left after the last for the dit to
+    // be sent and its tail measured.
+    expect((calls - 1) * drill.cueSec!).toBeLessThan(drill.seconds);
+    expect(drill.seconds - (calls - 1) * drill.cueSec!).toBeGreaterThanOrEqual(1);
   });
 
   it("shows the closing message drawn, raw and corrected", async () => {
