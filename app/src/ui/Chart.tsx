@@ -28,6 +28,8 @@ export interface ChartProps {
   /** Session indices, in the order their rows go. */
   order?: readonly number[];
   selected?: number;
+  /** The track playback is about, for the gutter's highlight. */
+  heard?: "you" | "tgt";
   settings: ReviewSettings;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
@@ -37,6 +39,7 @@ export interface ChartProps {
   onPlayChar?: ChartCallbacks["onPlayChar"];
   onSeek?: ChartCallbacks["onSeek"];
   onSelectRun?: ChartCallbacks["onSelectRun"];
+  onSelectTarget?: ChartCallbacks["onSelectTarget"];
   onZoom?: ChartCallbacks["onZoom"];
   /** The view moved. Used to keep more than one chart in step. */
   onScroll?: ChartCallbacks["onScroll"];
@@ -97,12 +100,14 @@ export function ChartView({
   stack,
   order,
   selected,
+  heard,
   settings,
   focus,
   playhead,
   onPlayChar,
   onSeek,
   onSelectRun,
+  onSelectTarget,
   onZoom,
   onScroll,
   handle,
@@ -115,8 +120,8 @@ export function ChartView({
   // Callbacks are held in a ref so the chart is created exactly once. Passing
   // them straight through would tear the canvas down and rebuild it on every
   // parent render, losing the scroll position each time.
-  const cb = useRef({ onPlayChar, onSeek, onSelectRun, onZoom, onScroll });
-  cb.current = { onPlayChar, onSeek, onSelectRun, onZoom, onScroll };
+  const cb = useRef({ onPlayChar, onSeek, onSelectRun, onSelectTarget, onZoom, onScroll });
+  cb.current = { onPlayChar, onSeek, onSelectRun, onSelectTarget, onZoom, onScroll };
   const unitRef = useRef(review.ref.unitSec);
   unitRef.current = review.ref.unitSec;
   const blocksRef = useRef(settings.charMarkers);
@@ -131,6 +136,7 @@ export function ChartView({
       onPlayChar: (...a) => cb.current.onPlayChar?.(...a),
       onSeek: (...a) => cb.current.onSeek?.(...a),
       onSelectRun: (...a) => cb.current.onSelectRun?.(...a),
+      onSelectTarget: (...a) => cb.current.onSelectTarget?.(...a),
       onZoom: (...a) => cb.current.onZoom?.(...a),
       onScroll: (...a) => cb.current.onScroll?.(...a),
       onHover: (hit, x, y) => {
@@ -167,8 +173,9 @@ export function ChartView({
       ...(stack ? { stack } : {}),
       ...(order ? { order } : {}),
       ...(selected === undefined ? {} : { selected }),
+      ...(heard ? { heard } : {}),
     });
-  }, [review, stack, order, selected, settings, focus]);
+  }, [review, stack, order, selected, heard, settings, focus]);
 
   useEffect(() => {
     chartRef.current?.setPlayhead(playhead);

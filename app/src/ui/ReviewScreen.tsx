@@ -400,15 +400,16 @@ export function ReviewScreen({
     return blob.arrayBuffer();
   }, [loaded]);
 
-  /* The track the ruler seeks into: the one you were last listening to.
+  /* The track the ruler seeks into: the one you were last listening to, or
+     the one you picked up by its name in the gutter.
      One ruler runs over both of them, so "play from here" has no answer of
      its own — clicking along a target you are following would otherwise drop
      you back into your own recording every time. */
-  const heard = useRef<PlaySide>("you");
+  const [heard, setHeard] = useState<PlaySide>("you");
 
   const playYou = useCallback(
     async (from?: number, to?: number) => {
-      heard.current = "you";
+      setHeard("you");
       if (playing === "you" && from === undefined) {
         player.stop();
         return;
@@ -431,7 +432,7 @@ export function ReviewScreen({
 
   const playTarget = useCallback(
     (from?: number, to?: number) => {
-      heard.current = "tgt";
+      setHeard("tgt");
       if (playing === "tgt" && from === undefined) {
         player.stop();
         return;
@@ -448,17 +449,27 @@ export function ReviewScreen({
 
   const stop = useCallback(() => player.stop(), [player]);
 
-  /* Moving to another attempt ends whatever is playing.
+  /* Picking up another track ends whatever is playing.
      Everything on this screen that names a recording follows the selection,
      so audio out of the one you just left is the single thing still talking
      about the row you are no longer looking at. */
   const selectRun = useCallback(
     (at: number) => {
-      if (at !== selected) player.stop();
+      if (at !== selected || heard !== "you") player.stop();
+      setHeard("you");
       onSelectRun(at);
     },
-    [onSelectRun, player, selected],
+    [heard, onSelectRun, player, selected],
   );
+
+  /* The target's name picks up the target and nothing else. It is not an
+     attempt — it has no score, no recording and no report — so the row being
+     read stays the row being read, and what changes is which track the ruler
+     and the transport are about. */
+  const selectTarget = useCallback(() => {
+    if (heard !== "tgt") player.stop();
+    setHeard("tgt");
+  }, [heard, player]);
 
   const playDeviation = useCallback(
     (side: "you" | "tgt", idx: number, kind: Focus["kind"]) => {
@@ -743,6 +754,8 @@ export function ReviewScreen({
           order={order}
           selected={shownAt}
           onSelectRun={selectRun}
+          onSelectTarget={selectTarget}
+          heard={heard}
           settings={settings}
           focus={focus}
           playhead={playhead}
@@ -752,9 +765,8 @@ export function ReviewScreen({
             else playTarget(from, to);
           }}
           onSeek={(at) => {
-            const side = heard.current;
-            const from = Math.max(at[side] - PLAY_PAD, 0);
-            if (side === "you") void playYou(from);
+            const from = Math.max(at[heard] - PLAY_PAD, 0);
+            if (heard === "you") void playYou(from);
             else playTarget(from);
           }}
           onZoom={(ppu) => onChange({ ppu })}

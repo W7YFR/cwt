@@ -36,6 +36,7 @@ import {
   draw,
   scrollbarThumb,
   trackBands,
+  type GutterName,
   type Lane,
   type Scene,
   type Viewport,
@@ -52,6 +53,12 @@ export interface ChartCallbacks {
    * another attempt is what moves them there. A second click then plays it,
    * out of the right recording. */
   onSelectRun?: (run: number) => void;
+  /** The target's name in the gutter was clicked.
+   *
+   * Not a run and not a selection of one — the report below the chart stays
+   * about the attempt it was about. What it picks up is the track: the ruler
+   * seeks into the target from here, and the name lights to say so. */
+  onSelectTarget?: () => void;
   /** The ruler was clicked: seek and play from here.
    *
    * Both tracks' times for that point, because one ruler runs over two of
@@ -85,6 +92,8 @@ export interface ChartInput {
   stack?: readonly Review[];
   /** Which of `stack` is `review`. */
   selected?: number;
+  /** The track playback is about, for the gutter. Defaults to yours. */
+  heard?: "you" | "tgt";
   settings: ReviewSettings;
   focus: Focus | null;
 }
@@ -157,8 +166,8 @@ export function createChart(
   let lanes: Lane[] = [];
   let rows = rowsFor(1, 0);
   let selected = 0;
-  /** The run name under the pointer, for the gutter's highlight. */
-  let picking = -1;
+  /** The name in the gutter under the pointer, for its highlight. */
+  let picking: GutterName | null = null;
 
   /** The attempts to draw, in the order their rows go, and which row is being
    *  read.
@@ -222,6 +231,7 @@ export function createChart(
       runs: lanes,
       selected,
       picking,
+      ...(input.heard ? { heard: input.heard } : {}),
       ...(columns ? { columns } : {}),
       layout,
       slots: lanes[selected]!.slots,
@@ -464,23 +474,34 @@ export function createChart(
    *  without the other row answering it. */
   const NO_BAND: [number, number] = [-1, -1];
 
-  /** Which attempt's name in the gutter is under this point, or -1.
+  /** Which name in the gutter is under this point, or null.
    *
-   * The names are the handle for picking a row up. Clicking the row itself
+   * The names are the handle for picking a track up. Clicking the row itself
    * works too, but a row is mostly the marks on it, and going through a mark
    * to reach the row it belongs to is an indirection you can feel — you aim at
    * a dit to say "this run". The name says only that, which is why it is the
-   * one to click.
+   * one to click. The target has a row and a name like the rest, so it is one
+   * of them.
    *
-   * Nothing to pick with a single attempt on screen: the label reads YOU and
-   * there is no other row for it to be. */
-  function gutterRunAt(p: { x: number; y: number }): number {
-    if (p.x >= GUTTER || lanes.length < 2) return -1;
+   * Overlay is the exception: the two tracks share a band there, so its names
+   * are a color key rather than handles and there is no row under either. */
+  function gutterNameAt(p: { x: number; y: number }): GutterName | null {
+    if (p.x >= GUTTER || !input) return null;
+    const overlay = input.settings.view === "overlay";
+    /* Only where there is something to pick it up: a chart can be shown purely
+       to be looked at — the calibration preview is one — and a name that
+       changes the cursor but answers no click is a control that lies. */
+    if (!overlay && callbacks.onSelectTarget && p.y >= rows.tgt && p.y < rows.tgt + ROW_H) {
+      return "tgt";
+    }
+    // Nothing to pick among the attempts with one on screen: the label reads
+    // YOU and there is no other row for it to be.
+    if (lanes.length < 2 || !callbacks.onSelectRun) return null;
     for (let r = 0; r < lanes.length; r++) {
       const row = rows.runs[r];
       if (row && p.y >= row.row && p.y < row.row + ROW_H) return r;
     }
-    return -1;
+    return null;
   }
 
   function hitAt(p: { x: number; y: number }): HitResult | null {
@@ -516,8 +537,8 @@ export function createChart(
       return;
     }
     const p = localPos(ev);
-    const over = gutterRunAt(p);
-    canvas.classList.toggle("picking", over >= 0);
+    const over = gutterNameAt(p);
+    canvas.classList.toggle("picking", over !== null);
     if (over !== picking) {
       picking = over;
       paint();
@@ -533,8 +554,8 @@ export function createChart(
 
   const onMouseLeave = (ev: MouseEvent) => {
     canvas.classList.remove("picking");
-    if (picking !== -1) {
-      picking = -1;
+    if (picking !== null) {
+      picking = null;
       paint();
     }
     callbacks.onHover?.(null, ev.clientX, ev.clientY);
@@ -553,10 +574,11 @@ export function createChart(
     if (!layout) return;
     const p = localPos(ev);
 
-    // The run names in the gutter pick a row up, and that is all they do.
-    const named = gutterRunAt(p);
-    if (named >= 0) {
-      if (named !== selected) callbacks.onSelectRun?.(lanes[named]!.ordinal);
+    // The names in the gutter pick a track up, and that is all they do.
+    const named = gutterNameAt(p);
+    if (named !== null) {
+      if (named === "tgt") callbacks.onSelectTarget?.();
+      else if (named !== selected) callbacks.onSelectRun?.(lanes[named]!.ordinal);
       return;
     }
 

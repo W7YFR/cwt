@@ -125,16 +125,25 @@ export interface Lane {
   blank?: boolean;
 }
 
+/** A clickable name in the gutter: an attempt by its row, or the target.
+ *
+ * The target is in the list because it is a track you play, not because it is
+ * an attempt — the message you meant to send has no score and no report. */
+export type GutterName = number | "tgt";
+
 export interface Scene {
   /** The attempts on screen, in the order they are drawn. */
   runs: readonly Lane[];
   /** Which of them is being read in detail: the one with a caption band, and
    *  the one the report below the chart is about. */
   selected: number;
-  /** The run whose name in the gutter the pointer is over, if any. Lights it,
-   *  because a word you can click has to look different from a word you
-   *  cannot. */
-  picking?: number;
+  /** The name in the gutter the pointer is over, if any. Lights it, because a
+   *  word you can click has to look different from a word you cannot. */
+  picking?: GutterName | null;
+  /** Which track playback is about, so its name in the gutter shows as the one
+   *  in hand. The target is not an attempt and cannot be `selected`, but it is
+   *  something you listen to, and the ruler needs to say which. */
+  heard?: "you" | "tgt";
   /** The shared per-character column axis. Absent in the time views, which
    *  need no columns — there the axis is the clock. */
   columns?: ColumnMetrics;
@@ -1051,7 +1060,15 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
           [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],
         ]
       : [
-          [scene.rows.tgt + ROW_H / 2, "TGT", C.tgt],
+          [
+            scene.rows.tgt + ROW_H / 2,
+            "TGT",
+            // Lit while the target is the track being played, resting in its
+            // own color otherwise. Its color is muted by design — the target
+            // is the reference, not the subject — so "picked up" has to be
+            // brightness rather than a second hue.
+            scene.heard === "tgt" || scene.picking === "tgt" ? C.ink : C.tgt,
+          ],
           /* One name per attempt. "YOU" only while there is one of them —
              with a stack, which attempt a row is is the thing you need from
              this band, and four rows all called YOU would not say it. Numbered
