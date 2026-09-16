@@ -29,6 +29,7 @@ import { FALLBACK_PALETTE } from "@/render/theme";
 import {
   GUTTER,
   MARK_H,
+  CLOCK_MARKER_MIN_W,
   MARKER_W,
   PAD_R,
   PAD_X,
@@ -51,14 +52,30 @@ const VIEWS: ViewMode[] = ["per-char", "absolute", "overlay"];
 /** How the renderer writes a gap's length on its bracket. */
 const fmtUnits = (u: number) => `${u.toFixed(1)}u`;
 
-function layoutFor(review: Review, view: ViewMode, ppu: number): Layout {
-  return buildLayout(review, { view, ppu, durationSec: review.take.durationSec });
+function layoutFor(review: Review, view: ViewMode, ppu: number, markers = false): Layout {
+  return buildLayout(review, {
+    view,
+    ppu,
+    durationSec: review.take.durationSec,
+    charMarkers: markers,
+  });
 }
 
-function sceneFor(review: Review, view: ViewMode, ppu: number, trackW = 900): Scene {
-  const layout = layoutFor(review, view, ppu);
-  const columns = view === "per-char" ? measureColumns([review.slots], ppu) : undefined;
+/** `markers` reaches the axis as well as the scene, the way the chart passes
+ *  it: a column is as wide as what is drawn in it, so measuring one way and
+ *  drawing the other would be a picture the app never shows. */
+function sceneFor(
+  review: Review,
+  view: ViewMode,
+  ppu: number,
+  trackW = 900,
+  markers = false,
+): Scene {
+  const layout = layoutFor(review, view, ppu, markers);
+  const columns =
+    view === "per-char" ? measureColumns([review.slots], ppu, markers) : undefined;
   return {
+    ...(markers ? { charMarkers: true } : {}),
     runs: [
       {
         layout,
@@ -373,12 +390,20 @@ describe("a gap that reaches in from off screen", () => {
   });
 });
 
-describe("characters as start markers", () => {
-  /* A fixed-width tick at the moment a character begins, instead of the dits
-     and dahs in it. What is being practiced is the rhythm — when the next
-     character starts — and a block whose length tracked the character puts its
-     duration back on screen, which is what pulls attention into counting
-     elements rather than keeping time. */
+describe("characters drawn without their elements", () => {
+  /* One shape per character instead of the dits and dahs inside it. What is
+     being practiced is the rhythm — when the next character starts — and
+     drawing the elements is what pulls attention into counting them rather
+     than keeping time.
+
+     What the shape is depends on the axis, and the two answers are opposites.
+     In the per-character view it is a fixed-width tick at the moment the
+     character begins: the axis there is a schematic of order and silence, so
+     how long the character took is deliberately absent, and the tick has a
+     column of its own with a gap either side to sit against. On a clock axis
+     it is the character's own extent, because position there IS time — the
+     length is on screen whether it is drawn or not, and a hairline in a second
+     of empty space is lost. */
   const review = reviewFrom(caseNamed(SLOPPY)).review;
   const PPU = 18;
   const ROW_Y = Y_YOU + (ROW_H - MARK_H) / 2;
@@ -386,11 +411,17 @@ describe("characters as start markers", () => {
   /* Wide enough that nothing is culled: these are claims about every
      character, and a viewport that dropped half of them would make them
      claims about whichever half happened to be on screen. */
-  const paint = (over: Partial<Scene> = {}) => {
+  const paint = (markers: boolean, over: Partial<Scene> = {}) => {
     const ctx = recordingCtx();
-    draw(ctx, { ...sceneFor(review, "per-char", PPU, 4000), ...over });
+    draw(ctx, { ...sceneFor(review, "per-char", PPU, 4000, markers), ...over });
     return ctx;
   };
+
+  /** Where each character begins on the axis this scene was measured for. */
+  const startsOf = (markers: boolean) =>
+    layoutFor(review, "per-char", PPU, markers)
+      .items.filter((it) => it.slot.actual && it.x !== null)
+      .map((it) => it.x! + it.gapW);
 
   /** Every filled rounded rect on the "yours" row, as [x, width, color].
    *
@@ -425,25 +456,48 @@ describe("characters as start markers", () => {
     );
     expect(lengths.size, "fixture has only one shape of character").toBeGreaterThan(1);
 
-    const widths = new Set(bodies(paint({ charMarkers: true })).map((b) => b.w));
+    const widths = new Set(bodies(paint(true)).map((b) => b.w));
     expect(widths).toEqual(new Set([MARKER_W]));
   });
 
   it("puts the marker where the character starts", () => {
     // It is a mark on the clock: its position is the whole of its meaning, and
     // that position is where the character's first element begins.
-    const markers = bodies(paint({ charMarkers: true }));
+    const markers = bodies(paint(true));
     expect(markers.length).toBeGreaterThan(2);
-
-    const layout = buildLayout(review, {
-      view: "per-char",
-      ppu: PPU,
-      durationSec: review.take.durationSec,
-    });
-    const starts = layout.items
-      .filter((it) => it.slot.actual && it.x !== null)
-      .map((it) => it.x! + it.gapW);
+    const starts = startsOf(true);
     expect(markers.map((m) => Math.round(m.x))).toEqual(starts.map((x) => Math.round(x)));
+  });
+
+  it("writes a character's name where the character starts", () => {
+    /* Started there, not centered over it. What you read along a row is where
+       things BEGIN, and a name centered over a character sits half its own
+       width to the right of that — half of a different width for every letter,
+       so the names come out on a ragged line of their own while the marks they
+       name are on a straight one. With the marks off it was worse again: the
+       width being centered in was never drawn at all, so a dah-heavy letter
+       ended up nearest a neighbor it had nothing to do with.
+
+       Both ways of drawing a character, and both rows. The rule is about the
+       axis, not about what happens to be on it. */
+    for (const markers of [true, false]) {
+      const ctx = paint(markers);
+      const starts = startsOf(markers);
+      expect(starts.length).toBeGreaterThan(2);
+
+      const capsAt = (y: number) =>
+        ctx.ofType("fillText").filter((c) => c.args[1] === y);
+      for (const [name, caps] of [
+        ["yours", capsAt(Y_YOU_LABEL + CAP_CHAR)],
+        ["the target", capsAt(Y_TGT_LABEL + LABEL_H - CAP_CHAR)],
+      ] as const) {
+        const where = `${name}, markers ${String(markers)}`;
+        expect(caps.length, where).toBe(starts.length);
+        expect(caps.map((c) => c.args[0]!), where).toEqual(starts);
+        // Started, which is what puts the glyph there rather than around it.
+        expect(new Set(caps.map((c) => c.align)), where).toEqual(new Set(["left"]));
+      }
+    }
   });
 
   it("takes the worst grade of its elements and the gap that led into it", () => {
@@ -452,7 +506,7 @@ describe("characters as start markers", () => {
        elements are ragged must not come back clean just because it is drawn as
        one tick now. */
     const tolerance = 0.02;
-    const drawn = bodies(paint({ charMarkers: true, tolerance }));
+    const drawn = bodies(paint(true, { tolerance }));
     const chars = review.slots.map((s) => s.actual).filter((c) => c !== null);
     expect(drawn.length).toBe(chars.length);
 
@@ -476,9 +530,42 @@ describe("characters as start markers", () => {
     expect(sawFault).toBe(true);
   });
 
+  it("outlines a character's own extent on a clock axis", () => {
+    /* Position on a clock axis IS time, so how long a character took is on
+       screen whether it is drawn or not: the next one starts where it starts.
+       Left as a tick, the space between them was dead — and what a marker is
+       for withholding is the dits and dahs inside, not the character.
+
+       In the per-character view the opposite holds. The axis there is a
+       schematic of order and silence, a character has a column of its own with
+       a gap either side to sit against, and its length is deliberately absent. */
+    const clock = recordingCtx();
+    draw(clock, { ...sceneFor(review, "absolute", PPU, 4000, true) });
+    const drawn = bodies(clock);
+    const chars = review.actual.chars;
+    expect(drawn.length).toBe(chars.length);
+
+    // Its own extent, so a dah-heavy letter is wider than a dit.
+    const want = chars.map((c) =>
+      Math.max(c.blocks.reduce((a, b) => a + b.units, 0) * PPU, CLOCK_MARKER_MIN_W),
+    );
+    // Reconstructed from the path, so the two sides round differently.
+    drawn.forEach((b, i) => expect(b.w, `character ${i}`).toBeCloseTo(want[i]!, 6));
+    expect(new Set(want).size, "fixture has only one shape of character").toBeGreaterThan(1);
+
+    /* One shape per character rather than one per element, which is the whole
+       of what "marks only" still means here — drawn as its elements the same
+       fixture puts far more on the row. */
+    const patterns = recordingCtx();
+    draw(patterns, { ...sceneFor(review, "absolute", PPU, 4000) });
+    expect(bodies(patterns).length).toBeGreaterThan(drawn.length);
+  });
+
   it("leaves the chart exactly as it was when it is off", () => {
     // Inert by construction, like everything else optional here.
-    expect(paint({ charMarkers: false }).calls).toEqual(paint().calls);
+    const ctx = recordingCtx();
+    draw(ctx, { ...sceneFor(review, "per-char", PPU, 4000), charMarkers: false });
+    expect(ctx.calls).toEqual(paint(false).calls);
   });
 });
 
@@ -831,6 +918,49 @@ describe("hit testing", () => {
   it("returns nothing above the tracks", () => {
     const layout = layoutFor(review, "per-char", 16);
     expect(hitTest(layout, 100, 0, trackBands("per-char"))).toBeNull();
+  });
+
+  it("answers about the tick when the tick is all there is", () => {
+    /* With markers on, a character's elements are not drawn and its column has
+       no room for them. Walked anyway, one character's answer reached across
+       the gap after it and several columns beyond — so pointing at a letter
+       gap reported an intra-character gap, and clicking it played something
+       from a character three letters back.
+
+       The gap keeps its own region, which is most of the column and the thing
+       actually being measured. */
+    const layout = layoutFor(review, "per-char", 16, true);
+    const bands = trackBands("per-char");
+    const midYou = (bands.you[0] + bands.you[1]) / 2;
+    const at = (x: number) => hitTest(layout, x, midYou, bands);
+
+    const items = layout.items.filter((i) => i.slot.actual && i.x !== null);
+    expect(items.length).toBeGreaterThan(2);
+    // A column with a real gap in front of it, so both halves are reachable.
+    const item = items.find((i) => i.youGapW > 20);
+    expect(item, "a column with a gap wide enough to aim at").toBeDefined();
+    const ch = item!.slot.actual!;
+    const bx = item!.x! + item!.gapW;
+
+    expect(at(bx + 1)?.char, "on the tick").toBe(ch);
+    expect(at(bx + 1)?.block, "its own element, not a gap").toBe(ch.blocks[0]);
+    expect(at(item!.x! + item!.youGapW / 2)?.block, "in the gap").toBe(ch.leadGap);
+    // And nothing of this character is still being reported a column later.
+    const next = items[items.indexOf(item!) + 1]!;
+    expect(at(next.x! + next.youGapW / 2)?.char).not.toBe(ch);
+  });
+
+  it("puts a character on the axis where it is drawn", () => {
+    /* The time map is what the playhead, the ruler and every seek read. Tiling
+       a character's elements across a width the column does not have put all
+       three somewhere off to the right of what is on screen. */
+    const layout = layoutFor(review, "per-char", 16, true);
+    for (const it of layout.items) {
+      if (!it.slot.actual || it.x === null) continue;
+      const bx = it.x + it.gapW;
+      expect(timeToX(layout, it.slot.actual.t0, "you")).toBeCloseTo(bx, 6);
+      expect(timeToX(layout, it.slot.actual.t1, "you")).toBeCloseTo(bx + it.bodyW, 6);
+    }
   });
 
   it("splits the shared band in overlay so both tracks stay reachable", () => {

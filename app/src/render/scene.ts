@@ -14,6 +14,7 @@ import type { Analysis, Block, Char, Slot, ViewMode } from "@/types";
 import {
   CAP_CHAR,
   CAP_NOTE,
+  CLOCK_MARKER_MIN_W,
   DRIFT_H,
   GRADE_H,
   GUTTER,
@@ -41,6 +42,7 @@ import {
 } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
 import {
+  charWidth,
   gapWidth,
   isRest,
   timeToX,
@@ -365,6 +367,48 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
   ctx.globalAlpha = 1;
 }
 
+/** How wide a character is drawn when its elements are not.
+ *
+ * Two answers, because the two axes are about different things.
+ *
+ * In the per-character view a character has a column of its own and the axis
+ * is a schematic: what it says is the ORDER of things and the length of the
+ * silences between them, so a character is one tick and how long it took is
+ * deliberately absent — that is the whole reason for drawing markers. It also
+ * has the gap either side to sit against, so a hairline is legible there, and
+ * it is what the pacing cursor is matched to.
+ *
+ * On a clock axis it has neither. Position there IS time, so how long a
+ * character took is already on screen whether it is drawn or not — the next
+ * character starts where it starts, and nothing is being withheld by leaving
+ * the space empty except the ability to see it. And a hairline in a second of
+ * empty space reads as a rendering artifact. So a character gets its own
+ * extent, and what a marker withholds is what it always withheld: the dits and
+ * dahs inside, which are what pulls attention into counting rather than
+ * keeping time. Floored, so that a single dit at a wide zoom is still
+ * something you can see and point at. */
+function markerW(scene: Scene, ch: Char): number {
+  if (scene.view === "per-char") return MARKER_W;
+  return Math.max(charWidth(ch, scene.layout.ppu), CLOCK_MARKER_MIN_W);
+}
+
+/** Write a character's name where the character starts.
+ *
+ * Started at the same x rather than centered over it, and that is the rule on
+ * every axis here. What you read along a row is where things BEGIN — the
+ * marks, the gap that led into them, the tick that stands in for them when the
+ * marks are off — and a name centered over a character sits half its own width
+ * to the right of that. Half of a different width for every letter, so the
+ * names come out on a ragged line of their own while the thing they name is on
+ * a straight one. With the marks off it was worse again: the width being
+ * centered in was never drawn at all, so a dah-heavy letter ended up nearest a
+ * neighbor it had nothing to do with. */
+function caption(ctx: Ctx2D, text: string, start: number, y: number): void {
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, start, y);
+}
+
 /** The target's caption line. Its band is above its row, so the text is
  *  measured up from the marks rather than down onto them. */
 function tgtCapY(scene: Scene): number {
@@ -408,8 +452,6 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
   if (!cols) return;
   const bottom = scene.rows.runs[scene.rows.runs.length - 1]!;
 
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
   for (let c = 0; c < cols.x.length; c++) {
     const x = cols.x[c]!;
     const gapW = cols.gapW[c]!;
@@ -424,7 +466,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
        for there is no intended character at all, and the blank says so. */
     ctx.fillStyle = C.ink;
     ctx.font = `600 12px ${C.mono}`;
-    ctx.fillText(ideal ? ideal.char : "·", bx + bodyW / 2, tgtCapY(scene));
+    caption(ctx, ideal ? ideal.char : "·", bx, tgtCapY(scene));
 
     // Where the character starts, when the gaps arriving here disagree about
     // it. Drawn once, down the whole stack: it is a fact about the column.
@@ -455,10 +497,6 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
     if (it.x === null || !visible(it.x, it.w, scene)) continue;
     const slot = it.slot;
     const bx = it.x + it.gapW;
-    const mid = bx + it.bodyW / 2;
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
 
     /* What came out, and how it differs from the target above.
      *
@@ -470,13 +508,16 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C.ink;
       ctx.font = `600 12px ${C.mono}`;
-      ctx.fillText(cap.text, mid, row.label + CAP_CHAR);
+      caption(ctx, cap.text, bx, row.label + CAP_CHAR);
 
       // A word-boundary error is a fault in what was sent, so it is called out
       // beside that row's caption, over the gap that caused it.
       if (!blank && (slot.spaceOp === "del" || slot.spaceOp === "ins")) {
         ctx.fillStyle = C.bad;
         ctx.font = `600 9px ${C.mono}`;
+        // Over the gap it is about, so centered on it rather than started
+        // where a character is.
+        ctx.textAlign = "center";
         ctx.fillText(
           slot.spaceOp === "del" ? "no space" : "extra space",
           it.x + it.gapW / 2,
@@ -526,9 +567,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
          that offset IS the drift. Naming both is what makes it readable. */
       ctx.fillStyle = C["ink-dim"];
       ctx.font = `600 11px ${C.mono}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(slot.ideal.char, it.ix + iw / 2, tgtCapY(scene));
+      caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
     }
   }
 
@@ -565,9 +604,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
       ctx.font = `600 11px ${C.mono}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(cap.text, it.x + w / 2, row.label + CAP_CHAR);
+      caption(ctx, cap.text, it.x, row.label + CAP_CHAR);
     }
   });
 }
@@ -593,7 +630,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     if (scene.charMarkers) {
       // One tick for the character here too — the setting is about what a
       // block on the chart means, not about which axis it is drawn on.
-      paint(x, MARKER_W);
+      paint(x, markerW(scene, ch));
       return;
     }
     let bx = x;
@@ -614,9 +651,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
         band(slot.ideal, it.ix, C.tgt, 0.55);
         ctx.fillStyle = C["ink-dim"];
         ctx.font = `600 11px ${C.mono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(slot.ideal.char, it.ix + iw / 2, tgtCapY(scene));
+        caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       }
     }
   }
@@ -635,9 +670,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
       const cap = sentCaption(slot, lane.blank === true);
       ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
       ctx.font = `600 11px ${C.mono}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(cap.text, it.x + w / 2, capY + CAP_CHAR);
+      caption(ctx, cap.text, it.x, capY + CAP_CHAR);
     }
   });
 
@@ -853,16 +886,34 @@ function drawCharMarker(
     }
   }
 
-  ctx.fillStyle = isTarget
+  const color = isTarget
     ? C.tgt
     : worst === "warn"
       ? C.warn
       : worst === "bad"
         ? C.bad
         : C.you;
-  ctx.globalAlpha = isTarget ? 0.55 : 1;
-  roundRect(ctx, x0, y, MARKER_W, MARK_H, 3);
-  ctx.fill();
+  const w = markerW(scene, ch);
+  const solid = isTarget ? 0.55 : 1;
+
+  ctx.fillStyle = color;
+  if (scene.view === "per-char") {
+    // A tick, and that is the whole of it.
+    ctx.globalAlpha = solid;
+    roundRect(ctx, x0, y, w, MARK_H, 3);
+    ctx.fill();
+  } else {
+    /* Outlined rather than solid: it is the extent of a character, not one
+       long element, and a filled block that wide would read as a dah. */
+    ctx.globalAlpha = solid * 0.18;
+    roundRect(ctx, x0, y, w, MARK_H, 3);
+    ctx.fill();
+    ctx.globalAlpha = solid;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, x0 + 0.75, y + 0.75, w - 1.5, MARK_H - 1.5, 3);
+    ctx.stroke();
+  }
   ctx.globalAlpha = 1;
 
   /* Hovering anywhere in the character lights its marker, since the marker is
@@ -872,7 +923,7 @@ function drawCharMarker(
   if (scene.hover && ch.blocks.includes(scene.hover)) {
     ctx.strokeStyle = C.ink;
     ctx.lineWidth = 1;
-    roundRect(ctx, x0 - 2.5, y - 2.5, MARKER_W + 5, MARK_H + 5, 3);
+    roundRect(ctx, x0 - 2.5, y - 2.5, w + 5, MARK_H + 5, 3);
     ctx.stroke();
   }
 }
@@ -940,7 +991,10 @@ function drawGhost(
 ): void {
   // A hole where a character should have been, the same size as the thing it
   // is standing in for.
-  const w = scene.charMarkers ? MARKER_W : width;
+  /* A hole the size of the thing it stands in for. On a clock axis that is
+     the space the character would have taken, markers or not — there is no
+     character to ask how wide it is, and the axis already reserved it. */
+  const w = scene.charMarkers && scene.view === "per-char" ? MARKER_W : width;
   const y = yTop + (ROW_H - MARK_H) / 2;
   ctx.strokeStyle = scene.palette.ghost;
   ctx.setLineDash([3, 3]);

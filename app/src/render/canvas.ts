@@ -291,7 +291,11 @@ export function createChart(
        which is what makes a column mean the same thing on every row. */
     columns =
       input.settings.view === "per-char"
-        ? measureColumns(stack.reviews.map((r) => r.slots), input.settings.ppu)
+        ? measureColumns(
+            stack.reviews.map((r) => r.slots),
+            input.settings.ppu,
+            input.settings.charMarkers,
+          )
         : undefined;
 
     const opts = {
@@ -301,6 +305,12 @@ export function createChart(
       // The same runway either side: it is the room a centered playhead needs
       // to keep moving at both ends, and one number is one thing to get wrong.
       tailSec: leadSec,
+      /* Goes to the layout as well as to the columns. They have to be measured
+         the same way or the chart is drawn on one axis and read on another:
+         the columns collapse to the tick, the time map tiles the elements
+         across a width that is no longer there, and the playhead sweeps a
+         character's phantom width and then snaps back to the next column. */
+      charMarkers: input.settings.charMarkers,
     };
 
     lanes = stack.order.map((at) => {
@@ -336,7 +346,11 @@ export function createChart(
     const stack = stackOf(input);
     const cols =
       input.settings.view === "per-char"
-        ? measureColumns(stack.reviews.map((r) => r.slots), ppu)
+        ? measureColumns(
+            stack.reviews.map((r) => r.slots),
+            ppu,
+            input.settings.charMarkers,
+          )
         : undefined;
     let width = 0;
     for (const at of stack.order) {
@@ -346,6 +360,7 @@ export function createChart(
         ppu,
         leadSec,
         tailSec: leadSec,
+        charMarkers: input.settings.charMarkers,
         durationSec: review.take.durationSec,
         ...(cols ? { columns: cols, run: at } : {}),
       });
@@ -807,6 +822,7 @@ export function createChart(
         view: input.settings.view,
         ppu,
         durationSec: input.review.take.durationSec,
+        charMarkers: input.settings.charMarkers,
       });
       let note = "";
       if (GUTTER + exportLayout.width + PAD_R > budget) {
@@ -816,6 +832,7 @@ export function createChart(
           view: input.settings.view,
           ppu,
           durationSec: input.review.take.durationSec,
+          charMarkers: input.settings.charMarkers,
         });
         note = `zoomed to ${ppu.toFixed(1)} px/unit so the whole session fits`;
       }
@@ -825,7 +842,7 @@ export function createChart(
          against and would be missing from the picture entirely. */
       const exportColumns =
         input.settings.view === "per-char"
-          ? measureColumns([input.review.slots], ppu)
+          ? measureColumns([input.review.slots], ppu, input.settings.charMarkers)
           : undefined;
 
       const w = Math.ceil(GUTTER + exportLayout.width + PAD_R);

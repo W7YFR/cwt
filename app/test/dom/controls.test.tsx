@@ -450,7 +450,7 @@ describe("controls", () => {
     }
   });
 
-  it("offers characters as start markers, off unless asked for", async () => {
+  it("offers characters without their elements, off unless asked for", async () => {
     /* What the trainer is for is spacing and placement; a row of elements
        invites counting them instead, which is reading Morse off a screen
        rather than learning to send it. Off by default all the same — it hides

@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { planColumns } from "@/render/columns";
 import { buildLayout, measureColumns } from "@/render/layout";
+import { MARKER_W } from "@/render/geometry";
 import { buildTimeline, idealTimeline, pair, targetTiming } from "@/timing";
 import type { Char, Slot } from "@/types";
 import { caseNamed, CLEAN, reviewFrom, SLOPPY } from "../fixture";
@@ -171,6 +172,68 @@ describe("laying runs out against the shared columns", () => {
       layout.items.filter((it) => it.slot.ideal).map((it) => it.x);
     expect(xsOfTargets(la)).toEqual(xsOfTargets(lb));
     expect(la.width).toBe(lb.width);
+  });
+
+  it("gives a column room for what is drawn in it, not for what is not", () => {
+    /* With markers on, a character is one tick at the moment it starts — its
+       own width is never drawn. Reserved anyway, a column came out mostly
+       empty and the gap after it began a whole character away from the tick it
+       followed, which is the thing you are reading the axis for. Mark, gap,
+       mark, gap. */
+    const review = reviews()[0]!;
+    const wide = measureColumns([review.slots], PPU);
+    const ticks = measureColumns([review.slots], PPU, true);
+
+    expect(new Set(ticks.bodyW)).toEqual(new Set([MARKER_W]));
+    // The gaps are the measurement and are untouched; only the bodies go.
+    expect(ticks.gapW).toEqual(wide.gapW);
+    expect(ticks.width).toBeLessThan(wide.width / 2);
+  });
+
+  it("runs one column straight into the next", () => {
+    /* Horizontal distance on this axis is time. Padding between the slots is
+       silence nobody measured, and it read as exactly that: a second gap
+       sitting between a character and the gap after it. The absolute view has
+       never had any, and this is the same picture rearranged. */
+    for (const markers of [false, true]) {
+      const cols = measureColumns([reviews()[0]!.slots], PPU, markers);
+      for (let c = 1; c < cols.x.length; c++) {
+        const ended = cols.x[c - 1]! + cols.gapW[c - 1]! + cols.bodyW[c - 1]!;
+        // Close, not equal: the axis accumulates, so the two sides of this
+        // reach the same place by a different route of float additions.
+        expect(cols.x[c], `column ${c}, markers ${String(markers)}`).toBeCloseTo(ended, 6);
+      }
+    }
+  });
+
+  it("reads the axis the way it was drawn, without being told twice", () => {
+    /* The columns collapse to the tick when the characters are drawn as
+       markers. The time map has to collapse with them — it is what the
+       playhead, the ruler and every seek read — and it did not, because the
+       flag reached the columns and not the layout. So the chart was drawn on
+       one axis and read on another: the playhead swept the width a character
+       no longer had and then snapped back to the next column, and ran off the
+       end of the content entirely.
+
+       Two places to pass one fact is one place to forget it, so the columns
+       carry the answer and the layout takes it from them. Built here WITHOUT
+       the option, which is the mistake being made unreachable. */
+    const review = reviews()[0]!;
+    const cols = measureColumns([review.slots], PPU, true);
+    const layout = buildLayout(review, {
+      view: "per-char",
+      ppu: PPU,
+      durationSec: review.take.durationSec,
+      columns: cols,
+      run: 0,
+    });
+    expect(layout.charMarkers).toBe(true);
+    for (const side of ["you", "tgt"] as const) {
+      const xs = layout.maps[side].map(([, x]) => x);
+      expect(Math.max(...xs), side).toBeLessThanOrEqual(cols.width);
+      // And forward the whole way, or the playhead travels backward.
+      expect([...xs].sort((a, b) => a - b), side).toEqual(xs);
+    }
   });
 
   it("makes every row as wide as the widest thing in each column", () => {

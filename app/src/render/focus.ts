@@ -7,7 +7,7 @@
  */
 
 import type { BlockKind, Char, Review, Slot } from "@/types";
-import { PLAY_PAD } from "./geometry";
+import { MARKER_HIT_W, PLAY_PAD } from "./geometry";
 import { gapWidth, slotSpan, type Layout } from "./layout";
 import { opensWord } from "@/timing/timeline";
 
@@ -194,6 +194,22 @@ export function hitTest(
       const gw = row === "you" ? it.youGapW : it.tgtGapW;
       if (gap && contentX >= it.x! && contentX < it.x! + gw) {
         return { block: gap, char: ch, row, slot: it.slot, index, run };
+      }
+      /* One tick is the whole character: its elements are not drawn, and the
+         column has no room for them. Walking them anyway put a character's
+         answer across the gap after it and several columns beyond — so
+         pointing at a letter gap reported an intra-character gap, and clicking
+         it played the wrong thing.
+
+         Answered as the character's first element, because "which element" is
+         a question about a picture that is not on screen. That is also what
+         makes a click play the character rather than a gap's context. */
+      if (layout.charMarkers) {
+        const first = ch.blocks[0];
+        if (first && contentX >= bx && contentX < bx + MARKER_HIT_W) {
+          return { block: first, char: ch, row, slot: it.slot, index, run };
+        }
+        continue;
       }
     } else {
       const start = row === "you" ? it.x : it.ix;

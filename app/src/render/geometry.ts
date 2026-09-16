@@ -47,8 +47,6 @@ export const DRIFT_H = 46;
 export const RULER_H = 18;
 /** The canvas-drawn scrollbar band. */
 export const SCROLL_H = 14;
-/** Breathing room between per-character slots. */
-export const SLOT_GAP = 10;
 /** Height of a dit/dah block. */
 export const MARK_H = 20;
 
@@ -68,6 +66,26 @@ export const PLAYHEAD_W = 1.5;
  * cursor arriving on a tick, and a cursor fatter or thinner than the thing it
  * is arriving at makes that moment harder to judge than it needs to be. */
 export const MARKER_W = PLAYHEAD_W;
+
+/** Narrowest a character may be drawn on the clock axes.
+ *
+ * There a character marker spans the character's own extent — position on
+ * those axes is time, so how long it took is already on screen whether it is
+ * drawn or not, and leaving the space empty withholds nothing except the
+ * ability to see it. A floor rather than a width: zoomed far enough out a
+ * single dit is a fraction of a pixel, and a character you cannot see is a
+ * character you cannot point at either. */
+export const CLOCK_MARKER_MIN_W = 6;
+
+/** How much room a character marker answers to in the per-character view.
+ *
+ * A marker is the whole of a character on screen there and is a pixel and a
+ * half wide, which is not something a pointer can be asked to land on. So the
+ * region it answers to is a pointer's worth of room starting where the
+ * character does. That overlaps the near edge of the gap after it, which is
+ * the right trade: the near edge of a gap is exactly where "the character
+ * ended" and "the silence began" are hardest to tell apart by eye anyway. */
+export const MARKER_HIT_W = 9;
 
 /* The rows, top to bottom.
  *

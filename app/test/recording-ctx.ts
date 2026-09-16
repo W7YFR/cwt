@@ -20,6 +20,9 @@ export interface DrawCall {
   stroke: string;
   alpha: number;
   font: string;
+  /** Which end of the text `args[0]` is. Text drawn at a given x means two
+   *  different pictures depending on it, so it has to be recorded with it. */
+  align: CanvasTextAlign;
 }
 
 export interface RecordingCtx extends Ctx2D {
@@ -54,6 +57,7 @@ export function recordingCtx(charWidth = 6): RecordingCtx {
       stroke: state.strokeStyle,
       alpha: state.globalAlpha,
       font: state.font,
+      align: state.textAlign,
     };
     if (text !== undefined) call.text = text;
     calls.push(call);
