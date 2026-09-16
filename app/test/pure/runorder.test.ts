@@ -81,6 +81,7 @@ describe("how many of them are drawn", () => {
        so how long a tail is the whole of the answer. */
     expect(recentCount("all")).toBeNull();
     expect(recentCount("last")).toBe(1);
+    expect(recentCount("last3")).toBe(3);
     expect(recentCount("last5")).toBe(5);
   });
 

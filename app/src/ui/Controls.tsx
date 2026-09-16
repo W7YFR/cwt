@@ -373,6 +373,7 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
             >
               <option value="all">All runs</option>
               <option value="last5">Last 5 runs</option>
+              <option value="last3">Last 3 runs</option>
               <option value="last">Last run</option>
             </select>
           </div>

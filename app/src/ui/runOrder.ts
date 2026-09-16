@@ -37,6 +37,8 @@ export function recentCount(show: ReviewSettings["showRuns"]): number | null {
   switch (show) {
     case "last":
       return 1;
+    case "last3":
+      return 3;
     case "last5":
       return 5;
     case "all":

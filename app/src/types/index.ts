@@ -309,10 +309,10 @@ export interface ReviewSettings {
    *
    * "Last" is for the loop rather than the comparison — send it, look at it,
    * send it again — where the rows behind the one you just made are in the
-   * way rather than in the picture. "Last 5" is the middle of the two: enough
-   * rows to see whether the thing you just changed is holding, without a long
-   * session's worth of early attempts squeezing them. */
-  showRuns: "all" | "last5" | "last";
+   * way rather than in the picture. The counted windows are the middle of the
+   * two: enough rows to see whether the thing you just changed is holding,
+   * without a long session's worth of early attempts squeezing them. */
+  showRuns: "all" | "last5" | "last3" | "last";
   /** Offer the four download buttons.
    *
    * Off by default. Getting a file out is an occasional act — archiving a
