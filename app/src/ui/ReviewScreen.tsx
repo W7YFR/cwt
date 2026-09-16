@@ -611,10 +611,12 @@ export function ReviewScreen({
           profiles={profiles}
           profileId={profileId}
           onProfileChange={chooseProfile}
-          /* Behind the settings button, like everything else that is not the
-             loop. Calibrating is a thing you do once for a microphone and then
-             leave alone, and it sat in the header being rare. */
-          onCalibrate={chartSettings ? onCalibrate : undefined}
+          onCalibrate={onCalibrate}
+          /* The setup goes behind the settings button, like everything else
+             that is not the loop: which microphone, and what to correct it by.
+             Both are answered once and then left alone, and both sat in the
+             header being rare. */
+          configuring={chartSettings}
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
           leadLeft={leadLeft}

@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { RecordBar } from "@/ui/Record";
 import type { RecorderHandle } from "@/ui/useRecorder";
 import type { Profile } from "@/io/profiles";
@@ -108,13 +108,33 @@ describe("the record bar in a session", () => {
        the only ways in are the landing screen and the configuration screen,
        neither of which is where you are standing when you notice. */
     const onCalibrate = vi.fn();
-    const { container } = bar({ onCalibrate });
+    const { container } = bar({ onCalibrate, configuring: true });
     const button = screen.getByTestId("calibrate");
     // Inside the picker rather than out in the row of session actions: it is
     // about the control next to it, not about the session.
     expect(container.querySelector("[data-testid='calpick']")).toContainElement(button);
     button.click();
     expect(onCalibrate).toHaveBeenCalled();
+  });
+
+  it("keeps the setup behind the configuration it belongs to", () => {
+    /* Which microphone, and what to correct it by. You cannot reach this
+       screen without having answered the first, and the answer holds until
+       something is unplugged — so in the row you work in, both are controls
+       you use once and read past every time after. */
+    const devices = [
+      { deviceId: "a", label: "one" },
+      { deviceId: "b", label: "two" },
+    ];
+    const rec = { ...IDLE, devices };
+    bar({ rec, onCalibrate: () => {} });
+    expect(screen.queryByLabelText(/input device/i)).toBeNull();
+    expect(screen.queryByTestId("calibrate")).toBeNull();
+
+    cleanup();
+    bar({ rec, onCalibrate: () => {}, configuring: true });
+    expect(screen.getByLabelText(/input device/i)).toBeInTheDocument();
+    expect(screen.getByTestId("calibrate")).toBeInTheDocument();
   });
 
   it("does not offer calibrating against a recording that cannot use it", () => {

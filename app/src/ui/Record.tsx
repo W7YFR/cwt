@@ -140,6 +140,14 @@ export interface RecordBarProps {
   /** Into the calibration wizard. Beside the picker, because the picker is
    *  where you find out you have nothing to pick. */
   onCalibrate?: (() => void) | undefined;
+  /** The configuration panel is open.
+   *
+   * What is behind it is the setup: which microphone, and what to correct it
+   * by. You cannot reach this screen without having already answered the
+   * first, and the answer holds for as long as you are plugged into the same
+   * thing — so on the row you are actually working in, a microphone picker is
+   * a control you will use once and read past every time after. */
+  configuring?: boolean;
 }
 
 /** Record another, without leaving the review. */
@@ -158,6 +166,7 @@ export function RecordBar({
   onFile,
   canOpenFile = true,
   onCalibrate,
+  configuring = false,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -257,7 +266,9 @@ export function RecordBar({
           Clear
         </button>
       )}
-      <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
+      {configuring && (
+        <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
+      )}
 
       {appliesToTake ? (
         /* A picker rather than a label, because the audio is right here and
@@ -294,7 +305,7 @@ export function RecordBar({
               landing screen and from the configuration screen, neither of
               which is where you are standing when the picker in front of you
               says there is nothing to apply. */}
-          {onCalibrate && (
+          {configuring && onCalibrate && (
             <button
               className="cal"
               data-testid="calibrate"
