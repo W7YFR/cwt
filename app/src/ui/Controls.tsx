@@ -41,7 +41,7 @@ import {
   PACE_LEAD_MIN_SEC,
 } from "@/render/geometry";
 import { fmtGain, fmtPpu, fmtSeconds, fmtTolerance, fmtWpm } from "./format";
-import { RUN_SORTS, type RunSort } from "./runOrder";
+import { RUN_SORTS, recentCount, type RunSort } from "./runOrder";
 import { useUpperField } from "./useUpperField";
 
 export interface ControlsProps {
@@ -317,9 +317,17 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
      and a strip of blank page above a chart reads as something that failed to
      load. */
   if (!s.showChartControls) return null;
+  /* How many rows the chart is actually drawing — the session, capped by
+     whatever window Show has in force. What Sort is about. */
+  const want = recentCount(s.showRuns);
+  const drawn = want === null ? props.runs : Math.min(want, props.runs);
   return (
     <section className="viewcontrols">
-        {props.runs > 1 && (
+        {/* Only where there is an order to choose. One row has exactly one
+            arrangement, whether that is a session with one attempt in it or a
+            session showing its last — and a control whose every setting draws
+            the same picture is furniture. */}
+        {drawn > 1 && (
           <div className="group">
             <label htmlFor="run-sort" title={RUN_SORT_HELP}>
               Sort
