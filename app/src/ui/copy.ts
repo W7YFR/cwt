@@ -208,11 +208,12 @@ export const SHOW_HINTS_HELP =
   "an instruction, and it is read every time.";
 
 export const SHOW_RUNS_HELP =
-  "Whether the chart draws every attempt in the session or only the most " +
-  "recent. All of them is the comparison \u2014 the rows share one column " +
-  "axis and can be read down a column as well as along a row. The last one " +
-  "alone is the loop: send it, look at it, send it again, where the attempts " +
-  "behind the one you just made are in the way rather than in the picture.";
+  "How many of the session's attempts the chart draws. All of them is the " +
+  "comparison \u2014 the rows share one column axis and can be read down a " +
+  "column as well as along a row. The last one alone is the loop: send it, " +
+  "look at it, send it again, where the attempts behind the one you just " +
+  "made are in the way rather than in the picture. The last five is between " +
+  "the two: enough rows to see whether a change is holding.";
 
 export const SHOW_CHART_CONTROLS_HELP =
   "The row above the chart: the order the rows are in, the axis, which " +

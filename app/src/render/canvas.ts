@@ -95,6 +95,17 @@ export interface ChartInput {
   stack?: readonly Review[];
   /** Which of `stack` is `review`. */
   selected?: number;
+  /** The session number of `stack[0]`.
+   *
+   * The chart can be handed a tail of a session rather than all of it — "the
+   * last five" — and a run's number is the order it was recorded in, not where
+   * it lands on screen. Without this the fourth attempt would be drawn as RUN
+   * 1 and clicking its name would pick up the first, which is the same class
+   * of bug sorting the rows already avoids.
+   *
+   * One number covers it because the window is always a tail: nothing is ever
+   * left out of the middle. */
+  firstRun?: number;
   /** The track playback is about, for the gutter. Defaults to yours. */
   heard?: "you" | "tgt";
   settings: ReviewSettings;
@@ -306,7 +317,7 @@ export function createChart(
         analysis: review.analysis,
         accuracy: review.comparison?.accuracy ?? null,
         blank: review.take.segments.length === 0,
-        ordinal: at,
+        ordinal: (input?.firstRun ?? 0) + at,
       } satisfies Lane;
     });
     layout = lanes[selected]!.layout;

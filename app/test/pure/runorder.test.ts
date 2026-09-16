@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { runOrder, type RunSort } from "@/ui/runOrder";
+import { recentCount, runOrder, type RunSort } from "@/ui/runOrder";
 import { caseNamed, reviewFrom, CLEAN, FARNSWORTH, SLOPPY } from "../fixture";
 import type { Review } from "@/types";
 
@@ -72,5 +72,25 @@ describe("the order the attempts are drawn in", () => {
   it("has an order for a session with one attempt, or none", () => {
     expect(runOrder([], "best")).toEqual([]);
     expect(runOrder([session()[0]!], "newest")).toEqual([0]);
+  });
+});
+
+describe("how many of them are drawn", () => {
+  it("counts back from the newest, or asks for all of them", () => {
+    /* The window is always a tail — nothing is ever left out of the middle —
+       so how long a tail is the whole of the answer. */
+    expect(recentCount("all")).toBeNull();
+    expect(recentCount("last")).toBe(1);
+    expect(recentCount("last5")).toBe(5);
+  });
+
+  it("asks for more than a short session has, rather than for a special case", () => {
+    /* Three attempts under "last 5" is those three. A count that clamped
+       itself would need a second answer for what the window is anchored on,
+       and there is only one: the newest. */
+    const runs = session();
+    const want = recentCount("last5")!;
+    expect(runs.length).toBeLessThan(want);
+    expect(runs.slice(Math.max(runs.length - want, 0))).toEqual(runs);
   });
 });

@@ -28,6 +28,9 @@ export interface ChartProps {
   /** Session indices, in the order their rows go. */
   order?: readonly number[];
   selected?: number;
+  /** The session number of `stack[0]`, when the stack is a tail of a session
+   *  rather than all of it. */
+  firstRun?: number;
   /** The track playback is about, for the gutter's highlight. */
   heard?: "you" | "tgt";
   settings: ReviewSettings;
@@ -101,6 +104,7 @@ export function ChartView({
   stack,
   order,
   selected,
+  firstRun,
   heard,
   settings,
   focus,
@@ -192,9 +196,10 @@ export function ChartView({
       ...(stack ? { stack } : {}),
       ...(order ? { order } : {}),
       ...(selected === undefined ? {} : { selected }),
+      ...(firstRun ? { firstRun } : {}),
       ...(heard ? { heard } : {}),
     });
-  }, [review, stack, order, selected, heard, settings, focus]);
+  }, [review, stack, order, selected, firstRun, heard, settings, focus]);
 
   useEffect(() => {
     chartRef.current?.setPlayhead(playhead);

@@ -353,7 +353,12 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
 
         {/* Next to the axis, because it is the same kind of question: not what
             is graded, but what is on screen to read. Only with a stack — with
-            one attempt "all" and "the last one" are the same row. */}
+            one attempt every answer here is the same row.
+
+            All three offered whenever it shows, short sessions included: "the
+            last five" of three attempts is those three, which is what it says
+            it is. Dropping an option once a session is short enough for two of
+            them to agree would move the others under the pointer. */}
         {props.runs > 1 && (
           <div className="group">
             <label htmlFor="show-runs" title={SHOW_RUNS_HELP}>
@@ -367,6 +372,7 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
               }
             >
               <option value="all">All runs</option>
+              <option value="last5">Last 5 runs</option>
               <option value="last">Last run</option>
             </select>
           </div>

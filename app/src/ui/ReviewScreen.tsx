@@ -29,7 +29,7 @@ import { APP_NAME, Brandmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { reviewTake } from "@/timing";
-import { runOrder } from "./runOrder";
+import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
 import { baseName } from "./format";
 import { useRecorder } from "./useRecorder";
@@ -171,28 +171,37 @@ export function ReviewScreen({
       ),
     [settings, loaded.take.toneHz],
   );
-  /* The same reduction the cursor gets, asked for rather than imposed: one
-     row, and it is the attempt just made. */
-  const lastOnly = !recording && settings.showRuns === "last" && stack.length > 1;
-  const last = stack.length - 1;
-  const shown = recording ? [incoming] : lastOnly ? [stack[last]!] : stack;
-  const shownAt = recording || lastOnly ? 0 : selected;
-  /* Where each attempt's row goes. Session indices throughout — sorting moves
-     rows, and nothing else in here has to know that it did. */
+  /* A tail of the session rather than all of it, asked for rather than
+     imposed: the last one while you are still going, the last few while you
+     are checking whether a change is holding. */
+  const want = recording ? null : recentCount(settings.showRuns);
+  const from = want === null ? 0 : Math.max(stack.length - want, 0);
+  const shown = recording ? [incoming] : stack.slice(from);
+  /* Clamped into the window rather than left outside it. The effect below
+     moves the selection in, and until it has run the chart would be asked to
+     caption a row it is not drawing — onto the newest, which is both where
+     that effect takes it and what the window is anchored on. */
+  const inWindow = !recording && selected >= from;
+  const shownAt = inWindow ? selected - from : shown.length - 1;
+  /* Where each attempt's row goes, as positions within what is drawn. The
+     sort applies to the window rather than choosing it: which attempts you
+     are looking at and what order they sit in are two questions, and a Sort
+     control that did nothing while a window was in force would be a control
+     that lies. */
   const order = useMemo(
-    () => (recording || lastOnly ? [0] : runOrder(stack, settings.runSort)),
-    [recording, lastOnly, stack, settings.runSort],
+    () => runOrder(shown, settings.runSort),
+    [shown, settings.runSort],
   );
 
-  /* And the rest of the page reads the same attempt the chart is drawing.
-     Everything below the chart is about the selected run, so showing the last
-     one while the scores and the report describe another would be two answers
-     to one question. Moving the selection rather than teaching each of them a
-     second way to find its subject. */
+  /* And the rest of the page reads an attempt the chart is drawing.
+     Everything below the chart is about the selected run, so showing a window
+     that does not contain it would be two answers to one question. Moving the
+     selection rather than teaching each of them a second way to find its
+     subject — to the newest, which is the one the window is anchored on. */
   useEffect(() => {
-    if (!lastOnly || last < 0 || selected === last) return;
-    onSelectRun(last);
-  }, [lastOnly, last, selected, onSelectRun]);
+    if (recording || selected >= from || stack.length === 0) return;
+    onSelectRun(stack.length - 1);
+  }, [recording, from, selected, stack.length, onSelectRun]);
   const [rereading, setRereading] = useState(false);
   /* Seconds left of the lead-in, or null when no cursor is running. Whole
      numbers only: this is state, and updating it every frame would re-render
@@ -755,6 +764,7 @@ export function ReviewScreen({
           stack={shown}
           order={order}
           selected={shownAt}
+          firstRun={recording ? 0 : from}
           onSelectRun={selectRun}
           onSelectTarget={selectTarget}
           onPlayTrack={(side) => {
