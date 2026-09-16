@@ -12,6 +12,8 @@
 
 import type { Analysis, Block, Char, Slot, ViewMode } from "@/types";
 import {
+  CAP_CHAR,
+  CAP_NOTE,
   DRIFT_H,
   GRADE_H,
   GUTTER,
@@ -363,6 +365,12 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
   ctx.globalAlpha = 1;
 }
 
+/** The target's caption line. Its band is above its row, so the text is
+ *  measured up from the marks rather than down onto them. */
+function tgtCapY(scene: Scene): number {
+  return scene.rows.tgtLabel + LABEL_H - CAP_CHAR;
+}
+
 /** What to write under your row for one slot.
  *
  * One function, used by all three views. It was per-view once and only the
@@ -416,7 +424,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
        for there is no intended character at all, and the blank says so. */
     ctx.fillStyle = C.ink;
     ctx.font = `600 12px ${C.mono}`;
-    ctx.fillText(ideal ? ideal.char : "·", bx + bodyW / 2, scene.rows.tgtLabel + LABEL_H / 2);
+    ctx.fillText(ideal ? ideal.char : "·", bx + bodyW / 2, tgtCapY(scene));
 
     // Where the character starts, when the gaps arriving here disagree about
     // it. Drawn once, down the whole stack: it is a fact about the column.
@@ -462,7 +470,7 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C.ink;
       ctx.font = `600 12px ${C.mono}`;
-      ctx.fillText(cap.text, mid, row.label + LABEL_H / 2);
+      ctx.fillText(cap.text, mid, row.label + CAP_CHAR);
 
       // A word-boundary error is a fault in what was sent, so it is called out
       // beside that row's caption, over the gap that caused it.
@@ -472,7 +480,7 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
         ctx.fillText(
           slot.spaceOp === "del" ? "no space" : "extra space",
           it.x + it.gapW / 2,
-          row.label + LABEL_H - 5,
+          row.label + CAP_NOTE,
         );
       }
     }
@@ -520,7 +528,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       ctx.font = `600 11px ${C.mono}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
+      ctx.fillText(slot.ideal.char, it.ix + iw / 2, tgtCapY(scene));
     }
   }
 
@@ -559,7 +567,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       ctx.font = `600 11px ${C.mono}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(cap.text, it.x + w / 2, row.label + LABEL_H / 2);
+      ctx.fillText(cap.text, it.x + w / 2, row.label + CAP_CHAR);
     }
   });
 }
@@ -608,7 +616,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
         ctx.font = `600 11px ${C.mono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
+        ctx.fillText(slot.ideal.char, it.ix + iw / 2, tgtCapY(scene));
       }
     }
   }
@@ -629,7 +637,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
       ctx.font = `600 11px ${C.mono}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(cap.text, it.x + w / 2, capY + LABEL_H / 2);
+      ctx.fillText(cap.text, it.x + w / 2, capY + CAP_CHAR);
     }
   });
 

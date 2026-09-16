@@ -33,6 +33,7 @@ import {
   PAD_R,
   PAD_X,
   REST_W,
+  CAP_CHAR,
   LABEL_H,
   ROW_H,
   Y_TGT,
@@ -192,8 +193,35 @@ describe("the two tracks, and the text on each", () => {
   const textAt = (ctx: ReturnType<typeof recordingCtx>, y: number) =>
     ctx.ofType("fillText").filter((c) => c.args[1] === y).map((c) => c.text ?? "");
 
-  const TGT_CAP = Y_TGT_LABEL + LABEL_H / 2;
-  const YOU_CAP = Y_YOU_LABEL + LABEL_H / 2;
+  /* Each band puts its text toward its own row: the target's above the marks,
+     yours below them, measured from the edge they share. */
+  const TGT_CAP = Y_TGT_LABEL + LABEL_H - CAP_CHAR;
+  const YOU_CAP = Y_YOU_LABEL + CAP_CHAR;
+
+  it("keeps a caption and the note under it off each other", () => {
+    /* Your row's band carries two lines when the gap before a character was a
+       word break that should not have been there. Sized for one, the note was
+       written across the character it was about.
+
+       Measured off what was actually drawn — position and font both — rather
+       than restated from the constants, which is the only way this catches a
+       change to either one. */
+    const spaced = reviewFrom(caseNamed(SLOPPY), { expected: "CQ DE W7YFR" }).review;
+    const drawn = paint("per-char", spaced).ofType("fillText");
+    const px = (call: (typeof drawn)[number]) => Number(/(\d+)px/.exec(call.font)?.[1]);
+
+    const note = drawn.find((c) => c.text === "extra space");
+    expect(note, "a word-boundary fault to write about").toBeDefined();
+    const caption = drawn.find((c) => c.args[1] === YOU_CAP && c.text !== "");
+    expect(caption, "a caption on your row").toBeDefined();
+
+    // Drawn on the middle baseline, so each line reaches half its size either
+    // way from where it sits.
+    const capBottom = caption!.args[1]! + px(caption!) / 2;
+    const noteTop = note!.args[1]! - px(note!) / 2;
+    expect(noteTop, "the note clears the caption").toBeGreaterThanOrEqual(capBottom);
+    expect(note!.args[1]! + px(note!) / 2).toBeLessThanOrEqual(Y_YOU_LABEL + LABEL_H);
+  });
 
   it("puts the target above your sending, in every view", () => {
     expect(Y_TGT).toBeLessThan(Y_YOU);
@@ -282,7 +310,7 @@ describe("a chart with nothing recorded into it", () => {
   it("writes nothing under your row", () => {
     const under = paint()
       .ofType("fillText")
-      .filter((c) => c.args[1] === Y_YOU_LABEL + LABEL_H / 2)
+      .filter((c) => c.args[1] === Y_YOU_LABEL + CAP_CHAR)
       .map((c) => c.text ?? "")
       .join("");
     expect(under).toBe("");
@@ -297,7 +325,7 @@ describe("a chart with nothing recorded into it", () => {
   it("still draws the target, which is the whole point of staying", () => {
     const above = paint()
       .ofType("fillText")
-      .filter((c) => c.args[1] === Y_TGT_LABEL + LABEL_H / 2)
+      .filter((c) => c.args[1] === Y_TGT_LABEL + LABEL_H - CAP_CHAR)
       .map((c) => c.text ?? "")
       .join("");
     expect(above.length).toBeGreaterThan(3);
