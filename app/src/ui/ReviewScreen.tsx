@@ -400,8 +400,15 @@ export function ReviewScreen({
     return blob.arrayBuffer();
   }, [loaded]);
 
+  /* The track the ruler seeks into: the one you were last listening to.
+     One ruler runs over both of them, so "play from here" has no answer of
+     its own — clicking along a target you are following would otherwise drop
+     you back into your own recording every time. */
+  const heard = useRef<PlaySide>("you");
+
   const playYou = useCallback(
     async (from?: number, to?: number) => {
+      heard.current = "you";
       if (playing === "you" && from === undefined) {
         player.stop();
         return;
@@ -424,6 +431,7 @@ export function ReviewScreen({
 
   const playTarget = useCallback(
     (from?: number, to?: number) => {
+      heard.current = "tgt";
       if (playing === "tgt" && from === undefined) {
         player.stop();
         return;
@@ -439,6 +447,18 @@ export function ReviewScreen({
   );
 
   const stop = useCallback(() => player.stop(), [player]);
+
+  /* Moving to another attempt ends whatever is playing.
+     Everything on this screen that names a recording follows the selection,
+     so audio out of the one you just left is the single thing still talking
+     about the row you are no longer looking at. */
+  const selectRun = useCallback(
+    (at: number) => {
+      if (at !== selected) player.stop();
+      onSelectRun(at);
+    },
+    [onSelectRun, player, selected],
+  );
 
   const playDeviation = useCallback(
     (side: "you" | "tgt", idx: number, kind: Focus["kind"]) => {
@@ -722,7 +742,7 @@ export function ReviewScreen({
           stack={shown}
           order={order}
           selected={shownAt}
-          onSelectRun={onSelectRun}
+          onSelectRun={selectRun}
           settings={settings}
           focus={focus}
           playhead={playhead}
@@ -731,7 +751,12 @@ export function ReviewScreen({
             if (side === "you") void playYou(from, to);
             else playTarget(from, to);
           }}
-          onSeek={(t) => void playYou(Math.max(t - PLAY_PAD, 0))}
+          onSeek={(at) => {
+            const side = heard.current;
+            const from = Math.max(at[side] - PLAY_PAD, 0);
+            if (side === "you") void playYou(from);
+            else playTarget(from);
+          }}
           onZoom={(ppu) => onChange({ ppu })}
         />
 

@@ -52,8 +52,13 @@ export interface ChartCallbacks {
    * another attempt is what moves them there. A second click then plays it,
    * out of the right recording. */
   onSelectRun?: (run: number) => void;
-  /** The ruler was clicked: seek and play from here. */
-  onSeek?: (t: number) => void;
+  /** The ruler was clicked: seek and play from here.
+   *
+   * Both tracks' times for that point, because one ruler runs over two of
+   * them and only the caller knows which one is being listened to. In
+   * per-character view the two tracks are stretched to a shared column axis
+   * independently, so a point on the ruler is a different second on each. */
+  onSeek?: (at: { you: number; tgt: number }) => void;
   /** Pointer moved over (or off) a block, for the tooltip. */
   onHover?: (hit: HitResult | null, clientX: number, clientY: number) => void;
   /** The zoom changed from a wheel gesture, so the slider can follow. */
@@ -559,7 +564,11 @@ export function createChart(
 
     // The ruler band is a seek strip.
     if (p.y < RULER_H) {
-      callbacks.onSeek?.(Math.max(xToTime(layout, contentXOf(p.x), "you"), 0));
+      const at = contentXOf(p.x);
+      callbacks.onSeek?.({
+        you: Math.max(xToTime(layout, at, "you"), 0),
+        tgt: Math.max(xToTime(layout, at, "tgt"), 0),
+      });
       return;
     }
     const h = hitAt(p);

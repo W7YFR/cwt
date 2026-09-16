@@ -446,7 +446,7 @@ describe("the chart in a browser", () => {
       }),
     );
     expect(onSeek).toHaveBeenCalled();
-    expect(onSeek.mock.calls[0]![0]).toBeGreaterThanOrEqual(0);
+    expect(onSeek.mock.calls[0]![0].you).toBeGreaterThanOrEqual(0);
   });
 
   it("fits the session to the real width of its container", () => {
