@@ -755,6 +755,10 @@ export function ReviewScreen({
           selected={shownAt}
           onSelectRun={selectRun}
           onSelectTarget={selectTarget}
+          onPlayTrack={(side) => {
+            if (side === "you") void playYou();
+            else playTarget();
+          }}
           heard={heard}
           settings={settings}
           focus={focus}
@@ -789,9 +793,10 @@ export function ReviewScreen({
             <>
               <p className="legend howto">
                 click a character to hear it, a gap to hear it between what it
-                separates &nbsp;·&nbsp; click the ruler to seek &nbsp;·&nbsp;
-                scroll to zoom &nbsp;·&nbsp; drag or shift-scroll to pan (the
-                view follows playback)
+                separates &nbsp;·&nbsp; click a track&rsquo;s name to pick it up,
+                again to play it &nbsp;·&nbsp; click the ruler to seek
+                &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
+                to pan (the view follows playback)
               </p>
               {/* The recording transport, which is otherwise only discoverable
                   by pressing a key and seeing what happens. R carries both

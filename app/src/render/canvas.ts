@@ -59,6 +59,9 @@ export interface ChartCallbacks {
    * about the attempt it was about. What it picks up is the track: the ruler
    * seeks into the target from here, and the name lights to say so. */
   onSelectTarget?: () => void;
+  /** A name in the gutter was clicked while its track was already the one in
+   *  hand. Play it, or stop it if it is already running. */
+  onPlayTrack?: (side: "you" | "tgt") => void;
   /** The ruler was clicked: seek and play from here.
    *
    * Both tracks' times for that point, because one ruler runs over two of
@@ -481,27 +484,34 @@ export function createChart(
    * to reach the row it belongs to is an indirection you can feel — you aim at
    * a dit to say "this run". The name says only that, which is why it is the
    * one to click. The target has a row and a name like the rest, so it is one
-   * of them.
-   *
-   * Overlay is the exception: the two tracks share a band there, so its names
-   * are a color key rather than handles and there is no row under either. */
+   * of them. */
   function gutterNameAt(p: { x: number; y: number }): GutterName | null {
     if (p.x >= GUTTER || !input) return null;
-    const overlay = input.settings.view === "overlay";
-    /* Only where there is something to pick it up: a chart can be shown purely
-       to be looked at — the calibration preview is one — and a name that
-       changes the cursor but answers no click is a control that lies. */
-    if (!overlay && callbacks.onSelectTarget && p.y >= rows.tgt && p.y < rows.tgt + ROW_H) {
-      return "tgt";
-    }
-    // Nothing to pick among the attempts with one on screen: the label reads
-    // YOU and there is no other row for it to be.
-    if (lanes.length < 2 || !callbacks.onSelectRun) return null;
+    /* Only where there is something for a click to do: a chart can be shown
+       purely to be looked at — the calibration preview is one — and a name
+       that changes the cursor but answers no click is a control that lies. */
+    if (!callbacks.onPlayTrack && !callbacks.onSelectRun) return null;
+    // Overlay's gutter is a color key rather than a set of handles: the tracks
+    // share one band there, so there is no row under either name.
+    if (input.settings.view === "overlay") return null;
+    if (p.y >= rows.tgt && p.y < rows.tgt + ROW_H) return "tgt";
     for (let r = 0; r < lanes.length; r++) {
       const row = rows.runs[r];
       if (row && p.y >= row.row && p.y < row.row + ROW_H) return r;
     }
     return null;
+  }
+
+  /** Whether that name's track is the one already in hand.
+   *
+   * Which is the whole of what a second click on a name means. Yours is in
+   * hand when its row is the one being read AND the target is not what you
+   * are listening to, so a run picked up while the target was playing takes
+   * one click to come back to and a second to play — the same two clicks any
+   * other name takes. */
+  function inHand(name: GutterName): boolean {
+    const heard = input?.heard ?? "you";
+    return name === "tgt" ? heard === "tgt" : name === selected && heard === "you";
   }
 
   function hitAt(p: { x: number; y: number }): HitResult | null {
@@ -574,11 +584,19 @@ export function createChart(
     if (!layout) return;
     const p = localPos(ev);
 
-    // The names in the gutter pick a track up, and that is all they do.
+    /* The names in the gutter pick a track up, and play the one already in
+       hand. Picking up first rather than playing straight away: the report
+       below the chart, the scores and the caption band all follow the
+       selection, so a click on another attempt has to move them there before
+       anything comes out of the speakers — playing a recording while the
+       numbers on screen describe a different one is worse than one more
+       click. Once it IS the one on screen, there is nothing left to move and
+       the click is free to do the obvious thing. */
     const named = gutterNameAt(p);
     if (named !== null) {
-      if (named === "tgt") callbacks.onSelectTarget?.();
-      else if (named !== selected) callbacks.onSelectRun?.(lanes[named]!.ordinal);
+      if (inHand(named)) callbacks.onPlayTrack?.(named === "tgt" ? "tgt" : "you");
+      else if (named === "tgt") callbacks.onSelectTarget?.();
+      else callbacks.onSelectRun?.(lanes[named]!.ordinal);
       return;
     }
 

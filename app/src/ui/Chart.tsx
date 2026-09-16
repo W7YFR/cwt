@@ -40,6 +40,7 @@ export interface ChartProps {
   onSeek?: ChartCallbacks["onSeek"];
   onSelectRun?: ChartCallbacks["onSelectRun"];
   onSelectTarget?: ChartCallbacks["onSelectTarget"];
+  onPlayTrack?: ChartCallbacks["onPlayTrack"];
   onZoom?: ChartCallbacks["onZoom"];
   /** The view moved. Used to keep more than one chart in step. */
   onScroll?: ChartCallbacks["onScroll"];
@@ -108,6 +109,7 @@ export function ChartView({
   onSeek,
   onSelectRun,
   onSelectTarget,
+  onPlayTrack,
   onZoom,
   onScroll,
   handle,
@@ -120,8 +122,24 @@ export function ChartView({
   // Callbacks are held in a ref so the chart is created exactly once. Passing
   // them straight through would tear the canvas down and rebuild it on every
   // parent render, losing the scroll position each time.
-  const cb = useRef({ onPlayChar, onSeek, onSelectRun, onSelectTarget, onZoom, onScroll });
-  cb.current = { onPlayChar, onSeek, onSelectRun, onSelectTarget, onZoom, onScroll };
+  const cb = useRef({
+    onPlayChar,
+    onPlayTrack,
+    onSeek,
+    onSelectRun,
+    onSelectTarget,
+    onZoom,
+    onScroll,
+  });
+  cb.current = {
+    onPlayChar,
+    onPlayTrack,
+    onSeek,
+    onSelectRun,
+    onSelectTarget,
+    onZoom,
+    onScroll,
+  };
   const unitRef = useRef(review.ref.unitSec);
   unitRef.current = review.ref.unitSec;
   const blocksRef = useRef(settings.charMarkers);
@@ -137,6 +155,7 @@ export function ChartView({
       onSeek: (...a) => cb.current.onSeek?.(...a),
       onSelectRun: (...a) => cb.current.onSelectRun?.(...a),
       onSelectTarget: (...a) => cb.current.onSelectTarget?.(...a),
+      onPlayTrack: (...a) => cb.current.onPlayTrack?.(...a),
       onZoom: (...a) => cb.current.onZoom?.(...a),
       onScroll: (...a) => cb.current.onScroll?.(...a),
       onHover: (hit, x, y) => {
