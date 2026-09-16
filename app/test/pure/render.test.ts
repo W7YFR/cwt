@@ -35,6 +35,7 @@ import {
   PAD_X,
   REST_W,
   CAP_CHAR,
+  DRIFT_H,
   LABEL_H,
   ROW_H,
   Y_TGT,
@@ -264,14 +265,28 @@ describe("the two tracks, and the text on each", () => {
     expect(textAt(ctx, YOU_CAP)[0]).toBe(subLabel(swap, sent[0]!));
   });
 
-  it.each(VIEWS)("labels both rows, not just one of them (%s)", (view) => {
-    /* The target row used to go unnamed in the time-axis views: there was one
-       caption band and it belonged to the decode. On a wall clock the two
-       rows' characters sit at different x, and that offset IS the drift —
-       naming both is what makes it readable. */
-    const ctx = paint(view, mismatched);
-    expect(textAt(ctx, TGT_CAP).join("").length, `${view} target`).toBeGreaterThan(0);
-    expect(textAt(ctx, YOU_CAP).join("").length, `${view} yours`).toBeGreaterThan(0);
+  it.each(["per-char", "absolute"] as const)(
+    "labels both rows, not just one of them (%s)",
+    (view) => {
+      /* The target row used to go unnamed on the wall clock: there was one
+         caption band and it belonged to the decode. But the two rows'
+         characters sit at different x there, and that offset IS the drift —
+         naming both is what makes it readable. */
+      const ctx = paint(view, mismatched);
+      expect(textAt(ctx, TGT_CAP).join("").length, `${view} target`).toBeGreaterThan(0);
+      expect(textAt(ctx, YOU_CAP).join("").length, `${view} yours`).toBeGreaterThan(0);
+    },
+  );
+
+  it("names only the target in overlay, which is the one thing it can name", () => {
+    /* Every attempt shares one band there — superimposing them is the view —
+       under a single caption band. So it could only ever have named one of
+       them, unmarked, and a row of letters standing for an unidentified one of
+       N says less than nothing. What the marks are being read against is the
+       target, and that is named above them. */
+    const ctx = paint("overlay", mismatched);
+    expect(textAt(ctx, TGT_CAP).join("").length).toBeGreaterThan(0);
+    expect(textAt(ctx, YOU_CAP)).toEqual([]);
   });
 
   it("writes a substitution the same way the accuracy panel does", () => {
@@ -1005,6 +1020,43 @@ describe("drawing", () => {
     expect(ctx.texts()).toContain("TGT");
     expect(ctx.texts()).toContain("DRIFT");
   });
+
+  it.each(["per-char", "absolute"] as const)(
+    "runs the drift trace the length of the sending (%s)",
+    (view) => {
+      /* One reading per character, and every reading is about the END of the
+         character — how late it finished. Put at the middle of the character
+         instead, the trace stopped half a character short of the last mark and
+         read as a plot that had given up early.
+
+         It opens on zero at the first mark, which is not a drawing
+         convenience: the offset everything after is measured against is taken
+         there, so being in step at that instant is what the measurement says. */
+      const scene = sceneFor(review, view, 12, 6000);
+      const ctx = recordingCtx();
+      draw(ctx, scene);
+
+      const mid = scene.rows.drift + DRIFT_H / 2;
+      const pts = ctx.calls.filter(
+        (c) =>
+          (c.op === "moveTo" || c.op === "lineTo") &&
+          c.args[1]! > scene.rows.drift &&
+          c.args[1]! < scene.rows.drift + DRIFT_H &&
+          // Not the zero rule, which spans the frame rather than the sending.
+          Math.abs(c.args[1]! - mid - 0.5) > 1e-9,
+      );
+      expect(pts.length).toBeGreaterThan(2);
+
+      const chars = review.actual.chars;
+      const first = chars[0]!;
+      const last = chars[chars.length - 1]!;
+      const xs = pts.map((c) => c.args[0]!);
+      expect(Math.min(...xs)).toBeCloseTo(timeToX(scene.layout, first.t0, "you"), 6);
+      expect(Math.max(...xs)).toBeCloseTo(timeToX(scene.layout, last.t1, "you"), 6);
+      // At the first mark it is in step by definition.
+      expect(pts[0]!.args[1]).toBeCloseTo(mid, 6);
+    },
+  );
 
   it("clips the content to the right of the gutter", () => {
     const ctx = recordingCtx();

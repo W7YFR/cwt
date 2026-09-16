@@ -164,6 +164,25 @@ describe("showing one attempt or all of them", () => {
   });
 });
 
+describe("overlay, which is one band however many attempts are in it", () => {
+  it("does not grow a row's worth of page per attempt", () => {
+    /* Laid out per lane it reserved a row, a grade strip and a caption band
+       for each — none of which it draws — so a session opened a screen of
+       empty page between the marks and the drift plot. Superimposing the
+       attempts is the whole of the view: there is one band, and its height is
+       not a function of how many things are in it. */
+    const stacked = mount({ view: "overlay" });
+    const height = () => host.querySelector("canvas")!.getBoundingClientRect().height;
+    const many = height();
+    expect(stacked.runs).toBeGreaterThan(1);
+
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount({ view: "overlay", showRuns: "last" });
+    expect(height()).toBe(many);
+  });
+});
+
 describe("fitting the chart to the window", () => {
   /* Wide enough that the fit is a real answer rather than the slider's floor.
      At 900px this session cannot fit at any zoom the slider offers, and a

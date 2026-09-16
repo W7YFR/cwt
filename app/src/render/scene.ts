@@ -342,8 +342,10 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
      row means lighting the band from its caption through its marks. */
   const lit = scene.rows.runs[scene.focus.run ?? scene.selected] ?? scene.rows.runs[0]!;
   if (scene.view === "overlay") {
+    // The target's caption band and the one band the tracks share, which is
+    // the whole of this view — it carries no caption of its own.
     top = scene.rows.tgtLabel;
-    h = (lit.label ?? lit.row + ROW_H) + LABEL_H - scene.rows.tgtLabel;
+    h = scene.rows.tgt + OVER_H - scene.rows.tgtLabel;
   } else if (scene.focus.side === "you") {
     top = lit.row - 2;
     // A row without a caption band of its own is lit to its own bottom edge
@@ -656,21 +658,18 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     }
   }
   /* Every attempt in the one band — superimposing them is what this view is.
-     Only the one being read is captioned: there is a single band of text here
-     and four runs' worth of characters written into it would be unreadable. */
-  const capY = scene.rows.runs[scene.selected]?.label;
-  scene.runs.forEach((lane, r) => {
+     Uncaptioned, and that is the point of the view rather than a shortfall:
+     there is one band of text under a band holding every attempt, so it could
+     only ever have named one of them, and one row of letters standing for an
+     unmarked one of N says less than nothing. The target is named above, which
+     is what the marks here are being read against. */
+  scene.runs.forEach((lane) => {
     for (const it of lane.layout.items) {
       const slot = it.slot;
       if (!slot.actual || it.x === null) continue;
       const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
       if (!visible(it.x, w, scene)) continue;
       band(slot.actual, it.x, slot.op === "equal" ? C.you : C.bad, 0.55);
-      if (r !== scene.selected || capY === null || capY === undefined) continue;
-      const cap = sentCaption(slot, lane.blank === true);
-      ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
-      ctx.font = `600 11px ${C.mono}`;
-      caption(ctx, cap.text, it.x, capY + CAP_CHAR);
     }
   });
 
@@ -1048,8 +1047,14 @@ function drawGradeStrip(
  *
  * The local name is "traces" and not "runs" — a run is an attempt now, and
  * the two meanings sat on the same word in here. */
-function driftTraces(scene: Scene, lane: Lane): Array<Array<[number, number]>> {
+function driftTraces(lane: Lane): Array<Array<[number, number]>> {
   const u = lane.layout.unitSec;
+  /* Where a moment is on this chart, asked of the axis rather than worked out
+     again here. It is the one place that knows what the axis is doing — which
+     view, what zoom, whether a rest re-anchored it, whether the characters are
+     drawn as their elements — and a second copy of that arithmetic is a second
+     answer to the same question. */
+  const at = (t: number) => timeToX(lane.layout, t, "you");
   const traces: Array<Array<[number, number]>> = [];
   let pts: Array<[number, number]> | null = null;
   let base: number | null = null;
@@ -1058,16 +1063,19 @@ function driftTraces(scene: Scene, lane: Lane): Array<Array<[number, number]>> {
     const slot = it.slot;
     if (!slot.actual || !slot.ideal) continue;
     if (base === null || isRest(slot.actual.leadGap)) {
+      /* Opening on zero, at the first mark. `base` is taken here, so being in
+         step at this instant is exactly what everything after it is measured
+         against — and a trace that began at the first character's reading
+         started a character in from the sending it is about. */
       base = slot.actual.t0 - slot.ideal.t0;
-      pts = [];
+      pts = [[at(slot.actual.t0), 0]];
       traces.push(pts);
     }
-    const drift = (slot.actual.t1 - base - slot.ideal.t1) / u;
-    const x =
-      scene.view === "per-char"
-        ? it.x! + it.gapW + it.bodyW / 2
-        : it.x! + (((slot.actual.t1 - slot.actual.t0) / u) * lane.layout.ppu) / 2;
-    pts!.push([x, drift]);
+    /* Plotted where the moment it measures is. The reading is about the END of
+       a character — how late it finished — so it goes at the end of it, and
+       the trace runs out to where the sending does instead of stopping half a
+       character short of it. */
+    pts!.push([at(slot.actual.t1), (slot.actual.t1 - base - slot.ideal.t1) / u]);
   }
   return traces;
 }
@@ -1086,7 +1094,7 @@ function driftTraces(scene: Scene, lane: Lane): Array<Array<[number, number]>> {
  * forty-six pixels tall there is no room for it and the question here is the
  * shape of the family rather than which line is which. */
 function drawDrift(ctx: Ctx2D, scene: Scene): void {
-  const perLane = scene.runs.map((lane) => driftTraces(scene, lane));
+  const perLane = scene.runs.map((lane) => driftTraces(lane));
 
   let driftMax = 1;
   for (const traces of perLane) {

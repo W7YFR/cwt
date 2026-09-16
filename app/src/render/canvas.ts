@@ -331,7 +331,16 @@ export function createChart(
       } satisfies Lane;
     });
     layout = lanes[selected]!.layout;
-    rows = rowsFor(lanes.length, selected, input.settings.captionAll);
+    /* Overlay draws every attempt in one band, so its height is not a function
+       of how many there are. Laid out per lane it reserved a row, a grade
+       strip and a caption band for each — none of which it draws — and a
+       session of four opened a screen of empty page between the marks and the
+       drift plot. One lane, and uncaptioned: superimposing them is the view,
+       and there is no row for a caption to belong to. */
+    rows =
+      input.settings.view === "overlay"
+        ? rowsFor(1, -1)
+        : rowsFor(lanes.length, selected, input.settings.captionAll);
   }
 
   /** How wide the chart would be at this zoom — the whole of it.
@@ -576,10 +585,16 @@ export function createChart(
     /* Then each attempt, in its own band. Overlay superimposes them, so there
        is one band to share. */
     for (let r = 0; r < lanes.length; r++) {
-      const row = rows.runs[r];
-      if (!row) continue;
-      const band: [number, number] =
-        input.settings.view === "overlay" ? bands.you : [row.row, row.row + ROW_H];
+      /* Overlay has one band however many attempts are in it, so a lane there
+         has no row of its own to be found by — and asking for one would leave
+         every attempt but the first unreachable. */
+      let band: [number, number];
+      if (input.settings.view === "overlay") band = bands.you;
+      else {
+        const row = rows.runs[r];
+        if (!row) continue;
+        band = [row.row, row.row + ROW_H];
+      }
       const h = hitTest(lanes[r]!.layout, x, p.y, { you: band, tgt: NO_BAND }, r);
       if (h) return h;
     }
