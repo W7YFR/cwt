@@ -26,6 +26,15 @@ export interface UseRecorderOptions {
   /** A finished recording, at the level it was captured. */
   onClip(clip: AudioClip): void;
   onError(message: string): void;
+  /** Called just before the device is opened.
+   *
+   * Where a screen with a transport stops it. Playback and recording cannot
+   * both have the room: through a loopback device a playing target is
+   * recorded literally, and through speakers it arrives a moment later and
+   * grades as your sending. Here rather than on the buttons because R starts
+   * a recording too, and a rule that only one of the two ways in obeys is not
+   * a rule. */
+  onStart?: (() => void) | undefined;
   /** Whether R starts a recording when none is running.
    *
    * Off unless asked for. The calibration wizard drives the recorder itself,
@@ -64,7 +73,7 @@ function bareR(ev: KeyboardEvent): boolean {
 }
 
 export function useRecorder(options: UseRecorderOptions): RecorderHandle {
-  const { deviceId, onClip, onError, startKey = false } = options;
+  const { deviceId, onClip, onError, onStart, startKey = false } = options;
   const [devices, setDevices] = useState<InputDevice[]>([]);
   const [needPermission, setNeedPermission] = useState(false);
   const [recorder, setRecorder] = useState<Recorder | null>(null);
@@ -108,6 +117,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
      * which is exactly when the stale value is on screen. */
     setElapsed(0);
     setLevel(0);
+    onStart?.();
     try {
       const rec = await startRecording({
         deviceId,
@@ -128,7 +138,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
           : `Could not open the microphone: ${msg}`,
       );
     }
-  }, [deviceId, onError, refreshDevices]);
+  }, [deviceId, onError, onStart, refreshDevices]);
 
   /* The same reset, for the same reason: `restart()` zeroes the recorder's own
      counter, but nothing reports that until the next level callback. */

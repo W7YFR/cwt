@@ -306,6 +306,26 @@ describe("controls", () => {
     expect(seen).toEqual([{ runScores: false }, { captionAll: true }]);
   });
 
+  it("offers an order only where there is more than one row to order", () => {
+    /* One row has exactly one arrangement. That is a session with one attempt
+       in it, and — the case this is really about — a session drawing only its
+       last: Show has already answered what is on screen, and a Sort that
+       redraws the same picture whatever it is set to is furniture. */
+    const { unmount } = renderView({ runs: 3 });
+    expect(screen.getByLabelText(/^sort$/i)).toBeInTheDocument();
+    unmount();
+
+    const shrunk = renderView({ runs: 3, over: { showRuns: "last" } });
+    expect(screen.queryByLabelText(/^sort$/i)).toBeNull();
+    // And Show stays, or there would be no way back out of it.
+    expect(screen.getByLabelText(/^show$/i)).toBeInTheDocument();
+    shrunk.unmount();
+
+    // A window wider than one row still has an order to choose.
+    renderView({ runs: 3, over: { showRuns: "last3" } });
+    expect(screen.getByLabelText(/^sort$/i)).toBeInTheDocument();
+  });
+
   it("puts whole blocks of the page on their own switches", async () => {
     /* None of these is about the chart — each puts a block on the page or
        takes it away — so they are a band of their own rather than more ways to
@@ -430,7 +450,7 @@ describe("controls", () => {
     }
   });
 
-  it("offers characters as start markers, off unless asked for", async () => {
+  it("offers characters without their elements, off unless asked for", async () => {
     /* What the trainer is for is spacing and placement; a row of elements
        invites counting them instead, which is reading Morse off a screen
        rather than learning to send it. Off by default all the same — it hides

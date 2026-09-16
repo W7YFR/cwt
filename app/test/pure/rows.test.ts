@@ -11,6 +11,7 @@ import {
   GRADE_H,
   HEIGHT,
   LABEL_H,
+  LANE_GAP,
   PLOT_BOTTOM,
   ROW_H,
   Y_DRIFT,
@@ -43,7 +44,8 @@ describe("the row geometry", () => {
     const rows = rowsFor(3, 0);
     expect(rows.runs).toHaveLength(3);
     for (let r = 1; r < rows.runs.length; r++) {
-      expect(rows.runs[r]!.grade).toBe(rows.runs[r - 1]!.bottom);
+      // Under it with air in between, which belongs to neither band.
+      expect(rows.runs[r]!.grade).toBe(rows.runs[r - 1]!.bottom + LANE_GAP);
       expect(rows.runs[r]!.row).toBe(rows.runs[r]!.grade + GRADE_H);
     }
   });
@@ -59,6 +61,8 @@ describe("the row geometry", () => {
        moved by the height of one each time it changed — so the marks you were
        comparing jumped out from under the pointer about to click the next
        row. */
+    // The lane's own band, which the gap above it is deliberately not part of:
+    // the break in the page is what says where one row ends.
     const lane = GRADE_H + ROW_H + LABEL_H;
     for (const at of [0, 1, 2, 3]) {
       const rows = rowsFor(4, at);
@@ -84,7 +88,7 @@ describe("the row geometry", () => {
   it("grows the chart by a lane for every attempt, and nothing else", () => {
     const one = rowsFor(1, 0);
     const two = rowsFor(2, 0);
-    expect(two.height - one.height).toBe(GRADE_H + ROW_H + LABEL_H);
+    expect(two.height - one.height).toBe(LANE_GAP + GRADE_H + ROW_H + LABEL_H);
     // The drift plot and the scrollbar keep their order under the lanes.
     expect(two.drift).toBeGreaterThan(two.runs[1]!.bottom);
     expect(two.scroll).toBeGreaterThan(two.plotBottom - 1);

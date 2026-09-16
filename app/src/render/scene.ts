@@ -12,6 +12,9 @@
 
 import type { Analysis, Block, Char, Slot, ViewMode } from "@/types";
 import {
+  CAP_CHAR,
+  CAP_NOTE,
+  CLOCK_MARKER_MIN_W,
   DRIFT_H,
   GRADE_H,
   GUTTER,
@@ -39,6 +42,7 @@ import {
 } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
 import {
+  charWidth,
   gapWidth,
   isRest,
   timeToX,
@@ -125,16 +129,27 @@ export interface Lane {
   blank?: boolean;
 }
 
+/** A clickable name in the gutter: an attempt by its row, or the target.
+ *
+ * The target is in the list because it is a track you play, not because it is
+ * an attempt — the message you meant to send has no score and no report. */
+export type GutterName = number | "tgt";
+
 export interface Scene {
   /** The attempts on screen, in the order they are drawn. */
   runs: readonly Lane[];
   /** Which of them is being read in detail: the one with a caption band, and
    *  the one the report below the chart is about. */
   selected: number;
-  /** The run whose name in the gutter the pointer is over, if any. Lights it,
-   *  because a word you can click has to look different from a word you
-   *  cannot. */
-  picking?: number;
+  /** The name in the gutter the pointer is over, if any. Lights it, because a
+   *  word you can click has to look different from a word you cannot. */
+  picking?: GutterName | null;
+  /** The row the pointer is anywhere over, for its tint. */
+  hoverRow?: GutterName | null;
+  /** Which track playback is about, so its name in the gutter shows as the one
+   *  in hand. The target is not an attempt and cannot be `selected`, but it is
+   *  something you listen to, and the ruler needs to say which. */
+  heard?: "you" | "tgt";
   /** The shared per-character column axis. Absent in the time views, which
    *  need no columns — there the axis is the clock. */
   columns?: ColumnMetrics;
@@ -226,6 +241,40 @@ export function draw(ctx: Ctx2D, scene: Scene): void {
   drawScrollbar(ctx, scene);
   drawPlayhead(ctx, scene);
   drawCountIn(ctx, scene);
+  drawRowTint(ctx, scene);
+}
+
+/** Top and bottom of everything belonging to one row, or null if there is no
+ *  such row. Overlay has none: the tracks share a band there. */
+function rowBand(scene: Scene, name: GutterName | null | undefined): [number, number] | null {
+  if (name === null || name === undefined || scene.view === "overlay") return null;
+  if (name === "tgt") return [scene.rows.tgtLabel, scene.rows.tgt + ROW_H];
+  const lane = scene.rows.runs[name];
+  return lane ? [lane.grade, lane.bottom] : null;
+}
+
+/** A wash over the whole of one row, gutter included.
+ *
+ * A row is not one strip. It is a grade marker above the marks, the marks
+ * themselves, the caption under them and the scores out in the gutter, and
+ * collecting those four bands by eye is work the chart can do for you.
+ *
+ * Over everything rather than under it, which is what makes it one tint
+ * instead of a tinted row with holes in it: the gutter paints itself opaque
+ * after the content, and the gap and count-in labels sit on opaque chips of
+ * their own. A wash underneath comes out everywhere except the parts that
+ * carry the text.
+ *
+ * Neutral rather than colored — every other wash on this chart means something
+ * definite, which track or which deviation, and one more that means only "the
+ * pointer is here" would dilute the rest. */
+function drawRowTint(ctx: Ctx2D, scene: Scene): void {
+  const band = rowBand(scene, scene.hoverRow);
+  if (!band) return;
+  ctx.fillStyle = scene.palette.ink;
+  ctx.globalAlpha = 0.06;
+  ctx.fillRect(0, band[0], scene.viewport.viewW, band[1] - band[0]);
+  ctx.globalAlpha = 1;
 }
 
 /** Structural rules, in screen coordinates so they span the visible track. */
@@ -293,8 +342,10 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
      row means lighting the band from its caption through its marks. */
   const lit = scene.rows.runs[scene.focus.run ?? scene.selected] ?? scene.rows.runs[0]!;
   if (scene.view === "overlay") {
+    // The target's caption band and the one band the tracks share, which is
+    // the whole of this view — it carries no caption of its own.
     top = scene.rows.tgtLabel;
-    h = (lit.label ?? lit.row + ROW_H) + LABEL_H - scene.rows.tgtLabel;
+    h = scene.rows.tgt + OVER_H - scene.rows.tgtLabel;
   } else if (scene.focus.side === "you") {
     top = lit.row - 2;
     // A row without a caption band of its own is lit to its own bottom edge
@@ -316,6 +367,54 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
   roundRect(ctx, x + 0.5, top + 0.5, w - 1, h - 1, 4);
   ctx.stroke();
   ctx.globalAlpha = 1;
+}
+
+/** How wide a character is drawn when its elements are not.
+ *
+ * Two answers, because the two axes are about different things.
+ *
+ * In the per-character view a character has a column of its own and the axis
+ * is a schematic: what it says is the ORDER of things and the length of the
+ * silences between them, so a character is one tick and how long it took is
+ * deliberately absent — that is the whole reason for drawing markers. It also
+ * has the gap either side to sit against, so a hairline is legible there, and
+ * it is what the pacing cursor is matched to.
+ *
+ * On a clock axis it has neither. Position there IS time, so how long a
+ * character took is already on screen whether it is drawn or not — the next
+ * character starts where it starts, and nothing is being withheld by leaving
+ * the space empty except the ability to see it. And a hairline in a second of
+ * empty space reads as a rendering artifact. So a character gets its own
+ * extent, and what a marker withholds is what it always withheld: the dits and
+ * dahs inside, which are what pulls attention into counting rather than
+ * keeping time. Floored, so that a single dit at a wide zoom is still
+ * something you can see and point at. */
+function markerW(scene: Scene, ch: Char): number {
+  if (scene.view === "per-char") return MARKER_W;
+  return Math.max(charWidth(ch, scene.layout.ppu), CLOCK_MARKER_MIN_W);
+}
+
+/** Write a character's name where the character starts.
+ *
+ * Started at the same x rather than centered over it, and that is the rule on
+ * every axis here. What you read along a row is where things BEGIN — the
+ * marks, the gap that led into them, the tick that stands in for them when the
+ * marks are off — and a name centered over a character sits half its own width
+ * to the right of that. Half of a different width for every letter, so the
+ * names come out on a ragged line of their own while the thing they name is on
+ * a straight one. With the marks off it was worse again: the width being
+ * centered in was never drawn at all, so a dah-heavy letter ended up nearest a
+ * neighbor it had nothing to do with. */
+function caption(ctx: Ctx2D, text: string, start: number, y: number): void {
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, start, y);
+}
+
+/** The target's caption line. Its band is above its row, so the text is
+ *  measured up from the marks rather than down onto them. */
+function tgtCapY(scene: Scene): number {
+  return scene.rows.tgtLabel + LABEL_H - CAP_CHAR;
 }
 
 /** What to write under your row for one slot.
@@ -355,8 +454,6 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
   if (!cols) return;
   const bottom = scene.rows.runs[scene.rows.runs.length - 1]!;
 
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
   for (let c = 0; c < cols.x.length; c++) {
     const x = cols.x[c]!;
     const gapW = cols.gapW[c]!;
@@ -371,7 +468,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
        for there is no intended character at all, and the blank says so. */
     ctx.fillStyle = C.ink;
     ctx.font = `600 12px ${C.mono}`;
-    ctx.fillText(ideal ? ideal.char : "·", bx + bodyW / 2, scene.rows.tgtLabel + LABEL_H / 2);
+    caption(ctx, ideal ? ideal.char : "·", bx, tgtCapY(scene));
 
     // Where the character starts, when the gaps arriving here disagree about
     // it. Drawn once, down the whole stack: it is a fact about the column.
@@ -402,10 +499,6 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
     if (it.x === null || !visible(it.x, it.w, scene)) continue;
     const slot = it.slot;
     const bx = it.x + it.gapW;
-    const mid = bx + it.bodyW / 2;
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
 
     /* What came out, and how it differs from the target above.
      *
@@ -417,17 +510,20 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C.ink;
       ctx.font = `600 12px ${C.mono}`;
-      ctx.fillText(cap.text, mid, row.label + LABEL_H / 2);
+      caption(ctx, cap.text, bx, row.label + CAP_CHAR);
 
       // A word-boundary error is a fault in what was sent, so it is called out
       // beside that row's caption, over the gap that caused it.
       if (!blank && (slot.spaceOp === "del" || slot.spaceOp === "ins")) {
         ctx.fillStyle = C.bad;
         ctx.font = `600 9px ${C.mono}`;
+        // Over the gap it is about, so centered on it rather than started
+        // where a character is.
+        ctx.textAlign = "center";
         ctx.fillText(
           slot.spaceOp === "del" ? "no space" : "extra space",
           it.x + it.gapW / 2,
-          row.label + LABEL_H - 5,
+          row.label + CAP_NOTE,
         );
       }
     }
@@ -473,9 +569,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
          that offset IS the drift. Naming both is what makes it readable. */
       ctx.fillStyle = C["ink-dim"];
       ctx.font = `600 11px ${C.mono}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
+      caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
     }
   }
 
@@ -512,9 +606,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
       ctx.font = `600 11px ${C.mono}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(cap.text, it.x + w / 2, row.label + LABEL_H / 2);
+      caption(ctx, cap.text, it.x, row.label + CAP_CHAR);
     }
   });
 }
@@ -540,7 +632,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
     if (scene.charMarkers) {
       // One tick for the character here too — the setting is about what a
       // block on the chart means, not about which axis it is drawn on.
-      paint(x, MARKER_W);
+      paint(x, markerW(scene, ch));
       return;
     }
     let bx = x;
@@ -561,30 +653,23 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
         band(slot.ideal, it.ix, C.tgt, 0.55);
         ctx.fillStyle = C["ink-dim"];
         ctx.font = `600 11px ${C.mono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(slot.ideal.char, it.ix + iw / 2, scene.rows.tgtLabel + LABEL_H / 2);
+        caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       }
     }
   }
   /* Every attempt in the one band — superimposing them is what this view is.
-     Only the one being read is captioned: there is a single band of text here
-     and four runs' worth of characters written into it would be unreadable. */
-  const capY = scene.rows.runs[scene.selected]?.label;
-  scene.runs.forEach((lane, r) => {
+     Uncaptioned, and that is the point of the view rather than a shortfall:
+     there is one band of text under a band holding every attempt, so it could
+     only ever have named one of them, and one row of letters standing for an
+     unmarked one of N says less than nothing. The target is named above, which
+     is what the marks here are being read against. */
+  scene.runs.forEach((lane) => {
     for (const it of lane.layout.items) {
       const slot = it.slot;
       if (!slot.actual || it.x === null) continue;
       const w = ((slot.actual.t1 - slot.actual.t0) / u) * ppu;
       if (!visible(it.x, w, scene)) continue;
       band(slot.actual, it.x, slot.op === "equal" ? C.you : C.bad, 0.55);
-      if (r !== scene.selected || capY === null || capY === undefined) continue;
-      const cap = sentCaption(slot, lane.blank === true);
-      ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
-      ctx.font = `600 11px ${C.mono}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(cap.text, it.x + w / 2, capY + LABEL_H / 2);
     }
   });
 
@@ -800,16 +885,34 @@ function drawCharMarker(
     }
   }
 
-  ctx.fillStyle = isTarget
+  const color = isTarget
     ? C.tgt
     : worst === "warn"
       ? C.warn
       : worst === "bad"
         ? C.bad
         : C.you;
-  ctx.globalAlpha = isTarget ? 0.55 : 1;
-  roundRect(ctx, x0, y, MARKER_W, MARK_H, 3);
-  ctx.fill();
+  const w = markerW(scene, ch);
+  const solid = isTarget ? 0.55 : 1;
+
+  ctx.fillStyle = color;
+  if (scene.view === "per-char") {
+    // A tick, and that is the whole of it.
+    ctx.globalAlpha = solid;
+    roundRect(ctx, x0, y, w, MARK_H, 3);
+    ctx.fill();
+  } else {
+    /* Outlined rather than solid: it is the extent of a character, not one
+       long element, and a filled block that wide would read as a dah. */
+    ctx.globalAlpha = solid * 0.18;
+    roundRect(ctx, x0, y, w, MARK_H, 3);
+    ctx.fill();
+    ctx.globalAlpha = solid;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, x0 + 0.75, y + 0.75, w - 1.5, MARK_H - 1.5, 3);
+    ctx.stroke();
+  }
   ctx.globalAlpha = 1;
 
   /* Hovering anywhere in the character lights its marker, since the marker is
@@ -819,7 +922,7 @@ function drawCharMarker(
   if (scene.hover && ch.blocks.includes(scene.hover)) {
     ctx.strokeStyle = C.ink;
     ctx.lineWidth = 1;
-    roundRect(ctx, x0 - 2.5, y - 2.5, MARKER_W + 5, MARK_H + 5, 3);
+    roundRect(ctx, x0 - 2.5, y - 2.5, w + 5, MARK_H + 5, 3);
     ctx.stroke();
   }
 }
@@ -887,7 +990,10 @@ function drawGhost(
 ): void {
   // A hole where a character should have been, the same size as the thing it
   // is standing in for.
-  const w = scene.charMarkers ? MARKER_W : width;
+  /* A hole the size of the thing it stands in for. On a clock axis that is
+     the space the character would have taken, markers or not — there is no
+     character to ask how wide it is, and the axis already reserved it. */
+  const w = scene.charMarkers && scene.view === "per-char" ? MARKER_W : width;
   const y = yTop + (ROW_H - MARK_H) / 2;
   ctx.strokeStyle = scene.palette.ghost;
   ctx.setLineDash([3, 3]);
@@ -941,8 +1047,14 @@ function drawGradeStrip(
  *
  * The local name is "traces" and not "runs" — a run is an attempt now, and
  * the two meanings sat on the same word in here. */
-function driftTraces(scene: Scene, lane: Lane): Array<Array<[number, number]>> {
+function driftTraces(lane: Lane): Array<Array<[number, number]>> {
   const u = lane.layout.unitSec;
+  /* Where a moment is on this chart, asked of the axis rather than worked out
+     again here. It is the one place that knows what the axis is doing — which
+     view, what zoom, whether a rest re-anchored it, whether the characters are
+     drawn as their elements — and a second copy of that arithmetic is a second
+     answer to the same question. */
+  const at = (t: number) => timeToX(lane.layout, t, "you");
   const traces: Array<Array<[number, number]>> = [];
   let pts: Array<[number, number]> | null = null;
   let base: number | null = null;
@@ -951,16 +1063,19 @@ function driftTraces(scene: Scene, lane: Lane): Array<Array<[number, number]>> {
     const slot = it.slot;
     if (!slot.actual || !slot.ideal) continue;
     if (base === null || isRest(slot.actual.leadGap)) {
+      /* Opening on zero, at the first mark. `base` is taken here, so being in
+         step at this instant is exactly what everything after it is measured
+         against — and a trace that began at the first character's reading
+         started a character in from the sending it is about. */
       base = slot.actual.t0 - slot.ideal.t0;
-      pts = [];
+      pts = [[at(slot.actual.t0), 0]];
       traces.push(pts);
     }
-    const drift = (slot.actual.t1 - base - slot.ideal.t1) / u;
-    const x =
-      scene.view === "per-char"
-        ? it.x! + it.gapW + it.bodyW / 2
-        : it.x! + (((slot.actual.t1 - slot.actual.t0) / u) * lane.layout.ppu) / 2;
-    pts!.push([x, drift]);
+    /* Plotted where the moment it measures is. The reading is about the END of
+       a character — how late it finished — so it goes at the end of it, and
+       the trace runs out to where the sending does instead of stopping half a
+       character short of it. */
+    pts!.push([at(slot.actual.t1), (slot.actual.t1 - base - slot.ideal.t1) / u]);
   }
   return traces;
 }
@@ -979,7 +1094,7 @@ function driftTraces(scene: Scene, lane: Lane): Array<Array<[number, number]>> {
  * forty-six pixels tall there is no room for it and the question here is the
  * shape of the family rather than which line is which. */
 function drawDrift(ctx: Ctx2D, scene: Scene): void {
-  const perLane = scene.runs.map((lane) => driftTraces(scene, lane));
+  const perLane = scene.runs.map((lane) => driftTraces(lane));
 
   let driftMax = 1;
   for (const traces of perLane) {
@@ -1051,7 +1166,15 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
           [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],
         ]
       : [
-          [scene.rows.tgt + ROW_H / 2, "TGT", C.tgt],
+          [
+            scene.rows.tgt + ROW_H / 2,
+            "TGT",
+            // Lit while the target is the track being played, resting in its
+            // own color otherwise. Its color is muted by design — the target
+            // is the reference, not the subject — so "picked up" has to be
+            // brightness rather than a second hue.
+            scene.heard === "tgt" || scene.picking === "tgt" ? C.ink : C.tgt,
+          ],
           /* One name per attempt. "YOU" only while there is one of them —
              with a stack, which attempt a row is is the thing you need from
              this band, and four rows all called YOU would not say it. Numbered

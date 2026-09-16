@@ -65,6 +65,38 @@ describe("a practice session", () => {
     expect(result.current.settings.expected).toBe(target);
   });
 
+  it("keeps it across a clear, which is what makes the loop a loop", () => {
+    /* Clear throws the recordings away and keeps the message — that is the
+       whole of what it is for. The first recording after it is the first
+       recording of a session again, and it used to establish the target the
+       way a first recording does: with its own decode. So the box you had just
+       cleared a session in order to have another go at was rewritten with
+       whatever came out, and the attempt was graded against itself.
+
+       Only ever filled in, never replaced: whatever put it there is what the
+       session is about until somebody says otherwise. */
+    const { result } = renderHook(() => useTake());
+    record(result, SLOPPY, "r1");
+    act(() => result.current.setSettings({ expected: "CQ DE W7YFR" }));
+    const target = result.current.settings.expected;
+
+    act(() => result.current.reset());
+    expect(result.current.settings.expected).toBe(target);
+
+    record(result, CLEAN, "r2");
+    expect(result.current.settings.expected).toBe(target);
+  });
+
+  it("still takes the decode when there is nothing to keep", () => {
+    /* The other half of the rule, and the reason the box is not simply left
+       alone: opening a recording with nothing declared has only one honest
+       answer for what it was aimed at, and it is what came out. */
+    const { result } = renderHook(() => useTake());
+    record(result, SLOPPY, "r1");
+    expect(result.current.settings.expected).toBe(result.current.loaded!.take.decoded);
+    expect(result.current.settings.expected).not.toBe("");
+  });
+
   it("grades every attempt against that one target", () => {
     const { result } = renderHook(() => useTake());
     record(result, SLOPPY, "r1");

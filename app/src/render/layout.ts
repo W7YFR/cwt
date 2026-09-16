@@ -13,7 +13,7 @@
  */
 
 import type { Block, Char, Review, Slot, ViewMode } from "@/types";
-import { PAD_X, REST_W, SLOT_GAP } from "./geometry";
+import { MARKER_W, PAD_X, REST_W } from "./geometry";
 import { planColumns, type ColumnPlan } from "./columns";
 
 /** Breakpoints of a piecewise time->x map, as [seconds, contentX] pairs. */
@@ -46,6 +46,15 @@ export interface Layout {
   breaks: number[];
   ppu: number;
   unitSec: number;
+  /** Characters were laid out as one marker each rather than as their
+   *  elements.
+   *
+   * Recorded on the layout because it changes the layout: a column is as wide
+   * as what is drawn in it, so with markers on a character occupies a tick and
+   * its elements occupy nothing. Everything that reads a position back out of
+   * here — the time axis, the hit test, the focus highlight — has to agree
+   * with that or it is answering about a picture nobody is looking at. */
+  charMarkers?: boolean;
 }
 
 /** Is this gap the sender resting rather than spacing?
@@ -103,6 +112,15 @@ export interface ColumnMetrics {
   readonly ragged: readonly boolean[];
   /** Total content width, including both margins. */
   readonly width: number;
+  /** These columns were measured for a chart drawing one marker per character.
+   *
+   * Carried so that a layout built against them cannot be measured the other
+   * way. It was: the columns collapsed to the tick while the time map went on
+   * tiling each character's elements across a width that was no longer there,
+   * so the chart was drawn on one axis and read on another — the playhead
+   * swept a character's phantom width and then snapped back to the next
+   * column, and ran off the end of the content entirely. */
+  readonly markers: boolean;
 }
 
 /** Measure the columns a set of runs share.
@@ -115,6 +133,7 @@ export interface ColumnMetrics {
 export function measureColumns(
   runs: readonly (readonly Slot[])[],
   ppu: number,
+  markers = false,
 ): ColumnMetrics {
   const plan = planColumns(runs);
   const n = plan.columns.length;
@@ -131,11 +150,15 @@ export function measureColumns(
       const tg = gapWidth(slot.ideal?.leadGap, ppu);
       gapW[c] = Math.max(gapW[c]!, yg, tg);
       narrowest[c] = Math.min(narrowest[c]!, yg, tg);
-      bodyW[c] = Math.max(
-        bodyW[c]!,
-        charWidth(slot.actual, ppu),
-        charWidth(slot.ideal, ppu),
-      );
+      /* A column is as wide as what is drawn in it.
+         With markers on that is one tick at the moment the character starts,
+         and the width the character would have had is not on screen at all —
+         so reserving it left a column mostly empty, with the gap that follows
+         pushed a whole character away from the tick it follows. The axis is
+         supposed to read as mark, gap, mark, gap. */
+      bodyW[c] = markers
+        ? MARKER_W
+        : Math.max(bodyW[c]!, charWidth(slot.actual, ppu), charWidth(slot.ideal, ppu));
       // Every run holds the same target character here; the first to say so
       // settles it.
       if (slot.ideal && !ideal[c]) ideal[c] = slot.ideal;
@@ -150,9 +173,14 @@ export function measureColumns(
   let cur = PAD_X;
   for (let c = 0; c < n; c++) {
     x.push(cur);
-    cur += gapW[c]! + bodyW[c]! + SLOT_GAP;
+    /* Flush: a column ends where the next one starts.
+       On an axis where horizontal distance is time, padding between the slots
+       is silence nobody measured — it read as a second gap sitting between a
+       character and the gap after it, and there is no such thing. The absolute
+       view has never had any, and this is the same picture rearranged. */
+    cur += gapW[c]! + bodyW[c]!;
   }
-  return { plan, x, gapW, bodyW, ideal, ragged, width: cur + PAD_X };
+  return { plan, x, gapW, bodyW, ideal, ragged, width: cur + PAD_X, markers };
 }
 
 export interface LayoutOptions {
@@ -168,6 +196,10 @@ export interface LayoutOptions {
    * cannot watch approach is not a count-in. Zero, and everything below is
    * exactly as it was. */
   readonly leadSec?: number;
+  /** Characters are drawn as one tick at the moment they start, so a column
+   *  only needs room for the tick. Only consulted when this run measures its
+   *  own axis — a shared one was measured with the same answer. */
+  readonly charMarkers?: boolean;
   /** The column axis to lay this run out against, and which run it is.
    *
    * Omitted for a lone run, which measures its own — the result is the same
@@ -234,7 +266,11 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
        ColumnMetrics. A run that is on its own measures its own, which comes
        out identical to the way this was built when a chart could only ever
        hold one. */
-    const cols = options.columns ?? measureColumns([slots], ppu);
+    const cols =
+      options.columns ?? measureColumns([slots], ppu, options.charMarkers === true);
+    // The axis answers this, not the caller: a layout read one way and drawn
+    // the other is the bug this exists to make unreachable.
+    const markers = cols.markers;
     const at = cols.plan.at[options.columns ? (options.run ?? 0) : 0] ?? [];
 
     slots.forEach((slot, i) => {
@@ -255,28 +291,34 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
         w: gapW + bodyW,
       });
 
-      // Time->x breakpoints, taken from the blocks as they are actually drawn.
+      /* Time->x breakpoints, taken from the blocks as they are actually drawn.
+         With markers on they are not drawn at all — a character is one tick,
+         and its whole span lands on that tick. Tiling the elements across a
+         width the column no longer has would put the playhead, the ruler and
+         every seek somewhere off to the right of what is on screen. */
+      const span = (map: AxisMap, ch: Char, from: number) => {
+        if (markers) {
+          map.push([ch.t0, from], [ch.t1, from + bodyW]);
+          return;
+        }
+        let at = from;
+        for (const b of ch.blocks) {
+          map.push([b.t0, at]);
+          at += b.units * ppu;
+          map.push([b.t1, at]);
+        }
+      };
       if (slot.actual) {
-        let bx = x + gapW;
         if (slot.actual.leadGap) {
           maps.you.push([slot.actual.leadGap.t0, x], [slot.actual.leadGap.t1, x + yg]);
         }
-        for (const b of slot.actual.blocks) {
-          maps.you.push([b.t0, bx]);
-          bx += b.units * ppu;
-          maps.you.push([b.t1, bx]);
-        }
+        span(maps.you, slot.actual, x + gapW);
       }
       if (slot.ideal) {
-        let ix = x + gapW;
         if (slot.ideal.leadGap) {
           maps.tgt.push([slot.ideal.leadGap.t0, x], [slot.ideal.leadGap.t1, x + tg]);
         }
-        for (const b of slot.ideal.blocks) {
-          maps.tgt.push([b.t0, ix]);
-          ix += b.units * ppu;
-          maps.tgt.push([b.t1, ix]);
-        }
+        span(maps.tgt, slot.ideal, x + gapW);
       }
     });
     return withRunway({
@@ -288,6 +330,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       breaks: [],
       ppu,
       unitSec,
+      charMarkers: markers,
     }, options.leadSec ?? 0, options.tailSec ?? 0);
   }
 
@@ -415,7 +458,11 @@ export function slotSpan(
     // the longer of the two, so the shorter one starts further in.
     const gapW = !withLeadGap ? 0 : side === "you" ? it.youGapW : it.tgtGapW;
     const bx = it.x! + it.gapW;
-    return [bx - gapW, bx + charWidth(ch, layout.ppu)];
+    /* Never past the column. Its body is the character's own width normally,
+       and one tick when the elements are not drawn — where highlighting the
+       width the character would have had would wash over the gap after it and
+       several columns beyond. */
+    return [bx - gapW, bx + Math.min(charWidth(ch, layout.ppu), it.bodyW)];
   }
 
   const x = side === "you" ? it.x : it.ix;

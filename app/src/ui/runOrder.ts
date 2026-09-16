@@ -17,7 +17,7 @@
  * by drawing a chart and looking at it.
  */
 
-import type { Review, RunSort } from "@/types";
+import type { Review, ReviewSettings, RunSort } from "@/types";
 
 export type { RunSort };
 
@@ -27,6 +27,24 @@ export const RUN_SORTS: readonly { value: RunSort; label: string }[] = [
   { value: "best", label: "Most consistent" },
   { value: "worst", label: "Least consistent" },
 ];
+
+/** How many of the most recent attempts to draw, or null for all of them.
+ *
+ * A count rather than a flag because there are three answers now and there is
+ * nothing special about one: the window is always a tail of the session, and
+ * how long a tail is the only thing that varies. */
+export function recentCount(show: ReviewSettings["showRuns"]): number | null {
+  switch (show) {
+    case "last":
+      return 1;
+    case "last3":
+      return 3;
+    case "last5":
+      return 5;
+    case "all":
+      return null;
+  }
+}
 
 /** How good an attempt was, as one number.
  *

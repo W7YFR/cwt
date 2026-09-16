@@ -41,7 +41,7 @@ import {
   PACE_LEAD_MIN_SEC,
 } from "@/render/geometry";
 import { fmtGain, fmtPpu, fmtSeconds, fmtTolerance, fmtWpm } from "./format";
-import { RUN_SORTS, type RunSort } from "./runOrder";
+import { RUN_SORTS, recentCount, type RunSort } from "./runOrder";
 import { useUpperField } from "./useUpperField";
 
 export interface ControlsProps {
@@ -317,9 +317,17 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
      and a strip of blank page above a chart reads as something that failed to
      load. */
   if (!s.showChartControls) return null;
+  /* How many rows the chart is actually drawing — the session, capped by
+     whatever window Show has in force. What Sort is about. */
+  const want = recentCount(s.showRuns);
+  const drawn = want === null ? props.runs : Math.min(want, props.runs);
   return (
     <section className="viewcontrols">
-        {props.runs > 1 && (
+        {/* Only where there is an order to choose. One row has exactly one
+            arrangement, whether that is a session with one attempt in it or a
+            session showing its last — and a control whose every setting draws
+            the same picture is furniture. */}
+        {drawn > 1 && (
           <div className="group">
             <label htmlFor="run-sort" title={RUN_SORT_HELP}>
               Sort
@@ -353,7 +361,12 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
 
         {/* Next to the axis, because it is the same kind of question: not what
             is graded, but what is on screen to read. Only with a stack — with
-            one attempt "all" and "the last one" are the same row. */}
+            one attempt every answer here is the same row.
+
+            All three offered whenever it shows, short sessions included: "the
+            last five" of three attempts is those three, which is what it says
+            it is. Dropping an option once a session is short enough for two of
+            them to agree would move the others under the pointer. */}
         {props.runs > 1 && (
           <div className="group">
             <label htmlFor="show-runs" title={SHOW_RUNS_HELP}>
@@ -367,6 +380,8 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
               }
             >
               <option value="all">All runs</option>
+              <option value="last5">Last 5 runs</option>
+              <option value="last3">Last 3 runs</option>
               <option value="last">Last run</option>
             </select>
           </div>

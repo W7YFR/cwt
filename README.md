@@ -50,11 +50,16 @@ real question — did I drop that letter every time, or only once — and the dr
 traces share one axis, so a wander getting smaller is a wander you can see
 getting smaller.
 
-Click a run's name in the gutter to read it in detail; the scores, the tables
-and the audio follow. **Drop run N** throws one attempt away and keeps the
-rest. **Sort** reorders the rows — newest first while you're still going, most
-consistent first when you're hunting for the one that went right. A run keeps
-the number it was recorded with wherever it lands.
+Click a name in the gutter to pick that track up — the scores, the tables and
+the audio follow — and click it again to play it. **TGT** is one of them, so
+the target is picked up and played the same way an attempt is. The trash icon
+throws one attempt away and keeps the rest.
+
+**Show** is how many attempts the chart draws: all of them, the last few, or
+only the newest — the comparison, or the loop. **Sort** reorders whatever is
+drawn, newest first while you're still going, most consistent first when you're
+hunting for the one that went right. A run keeps the number it was recorded
+with wherever it lands.
 
 A session is several attempts at **one message at one speed** — that's what
 makes the rows comparable. **New session** is where those change; the intended
@@ -93,9 +98,15 @@ clock, so accumulated drift shears them apart. **Overlay** superimposes them.
   the session draws a trace, all against one axis — scaled to its own worst
   moment, a run half as bad would draw an identical picture.
 
-Scroll to zoom, drag or shift-scroll to pan, click a character to hear it, click
-the ruler to seek. In the deviations table, click **yours** and then **target**
-to hear one fault back to back — which tells you far more than "1.49u" does.
+**Marks only** draws each character as one shape instead of the dits and dahs
+inside it: a tick at the moment it starts in the per-character view, where the
+axis is about order and silence, and the character's own extent on the clock
+axes, where position already is time.
+
+Scroll to zoom, drag or shift-scroll to pan, click a character to hear it,
+click the ruler to seek — into whichever track you were last listening to. In
+the deviations table, click **yours** and then **target** to hear one fault back
+to back — which tells you far more than "1.49u" does.
 
 ---
 

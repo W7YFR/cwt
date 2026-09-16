@@ -66,6 +66,35 @@ async function heldStorage(): Promise<() => void> {
   };
 }
 
+/** Answer the microphone permission query with a state we control.
+ *
+ * Real Chromium answers "prompt" here, and the case worth testing is the one
+ * that cannot be reached by asking nicely: permission refused in the browser's
+ * own settings, before this page ever opened. */
+function permission(state: string) {
+  const target = new EventTarget() as EventTarget & { state: string };
+  target.state = state;
+  const real = Object.getOwnPropertyDescriptor(navigator, "permissions");
+  Object.defineProperty(navigator, "permissions", {
+    configurable: true,
+    value: { query: async () => target },
+  });
+  return {
+    /** The browser changing its mind while the page stays open, which is what
+     *  happens when you go and fix it in site settings and come back. */
+    becomes: async (next: string) => {
+      target.state = next;
+      await act(async () => {
+        target.dispatchEvent(new Event("change"));
+      });
+    },
+    restore: () => {
+      if (real) Object.defineProperty(navigator, "permissions", real);
+      else delete (navigator as { permissions?: unknown }).permissions;
+    },
+  };
+}
+
 /** Drive a range input the way React's synthetic onChange expects. */
 function setRange(el: HTMLInputElement, value: number) {
   const setter = Object.getOwnPropertyDescriptor(
@@ -155,6 +184,39 @@ describe("the app", () => {
     await mount();
     expect(container.textContent).toContain("Start recording");
     expect(container.querySelector("canvas")).toBeNull();
+  });
+
+  it("says so when the browser will not let it near a microphone", async () => {
+    /* The symptom is silence. Every picker that offers a choice correctly
+       declines to offer one when there is nothing to pick, so the page ends up
+       with no controls and nothing saying why — which reads as the app being
+       broken rather than as a permission to change.
+
+       And it clears itself: the fix happens in the browser's settings, off
+       this page, and coming back to a page still claiming to be blocked would
+       be the same lie in the other direction. */
+    const perm = permission("denied");
+    try {
+      await mount();
+      const banner = container.querySelector("[data-testid='mic-blocked']");
+      expect(banner).not.toBeNull();
+      expect(banner!.textContent).toMatch(/microphone/i);
+
+      await perm.becomes("granted");
+      expect(container.querySelector("[data-testid='mic-blocked']")).toBeNull();
+    } finally {
+      perm.restore();
+    }
+  });
+
+  it("says nothing about permission it has not been refused", async () => {
+    const perm = permission("prompt");
+    try {
+      await mount();
+      expect(container.querySelector("[data-testid='mic-blocked']")).toBeNull();
+    } finally {
+      perm.restore();
+    }
   });
 
   it("says nothing at all while a quick boot happens", async () => {

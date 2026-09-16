@@ -36,6 +36,7 @@ import {
   draw,
   scrollbarThumb,
   trackBands,
+  type GutterName,
   type Lane,
   type Scene,
   type Viewport,
@@ -52,8 +53,22 @@ export interface ChartCallbacks {
    * another attempt is what moves them there. A second click then plays it,
    * out of the right recording. */
   onSelectRun?: (run: number) => void;
-  /** The ruler was clicked: seek and play from here. */
-  onSeek?: (t: number) => void;
+  /** The target's name in the gutter was clicked.
+   *
+   * Not a run and not a selection of one — the report below the chart stays
+   * about the attempt it was about. What it picks up is the track: the ruler
+   * seeks into the target from here, and the name lights to say so. */
+  onSelectTarget?: () => void;
+  /** A name in the gutter was clicked while its track was already the one in
+   *  hand. Play it, or stop it if it is already running. */
+  onPlayTrack?: (side: "you" | "tgt") => void;
+  /** The ruler was clicked: seek and play from here.
+   *
+   * Both tracks' times for that point, because one ruler runs over two of
+   * them and only the caller knows which one is being listened to. In
+   * per-character view the two tracks are stretched to a shared column axis
+   * independently, so a point on the ruler is a different second on each. */
+  onSeek?: (at: { you: number; tgt: number }) => void;
   /** Pointer moved over (or off) a block, for the tooltip. */
   onHover?: (hit: HitResult | null, clientX: number, clientY: number) => void;
   /** The zoom changed from a wheel gesture, so the slider can follow. */
@@ -80,6 +95,19 @@ export interface ChartInput {
   stack?: readonly Review[];
   /** Which of `stack` is `review`. */
   selected?: number;
+  /** The session number of `stack[0]`.
+   *
+   * The chart can be handed a tail of a session rather than all of it — "the
+   * last five" — and a run's number is the order it was recorded in, not where
+   * it lands on screen. Without this the fourth attempt would be drawn as RUN
+   * 1 and clicking its name would pick up the first, which is the same class
+   * of bug sorting the rows already avoids.
+   *
+   * One number covers it because the window is always a tail: nothing is ever
+   * left out of the middle. */
+  firstRun?: number;
+  /** The track playback is about, for the gutter. Defaults to yours. */
+  heard?: "you" | "tgt";
   settings: ReviewSettings;
   focus: Focus | null;
 }
@@ -152,8 +180,10 @@ export function createChart(
   let lanes: Lane[] = [];
   let rows = rowsFor(1, 0);
   let selected = 0;
-  /** The run name under the pointer, for the gutter's highlight. */
-  let picking = -1;
+  /** The name in the gutter under the pointer, for its highlight. */
+  let picking: GutterName | null = null;
+  /** The row the pointer is anywhere over, for its tint. */
+  let hoverRow: GutterName | null = null;
 
   /** The attempts to draw, in the order their rows go, and which row is being
    *  read.
@@ -217,6 +247,8 @@ export function createChart(
       runs: lanes,
       selected,
       picking,
+      hoverRow,
+      ...(input.heard ? { heard: input.heard } : {}),
       ...(columns ? { columns } : {}),
       layout,
       slots: lanes[selected]!.slots,
@@ -259,7 +291,11 @@ export function createChart(
        which is what makes a column mean the same thing on every row. */
     columns =
       input.settings.view === "per-char"
-        ? measureColumns(stack.reviews.map((r) => r.slots), input.settings.ppu)
+        ? measureColumns(
+            stack.reviews.map((r) => r.slots),
+            input.settings.ppu,
+            input.settings.charMarkers,
+          )
         : undefined;
 
     const opts = {
@@ -269,6 +305,12 @@ export function createChart(
       // The same runway either side: it is the room a centered playhead needs
       // to keep moving at both ends, and one number is one thing to get wrong.
       tailSec: leadSec,
+      /* Goes to the layout as well as to the columns. They have to be measured
+         the same way or the chart is drawn on one axis and read on another:
+         the columns collapse to the tick, the time map tiles the elements
+         across a width that is no longer there, and the playhead sweeps a
+         character's phantom width and then snaps back to the next column. */
+      charMarkers: input.settings.charMarkers,
     };
 
     lanes = stack.order.map((at) => {
@@ -285,11 +327,20 @@ export function createChart(
         analysis: review.analysis,
         accuracy: review.comparison?.accuracy ?? null,
         blank: review.take.segments.length === 0,
-        ordinal: at,
+        ordinal: (input?.firstRun ?? 0) + at,
       } satisfies Lane;
     });
     layout = lanes[selected]!.layout;
-    rows = rowsFor(lanes.length, selected, input.settings.captionAll);
+    /* Overlay draws every attempt in one band, so its height is not a function
+       of how many there are. Laid out per lane it reserved a row, a grade
+       strip and a caption band for each — none of which it draws — and a
+       session of four opened a screen of empty page between the marks and the
+       drift plot. One lane, and uncaptioned: superimposing them is the view,
+       and there is no row for a caption to belong to. */
+    rows =
+      input.settings.view === "overlay"
+        ? rowsFor(1, -1)
+        : rowsFor(lanes.length, selected, input.settings.captionAll);
   }
 
   /** How wide the chart would be at this zoom — the whole of it.
@@ -304,7 +355,11 @@ export function createChart(
     const stack = stackOf(input);
     const cols =
       input.settings.view === "per-char"
-        ? measureColumns(stack.reviews.map((r) => r.slots), ppu)
+        ? measureColumns(
+            stack.reviews.map((r) => r.slots),
+            ppu,
+            input.settings.charMarkers,
+          )
         : undefined;
     let width = 0;
     for (const at of stack.order) {
@@ -314,6 +369,7 @@ export function createChart(
         ppu,
         leadSec,
         tailSec: leadSec,
+        charMarkers: input.settings.charMarkers,
         durationSec: review.take.durationSec,
         ...(cols ? { columns: cols, run: at } : {}),
       });
@@ -459,23 +515,55 @@ export function createChart(
    *  without the other row answering it. */
   const NO_BAND: [number, number] = [-1, -1];
 
-  /** Which attempt's name in the gutter is under this point, or -1.
+  /** Which track the gutter is offering at this point, or null.
    *
-   * The names are the handle for picking a row up. Clicking the row itself
+   * The gutter is the handle for picking a track up. Clicking the row itself
    * works too, but a row is mostly the marks on it, and going through a mark
    * to reach the row it belongs to is an indirection you can feel — you aim at
-   * a dit to say "this run". The name says only that, which is why it is the
-   * one to click.
+   * a dit to say "this run". The gutter says only that, which is why it is the
+   * place to click. The target has a row there like the rest, so it is one of
+   * them.
    *
-   * Nothing to pick with a single attempt on screen: the label reads YOU and
-   * there is no other row for it to be. */
-  function gutterRunAt(p: { x: number; y: number }): number {
-    if (p.x >= GUTTER || lanes.length < 2) return -1;
+   * The whole of the row's cell answers, not the few pixels the name is
+   * written in. The name is where a row's cell is legible, not where it is:
+   * the row lights under the pointer across its whole height, and then only a
+   * line of text inside it would take the click. Exactly the band the tint
+   * covers, so what lit is what answers. */
+  function gutterNameAt(p: { x: number; y: number }): GutterName | null {
+    if (p.x >= GUTTER) return null;
+    /* Only where there is something for a click to do: a chart can be shown
+       purely to be looked at — the calibration preview is one — and a cell
+       that changes the cursor but answers no click is a control that lies. */
+    if (!callbacks.onPlayTrack && !callbacks.onSelectRun) return null;
+    return rowAt(p);
+  }
+
+  /** Whether that name's track is the one already in hand.
+   *
+   * Which is the whole of what a second click on a name means. Yours is in
+   * hand when its row is the one being read AND the target is not what you
+   * are listening to, so a run picked up while the target was playing takes
+   * one click to come back to and a second to play — the same two clicks any
+   * other name takes. */
+  /** Which row this point is in, anywhere across the width — the gutter and
+   *  the marks alike, since the tint is about the whole row.
+   *
+   * A row runs from its grade strip to the bottom of its caption, which is
+   * exactly the band `rowsFor` reserves for it, so the tint cannot disagree
+   * with what is drawn in it. Overlay has no rows of its own to tint. */
+  function rowAt(p: { x: number; y: number }): GutterName | null {
+    if (!input || input.settings.view === "overlay") return null;
+    if (p.y >= rows.tgtLabel && p.y < rows.tgt + ROW_H) return "tgt";
     for (let r = 0; r < lanes.length; r++) {
       const row = rows.runs[r];
-      if (row && p.y >= row.row && p.y < row.row + ROW_H) return r;
+      if (row && p.y >= row.grade && p.y < row.bottom) return r;
     }
-    return -1;
+    return null;
+  }
+
+  function inHand(name: GutterName): boolean {
+    const heard = input?.heard ?? "you";
+    return name === "tgt" ? heard === "tgt" : name === selected && heard === "you";
   }
 
   function hitAt(p: { x: number; y: number }): HitResult | null {
@@ -495,10 +583,16 @@ export function createChart(
     /* Then each attempt, in its own band. Overlay superimposes them, so there
        is one band to share. */
     for (let r = 0; r < lanes.length; r++) {
-      const row = rows.runs[r];
-      if (!row) continue;
-      const band: [number, number] =
-        input.settings.view === "overlay" ? bands.you : [row.row, row.row + ROW_H];
+      /* Overlay has one band however many attempts are in it, so a lane there
+         has no row of its own to be found by — and asking for one would leave
+         every attempt but the first unreachable. */
+      let band: [number, number];
+      if (input.settings.view === "overlay") band = bands.you;
+      else {
+        const row = rows.runs[r];
+        if (!row) continue;
+        band = [row.row, row.row + ROW_H];
+      }
       const h = hitTest(lanes[r]!.layout, x, p.y, { you: band, tgt: NO_BAND }, r);
       if (h) return h;
     }
@@ -511,15 +605,15 @@ export function createChart(
       return;
     }
     const p = localPos(ev);
-    const over = gutterRunAt(p);
-    canvas.classList.toggle("picking", over >= 0);
-    if (over !== picking) {
-      picking = over;
-      paint();
-    }
+    const over = gutterNameAt(p);
+    canvas.classList.toggle("picking", over !== null);
+    const band = rowAt(p);
     const h = hitAt(p);
     const b = h ? h.block : null;
-    if (b !== hover) {
+    // One repaint for however many of the three moved, rather than one each.
+    if (over !== picking || band !== hoverRow || b !== hover) {
+      picking = over;
+      hoverRow = band;
       hover = b;
       paint();
     }
@@ -528,12 +622,10 @@ export function createChart(
 
   const onMouseLeave = (ev: MouseEvent) => {
     canvas.classList.remove("picking");
-    if (picking !== -1) {
-      picking = -1;
-      paint();
-    }
     callbacks.onHover?.(null, ev.clientX, ev.clientY);
-    if (hover) {
+    if (picking !== null || hoverRow !== null || hover) {
+      picking = null;
+      hoverRow = null;
       hover = null;
       paint();
     }
@@ -548,10 +640,18 @@ export function createChart(
     if (!layout) return;
     const p = localPos(ev);
 
-    // The run names in the gutter pick a row up, and that is all they do.
-    const named = gutterRunAt(p);
-    if (named >= 0) {
-      if (named !== selected) callbacks.onSelectRun?.(lanes[named]!.ordinal);
+    /* The gutter picks a track up, and plays the one already in hand. Picking up first rather than playing straight away: the report
+       below the chart, the scores and the caption band all follow the
+       selection, so a click on another attempt has to move them there before
+       anything comes out of the speakers — playing a recording while the
+       numbers on screen describe a different one is worse than one more
+       click. Once it IS the one on screen, there is nothing left to move and
+       the click is free to do the obvious thing. */
+    const named = gutterNameAt(p);
+    if (named !== null) {
+      if (inHand(named)) callbacks.onPlayTrack?.(named === "tgt" ? "tgt" : "you");
+      else if (named === "tgt") callbacks.onSelectTarget?.();
+      else callbacks.onSelectRun?.(lanes[named]!.ordinal);
       return;
     }
 
@@ -559,7 +659,11 @@ export function createChart(
 
     // The ruler band is a seek strip.
     if (p.y < RULER_H) {
-      callbacks.onSeek?.(Math.max(xToTime(layout, contentXOf(p.x), "you"), 0));
+      const at = contentXOf(p.x);
+      callbacks.onSeek?.({
+        you: Math.max(xToTime(layout, at, "you"), 0),
+        tgt: Math.max(xToTime(layout, at, "tgt"), 0),
+      });
       return;
     }
     const h = hitAt(p);
@@ -730,6 +834,7 @@ export function createChart(
         view: input.settings.view,
         ppu,
         durationSec: input.review.take.durationSec,
+        charMarkers: input.settings.charMarkers,
       });
       let note = "";
       if (GUTTER + exportLayout.width + PAD_R > budget) {
@@ -739,6 +844,7 @@ export function createChart(
           view: input.settings.view,
           ppu,
           durationSec: input.review.take.durationSec,
+          charMarkers: input.settings.charMarkers,
         });
         note = `zoomed to ${ppu.toFixed(1)} px/unit so the whole session fits`;
       }
@@ -748,7 +854,7 @@ export function createChart(
          against and would be missing from the picture entirely. */
       const exportColumns =
         input.settings.view === "per-char"
-          ? measureColumns([input.review.slots], ppu)
+          ? measureColumns([input.review.slots], ppu, input.settings.charMarkers)
           : undefined;
 
       const w = Math.ceil(GUTTER + exportLayout.width + PAD_R);

@@ -161,8 +161,22 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
 /** The settings a freshly loaded take should open at: its own defaults, but
  *  keeping the preferences that belong to the person rather than the take. */
 function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
+  const own = defaultSettings(take);
   return {
-    ...defaultSettings(take),
+    ...own,
+    /* The message being practiced is one of those, and it outlives every
+       attempt at it. A take falls back to its own decode when nothing was
+       declared — which is the right answer for the first thing you open, and
+       the wrong one for everything after: record against a message already in
+       the box and the box would be rewritten with whatever came out, so the
+       attempt would be graded against itself and score a meaningless hundred
+       percent.
+
+       Only ever filled in, never replaced. Whatever put it there — typed on
+       the landing screen, set in the New session dialog, or decoded off the
+       first recording when the box was empty — is what the session is about
+       until somebody says otherwise. */
+    expected: prev.expected || own.expected,
     tolerance: prev.tolerance,
     gainDb: prev.gainDb,
     collapseRests: prev.collapseRests,

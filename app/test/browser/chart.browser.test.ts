@@ -14,7 +14,7 @@ import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
 import { buildLayout, timeToX } from "@/render/layout";
 import { trackBands } from "@/render/scene";
 import { contextWindow } from "@/render/focus";
-import { HEIGHT, GUTTER, PAD_R, ZOOM_MIN } from "@/render/geometry";
+import { HEIGHT, GUTTER, PAD_R, ZOOM_MIN, rowsFor } from "@/render/geometry";
 import type { BlockKind } from "@/types";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
 
@@ -432,6 +432,51 @@ describe("the chart in a browser", () => {
     });
   });
 
+  it("keeps a run's own number when it is drawn as part of a tail", () => {
+    /* The chart can be handed the last few attempts of a session rather than
+       all of them. A run's number is the order it was recorded in, not where
+       it lands on screen — so the window's first row is not RUN 1, and
+       clicking its name has to pick up the attempt it names rather than the
+       one in that position.
+
+       The same class of bug sorting the rows already avoids, reached a
+       different way: there the rows move, here the ones above them are gone. */
+    const onSelectRun = vi.fn();
+    chart.destroy();
+    chart = createChart(host, canvas, { onSelectRun });
+    const { review: other } = reviewFrom(caseNamed(SLOPPY), { expected: "CQ" });
+    // The last two of a session of five.
+    chart.update({
+      review,
+      stack: [review, other],
+      selected: 0,
+      firstRun: 3,
+      settings,
+      focus: null,
+    });
+
+    const rows = rowsFor(2, 0);
+    const box = canvas.getBoundingClientRect();
+    const clickName = (at: number) =>
+      canvas.dispatchEvent(
+        new MouseEvent("click", {
+          clientX: box.left + 8,
+          clientY: box.top + rows.runs[at]!.row + 4,
+          bubbles: true,
+        }),
+      );
+
+    // The second row, which is the fifth attempt.
+    clickName(1);
+    expect(onSelectRun).toHaveBeenCalledWith(4);
+
+    // And the first row is already the one in hand, so it plays rather than
+    // re-selecting — the number it would have sent is the point either way.
+    onSelectRun.mockClear();
+    clickName(0);
+    expect(onSelectRun).not.toHaveBeenCalled();
+  });
+
   it("seeks when the ruler is clicked", () => {
     const onSeek = vi.fn();
     chart.destroy();
@@ -446,7 +491,7 @@ describe("the chart in a browser", () => {
       }),
     );
     expect(onSeek).toHaveBeenCalled();
-    expect(onSeek.mock.calls[0]![0]).toBeGreaterThanOrEqual(0);
+    expect(onSeek.mock.calls[0]![0].you).toBeGreaterThanOrEqual(0);
   });
 
   it("fits the session to the real width of its container", () => {

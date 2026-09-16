@@ -305,12 +305,14 @@ export interface ReviewSettings {
    * On by default — a hint nobody has seen yet cannot be asked for — and off
    * once you know, which is when a permanent instruction becomes furniture. */
   showHints: boolean;
-  /** Which attempts the chart draws: every one, or only the most recent.
+  /** Which attempts the chart draws: every one, or a tail of the most recent.
    *
    * "Last" is for the loop rather than the comparison — send it, look at it,
    * send it again — where the rows behind the one you just made are in the
-   * way rather than in the picture. */
-  showRuns: "all" | "last";
+   * way rather than in the picture. The counted windows are the middle of the
+   * two: enough rows to see whether the thing you just changed is holding,
+   * without a long session's worth of early attempts squeezing them. */
+  showRuns: "all" | "last5" | "last3" | "last";
   /** Offer the four download buttons.
    *
    * Off by default. Getting a file out is an occasional act — archiving a

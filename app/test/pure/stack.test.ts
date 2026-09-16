@@ -13,7 +13,7 @@ import { recordingCtx } from "../recording-ctx";
 import { caseNamed, reviewFrom, CLEAN, SLOPPY } from "../fixture";
 import { draw, type Lane, type Scene } from "@/render/scene";
 import { buildLayout, measureColumns } from "@/render/layout";
-import { GUTTER, LABEL_H, PAD_R, ROW_H, rowsFor } from "@/render/geometry";
+import { CAP_CHAR, GUTTER, LABEL_H, PAD_R, ROW_H, rowsFor } from "@/render/geometry";
 import { FALLBACK_PALETTE } from "@/render/theme";
 import type { Review, ViewMode } from "@/types";
 
@@ -141,7 +141,7 @@ describe("a stack of attempts", () => {
     const onTargetRow = (scene: Scene) =>
       paint(scene)
         .ofType("fillText")
-        .filter((c) => Math.abs(c.args[1]! - (scene.rows.tgtLabel + 11)) < 2)
+        .filter((c) => Math.abs(c.args[1]! - (scene.rows.tgtLabel + LABEL_H - CAP_CHAR)) < 2)
         .map((c) => c.text);
 
     for (const scene of [stack(reviews().slice(0, 1)), stack(reviews())]) {
@@ -159,7 +159,7 @@ describe("a stack of attempts", () => {
 
     const dots = paint(scene)
       .ofType("fillText")
-      .filter((c) => c.text === "·" && Math.abs(c.args[1]! - (scene.rows.tgtLabel + 11)) < 2);
+      .filter((c) => c.text === "·" && Math.abs(c.args[1]! - (scene.rows.tgtLabel + LABEL_H - CAP_CHAR)) < 2);
     expect(dots).toHaveLength(interstices);
   });
 
@@ -206,8 +206,8 @@ describe("a stack on the absolute axis", () => {
 
   it("writes no text above the target's own caption band", () => {
     /* The other half of the same bug. An uncaptioned run has `label === null`,
-       and a non-null assertion on it put the text at `null + 11` — eleven
-       pixels down, in the middle of the ruler. */
+       and a non-null assertion on it put the text at `null + CAP_CHAR` — a
+       few pixels down, in the middle of the ruler. */
     const scene = absolute(1);
     const above = paint(scene)
       .ofType("fillText")
@@ -224,7 +224,7 @@ describe("a stack on the absolute axis", () => {
       const band = scene.rows.runs[pick]!.label!;
       const captions = paint(scene)
         .ofType("fillText")
-        .filter((c) => Math.abs(c.args[1]! - (band + 11)) < 2);
+        .filter((c) => Math.abs(c.args[1]! - (band + CAP_CHAR)) < 2);
       expect(captions.length).toBeGreaterThan(0);
 
       // And nothing written into the row that has no band of its own.
@@ -245,7 +245,7 @@ describe("a stack on the absolute axis", () => {
     const scene = absolute(0);
     const onTargetRow = paint(scene)
       .ofType("fillText")
-      .filter((c) => Math.abs(c.args[1]! - (scene.rows.tgtLabel + 11)) < 2)
+      .filter((c) => Math.abs(c.args[1]! - (scene.rows.tgtLabel + LABEL_H - CAP_CHAR)) < 2)
       .map((c) => c.text);
     expect(onTargetRow).toEqual(target);
   });

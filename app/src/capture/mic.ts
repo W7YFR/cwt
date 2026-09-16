@@ -63,6 +63,51 @@ export async function listInputs(): Promise<InputDevice[]> {
     }));
 }
 
+/** What the browser will say about the microphone before one is opened.
+ *
+ * "unknown" is not "prompt": it means the browser would not answer the
+ * question — Firefox and Safari do not, for the microphone — and there the
+ * only way to find out is to ask for a device and see what happens. Nothing
+ * should be claimed on the page either way. */
+export type MicAccess = "granted" | "denied" | "prompt" | "unknown";
+
+/** Watch the microphone permission, and say so whenever it changes.
+ *
+ * Worth watching rather than reading once, because the interesting change
+ * happens somewhere this page cannot see: you go into the browser's site
+ * settings, allow the microphone, and come back. Chromium fires the change on
+ * the permission status, so the page can stop saying it is blocked without
+ * being reloaded.
+ *
+ * Returns an unsubscribe. */
+export function watchMicAccess(onChange: (access: MicAccess) => void): () => void {
+  const perms = navigator.permissions;
+  if (!perms?.query) {
+    onChange("unknown");
+    return () => {};
+  }
+  let live = true;
+  let drop = (): void => {};
+  perms
+    // Not in the standard permission-name union, and the browsers that do not
+    // know it reject rather than returning a state.
+    .query({ name: "microphone" as PermissionName })
+    .then((status) => {
+      if (!live) return;
+      const report = (): void => onChange(status.state as MicAccess);
+      report();
+      status.addEventListener("change", report);
+      drop = () => status.removeEventListener("change", report);
+    })
+    .catch(() => {
+      if (live) onChange("unknown");
+    });
+  return () => {
+    live = false;
+    drop();
+  };
+}
+
 export interface Recorder {
   /** Seconds captured so far. */
   elapsed(): number;

@@ -48,6 +48,18 @@ export function Scores({
   if (isBlankTake(take)) {
     return (
       <div className="scores" data-testid="scores" data-blank="true">
+        {/* Which attempt these figures are about.
+            Everything in this band, and every table under it, is one run — and
+            with a stack on the chart which one was only findable by noticing
+            where the caption band had moved to. Named the way the chart names
+            it, and in the color the chart lights it, so the row and its
+            numbers are one thing. Absent with a single attempt, where there is
+            nothing for it to be distinguished from. */}
+        {runOf && runOf.of > 1 && (
+          <div className="score runname" data-testid="run-name">
+            <b>Run {runOf.at + 1}</b>
+          </div>
+        )}
         <div className="score none">
           <b>—</b>
           <span>consistent</span>
@@ -80,6 +92,18 @@ export function Scores({
 
   return (
     <div className="scores" data-testid="scores" data-blank="false">
+      {/* Which attempt these figures are about.
+          Everything in this band, and every table under it, is one run — and
+          with a stack on the chart which one was only findable by noticing
+          where the caption band had moved to. Named the way the chart names
+          it, and in the color the chart lights it, so the row and its numbers
+          are one thing. Absent with a single attempt, where there is nothing
+          for it to be distinguished from. */}
+      {runOf && runOf.of > 1 && (
+        <div className="score runname" data-testid="run-name">
+          <b>Run {runOf.at + 1}</b>
+        </div>
+      )}
       <div className={`score ${scoreBand(g.withinTolFrac, CONSISTENT_BANDS)}`}>
         <b>{Math.round(g.withinTolFrac * 100)}%</b>
         <span>consistent</span>

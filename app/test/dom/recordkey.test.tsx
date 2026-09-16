@@ -30,7 +30,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function listening(startKey: boolean) {
+function listening(startKey: boolean, onStart?: () => void) {
   const start = vi.spyOn(mic, "startRecording").mockResolvedValue({
     elapsed: () => 0,
     peek: () => new Float32Array(0),
@@ -44,6 +44,7 @@ function listening(startKey: boolean) {
       onClip: vi.fn(),
       onError: vi.fn(),
       startKey,
+      ...(onStart ? { onStart } : {}),
     }),
   );
   return { start, view };
@@ -70,6 +71,26 @@ describe("the record key", () => {
     await settled();
     await pressR();
     expect(start).not.toHaveBeenCalled();
+  });
+
+  it("hands the room over before opening the device", async () => {
+    /* Playback and recording cannot both have it: through a loopback device a
+       playing target is recorded literally, and through speakers it arrives a
+       moment later and grades as your sending. The transport is already barred
+       from starting during a take, and this is the other half of that rule.
+
+       Before, not after — the point is that nothing is playing while the
+       device is open, and opening one takes long enough for the difference to
+       be audible. */
+    const clear = vi.fn();
+    const { start } = listening(true, clear);
+    await settled();
+    await pressR();
+    expect(clear).toHaveBeenCalled();
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(clear.mock.invocationCallOrder[0]!).toBeLessThan(
+      start.mock.invocationCallOrder[0]!,
+    );
   });
 
   it("can be taken away while a screen is busy with something else", async () => {

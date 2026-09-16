@@ -15,8 +15,29 @@ export const GUTTER = 44;
 export const PAD_R = 10;
 /** Leading margin, in content coordinates. */
 export const PAD_X = 8;
-/** Character captions. */
-export const LABEL_H = 22;
+/** Character captions.
+ *
+ * Tall enough for two lines, because it carries two: the character, and —
+ * under yours — a note when the gap before it was a word boundary that should
+ * not have been there or should have been. Sized for a caption alone, the note
+ * was written across the character it was about. */
+export const LABEL_H = 30;
+
+/** Where the text sits inside a caption band, from the edge nearest the row it
+ *  belongs to. The target's band is above its row and yours is below, so both
+ *  are measured toward their own marks and the two face each other across the
+ *  chart the way the rows do. */
+export const CAP_CHAR = 10;
+/** And the note under it, from the same edge. */
+export const CAP_NOTE = 22;
+
+/** Air above a row's grade strip, separating it from whatever is above.
+ *
+ * Belongs to the row below rather than to the one above: the grade strip is
+ * part of the attempt it reports on, so the break in the page goes before it.
+ * Left out of the row's own band, so a hovered row washes to its edges and the
+ * gap stays as the thing that says where one row ends. */
+export const LANE_GAP = 8;
 /** One track. Marks are drawn inside this. */
 export const ROW_H = 34;
 /** The OK / ~ / ** marker strip between the tracks. */
@@ -26,8 +47,6 @@ export const DRIFT_H = 46;
 export const RULER_H = 18;
 /** The canvas-drawn scrollbar band. */
 export const SCROLL_H = 14;
-/** Breathing room between per-character slots. */
-export const SLOT_GAP = 10;
 /** Height of a dit/dah block. */
 export const MARK_H = 20;
 
@@ -48,6 +67,26 @@ export const PLAYHEAD_W = 1.5;
  * is arriving at makes that moment harder to judge than it needs to be. */
 export const MARKER_W = PLAYHEAD_W;
 
+/** Narrowest a character may be drawn on the clock axes.
+ *
+ * There a character marker spans the character's own extent — position on
+ * those axes is time, so how long it took is already on screen whether it is
+ * drawn or not, and leaving the space empty withholds nothing except the
+ * ability to see it. A floor rather than a width: zoomed far enough out a
+ * single dit is a fraction of a pixel, and a character you cannot see is a
+ * character you cannot point at either. */
+export const CLOCK_MARKER_MIN_W = 6;
+
+/** How much room a character marker answers to in the per-character view.
+ *
+ * A marker is the whole of a character on screen there and is a pixel and a
+ * half wide, which is not something a pointer can be asked to land on. So the
+ * region it answers to is a pointer's worth of room starting where the
+ * character does. That overlaps the near edge of the gap after it, which is
+ * the right trade: the near edge of a gap is exactly where "the character
+ * ended" and "the silence began" are hardest to tell apart by eye anyway. */
+export const MARKER_HIT_W = 9;
+
 /* The rows, top to bottom.
  *
  * The target is above your sending, with a caption band of its own, and that
@@ -64,7 +103,7 @@ export const MARKER_W = PLAYHEAD_W;
 export const Y_RULER = 0;
 export const Y_TGT_LABEL = RULER_H;
 export const Y_TGT = Y_TGT_LABEL + LABEL_H;
-export const Y_GRADE = Y_TGT + ROW_H;
+export const Y_GRADE = Y_TGT + ROW_H + LANE_GAP;
 export const Y_YOU = Y_GRADE + GRADE_H;
 export const Y_YOU_LABEL = Y_YOU + ROW_H;
 export const Y_DRIFT = Y_YOU_LABEL + LABEL_H + 6;
@@ -127,7 +166,7 @@ export function rowsFor(runs: number, captioned: number, all = false): Rows {
 
   const lanes: RunRow[] = [];
   for (let r = 0; r < Math.max(runs, 1); r++) {
-    const grade = y;
+    const grade = y + LANE_GAP;
     const row = grade + GRADE_H;
     const label = all || r === captioned ? row + ROW_H : null;
     const bottom = row + ROW_H + LABEL_H;
