@@ -515,29 +515,27 @@ export function createChart(
    *  without the other row answering it. */
   const NO_BAND: [number, number] = [-1, -1];
 
-  /** Which name in the gutter is under this point, or null.
+  /** Which track the gutter is offering at this point, or null.
    *
-   * The names are the handle for picking a track up. Clicking the row itself
+   * The gutter is the handle for picking a track up. Clicking the row itself
    * works too, but a row is mostly the marks on it, and going through a mark
    * to reach the row it belongs to is an indirection you can feel — you aim at
-   * a dit to say "this run". The name says only that, which is why it is the
-   * one to click. The target has a row and a name like the rest, so it is one
-   * of them. */
+   * a dit to say "this run". The gutter says only that, which is why it is the
+   * place to click. The target has a row there like the rest, so it is one of
+   * them.
+   *
+   * The whole of the row's cell answers, not the few pixels the name is
+   * written in. The name is where a row's cell is legible, not where it is:
+   * the row lights under the pointer across its whole height, and then only a
+   * line of text inside it would take the click. Exactly the band the tint
+   * covers, so what lit is what answers. */
   function gutterNameAt(p: { x: number; y: number }): GutterName | null {
-    if (p.x >= GUTTER || !input) return null;
+    if (p.x >= GUTTER) return null;
     /* Only where there is something for a click to do: a chart can be shown
-       purely to be looked at — the calibration preview is one — and a name
+       purely to be looked at — the calibration preview is one — and a cell
        that changes the cursor but answers no click is a control that lies. */
     if (!callbacks.onPlayTrack && !callbacks.onSelectRun) return null;
-    // Overlay's gutter is a color key rather than a set of handles: the tracks
-    // share one band there, so there is no row under either name.
-    if (input.settings.view === "overlay") return null;
-    if (p.y >= rows.tgt && p.y < rows.tgt + ROW_H) return "tgt";
-    for (let r = 0; r < lanes.length; r++) {
-      const row = rows.runs[r];
-      if (row && p.y >= row.row && p.y < row.row + ROW_H) return r;
-    }
-    return null;
+    return rowAt(p);
   }
 
   /** Whether that name's track is the one already in hand.
@@ -642,8 +640,7 @@ export function createChart(
     if (!layout) return;
     const p = localPos(ev);
 
-    /* The names in the gutter pick a track up, and play the one already in
-       hand. Picking up first rather than playing straight away: the report
+    /* The gutter picks a track up, and plays the one already in hand. Picking up first rather than playing straight away: the report
        below the chart, the scores and the caption band all follow the
        selection, so a click on another attempt has to move them there before
        anything comes out of the speakers — playing a recording while the

@@ -104,8 +104,8 @@ function mount(over: Partial<ReviewSettings> = {}) {
   };
 }
 
-/** Click a run's name in the gutter, which is how a row is picked. */
-function pick(at: number, of: number): void {
+/** Click in a row's cell in the gutter, which is how a row is picked. */
+function pick(at: number, of: number, y?: number): void {
   const canvas = host.querySelector("canvas")!;
   const box = canvas.getBoundingClientRect();
   const rows = rowsFor(of, 0);
@@ -113,11 +113,27 @@ function pick(at: number, of: number): void {
     canvas.dispatchEvent(
       new MouseEvent("click", {
         clientX: box.left + 8,
-        clientY: box.top + rows.runs[at]!.row + ROW_H / 2,
+        clientY: box.top + (y ?? rows.runs[at]!.row + ROW_H / 2),
         bubbles: true,
       }),
     ),
   );
+}
+
+/** Move the pointer somewhere and say whether the chart offers a click there. */
+function hovering(y: number): boolean {
+  const canvas = host.querySelector("canvas")!;
+  const box = canvas.getBoundingClientRect();
+  act(() =>
+    canvas.dispatchEvent(
+      new MouseEvent("mousemove", {
+        clientX: box.left + 8,
+        clientY: box.top + y,
+        bubbles: true,
+      }),
+    ),
+  );
+  return canvas.classList.contains("picking");
 }
 
 describe("picking a row out of a stack", () => {
@@ -161,6 +177,36 @@ describe("showing one attempt or all of them", () => {
        question. */
     const app = mount({ showRuns: "last" });
     expect(app.picked()).toBe(app.runs - 1);
+  });
+});
+
+describe("the gutter as a handle", () => {
+  it("offers the whole of a row's cell, not the line its name is written on", () => {
+    /* The row lights under the pointer across its whole height. Only a few
+       pixels of that answering a click makes the highlight a lie about where
+       the thing you are pointing at is — so the cell that answers is the band
+       that lit: the grade strip, the marks and the caption under them. */
+    const app = mount();
+    const rows = rowsFor(app.runs, 0);
+    const lane = rows.runs[1]!;
+
+    for (const [what, y] of [
+      ["its grade strip", lane.grade + 2],
+      ["its marks", lane.row + ROW_H / 2],
+      ["its caption", lane.bottom - 4],
+    ] as const) {
+      expect(hovering(y), what).toBe(true);
+    }
+    // And not the air between one row's cell and the next.
+    expect(hovering(rows.runs[0]!.bottom + 2), "the gap between rows").toBe(false);
+
+    // Every part of it picks the same row up.
+    for (const y of [lane.grade + 2, lane.row + ROW_H / 2, lane.bottom - 4]) {
+      pick(0, app.runs);
+      expect(app.picked()).toBe(0);
+      pick(1, app.runs, y);
+      expect(app.picked(), `picked from y=${y}`).toBe(1);
+    }
   });
 });
 

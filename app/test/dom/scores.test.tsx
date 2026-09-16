@@ -29,6 +29,41 @@ function band(over: Partial<React.ComponentProps<typeof Scores>> = {}) {
   return { onDrop };
 }
 
+describe("which attempt the band is about", () => {
+  it("names the run, the way the chart names it", () => {
+    /* Everything in this band, and every table under it, is one attempt. With
+       a stack on the chart which one was only findable by noticing where the
+       caption band had moved to — and counted the way the chart counts, so the
+       name here and the row up there cannot disagree. */
+    band({ runOf: { at: 2, of: 4 } });
+    expect(screen.getByTestId("run-name").textContent).toContain("3");
+  });
+
+  it("says nothing when there is only one of them", () => {
+    // Nothing for it to be distinguished from.
+    band({ runOf: { at: 0, of: 1 } });
+    expect(screen.queryByTestId("run-name")).toBeNull();
+  });
+
+  it("names it even with nothing recorded into it yet", () => {
+    /* The dashes are still about one attempt: recording into a session leaves
+       the earlier ones on the chart, and which row the empty one is is the
+       same question. */
+    const take = blankTake({ expected: "CQ", charWpm: 20, farnsworthWpm: 20 });
+    const settings = defaultSettings(take);
+    const { review } = reviewFrom(caseNamed(SLOPPY));
+    render(
+      <Scores
+        review={review}
+        settings={settings}
+        take={take}
+        runOf={{ at: 3, of: 4 }}
+      />,
+    );
+    expect(screen.getByTestId("run-name").textContent).toContain("4");
+  });
+});
+
 describe("dropping a run from the scores", () => {
   it("is not offered when there is nothing else to keep", () => {
     /* With one attempt on screen, dropping it and clearing the session are the

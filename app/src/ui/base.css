@@ -218,6 +218,9 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .score.bad b { color: var(--bad); }
 /* Nothing recorded yet. Dashed rather than zeroed: a zero is a reading. */
 .score.none b { color: var(--ink-faint); }
+/* The same blue the chart lights the selected row's name in, so the row on the
+   chart and the numbers under it read as one thing. */
+.score.runname b { color: var(--you); }
 
 /* The next character, in type you can read without looking at it.
  *
