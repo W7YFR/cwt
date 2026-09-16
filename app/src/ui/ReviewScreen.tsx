@@ -127,6 +127,33 @@ export function ReviewScreen({
      business outliving the page or riding along in a saved report. */
   const [chartSettings, setChartSettings] = useState(false);
 
+  const [playing, setPlaying] = useState<PlaySide | null>(null);
+  const [clock, setClock] = useState<number | null>(null);
+  const [status, setStatus] = useState("");
+  // The playhead moves every frame. Routing it through state would re-render
+  // the whole screen sixty times a second; the chart takes it directly.
+  const [playhead, setPlayhead] = useState<{ t: number; side: PlaySide } | null>(null);
+
+  const playerRef = useRef<Player | null>(null);
+  if (!playerRef.current) {
+    playerRef.current = createPlayer({
+      onProgress: (t, side) => {
+        setPlayhead({ t, side });
+        setClock(t);
+      },
+      onEnded: () => {
+        setPlaying(null);
+        setPlayhead(null);
+        setClock(null);
+      },
+      onError: setStatus,
+    });
+  }
+  const player = playerRef.current;
+
+  useEffect(() => () => player.destroy(), [player]);
+  const stop = useCallback(() => player.stop(), [player]);
+
   const rec = useRecorder({
     deviceId,
     onClip: useCallback(
@@ -135,12 +162,15 @@ export function ReviewScreen({
     ),
     onError,
     startKey: !starting,
+    /* Playback and recording cannot both have the room. Through a loopback
+       device a playing target is recorded literally; through speakers it
+       arrives a moment later and grades as your sending. The transport is
+       already barred from starting during a take — this is the other half of
+       the same rule. */
+    onStart: stop,
   });
 
   const [focus, setFocus] = useState<Focus | null>(null);
-  const [playing, setPlaying] = useState<PlaySide | null>(null);
-  const [clock, setClock] = useState<number | null>(null);
-  const [status, setStatus] = useState("");
   /* Nothing recorded into this session yet. The target half of the review
      works without one — that is the point of it — but everything that reads
      the recording has to say so rather than act on an empty one. */
@@ -223,28 +253,6 @@ export function ReviewScreen({
   );
   const handle = useRef<ChartHandle>({ chart: null }).current;
 
-  // The playhead moves every frame. Routing it through state would re-render
-  // the whole screen sixty times a second; the chart takes it directly.
-  const [playhead, setPlayhead] = useState<{ t: number; side: PlaySide } | null>(null);
-
-  const playerRef = useRef<Player | null>(null);
-  if (!playerRef.current) {
-    playerRef.current = createPlayer({
-      onProgress: (t, side) => {
-        setPlayhead({ t, side });
-        setClock(t);
-      },
-      onEnded: () => {
-        setPlaying(null);
-        setPlayhead(null);
-        setClock(null);
-      },
-      onError: setStatus,
-    });
-  }
-  const player = playerRef.current;
-
-  useEffect(() => () => player.destroy(), [player]);
 
   /* The pacing cursor.
    *
@@ -456,7 +464,6 @@ export function ReviewScreen({
     [player, playing, review.ideal, targetOptions],
   );
 
-  const stop = useCallback(() => player.stop(), [player]);
 
   /* Picking up another track ends whatever is playing.
      Everything on this screen that names a recording follows the selection,
