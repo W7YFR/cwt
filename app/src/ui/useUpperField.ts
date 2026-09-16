@@ -26,13 +26,19 @@ interface Caret {
   readonly len: number;
 }
 
-export interface UpperField {
-  ref: React.RefObject<HTMLInputElement | null>;
-  onChange: React.ChangeEventHandler<HTMLInputElement>;
+/** Either kind of text field. A message is usually a line and sometimes a
+ *  paragraph pasted in, and both have a caret to keep. */
+type TextField = HTMLInputElement | HTMLTextAreaElement;
+
+export interface UpperField<T extends TextField = HTMLInputElement> {
+  ref: React.RefObject<T | null>;
+  onChange: React.ChangeEventHandler<T>;
 }
 
-export function useUpperField(onChange: (next: string) => void): UpperField {
-  const ref = useRef<HTMLInputElement | null>(null);
+export function useUpperField<T extends TextField = HTMLInputElement>(
+  onChange: (next: string) => void,
+): UpperField<T> {
+  const ref = useRef<T | null>(null);
   const caret = useRef<Caret | null>(null);
 
   useLayoutEffect(() => {
@@ -47,7 +53,7 @@ export function useUpperField(onChange: (next: string) => void): UpperField {
     el.setSelectionRange(want.at, want.at);
   });
 
-  const handle = useCallback<React.ChangeEventHandler<HTMLInputElement>>(
+  const handle = useCallback<React.ChangeEventHandler<T>>(
     (e) => {
       caret.current = { at: e.target.selectionStart ?? 0, len: e.target.value.length };
       onChange(e.target.value.toUpperCase());

@@ -50,6 +50,34 @@ describe("starting a new session", () => {
     });
   });
 
+  it("shows the message the way it will be sent", async () => {
+    /* Morse has one case, and the message is upper-cased on the way out
+       regardless. A box showing something other than what it is about to hand
+       over is a small lie, and small lies about the target are the ones that
+       cost you a session. */
+    const user = userEvent.setup();
+    open({ expected: "cq de w7yfr" });
+    expect(text().value).toBe("CQ DE W7YFR");
+    await user.clear(text());
+    await user.type(text(), "paris");
+    expect(text().value).toBe("PARIS");
+  });
+
+  it("keeps your place while it does it", async () => {
+    /* Upper-casing a controlled field writes the value back, which drops the
+       caret to the end, so typing anywhere but the end becomes impossible.
+       Here because the box has to be wired to the field that handles that and
+       not merely upper-case on its own — the two look identical until you
+       correct a call sign you already typed. */
+    const user = userEvent.setup();
+    open({ expected: "CQ W7YFR" });
+    await user.type(text(), "de ", {
+      initialSelectionStart: 3,
+      initialSelectionEnd: 3,
+    });
+    expect(text().value).toBe("CQ DE W7YFR");
+  });
+
   it("makes one message out of however it was pasted", () => {
     /* Practice text arrives from somewhere else, with newlines in it. */
     expect(oneLine("  cq  cq\n de   w7yfr \n")).toBe("CQ CQ DE W7YFR");

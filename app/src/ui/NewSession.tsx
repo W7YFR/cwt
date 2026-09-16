@@ -18,7 +18,8 @@
  * out, so a pasted paragraph is one message.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useUpperField } from "./useUpperField";
 
 export interface NewSessionProps {
   charWpm: number;
@@ -34,10 +35,14 @@ export function oneLine(text: string): string {
 }
 
 export function NewSession(props: NewSessionProps): React.ReactElement {
-  const [text, setText] = useState(props.expected);
+  const [text, setText] = useState(props.expected.toUpperCase());
   const [charWpm, setCharWpm] = useState(props.charWpm);
   const [farnsworthWpm, setFarnsworthWpm] = useState(props.farnsworthWpm);
-  const box = useRef<HTMLTextAreaElement>(null);
+  /* Upper case as it is typed, not only once Start is pressed. The message is
+     upper-cased on the way out either way, and a box that shows one thing
+     while promising another is the sort of small lie that makes you check. */
+  const sent = useUpperField<HTMLTextAreaElement>(setText);
+  const box = sent.ref;
 
   /* Straight into the textarea: the message is the reason the dialog opened,
      and the speeds usually carry over from the session before it. */
@@ -90,7 +95,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
           spellCheck={false}
           value={text}
           placeholder="The source of truth to grade against"
-          onChange={(e) => setText(e.target.value)}
+          onChange={sent.onChange}
         />
 
         <div className="speeds">
