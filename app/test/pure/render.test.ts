@@ -934,6 +934,46 @@ describe("drawing", () => {
     expect(moves.some((x) => Math.abs(x! - expectedX) < 0.01)).toBe(true);
   });
 
+  it("washes the whole of a hovered row, gutter to edge", () => {
+    /* A row is four bands — its grade strip, its marks, its caption and its
+       scores out in the gutter — and what the wash is for is saying which of
+       them belong together. Anything short of the whole row would leave the
+       reader doing the collecting the wash exists to save them. */
+    const scene = sceneFor(review, "per-char", 12);
+    const lane = scene.rows.runs[0]!;
+    const ctx = recordingCtx();
+    draw(ctx, { ...scene, hoverRow: 0 });
+    const wash = ctx
+      .ofType("fillRect")
+      .find((c) => c.args[1] === lane.grade && c.args[3] === lane.bottom - lane.grade);
+    expect(wash, "a wash over the row's whole band").toBeDefined();
+    expect(wash!.args[0], "from the left edge, so the gutter is in it").toBe(0);
+    expect(wash!.args[2]).toBe(scene.viewport.viewW);
+    // Slight: the row is being pointed at, not selected.
+    expect(wash!.alpha).toBeLessThan(0.15);
+
+    /* And last, which is what makes it one tint rather than a tinted row with
+       holes in it. The gutter paints itself opaque after the content, and the
+       gap labels sit on opaque chips, so a wash drawn underneath comes out
+       everywhere except the parts carrying text. */
+    const gutter = ctx
+      .ofType("fillRect")
+      .find((c) => c.args[0] === 0 && c.args[2] === GUTTER);
+    expect(gutter, "the gutter's own opaque band").toBeDefined();
+    expect(ctx.calls.indexOf(wash!)).toBeGreaterThan(ctx.calls.indexOf(gutter!));
+  });
+
+  it("washes nothing with the pointer off the rows", () => {
+    const scene = sceneFor(review, "per-char", 12);
+    const lane = scene.rows.runs[0]!;
+    const ctx = recordingCtx();
+    draw(ctx, scene);
+    const wash = ctx
+      .ofType("fillRect")
+      .find((c) => c.args[1] === lane.grade && c.args[3] === lane.bottom - lane.grade);
+    expect(wash).toBeUndefined();
+  });
+
   it("leaves a clean recording's chart free of bad-colored marks", () => {
     const { review: clean } = reviewFrom(caseNamed(CLEAN));
     const ctx = recordingCtx();

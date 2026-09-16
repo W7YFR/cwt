@@ -171,6 +171,8 @@ export function createChart(
   let selected = 0;
   /** The name in the gutter under the pointer, for its highlight. */
   let picking: GutterName | null = null;
+  /** The row the pointer is anywhere over, for its tint. */
+  let hoverRow: GutterName | null = null;
 
   /** The attempts to draw, in the order their rows go, and which row is being
    *  read.
@@ -234,6 +236,7 @@ export function createChart(
       runs: lanes,
       selected,
       picking,
+      hoverRow,
       ...(input.heard ? { heard: input.heard } : {}),
       ...(columns ? { columns } : {}),
       layout,
@@ -509,6 +512,22 @@ export function createChart(
    * are listening to, so a run picked up while the target was playing takes
    * one click to come back to and a second to play — the same two clicks any
    * other name takes. */
+  /** Which row this point is in, anywhere across the width — the gutter and
+   *  the marks alike, since the tint is about the whole row.
+   *
+   * A row runs from its grade strip to the bottom of its caption, which is
+   * exactly the band `rowsFor` reserves for it, so the tint cannot disagree
+   * with what is drawn in it. Overlay has no rows of its own to tint. */
+  function rowAt(p: { x: number; y: number }): GutterName | null {
+    if (!input || input.settings.view === "overlay") return null;
+    if (p.y >= rows.tgtLabel && p.y < rows.tgt + ROW_H) return "tgt";
+    for (let r = 0; r < lanes.length; r++) {
+      const row = rows.runs[r];
+      if (row && p.y >= row.grade && p.y < row.bottom) return r;
+    }
+    return null;
+  }
+
   function inHand(name: GutterName): boolean {
     const heard = input?.heard ?? "you";
     return name === "tgt" ? heard === "tgt" : name === selected && heard === "you";
@@ -549,13 +568,13 @@ export function createChart(
     const p = localPos(ev);
     const over = gutterNameAt(p);
     canvas.classList.toggle("picking", over !== null);
-    if (over !== picking) {
-      picking = over;
-      paint();
-    }
+    const band = rowAt(p);
     const h = hitAt(p);
     const b = h ? h.block : null;
-    if (b !== hover) {
+    // One repaint for however many of the three moved, rather than one each.
+    if (over !== picking || band !== hoverRow || b !== hover) {
+      picking = over;
+      hoverRow = band;
       hover = b;
       paint();
     }
@@ -564,12 +583,10 @@ export function createChart(
 
   const onMouseLeave = (ev: MouseEvent) => {
     canvas.classList.remove("picking");
-    if (picking !== null) {
-      picking = null;
-      paint();
-    }
     callbacks.onHover?.(null, ev.clientX, ev.clientY);
-    if (hover) {
+    if (picking !== null || hoverRow !== null || hover) {
+      picking = null;
+      hoverRow = null;
       hover = null;
       paint();
     }

@@ -140,6 +140,8 @@ export interface Scene {
   /** The name in the gutter the pointer is over, if any. Lights it, because a
    *  word you can click has to look different from a word you cannot. */
   picking?: GutterName | null;
+  /** The row the pointer is anywhere over, for its tint. */
+  hoverRow?: GutterName | null;
   /** Which track playback is about, so its name in the gutter shows as the one
    *  in hand. The target is not an attempt and cannot be `selected`, but it is
    *  something you listen to, and the ruler needs to say which. */
@@ -235,6 +237,40 @@ export function draw(ctx: Ctx2D, scene: Scene): void {
   drawScrollbar(ctx, scene);
   drawPlayhead(ctx, scene);
   drawCountIn(ctx, scene);
+  drawRowTint(ctx, scene);
+}
+
+/** Top and bottom of everything belonging to one row, or null if there is no
+ *  such row. Overlay has none: the tracks share a band there. */
+function rowBand(scene: Scene, name: GutterName | null | undefined): [number, number] | null {
+  if (name === null || name === undefined || scene.view === "overlay") return null;
+  if (name === "tgt") return [scene.rows.tgtLabel, scene.rows.tgt + ROW_H];
+  const lane = scene.rows.runs[name];
+  return lane ? [lane.grade, lane.bottom] : null;
+}
+
+/** A wash over the whole of one row, gutter included.
+ *
+ * A row is not one strip. It is a grade marker above the marks, the marks
+ * themselves, the caption under them and the scores out in the gutter, and
+ * collecting those four bands by eye is work the chart can do for you.
+ *
+ * Over everything rather than under it, which is what makes it one tint
+ * instead of a tinted row with holes in it: the gutter paints itself opaque
+ * after the content, and the gap and count-in labels sit on opaque chips of
+ * their own. A wash underneath comes out everywhere except the parts that
+ * carry the text.
+ *
+ * Neutral rather than colored — every other wash on this chart means something
+ * definite, which track or which deviation, and one more that means only "the
+ * pointer is here" would dilute the rest. */
+function drawRowTint(ctx: Ctx2D, scene: Scene): void {
+  const band = rowBand(scene, scene.hoverRow);
+  if (!band) return;
+  ctx.fillStyle = scene.palette.ink;
+  ctx.globalAlpha = 0.06;
+  ctx.fillRect(0, band[0], scene.viewport.viewW, band[1] - band[0]);
+  ctx.globalAlpha = 1;
 }
 
 /** Structural rules, in screen coordinates so they span the visible track. */
