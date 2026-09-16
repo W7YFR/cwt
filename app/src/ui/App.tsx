@@ -24,6 +24,7 @@ import { Settings } from "./Settings";
 import { ReviewScreen } from "./ReviewScreen";
 import { useFileDrop } from "./useFileDrop";
 import { OPEN_FILE_CLOSED } from "./copy";
+import { useMicAccess } from "./useMicAccess";
 import { useTake } from "./useTake";
 
 /** How long the boot may take before it says anything.
@@ -34,6 +35,7 @@ export const BOOT_MESSAGE_DELAY_MS = 400;
 
 export function App(): React.ReactElement {
   const take = useTake();
+  const micAccess = useMicAccess();
   const [error, setError] = useState<string | null>(null);
   /* What kind of thing the banner is reporting, beside the sentence itself.
      The sentence is for a person and is expected to be reworded; this is what
@@ -241,6 +243,24 @@ export function App(): React.ReactElement {
         >
           <p>{canOpenFile ? "Drop a recording to open it" : OPEN_FILE_CLOSED}</p>
         </div>
+      )}
+
+      {/* A standing condition rather than something that went wrong, so it is
+          not dismissible and it clears itself the moment the browser changes
+          its mind. Above the error band because it explains the errors: with
+          no microphone to open, everything that reaches for one fails, and
+          each of those failures on its own looks like a different bug.
+
+          At the top of the app rather than on the screen that noticed. Every
+          picker on every screen correctly hides itself when there is nothing
+          to pick, which leaves a page with no controls and nothing saying
+          why — the thing that reads as broken. */}
+      {micAccess === "denied" && (
+        <p className="banner error" role="alert" data-testid="mic-blocked">
+          Microphone access is blocked, so there is nothing to record from.
+          Allow it for this site — the control is on the icon at the left of
+          the address bar — then reload.
+        </p>
       )}
 
       {error && (
