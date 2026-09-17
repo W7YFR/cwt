@@ -9,13 +9,12 @@
 
 import { normalized, segmentsFrom, trimSilence, TRIM_PAD } from "@/dsp";
 import { buildTimeline, estimateTiming, targetTiming } from "@/timing";
-import type { AudioClip, Take, TakeProfile } from "@/types";
+import { MIC_SOURCE, type AudioClip, type Take, type TakeProfile } from "@/types";
 import { calibrationOf, isAdjusted, type Profile } from "./profiles";
 
-/** The `source` of a take captured through the microphone. A sentinel rather
- *  than a label: the header hides it, because it says the same thing every
- *  time, but a download still needs a filename stem. */
-export const MIC_SOURCE = "microphone";
+// Declared in types, where `timing` can see it too; re-exported here because
+// this is where everything that builds a take already looks for it.
+export { MIC_SOURCE } from "@/types";
 
 /** There was no keying in the audio — see dsp/presence.ts.
  *

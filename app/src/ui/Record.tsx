@@ -221,9 +221,13 @@ export function RecordBar({
           >
             <span aria-hidden="true">↑</span>
           </button>
+          {/* The button is the control; this is only the file dialog it
+              opens. Left in the tab order it is a stop on nothing: focus
+              lands on a clipped 1px box with no visible ring. */}
           <input
             ref={fileInput}
             className="visually-hidden"
+            tabIndex={-1}
             type="file"
             accept={ACCEPTED}
             onChange={(e) => {

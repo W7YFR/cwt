@@ -454,8 +454,13 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
   if (!cols) return;
   const bottom = scene.rows.runs[scene.rows.runs.length - 1]!;
 
+  /* The count-in moved every attempt right, and the target has to move with
+     them: it is drawn from the shared columns rather than from any one run's
+     items, so without this the two tracks stop sharing their columns and the
+     target sits a whole count-in to the left of the sending it is the
+     reference for. */
   for (let c = 0; c < cols.x.length; c++) {
-    const x = cols.x[c]!;
+    const x = cols.x[c]! + scene.layout.leadPx;
     const gapW = cols.gapW[c]!;
     const bodyW = cols.bodyW[c]!;
     if (!visible(x, gapW + bodyW, scene)) continue;

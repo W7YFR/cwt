@@ -173,12 +173,120 @@ describe("the view while pacing", () => {
     expect(app.seen.length).toBeLessThan(4);
   });
 
+  it("puts back the view it took, not a view of its own", async () => {
+    /* You may have been in overlay. Coming back to per-character is the swap
+       happening twice — once to record against and once for no reason at all. */
+    const app = mount({ paceCursor: true, view: "overlay" });
+    await record();
+    expect(app.view()).toBe("absolute");
+    await stop();
+    expect(app.view()).toBe("overlay");
+  });
+
+  it("holds the chart still when the swap is turned off", async () => {
+    /* It moves the chart out from under you at the moment your hand is on the
+       paddle, and whether that is worth a cursor that agrees with itself is
+       not a call the app gets to make for somebody. */
+    const app = mount({ paceCursor: true, paceAbsolute: false, view: "per-char" });
+    await record();
+    expect(app.view()).toBe("per-char");
+    await stop();
+    expect(app.view()).toBe("per-char");
+  });
+
   it("leaves the view alone when nothing is pacing the chart", async () => {
     /* The flash card runs on the same schedule but never touches the chart, so
        it is no reason to take a view away from somebody. */
     const app = mount({ paceCursor: false, flashCard: true, view: "per-char" });
     await record();
     expect(app.view()).toBe("per-char");
+  });
+});
+
+describe("zen mode", () => {
+  const sheet = () => host.querySelector("[data-testid='zen']");
+
+  it("covers the page for the take, and gives it back", async () => {
+    const app = mount({ zenMode: true, view: "per-char" });
+    expect(sheet()).toBeNull();
+
+    await record();
+    expect(sheet(), "the sheet is up while the take runs").toBeTruthy();
+    // And it carries the message, which is the whole reason it is there.
+    expect(host.querySelector("[data-testid='zen-message']")!.textContent)
+      .toBe("CQ DE W7YFR");
+
+    await stop();
+    expect(sheet(), "and gone once the paddle is down").toBeNull();
+    // Nothing of the paced aids' doing: the view is where it was left.
+    expect(app.view()).toBe("per-char");
+  });
+
+  it("fits every pass on the sheet, at a size that reads", async () => {
+    /* The sheet exists so you never have to touch the page while sending, and
+       one you have to scroll is one you have to touch. Sized by arithmetic it
+       overflowed: the message wraps at a width that depends on the font the
+       browser actually picked, so a pass the formula counted as one line was
+       two. It is measured now, and this is the measurement.
+
+       Checked at the counts, not at one: the failure only appears once there
+       is more than fits at full size. */
+    for (const times of [1, 3, 8]) {
+      mount({ zenMode: true, times, expected: "CQ CQ DE W7YFR K" });
+      await record();
+
+      const text = sheet()!.querySelector<HTMLElement>(".zenmessage")!;
+      const passes = text.querySelectorAll<HTMLElement>(".zenpass");
+      expect(passes.length, `${times} passes drawn`).toBe(times);
+      expect(
+        text.scrollHeight,
+        `${times} passes fit without scrolling`,
+      ).toBeLessThanOrEqual(text.clientHeight + 1);
+
+      /* And they read as separate passes. A long message wraps, so the space
+         between two passes has to be bigger than the space inside one — packed
+         tighter, the whole thing is a block of text with no way to see where a
+         pass ends. */
+      if (times > 1) {
+        const gap = passes[1]!.getBoundingClientRect().top
+          - passes[0]!.getBoundingClientRect().bottom;
+        const line = parseFloat(getComputedStyle(text).lineHeight)
+          - parseFloat(getComputedStyle(text).fontSize);
+        expect(gap, `${times} passes are told apart`).toBeGreaterThan(line);
+      }
+
+      await stop();
+    }
+  });
+
+  it("stops the take from where the sheet puts the button", async () => {
+    /* The sheet is over the record bar, so the bar's own Stop is unreachable.
+       Pressed here through the same name, which is what makes this a test of
+       the sheet's copy of it rather than of the one underneath. */
+    mount({ zenMode: true });
+    await record();
+    const stopper = sheet()!.querySelector<HTMLButtonElement>("[data-testid='zen-stop']")!;
+    await act(async () => {
+      stopper.click();
+      await new Promise((r) => setTimeout(r, 150));
+    });
+    expect(sheet()).toBeNull();
+  });
+
+  it("runs no count-in behind the sheet, whatever was set before", async () => {
+    /* A preference saved before zen mode existed would otherwise arm the
+       pacing loop — which swaps the axis, moves a cursor along a chart nobody
+       can see, and stops the take at the end of the message. */
+    const app = mount({ zenMode: true, paceCursor: true, paceAbsolute: true, view: "per-char" });
+    await record();
+    expect(sheet()).toBeTruthy();
+    expect(app.view(), "the axis is left alone").toBe("per-char");
+    /* The record bar's light, behind the sheet. It counts down while a paced
+       take is waiting to begin and reads the clock once it is under way, so
+       never reaching "waiting" is the count-in never having been armed. */
+    const light = host.querySelector<HTMLElement>("[data-testid='reclight']")!;
+    expect(light.dataset.state, "no count-in").toBe("sending");
+    await stop();
   });
 });
 

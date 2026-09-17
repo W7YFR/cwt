@@ -14,6 +14,7 @@
 import { useCallback, useState } from "react";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
+import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import {
   ADVANCED_GRADING_HELP,
   CAPTION_ALL_HELP,
@@ -30,7 +31,12 @@ import {
   RUN_SORT_HELP,
   WORD_PREVIEW_HELP,
   GAIN_HELP,
+  PACE_ABSOLUTE_HELP,
   PACE_CURSOR_HELP,
+  TIMES_FILE_HELP,
+  TIMES_HELP,
+  ZEN_MODE_HELP,
+  ZEN_PACING_HELP,
   PACE_LEAD_HELP,
   ZOOM_HELP,
 } from "./copy";
@@ -51,6 +57,10 @@ export interface ControlsProps {
   /** False when there is no recording to play — see `blankTake`. */
   canPlayYou: boolean;
   clock: number | null;
+  /** This session was opened from a file rather than keyed. A file holds
+   *  whatever it holds, so how many passes you are about to send is not a
+   *  question about it. */
+  fromFile: boolean;
   onPlayYou(): void;
   onPlayTarget(): void;
   onStop(): void;
@@ -163,60 +173,86 @@ export function Controls(props: ControlsProps): React.ReactElement {
         />
       </div>
 
-      <div className="group grow">
-        <label htmlFor="expected">Intended message</label>
-        {/* Says what the box is FOR, which is the thing worth knowing when it
-            is empty: with nothing here there is no source of truth, so the
-            grade falls back to the decoder's own reading of you and the
-            accuracy figure is a meaningless 100%. It belongs in the
-            placeholder rather than beside the label — it is only on screen
-            while the box is empty, which is exactly when a placeholder is, and
-            text that appears and disappears next to a label has to wrap
-            somewhere the label does not. Inside the box it has a whole row to
-            itself and clips instead of reflowing the row above it. */}
-        {/* The clear button sits inside the box's right edge rather than
-            beside it: this group is the one that absorbs the row's slack, and
-            a button next to the field would take the room back from the only
-            thing that wanted it. */}
-        <div className="clearable">
-          <input
-            type="text"
-            id="expected"
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="The source of truth to grade against"
-            value={s.expected}
-            ref={expected.ref}
-            onChange={expected.onChange}
+      {/* The message and how many of it, on one line. A wrapper, because the
+          message group claims a whole row by itself — it is the one control
+          here whose useful width has no upper bound — so the two share a line
+          by being one item on it, with the box taking whatever the count
+          does not. */}
+      <div className="msgrow">
+        <div className="group grow">
+          <label htmlFor="expected">Intended message</label>
+          {/* Says what the box is FOR, which is the thing worth knowing when it
+              is empty: with nothing here there is no source of truth, so the
+              grade falls back to the decoder's own reading of you and the
+              accuracy figure is a meaningless 100%. It belongs in the
+              placeholder rather than beside the label — it is only on screen
+              while the box is empty, which is exactly when a placeholder is, and
+              text that appears and disappears next to a label has to wrap
+              somewhere the label does not. Inside the box it has a whole row to
+              itself and clips instead of reflowing the row above it. */}
+          {/* The clear button sits inside the box's right edge rather than
+              beside it: this group is the one that absorbs the row's slack, and
+              a button next to the field would take the room back from the only
+              thing that wanted it. */}
+          <div className="clearable">
+            <input
+              type="text"
+              id="expected"
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="The source of truth to grade against"
+              value={s.expected}
+              ref={expected.ref}
+              onChange={expected.onChange}
+            />
+            {s.expected !== "" && (
+              <button
+                type="button"
+                className="clearbtn"
+                data-testid="clear-expected"
+                aria-label="Clear intended message"
+                title="Clear"
+                onClick={() => {
+                  onChange({ expected: "" });
+                  expected.ref.current?.focus();
+                }}
+              >
+                {/* Drawn rather than typed. A glyph is placed by the font's
+                    own metrics — its ink sits above the baseline, not on the
+                    center line of the box around it — so an × centered as text
+                    reads as riding high in the field. A shape centers on the
+                    geometry. */}
+                <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false">
+                  <path
+                    d="M3.2 3.2 L8.8 8.8 M8.8 3.2 L3.2 8.8"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Barred rather than hidden for a file. Gone, the row reflows and the
+            message box grows the moment a file is opened, which reads as the
+            page having changed its mind about something. Barred, it says what
+            it is: a question that does not apply to this take. */}
+        <div className="group">
+          <NumberField
+            id="times"
+            name="Times"
+            unit=""
+            help={props.fromFile ? TIMES_FILE_HELP : TIMES_HELP}
+            value={s.times}
+            min={TIMES_MIN}
+            max={TIMES_MAX}
+            step={1}
+            disabled={props.fromFile}
+            onChange={(v) => onChange({ times: v })}
           />
-          {s.expected !== "" && (
-            <button
-              type="button"
-              className="clearbtn"
-              data-testid="clear-expected"
-              aria-label="Clear intended message"
-              title="Clear"
-              onClick={() => {
-                onChange({ expected: "" });
-                expected.ref.current?.focus();
-              }}
-            >
-              {/* Drawn rather than typed. A glyph is placed by the font's
-                  own metrics — its ink sits above the baseline, not on the
-                  center line of the box around it — so an × centered as text
-                  reads as riding high in the field. A shape centers on the
-                  geometry. */}
-              <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false">
-                <path
-                  d="M3.2 3.2 L8.8 8.8 M8.8 3.2 L3.2 8.8"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          )}
         </div>
       </div>
 
@@ -237,16 +273,22 @@ function NumberField({
   id,
   name,
   unit,
+  spoken,
   help,
   value,
   min,
   max,
   step,
+  disabled,
   onChange,
 }: {
   id: string;
   name: string;
   unit: string;
+  disabled?: boolean;
+  /** The unit said out loud, for the accessible name. Defaults to the symbol,
+   *  which is right for a word like "times" and wrong for "s". */
+  spoken?: string;
   help: string;
   value: number;
   min: number;
@@ -256,7 +298,7 @@ function NumberField({
 }): React.ReactElement {
   const [text, setText] = useState<string | null>(null);
   return (
-    <label className="field row" title={help}>
+    <label className="field row" data-disabled={disabled === true} title={help}>
       <span className="fieldname">{name}</span>
       <input
         type="number"
@@ -264,6 +306,7 @@ function NumberField({
         min={min}
         max={max}
         step={step}
+        disabled={disabled === true}
         /* Sized by the widest number it can hold, so a field in seconds and a
            field in milliseconds are not the same box with three empty digits
            in one of them.
@@ -274,7 +317,7 @@ function NumberField({
            than the furniture and the number itself had nowhere to go. */
         style={{ width: `calc(${String(max).length}ch + 3em)` }}
         value={text ?? String(value)}
-        aria-label={`${name} in ${unit === "s" ? "seconds" : "milliseconds"}`}
+        aria-label={unit ? `${name} in ${spoken ?? unit}` : name}
         onChange={(e) => {
           setText(e.target.value);
           const v = Number(e.target.value);
@@ -284,7 +327,7 @@ function NumberField({
         // Back to showing what was actually committed, clamp included.
         onBlur={() => setText(null)}
       />
-      <span className="unit">{unit}</span>
+      {unit !== "" && <span className="unit">{unit}</span>}
     </label>
   );
 }
@@ -516,26 +559,66 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
           <div className="panelrow" data-panel="practice">
             <span className="uplabel">Practice aids</span>
             <div className="panelgroups">
+              {/* First, because it is the one that turns the others off. */}
               <div className="group">
-                <label className="check" title={PACE_CURSOR_HELP}>
+                <label className="check" title={ZEN_MODE_HELP}>
+                  <input
+                    type="checkbox"
+                    id="zen-mode"
+                    checked={s.zenMode}
+                    /* Turning it on clears the paced aids rather than merely
+                       overriding them. A checkbox left ticked while something
+                       else quietly ignores it is a setting that lies about
+                       what will happen when you press record. */
+                    onChange={(e) =>
+                      onChange(
+                        e.target.checked
+                          ? { zenMode: true, paceCursor: false, flashCard: false }
+                          : { zenMode: false },
+                      )
+                    }
+                  />{" "}
+                  Zen mode
+                </label>
+              </div>
+
+              <div className="group">
+                <label className="check" title={s.zenMode ? ZEN_PACING_HELP : PACE_CURSOR_HELP}>
                   <input
                     type="checkbox"
                     id="pace-cursor"
                     checked={s.paceCursor}
+                    disabled={s.zenMode}
                     onChange={(e) => onChange({ paceCursor: e.target.checked })}
                   />{" "}
                   Pacing cursor
                 </label>
               </div>
 
-              {/* Only with the cursor on. A count-in for a cursor that is not
-                  running is a setting for nothing. */}
+              {/* Both only with the cursor on. A count-in for a cursor that
+                  is not running, and an axis swapped for its benefit, are
+                  settings for nothing. */}
+              {s.paceCursor && (
+                <div className="group">
+                  <label className="check" title={PACE_ABSOLUTE_HELP}>
+                    <input
+                      type="checkbox"
+                      id="pace-absolute"
+                      checked={s.paceAbsolute}
+                      onChange={(e) => onChange({ paceAbsolute: e.target.checked })}
+                    />{" "}
+                    Clock axis while pacing
+                  </label>
+                </div>
+              )}
+
               {s.paceCursor && (
                 <div className="group">
                   <NumberField
                     id="pace-lead"
                     name="Delay start"
                     unit="s"
+                    spoken="seconds"
                     help={PACE_LEAD_HELP}
                     value={s.paceLeadSec}
                     min={PACE_LEAD_MIN_SEC}
@@ -546,12 +629,16 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                 </div>
               )}
 
+              {/* Barred by Zen mode for the same reason the cursor is: it
+                  runs on the same count-in and stops the take at the end of
+                  the message, which is pacing however it is drawn. */}
               <div className="group">
-                <label className="check" title={FLASH_CARD_HELP}>
+                <label className="check" title={s.zenMode ? ZEN_PACING_HELP : FLASH_CARD_HELP}>
                   <input
                     type="checkbox"
                     id="flash-card"
                     checked={s.flashCard}
+                    disabled={s.zenMode}
                     onChange={(e) => onChange({ flashCard: e.target.checked })}
                   />{" "}
                   Flash card
@@ -595,6 +682,7 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                     id="flash-lead"
                     name="Flash lead"
                     unit="ms"
+                    spoken="milliseconds"
                     help={FLASH_LEAD_HELP}
                     value={s.flashLeadMs}
                     min={FLASH_LEAD_MIN_MS}

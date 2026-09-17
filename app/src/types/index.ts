@@ -79,6 +79,16 @@ export type BlockKind =
   | "pause";
 
 /** The five classes that actually get graded, in report order. */
+/** The `source` of a take captured through the microphone. A sentinel rather
+ *  than a label: the header hides it, because it says the same thing every
+ *  time, but a download still needs a filename stem.
+ *
+ * Here rather than with the rest of the take-building because `timing` has to
+ * tell a recording from a file — a setting about what you are ABOUT to send
+ * cannot apply to audio that was sent before the app saw it — and `io` already
+ * imports `timing`. */
+export const MIC_SOURCE = "microphone";
+
 export const GRADED_KINDS = [
   "dit",
   "dah",
@@ -279,12 +289,35 @@ export interface ReviewSettings {
   farnsworthWpm: number;
   tolerance: number;
   expected: string;
+  /** How many times the intended message is sent in one take.
+   *
+   * The message itself stays a single instance — it is what you are practicing
+   * and it is what the box shows. This is how many of them make up one
+   * attempt, and it applies wherever the target is REALIZED: the audio you
+   * play, the row the chart draws, the pacing schedule, and what your sending
+   * is graded against. Repetition is most of how sending is practiced, and
+   * typing a callsign out five times to grade five of them is copying, not
+   * practice. */
+  times: number;
   collapseRests: boolean;
   /** Run a pacing cursor along the target track while recording. Off by
    *  default: it is a practice aid, not a way of reading the chart. */
   paceCursor: boolean;
   /** Seconds of count-in before that cursor sets off. */
   paceLeadSec: number;
+  /** Show the clock axis while a paced recording runs, and put the view back
+   *  afterward.
+   *
+   * On by default, because the cursor and the per-character axis disagree by
+   * construction: the cursor moves in real time and that axis packs the slots
+   * evenly so the columns line up. On the clock a second of silence is a
+   * second of chart, and the two mean the same thing.
+   *
+   * A setting rather than a rule all the same. It moves the chart out from
+   * under you at the moment you have a hand on the paddle, and whether that is
+   * worth a cursor that agrees with itself is not something this can decide
+   * for somebody. */
+  paceAbsolute: boolean;
   /** Draw each character as one marker rather than as its dits and dahs. */
   charMarkers: boolean;
   /** Put each attempt's two scores in the gutter beside its name.
@@ -333,6 +366,20 @@ export interface ReviewSettings {
    * what it costs is a page of text where you may only have wanted one row
    * of it. */
   captionAll: boolean;
+  /** Put the message on screen by itself while you record, and nothing else.
+   *
+   * The opposite of the paced aids rather than another one of them: no beat to
+   * follow, no count-in, no chart moving under a cursor — the text you are
+   * sending, large, and the way to stop. Mutually exclusive with pacing, which
+   * is the whole point of it.
+   *
+   * Deliberately NOT saved with the other aids. It is the only setting on the
+   * page that takes the page away, and one that had been remembered from some
+   * earlier visit would blank the screen on a record nobody connected to a
+   * checkbox they ticked days ago. Chosen for the sitting you are in — it
+   * carries from take to take within one, so a zen session is not a box to
+   * re-tick after every attempt. */
+  zenMode: boolean;
   /** Show the next character to send, large, with a countdown to it. */
   flashCard: boolean;
   /** Flash that card on the beat. Separate from showing it: the card is a

@@ -62,6 +62,11 @@ export interface JsonReport {
     recorded_at: string;
     take_id: string;
     expected: string | null;
+    /* How many passes of it made up the take. `expected` is one instance —
+       that is what was practiced — so without this a directory of reports has
+       no way to tell an accuracy figure over one pass from one over five, and
+       the duration and element counts would look like a different message. */
+    times: number;
     collapse_rests: boolean;
     /* Which microphone profile the timings came from, and what it corrected
        by. Null is a real and common answer — no calibration — and is written
@@ -138,6 +143,7 @@ export function buildJsonReport(
       recorded_at: take.recordedAt,
       take_id: take.id,
       expected: intended,
+      times: settings.times,
       // Off, every long silence is graded as spacing, which moves both the
       // consistency figure and the deviation list. Recording it is what keeps
       // two dumps of the same session comparable.

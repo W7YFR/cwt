@@ -138,9 +138,11 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     ...(keyer ? { charWpm: keyer, farnsworthWpm: keyer } : {}),
     tolerance: p.tolerance ?? base.tolerance,
     gainDb: p.gainDb ?? base.gainDb,
+    times: p.times ?? base.times,
     collapseRests: p.collapseRests ?? base.collapseRests,
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
+    paceAbsolute: p.paceAbsolute ?? base.paceAbsolute,
     charMarkers: p.charMarkers ?? base.charMarkers,
     runScores: p.runScores ?? base.runScores,
     advancedGrading: p.advancedGrading ?? base.advancedGrading,
@@ -179,9 +181,11 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     expected: prev.expected || own.expected,
     tolerance: prev.tolerance,
     gainDb: prev.gainDb,
+    times: prev.times,
     collapseRests: prev.collapseRests,
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
+    paceAbsolute: prev.paceAbsolute,
     charMarkers: prev.charMarkers,
     runScores: prev.runScores,
     advancedGrading: prev.advancedGrading,
@@ -190,6 +194,7 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     showChartControls: prev.showChartControls,
     showRuns: prev.showRuns,
     captionAll: prev.captionAll,
+    zenMode: prev.zenMode,
     flashCard: prev.flashCard,
     flashCue: prev.flashCue,
     flashLeadMs: prev.flashLeadMs,
@@ -212,9 +217,11 @@ export function useTake(): TakeState {
       farnsworthWpm: 20,
       tolerance: 0.3,
       expected: "",
+      times: 1,
       collapseRests: true,
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
+      paceAbsolute: true,
       charMarkers: false,
       /* On, because it is what a stack is for: several attempts side by side
          and which went better readable without clicking through them. */
@@ -230,6 +237,7 @@ export function useTake(): TakeState {
       /* Off. One row of text is a caption; six is a wall, and the rows under
          it are the thing being compared. */
       captionAll: false,
+      zenMode: false,
       flashCard: false,
       flashCue: true,
       flashLeadMs: FLASH_LEAD_DEFAULT_MS,
@@ -288,9 +296,11 @@ export function useTake(): TakeState {
         ...loadPrefs(),
         tolerance: next.tolerance,
         gainDb: next.gainDb,
+        times: next.times,
         collapseRests: next.collapseRests,
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
+        paceAbsolute: next.paceAbsolute,
         charMarkers: next.charMarkers,
         runScores: next.runScores,
         advancedGrading: next.advancedGrading,
@@ -496,7 +506,15 @@ export function useTake(): TakeState {
          Rebuilding them from a take would drop the intended message, which is
          the one thing every attempt in the session shares. */
       const kept = entries[pick]?.settings ?? entries[entries.length - 1]?.settings;
-      const next = kept ?? openingSettings(lanes[pick]!.take, settingsRef.current);
+      /* Zen mode is the exception, and coming back is exactly when it matters:
+         it takes the whole page away on the next record, and a session restored
+         from a tab closed last week would do that with nothing on screen
+         connecting it to a box ticked then. Every other setting is worth
+         waking up in; this one is chosen for the sitting. */
+      const next = {
+        ...(kept ?? openingSettings(lanes[pick]!.take, settingsRef.current)),
+        zenMode: false,
+      };
       settingsRef.current = next;
       setSettingsRaw(next);
     },

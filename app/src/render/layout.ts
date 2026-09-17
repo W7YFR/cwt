@@ -46,6 +46,15 @@ export interface Layout {
   breaks: number[];
   ppu: number;
   unitSec: number;
+  /** How far everything was pushed right to make room for the count-in.
+   *
+   * Zero unless a pacing cursor has asked for a runway. Carried rather than
+   * recomputed because the per-character view draws the target from the shared
+   * columns and each attempt from its own items, and the runway moves only the
+   * items: measured a second time from the seconds and the zoom, the two would
+   * be one rounding apart, and taken as zero they were a whole count-in apart
+   * and the tracks stopped sharing their columns. */
+  leadPx: number;
   /** Characters were laid out as one marker each rather than as their
    *  elements.
    *
@@ -250,6 +259,7 @@ function withRunway(layout: Layout, leadSec: number, tailSec: number): Layout {
     })),
     maps: { you: pad(layout.maps.you), tgt: pad(layout.maps.tgt) },
     width: layout.width + leadPx + tailPx,
+    leadPx,
   };
 }
 
@@ -330,6 +340,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       breaks: [],
       ppu,
       unitSec,
+      leadPx: 0,
       charMarkers: markers,
     }, options.leadSec ?? 0, options.tailSec ?? 0);
   }
@@ -394,7 +405,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
     ) + PAD_X;
 
   return withRunway(
-    { view, items, width, maps, origin, breaks, ppu, unitSec },
+    { view, items, width, maps, origin, breaks, ppu, unitSec, leadPx: 0 },
     options.leadSec ?? 0,
     options.tailSec ?? 0,
   );

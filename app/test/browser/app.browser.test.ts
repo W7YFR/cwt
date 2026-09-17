@@ -305,6 +305,39 @@ async function tickSetting(id: string): Promise<void> {
 
 const showDownloads = () => tickSetting("show-downloads");
 
+  it("rolls the settings band open instead of dropping it in", async () => {
+    /* It arrives between two things already on screen and pushes the chart
+       down the page. Done instantly that reads as the page having jumped;
+       rolled open the eye follows the chart to where it went.
+
+       Which means the band is in the tree closed as well as open — there has
+       to be something to animate from — so what is checked is that a closed
+       one takes no room and cannot be reached: a panel rolled up is not a
+       panel you can land on with a tab key. */
+    await served();
+    await mount();
+    const band = () => container.querySelector<HTMLElement>(".chartsettings")!;
+    const cog = () => container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+
+    expect(band(), "in the tree while closed").not.toBeNull();
+    expect(band().getBoundingClientRect().height, "closed").toBe(0);
+    expect(band().firstElementChild!.hasAttribute("inert"), "closed").toBe(true);
+    // A real transition to run, not a swap dressed up as one.
+    expect(getComputedStyle(band()).transitionDuration).not.toBe("0s");
+
+    await act(async () => cog().click());
+    const atOnce = band().getBoundingClientRect().height;
+    expect(band().firstElementChild!.hasAttribute("inert"), "open").toBe(false);
+
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 400));
+    });
+    const open = band().getBoundingClientRect().height;
+    expect(open, "settles at the height of what is in it").toBeGreaterThan(0);
+    // The whole claim: it was not already there when the click returned.
+    expect(atOnce, "arrived rather than rolled").toBeLessThan(open);
+  });
+
   it("shows the grading tables only when they are asked for", async () => {
     /* They are the deepest thing on the page and the slowest to read, and the
        scores band answers "how did that go" without them. Driven through the
@@ -330,14 +363,23 @@ const showDownloads = () => tickSetting("show-downloads");
        are instructions, and an instruction is furniture once you know it. */
     await served();
     await mount();
-    const howto = () => container.querySelector(".legend.howto");
-    const keys = () => container.querySelector("[data-testid='hotkeys']");
-    expect(howto()).not.toBeNull();
-    expect(keys()).not.toBeNull();
+    /* Every note the switch covers, wherever it sits on the page. The one over
+       the deviations is down in the report rather than under the chart, and
+       being somewhere else is no reason for it to be the one instruction that
+       stays after you have turned instructions off. */
+    const notes = {
+      howto: () => container.querySelector(".legend.howto"),
+      keys: () => container.querySelector("[data-testid='hotkeys']"),
+      deviations: () => container.querySelector("[data-testid='deviation-hint']"),
+    };
+    for (const [what, at] of Object.entries(notes)) {
+      expect(at(), `${what} is shown`).not.toBeNull();
+    }
 
     await tickSetting("show-hints");
-    expect(howto()).toBeNull();
-    expect(keys()).toBeNull();
+    for (const [what, at] of Object.entries(notes)) {
+      expect(at(), `${what} goes with them`).toBeNull();
+    }
     // The swatches stay: that is what the colors on the chart mean.
     expect(container.querySelector(".legend .sw")).not.toBeNull();
   });
@@ -518,7 +560,6 @@ const showDownloads = () => tickSetting("show-downloads");
     await mount();
 
     const src = container.querySelector<HTMLElement>(".src")!;
-    const header = container.querySelector<HTMLElement>("header")!;
     expect(src.textContent).toBe(long);
 
     const brand = container.querySelector<HTMLElement>(".brand")!.getBoundingClientRect();
@@ -527,8 +568,12 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(src.getBoundingClientRect().top).toBeGreaterThanOrEqual(brand.bottom - 1);
     expect(src.getBoundingClientRect().top).toBeGreaterThanOrEqual(bar.bottom - 1);
 
-    // Below the brand in the document too, not merely pushed under it.
-    expect(header.lastElementChild).toBe(src);
+    /* Below the brand in the document too, not merely pushed under it. After
+       the record controls rather than last in the header: the corner button is
+       out of flow and sits after everything, which says nothing about where
+       the name is laid out. */
+    const bars = container.querySelector<HTMLElement>(".recordbar")!;
+    expect(bars.compareDocumentPosition(src) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     // And the record controls sit where they would with no name at all.
     const withName = bar.left;
@@ -543,6 +588,57 @@ const showDownloads = () => tickSetting("show-downloads");
     await mount();
     const short = container.querySelector<HTMLElement>(".recordbar")!.getBoundingClientRect();
     expect(short.left).toBeCloseTo(withName, 1);
+  });
+
+  it("keeps the grades and the way out of the run on one line", async () => {
+    /* The band holds two grades and five measurements. Left to reflow, which
+       line a figure landed on was a fact about the window rather than about
+       the figure — and on a narrow one the single button among them ended up
+       alone on a line of nothing else.
+
+       Measured at a width that cannot hold the lot, because that is the only
+       width where the claim means anything. */
+    await served();
+    await mount();
+    container.style.width = "620px";
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 50));
+    });
+
+    const head = container.querySelector<HTMLElement>(".scorehead")!;
+    const detail = container.querySelector<HTMLElement>(".scoredetail")!;
+    const drop = container.querySelector<HTMLElement>("[data-testid='drop-run']");
+    const consistent = [...head.querySelectorAll<HTMLElement>(".score")].find((el) =>
+      el.textContent!.includes("consistent"),
+    )!;
+
+    /* Two rows with boxes of their own, which is the whole mechanism: wrappers
+       that lay their children out into the band around them would put every
+       assertion below against a zero-sized rectangle and pass on nothing. */
+    for (const [what, row] of [["head", head], ["rest", detail]] as const) {
+      expect(getComputedStyle(row).display, `the ${what} is a row`).toBe("flex");
+      expect(row.getBoundingClientRect().height, `the ${what} is a row`).toBeGreaterThan(0);
+    }
+    expect(detail.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      head.getBoundingClientRect().bottom - 1,
+    );
+    // And the window really is too narrow to have held the lot on one line.
+    expect(head.scrollWidth + detail.scrollWidth).toBeGreaterThan(
+      container.getBoundingClientRect().width,
+    );
+
+    /* The grades and the button share the head's line, and the button is at
+       the end of it — an action among readings. */
+    const line = consistent.getBoundingClientRect();
+    if (drop) {
+      const box = drop.getBoundingClientRect();
+      expect(box.top).toBeLessThan(line.bottom);
+      expect(box.right).toBeCloseTo(head.getBoundingClientRect().right, 0);
+    }
+    // And nothing from underneath crept up onto it.
+    for (const el of detail.querySelectorAll<HTMLElement>(".score")) {
+      expect(el.getBoundingClientRect().top).toBeGreaterThanOrEqual(line.bottom - 1);
+    }
   });
 
   it("puts the scores on a row of their own, left-aligned", async () => {
@@ -577,6 +673,31 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(inner.top - outer.top).toBeCloseTo(outer.bottom - rule - inner.bottom, 0);
   });
 
+  it("reaches the corner button where the eye finds it, last in the header", async () => {
+    /* The button is out of flow, so where it is drawn says nothing about where
+       the keyboard finds it — only its place in the document does, and those
+       two were opposite ends of the header. Tabbing onto the review page put
+       you straight into chart settings, past the way home and every record
+       control, with the focus ring jumping to the far corner first. */
+    await served();
+    await mount();
+
+    /* Document order, which IS the order Tab walks for everything here: no
+       control on the page carries a positive tabindex, and nothing sets one. */
+    const reachable = (root: ParentNode) =>
+      [...root.querySelectorAll<HTMLElement>("button, select, input, a[href], [tabindex]")]
+        .filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
+
+    const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+    const inHeader = reachable(container.querySelector<HTMLElement>("header")!);
+
+    expect(inHeader.length, "the header has controls to come first").toBeGreaterThan(1);
+    expect(inHeader.at(-1), "the corner is reached last").toBe(cog);
+
+    // And the first stop on the page is the way home, which the corner took.
+    expect(reachable(container)[0]).toBe(container.querySelector(".brandmark"));
+  });
+
   it("ends the corner button on the page's own right margin", async () => {
     /* It is out of flow, so nothing lays it out against the things it sits
        among — and a few pixels inside or outside the margin every other row
@@ -597,6 +718,127 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
+  it("keeps the way out of the help in sight however long the help is", async () => {
+    /* The first version let the whole sheet scroll, which put Close below the
+       fold — reachable only by reading to the end of something you opened
+       because you did not know what you were looking for.
+
+       Asked structurally rather than by measuring the copy: whether this page
+       happens to overflow today is a fact about how much is written on it, and
+       a layout test that fails when somebody shortens a paragraph is a test
+       about the paragraph. */
+    await mount();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='sound-path-open']")!.click();
+    });
+
+    const sheet = container.querySelector<HTMLElement>("[data-testid='sound-path']")!;
+    const prose = sheet.querySelector<HTMLElement>(".prose")!;
+    const close = container.querySelector<HTMLElement>("[data-testid='sound-path-close']")!;
+    const title = sheet.querySelector<HTMLElement>("h2")!;
+
+    // The reading scrolls, and it is the only thing that does.
+    expect(getComputedStyle(prose).overflowY, "the reading scrolls").toBe("auto");
+    expect(getComputedStyle(sheet).overflowY, "the sheet does not").not.toBe("auto");
+
+    // The title and the way out are outside it, so neither can scroll away.
+    for (const [what, el] of [["title", title], ["way out", close]] as const) {
+      expect(prose.contains(el), `the ${what} is out of the scroll`).toBe(false);
+      const at = el.getBoundingClientRect();
+      const box = sheet.getBoundingClientRect();
+      expect(at.height, `the ${what} is drawn`).toBeGreaterThan(0);
+      expect(at.top, `the ${what} is inside the sheet`).toBeGreaterThanOrEqual(box.top - 1);
+      expect(at.bottom, `the ${what} is inside the sheet`).toBeLessThanOrEqual(box.bottom + 1);
+    }
+  });
+
+  it("asks for zen mode every sitting rather than remembering it", async () => {
+    /* It is the only setting on the page that takes the page away. Remembered
+       with the other aids, a box ticked days ago blanks the screen on the next
+       record and nothing on screen connects the two. Every other practice aid
+       is saved; this one is chosen. */
+    await served();
+    await mount();
+
+    const open = () =>
+      act(async () => {
+        container.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click();
+      });
+    const zen = () => container.querySelector<HTMLInputElement>("#zen-mode")!;
+
+    await open();
+    await act(async () => {
+      zen().click();
+    });
+    expect(zen().checked, "it is on for this sitting").toBe(true);
+
+    // Past the settings debounce, so anything that was going to be written has.
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 600));
+    });
+    expect(Object.keys(loadPrefs()), "nothing of it is saved").not.toContain("zenMode");
+
+    // And the next visit opens without it.
+    act(() => root!.unmount());
+    root = null;
+    container.innerHTML = "";
+    await mount();
+    await open();
+    expect(zen().checked, "the next visit starts off").toBe(false);
+  });
+
+  it("puts the repeat count beside the message, not under it", async () => {
+    /* The message group claims a whole row by itself — it is the only control
+       here whose useful width has no upper bound — so a small field after it
+       spends a whole band of the page on one number. Sharing the line, it also
+       has to stop where every other row stops: held to the groups' 130px
+       floor, the label stretched and left a hand's width of nothing between
+       the number and the edge. */
+    await served();
+    await mount();
+
+    const box = container.querySelector<HTMLElement>("#expected")!.getBoundingClientRect();
+    const times = container.querySelector<HTMLElement>("#times")!.getBoundingClientRect();
+    const row = container.querySelector<HTMLElement>(".msgrow")!.getBoundingClientRect();
+
+    // Beside it, on the same line.
+    expect(times.left, "to the right of the message").toBeGreaterThan(box.right);
+    expect(times.top).toBeLessThan(box.bottom);
+    expect(times.bottom).toBeGreaterThan(box.top);
+
+    // And nothing after it but the margin every other row keeps.
+    expect(times.right).toBeCloseTo(row.right, 0);
+  });
+
+  it("lets the pointer reach the reason a barred field is barred", async () => {
+    /* The title was already on the label and already said why. What it was not
+       was reachable: the disabled input is the hit target, and whether a
+       browser walks up from a disabled control to find an ancestor's tooltip is
+       not a thing to depend on. A control barred for a reason has to be able to
+       give the reason. */
+    await served();
+    await mount();
+
+    const times = container.querySelector<HTMLInputElement>("#times")!;
+    const label = times.closest("label")!;
+    const at = () => {
+      const box = times.getBoundingClientRect();
+      return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    };
+
+    /* This session was opened from a recording, which is the case the field is
+       barred for. The label is what the pointer lands on, and the label is
+       where the tooltip is. */
+    expect(times.disabled, "an opened recording bars it").toBe(true);
+    expect(at(), "the label takes the pointer").toBe(label);
+    expect(label.getAttribute("title"), "and carries the reason").toBeTruthy();
+
+    // Offered, the box itself is what you point at — it is a control again.
+    times.disabled = false;
+    label.setAttribute("data-disabled", "false");
+    expect(at(), "the box takes the pointer").toBe(times);
+  });
+
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.
@@ -605,6 +847,12 @@ const showDownloads = () => tickSetting("show-downloads");
     const foot = container.querySelector<HTMLElement>(".colophon")!;
     expect(foot.textContent).toContain(String(new Date().getFullYear()));
     expect(foot.textContent).toContain("W7YFR");
+
+    // And the call sign goes where a call sign goes, in a tab of its own so a
+    // session in progress is not navigated away from.
+    const sign = foot.querySelector<HTMLAnchorElement>("a")!;
+    expect(sign.href).toBe("https://www.qrz.com/db/W7YFR");
+    expect(sign.target).toBe("_blank");
   });
 
   it("lines up every control in the settings rows", async () => {
@@ -931,6 +1179,47 @@ const showDownloads = () => tickSetting("show-downloads");
     ) as unknown as typeof fetch;
     await mount();
     expect(container.textContent).toContain("Start recording");
+  });
+
+  it("never lands the keyboard on the file dialog itself", async () => {
+    /* Both ways in are a visible button that opens a hidden <input type=file>.
+       The input is clipped to a 1px box, so in the tab order it is a stop on
+       nothing: no visible focus ring, nothing to read, and Enter opens a file
+       dialog you did not ask for.
+
+       Both halves are the claim. Taking it out of the tab order would be easy
+       to do by hiding the whole feature from the keyboard, which is worse than
+       the problem. */
+    for (const [screen, opener] of [
+      ["landing", ".way.drop button"],
+      ["review", "[data-testid='open-file']"],
+    ] as const) {
+      if (screen === "review") await served();
+      await mount();
+      /* Opening a file is barred once a session has attempts in it, and a
+         barred button cannot take focus — so clear first and ask about the
+         control when it is actually on offer. */
+      if (screen === "review") {
+        await act(async () =>
+          container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.click(),
+        );
+      }
+
+      const inputs = [...container.querySelectorAll<HTMLInputElement>("input[type=file]")];
+      expect(inputs.length, `the ${screen} screen opens files`).toBeGreaterThan(0);
+      for (const input of inputs) {
+        expect(input.tabIndex, `the ${screen} dialog is skipped`).toBeLessThan(0);
+      }
+
+      const button = container.querySelector<HTMLButtonElement>(opener)!;
+      expect(button.tabIndex, `the ${screen} button is reachable`).toBeGreaterThanOrEqual(0);
+      button.focus();
+      expect(document.activeElement, `the ${screen} button takes focus`).toBe(button);
+
+      root?.unmount();
+      root = null;
+      container.innerHTML = "";
+    }
   });
 
   it("makes a closed upload look closed, not merely quiet", async () => {

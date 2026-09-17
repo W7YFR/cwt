@@ -14,7 +14,7 @@ import {
   Controls,
   ViewControls,
 } from "@/ui/Controls";
-import { defaultSettings } from "@/timing";
+import { defaultSettings, TIMES_MAX, TIMES_MIN } from "@/timing";
 import { PACE_LEAD_MAX_SEC } from "@/render/geometry";
 import type { ReviewSettings } from "@/types";
 import { caseNamed, SLOPPY } from "../fixture";
@@ -23,9 +23,12 @@ import { takeFrom } from "../fixture";
 function Harness({
   initial,
   onSettings,
+  fromFile,
 }: {
   initial?: Partial<ReviewSettings>;
   onSettings?: (s: ReviewSettings) => void;
+  /** This session was opened from a file rather than keyed. */
+  fromFile?: boolean;
 }) {
   const take = takeFrom(caseNamed(SLOPPY));
   const [settings, setSettings] = useState<ReviewSettings>({
@@ -47,6 +50,7 @@ function Harness({
       }
       playing={null}
       canPlayYou
+      fromFile={fromFile === true}
       clock={null}
       onPlayYou={() => {}}
       onPlayTarget={() => {}}
@@ -169,6 +173,54 @@ describe("controls", () => {
       />,
     );
     expect(widthsFor(wide.container)).toEqual(narrowWidths);
+  });
+
+  it("commits a repeat count, clamped to what can be built", () => {
+    /* The field is held as text while it is being edited, so what is under
+       test is what gets COMMITTED — typing past the ceiling has to settle at
+       the ceiling rather than at whatever was typed. */
+    const seen: ReviewSettings[] = [];
+    render(<Harness onSettings={(s) => seen.push(s)} />);
+    const times = document.getElementById("times") as HTMLInputElement;
+
+    fireEvent.change(times, { target: { value: "3" } });
+    expect(seen.at(-1)!.times).toBe(3);
+
+    fireEvent.change(times, { target: { value: "999" } });
+    expect(seen.at(-1)!.times).toBe(TIMES_MAX);
+
+    fireEvent.change(times, { target: { value: "0" } });
+    expect(seen.at(-1)!.times).toBe(TIMES_MIN);
+
+    // And the message it repeats is untouched by any of it.
+    expect(seen.at(-1)!.expected).toBe(seen[0]!.expected);
+  });
+
+  it("does not ask how many passes a file holds", () => {
+    /* `times` says how many you are ABOUT to send, and a file was sent before
+       the app saw it. The grading ignores it either way — this is the control
+       saying so rather than sitting there apparently set to five. */
+    const keyed = render(<Harness />);
+    const offered = document.getElementById("times") as HTMLInputElement;
+    expect(offered, "offered for a take you key").toBeEnabled();
+    const keyedTitle = offered.closest("label")!.getAttribute("title");
+    keyed.unmount();
+
+    render(<Harness fromFile />);
+    const times = document.getElementById("times") as HTMLInputElement;
+    expect(times, "barred for one you opened").toBeDisabled();
+
+    /* And it says why. A control barred for a reason has to be able to give
+       the reason — the two states are different sentences, not the same one
+       with the box greyed. */
+    const barred = times.closest("label")!.getAttribute("title");
+    expect(barred, "the barred field explains itself").toBeTruthy();
+    expect(barred, "and not with the copy for a take you key").not.toBe(
+      keyedTitle,
+    );
+    /* What it would grade as is the pure tier's question — `fireEvent.change`
+       dispatches straight at the element, so a disabled input answers it here
+       and would not in a browser. */
   });
 
   it("will not let the overall speed exceed the character speed", () => {
@@ -365,6 +417,7 @@ describe("controls", () => {
       settings: base,
       onChange: () => {},
       canPlayYou: true,
+      fromFile: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
@@ -382,6 +435,7 @@ describe("controls", () => {
       settings: defaultSettings(take),
       onChange: () => {},
       canPlayYou: true,
+      fromFile: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
@@ -403,6 +457,7 @@ describe("controls", () => {
       onChange: () => {},
       playing: null,
       canPlayYou: true,
+      fromFile: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
@@ -462,6 +517,37 @@ describe("controls", () => {
     expect(box.checked).toBe(false);
     await user.click(box);
     expect(onChange).toHaveBeenCalledWith({ charMarkers: true });
+  });
+
+  it("makes zen mode and the paced aids exclusive, both ways", async () => {
+    /* One puts a beat in front of you, the other takes the page away. Turning
+       zen on CLEARS the other two rather than quietly outranking them: a box
+       left ticked while something else ignores it is a setting that lies about
+       what pressing record will do. */
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderView({ onChange, open: true });
+
+    rerender(view({ paceCursor: true, flashCard: true }, onChange));
+    await user.click(screen.getByLabelText(/zen mode/i));
+    expect(onChange).toHaveBeenCalledWith({
+      zenMode: true,
+      paceCursor: false,
+      flashCard: false,
+    });
+
+    // And with it on, neither can be turned back on behind its back.
+    rerender(view({ zenMode: true }, onChange));
+    for (const aid of [/pacing cursor/i, /flash card/i]) {
+      expect(screen.getByLabelText(aid)).toBeDisabled();
+    }
+
+    // Turning it off gives them back, and takes nothing else with it.
+    onChange.mockClear();
+    await user.click(screen.getByLabelText(/zen mode/i));
+    expect(onChange).toHaveBeenCalledWith({ zenMode: false });
+    rerender(view({ zenMode: false }, onChange));
+    expect(screen.getByLabelText(/pacing cursor/i)).toBeEnabled();
   });
 
   it("keeps the flash card and its cue as two separate choices", async () => {

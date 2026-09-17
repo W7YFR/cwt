@@ -18,7 +18,15 @@ import {
   sniffWavRate,
   toMono,
 } from "@/dsp";
-import { idealTimeline, targetTiming, estimateTiming, buildTimeline } from "@/timing";
+import {
+  idealTimeline,
+  targetTiming,
+  estimateTiming,
+  buildTimeline,
+  defaultSettings,
+  reviewTake,
+} from "@/timing";
+import { blankTake } from "@/io/take";
 
 const TIMING = targetTiming(20, 20);
 const IDEAL = idealTimeline("CQ DE W1AW", TIMING);
@@ -78,6 +86,36 @@ describe("rendering the target offline", () => {
       expect(Math.abs(toneHz - 700)).toBeLessThan(3);
       const measured = estimateTiming(segments, "CQ DE W1AW");
       expect(buildTimeline(segments, measured).text).toBe("CQ DE W1AW");
+    } finally {
+      player.destroy();
+    }
+  });
+
+  it("sends the message as many times as the setting says", async () => {
+    /* Through reviewTake rather than through the text helper: what is under
+       test is that the audio is built from the SAME target the grading uses,
+       which is the only reason one setting can reach both. Decoded back,
+       because that is what a user would hear. */
+    const take = blankTake({
+      expected: "CQ DE W1AW",
+      expectedSource: "the test",
+      charWpm: 20,
+      farnsworthWpm: 20,
+    });
+    const review = reviewTake(take, { ...defaultSettings(take), expected: "CQ DE W1AW", times: 2 });
+
+    const player = createPlayer();
+    try {
+      const blob = await player.renderTarget(review.ideal, {
+        peak: 0.9,
+        padSec: 0.3,
+        rate: 8000,
+        voice: { toneHz: 700, filterQ: 3 },
+      });
+      const clip = await decodeAudioFile(await blob.arrayBuffer());
+      const { segments } = segmentsFrom(normalized(clip).samples, clip.rate);
+      const measured = estimateTiming(segments, "CQ DE W1AW CQ DE W1AW");
+      expect(buildTimeline(segments, measured).text).toBe("CQ DE W1AW CQ DE W1AW");
     } finally {
       player.destroy();
     }

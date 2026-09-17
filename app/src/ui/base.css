@@ -189,15 +189,29 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
+/* Two rows, not one that wraps.
+ *
+ * The band holds two grades and five measurements. Left to reflow, which line
+ * a figure landed on was a fact about the window rather than about the figure,
+ * and on a narrow one the single button among them ended up alone on a line of
+ * its own. Split, the head is always the same three things and the way out of
+ * the run; everything that supports them is under it. Each row still wraps
+ * within itself — that is the only wrapping left that tells you nothing. */
 .scores {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+.scorehead,
+.scoredetail {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 18px;
 }
 .score { display: flex; align-items: baseline; gap: 6px; }
-/* An action among readings, so it sits apart from them and at the far end. */
-.scores { width: 100%; }
 /* Square and icon-only — see `.iconbtn`, which it wears — so it reads as one
    action at the end of a row of readings rather than as a sentence competing
    with them. Quiet until it is under the pointer: it throws a recording away,
@@ -369,10 +383,41 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 }
 
 /* The band the corner button opens, under the header and above everything the
-   settings in it are about. */
+   settings in it are about.
+
+   It rolls down rather than appearing, because it appears between two things
+   that were already on screen and pushes everything under it down the page —
+   the chart most of all. Done instantly that reads as the page having jumped;
+   rolled open it reads as a band arriving, and the eye follows the chart to
+   where it went instead of having to find it again.
+
+   Through the grid track rather than through a height, which is what makes it
+   work without a number in it: `auto` is not a length and cannot be animated
+   to, and any max-height guessed here would be a guess about how many
+   checkboxes fit on a line at a window width nobody has told us. A single-row
+   grid going 0fr to 1fr resolves to the content's own height at both ends.
+
+   It stays in the tree either way so it has something to animate FROM, which
+   is why the closed band is inert: a panel rolled up is not a panel you can
+   reach with a tab key. */
 .chartsettings {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease;
+}
+.chartsettings[data-open="true"] { grid-template-rows: 1fr; }
+/* The clip the roll happens inside. On the track's own child, since that is
+   the box the track is sizing. */
+.chartsettings > div { overflow: hidden; }
+/* Inside the clip, so the rule under the band is revealed with the band rather
+   than sitting across the page waiting for it. */
+.chartsettings .viewpanel {
   padding: 10px 20px 12px;
   border-bottom: 1px solid var(--line);
+}
+/* Asked not to animate: still opens, just already open. */
+@media (prefers-reduced-motion: reduce) {
+  .chartsettings { transition: none; }
 }
 /* A band of its own under the row. `100%` on a wrapping flex row is what puts
    it there — it cannot share a line with anything, whatever the window is
@@ -428,6 +473,22 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    sentence somebody typed, it is the widest thing on the row, and sharing a
    line it was what everything else's width was negotiated against. */
 .group.grow { flex: 1 1 100%; }
+/* The message and the count it is sent, on the line the message would have
+   taken alone. Same gap as the row above, so the pair reads as two controls in
+   that row rather than as a thing of its own; stretched, so the count's field
+   lands on the message box's own center line the way the two-band scheme puts
+   everything else there. */
+.msgrow {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 10px 22px;
+}
+/* The 130px floor above is for a group carrying a caption over a control, and
+   this one is a two-word label beside a two-digit box. Held to it, the label
+   stretched and left a hand's width of nothing between the number and the edge
+   of the page. */
+.msgrow .group:not(.grow) { min-width: 0; flex: 0 0 auto; }
 .group .caption,
 .group label {
   font-size: 11px;
@@ -483,6 +544,21 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   align-items: center;
   cursor: pointer;
 }
+/* A checkbox barred by another setting, dimmed the way a barred button is.
+   Without this a setting that cannot be turned on looks exactly like one that
+   can, and the only way to learn otherwise is to click it and watch nothing
+   happen. The tooltip on the label says which setting is doing the barring. */
+.group label.check:has(input:disabled) { opacity: .45; cursor: default; }
+/* Same for a number field barred by what the session is. Dimmed as a whole
+   rather than just the box: the name beside it is half of what is barred, and
+   a bright caption over a dead input reads as a control that failed. */
+.group label.field[data-disabled="true"] { opacity: .45; cursor: default; }
+/* And the label is what the pointer lands on, so the tooltip saying WHY it is
+   barred is the label's own rather than something the browser has to find by
+   walking up from a disabled control. Left alone, the input is the hit target
+   and whether a title is inherited off one is not a thing to depend on — a
+   control that is barred for a reason has to be able to give the reason. */
+.group label.field[data-disabled="true"] input { pointer-events: none; }
 /* A label beside its box rather than above it, in a row of captions above
    theirs. It is a caption all the same, so it is set like one — without this
    it inherits the wizard's larger body size and reads as a different kind of
@@ -1030,6 +1106,109 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 .dialog .speeds input { width: 100%; }
 .dialog .confirm { margin-top: 6px; }
 
+/* A page to read rather than a form to fill in, so it is set as prose: a
+   measure narrow enough to track along, headings that break it into the three
+   questions somebody actually has, and room between paragraphs. */
+/* Left-aligned explicitly: the landing screen is a column of centered cards
+   and this inherits from it, but centered prose has no edge to return to at
+   the end of a line. */
+.soundpath {
+  width: min(620px, 100%);
+  gap: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: left;
+}
+.soundpath h3 {
+  margin: 20px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--you);
+}
+.soundpath p { margin: 0 0 10px; color: var(--ink-dim); }
+.soundpath b { color: var(--ink); font-weight: 600; }
+.soundpath ul { margin: 0 0 10px; padding-left: 18px; color: var(--ink-dim); }
+.soundpath li { margin-bottom: 6px; }
+/* The title and the way out are fixed and the reading scrolls between them.
+   This runs longer than a short window, and a way out you have to read to the
+   end to reach is not a way out. */
+.soundpath { overflow: hidden; }
+.soundpath .prose { flex: 1; min-height: 0; overflow-y: auto; }
+.soundpath .confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+/* Focus goes here on open so Escape has somewhere to land, and a ring around
+   the whole sheet reads as an error rather than as a place to type. */
+.soundpath:focus { outline: none; }
+
+/* ---- zen mode ------------------------------------------------------------ */
+
+/* Opaque, where every other sheet is a dim over the page. The others are about
+   the thing behind them and are worth seeing through; this one exists to take
+   the page away. */
+.zensheet { background: var(--bg); padding: 0; }
+.zen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  gap: 24px;
+}
+.zen:focus { outline: none; }
+
+/* The message fills what is left after the controls have taken theirs, and is
+   sized against the viewport rather than in points: what "large enough to read
+   without looking" means depends on how far away the screen is, and the window
+   is the only thing here that knows anything about that. */
+.zenmessage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Wider than the 1.35 line-height inside a pass, and that is the point: a
+     long message wraps, and with the passes packed tighter than their own
+     wrapped lines the whole thing read as one block of text with no way to see
+     where a pass ended. */
+  gap: .7em;
+  text-align: center;
+  /* Wide word spacing: what is being read here is one character at a time and
+     the word boundaries are what you key differently. */
+  word-spacing: .5em;
+  letter-spacing: .06em;
+  line-height: 1.35;
+  /* Set by the component, which measures. Whether the passes fit depends on
+     how many there are, how long the message is, and how wide the window is,
+     and the message wraps at a width that depends on the font the browser
+     actually picked — so no expression here can be right for all three. This
+     is the starting point it searches down from. */
+  font-size: 104px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.zenpass { margin: 0; }
+.zennothing {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: normal;
+  word-spacing: normal;
+  color: var(--ink-faint);
+}
+
+.zenfoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 20px;
+}
+.zenbuttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.zen .meter { width: 120px; height: 6px; }
+
 /* ---- recording ---------------------------------------------------------- */
 .recording {
   display: flex;
@@ -1420,6 +1599,19 @@ button.primary { border-color: var(--you); color: var(--ink); }
   color: var(--ink-faint);
 }
 
+/* Underlined rather than colored: this sits in the quietest text on the page
+   and a link color here would make the author louder than the app. */
+.colophon a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.colophon a:hover,
+.colophon a:focus-visible {
+  color: var(--ink);
+}
+
 /* What was asked for and what came back, above the arithmetic about them.
    Monospaced and on their own lines: these are call signs and the point is
    comparing them character by character. */
@@ -1573,6 +1765,9 @@ button.danger { border-color: var(--bad); color: var(--bad); }
    under a line that does not read as the wrong one being emphasized. */
 .way .calactions { justify-content: center; }
 .way .calactions button { flex: 0 0 auto; }
+/* Under the panel, and the quietest thing in it: it is the way out to reading
+   rather than one of the choices on offer. */
+.calstatus .calhelp { align-self: center; font-size: 12px; margin-top: -2px; }
 .calstatus .calstate b { font-weight: 600; }
 .calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 /* Not the recording light: this one does not blink, and its color is the
