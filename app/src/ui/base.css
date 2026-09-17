@@ -1075,6 +1075,39 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 .dialog .speeds input { width: 100%; }
 .dialog .confirm { margin-top: 6px; }
 
+/* A page to read rather than a form to fill in, so it is set as prose: a
+   measure narrow enough to track along, headings that break it into the three
+   questions somebody actually has, and room between paragraphs. */
+/* Left-aligned explicitly: the landing screen is a column of centered cards
+   and this inherits from it, but centered prose has no edge to return to at
+   the end of a line. */
+.soundpath {
+  width: min(620px, 100%);
+  gap: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: left;
+}
+.soundpath h3 {
+  margin: 20px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--you);
+}
+.soundpath p { margin: 0 0 10px; color: var(--ink-dim); }
+.soundpath b { color: var(--ink); font-weight: 600; }
+.soundpath ul { margin: 0 0 10px; padding-left: 18px; color: var(--ink-dim); }
+.soundpath li { margin-bottom: 6px; }
+/* The title and the way out are fixed and the reading scrolls between them.
+   This runs longer than a short window, and a way out you have to read to the
+   end to reach is not a way out. */
+.soundpath { overflow: hidden; }
+.soundpath .prose { flex: 1; min-height: 0; overflow-y: auto; }
+.soundpath .confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+/* Focus goes here on open so Escape has somewhere to land, and a ring around
+   the whole sheet reads as an error rather than as a place to type. */
+.soundpath:focus { outline: none; }
+
 /* ---- recording ---------------------------------------------------------- */
 .recording {
   display: flex;
@@ -1631,6 +1664,9 @@ button.danger { border-color: var(--bad); color: var(--bad); }
    under a line that does not read as the wrong one being emphasized. */
 .way .calactions { justify-content: center; }
 .way .calactions button { flex: 0 0 auto; }
+/* Under the panel, and the quietest thing in it: it is the way out to reading
+   rather than one of the choices on offer. */
+.calstatus .calhelp { align-self: center; font-size: 12px; margin-top: -2px; }
 .calstatus .calstate b { font-weight: 600; }
 .calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 /* Not the recording light: this one does not blink, and its color is the

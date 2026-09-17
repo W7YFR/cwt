@@ -419,5 +419,46 @@ describe("the landing screen", () => {
       expect(props.onProfileChange).toHaveBeenCalledWith(undefined);
       await settled();
     });
+
+    describe("what the app is listening through", () => {
+      /* Offered beside calibration because that is where somebody first
+         wonders, and the answer is often that they should not be calibrating
+         at all. It reads and closes and changes nothing — the only thing that
+         can go wrong is a way in with no way back out. */
+      it("opens from the calibration panel and gives the screen back", async () => {
+        const user = userEvent.setup();
+        renderLanding();
+        expect(screen.queryByTestId("sound-path")).toBeNull();
+
+        await user.click(screen.getByTestId("sound-path-open"));
+        expect(screen.getByTestId("sound-path")).toBeTruthy();
+
+        await user.click(screen.getByTestId("sound-path-close"));
+        expect(screen.queryByTestId("sound-path")).toBeNull();
+        await settled();
+      });
+
+      it("closes on Escape, like every other sheet", async () => {
+        const user = userEvent.setup();
+        renderLanding();
+        await user.click(screen.getByTestId("sound-path-open"));
+        // Focus has to be inside it or the key never reaches the handler.
+        expect(screen.getByTestId("sound-path")).toBe(document.activeElement);
+        await user.keyboard("{Escape}");
+        expect(screen.queryByTestId("sound-path")).toBeNull();
+        await settled();
+      });
+
+      it("leaves the calibration alone", async () => {
+        // A page to read. Nothing in it is a control over the recording.
+        const user = userEvent.setup();
+        const { props } = renderLanding({ profiles: [PROFILE], profileId: "p1" });
+        await user.click(screen.getByTestId("sound-path-open"));
+        await user.click(screen.getByTestId("sound-path-close"));
+        expect(props.onProfileChange).not.toHaveBeenCalled();
+        expect(props.onCalibrate).not.toHaveBeenCalled();
+        await settled();
+      });
+    });
   });
 });

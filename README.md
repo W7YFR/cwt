@@ -144,7 +144,8 @@ Two things are worth knowing about how gaps get classified:
 
 If your keyer's sidetone reaches the computer directly, skip this — there is
 nothing in the path to correct. Calibration is for when a microphone is
-listening to a speaker.
+listening to a speaker. **Need help?** under the calibration panel on the
+landing screen says the same thing in the app, with the measurements behind it.
 
 **A room delays every release.** Let up the paddle and the direct sound stops,
 but the reflections don't: the envelope stays above the threshold for a few

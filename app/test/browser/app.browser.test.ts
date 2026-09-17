@@ -709,6 +709,40 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
+  it("keeps the way out of the help in sight however long the help is", async () => {
+    /* The first version let the whole sheet scroll, which put Close below the
+       fold — reachable only by reading to the end of something you opened
+       because you did not know what you were looking for.
+
+       Asked structurally rather than by measuring the copy: whether this page
+       happens to overflow today is a fact about how much is written on it, and
+       a layout test that fails when somebody shortens a paragraph is a test
+       about the paragraph. */
+    await mount();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='sound-path-open']")!.click();
+    });
+
+    const sheet = container.querySelector<HTMLElement>("[data-testid='sound-path']")!;
+    const prose = sheet.querySelector<HTMLElement>(".prose")!;
+    const close = container.querySelector<HTMLElement>("[data-testid='sound-path-close']")!;
+    const title = sheet.querySelector<HTMLElement>("h2")!;
+
+    // The reading scrolls, and it is the only thing that does.
+    expect(getComputedStyle(prose).overflowY, "the reading scrolls").toBe("auto");
+    expect(getComputedStyle(sheet).overflowY, "the sheet does not").not.toBe("auto");
+
+    // The title and the way out are outside it, so neither can scroll away.
+    for (const [what, el] of [["title", title], ["way out", close]] as const) {
+      expect(prose.contains(el), `the ${what} is out of the scroll`).toBe(false);
+      const at = el.getBoundingClientRect();
+      const box = sheet.getBoundingClientRect();
+      expect(at.height, `the ${what} is drawn`).toBeGreaterThan(0);
+      expect(at.top, `the ${what} is inside the sheet`).toBeGreaterThanOrEqual(box.top - 1);
+      expect(at.bottom, `the ${what} is inside the sheet`).toBeLessThanOrEqual(box.bottom + 1);
+    }
+  });
+
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.

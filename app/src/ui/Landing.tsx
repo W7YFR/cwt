@@ -6,7 +6,7 @@
  * here because it is how you check a recording you already have.
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ACCEPTED } from "@/capture/file";
 import { MIC_SOURCE } from "@/io/take";
 import { orderProfiles, type Profile } from "@/io/profiles";
@@ -17,6 +17,7 @@ import { Wordmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 import { useRecorder } from "./useRecorder";
 import { useUpperField } from "./useUpperField";
+import { SoundPathHelp } from "./SoundPath";
 
 export interface LandingProps {
   expected: string;
@@ -44,6 +45,7 @@ export interface LandingProps {
 
 export function Landing(props: LandingProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
+  const [help, setHelp] = useState(false);
   const { onAudio, onError } = props;
   const expected = useUpperField(props.onExpectedChange);
 
@@ -143,6 +145,7 @@ export function Landing(props: LandingProps): React.ReactElement {
                 deviceId={props.deviceId}
                 onChange={props.onProfileChange}
                 onCalibrate={props.onCalibrate}
+                onHelp={() => setHelp(true)}
               />
               {rec.needPermission && (
                 <p>Device names appear once you have allowed microphone access.</p>
@@ -202,6 +205,8 @@ export function Landing(props: LandingProps): React.ReactElement {
       <p className="privacy">
         Private by design. All analysis is performed right here in the browser.
       </p>
+
+      {help && <SoundPathHelp onClose={() => setHelp(false)} />}
     </div>
   );
 }
@@ -212,6 +217,7 @@ interface CalibrationStatusProps {
   deviceId: string | undefined;
   onChange(id: string | undefined): void;
   onCalibrate(): void;
+  onHelp(): void;
 }
 
 /** Whether this microphone has been measured, and what to do about it.
@@ -240,6 +246,7 @@ function CalibrationStatus({
   deviceId,
   onChange,
   onCalibrate,
+  onHelp,
 }: CalibrationStatusProps): React.ReactElement {
   const ordered = orderProfiles(profiles, deviceId);
   const active = profiles.find((p) => p.id === value) ?? null;
@@ -302,6 +309,14 @@ function CalibrationStatus({
           {active ? "Recalibrate" : "Calibrate this microphone"}
         </button>
       </div>
+
+      {/* Under the calibration rather than beside the input picker. Calibrating
+          is the point at which somebody first wonders what the app is actually
+          listening through, and the answer is often that they should not be
+          calibrating at all — a direct connection has nothing to measure. */}
+      <button className="link calhelp" data-testid="sound-path-open" onClick={onHelp}>
+        Need help?
+      </button>
     </div>
   );
 }
