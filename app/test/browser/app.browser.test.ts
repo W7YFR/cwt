@@ -305,6 +305,39 @@ async function tickSetting(id: string): Promise<void> {
 
 const showDownloads = () => tickSetting("show-downloads");
 
+  it("rolls the settings band open instead of dropping it in", async () => {
+    /* It arrives between two things already on screen and pushes the chart
+       down the page. Done instantly that reads as the page having jumped;
+       rolled open the eye follows the chart to where it went.
+
+       Which means the band is in the tree closed as well as open — there has
+       to be something to animate from — so what is checked is that a closed
+       one takes no room and cannot be reached: a panel rolled up is not a
+       panel you can land on with a tab key. */
+    await served();
+    await mount();
+    const band = () => container.querySelector<HTMLElement>(".chartsettings")!;
+    const cog = () => container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+
+    expect(band(), "in the tree while closed").not.toBeNull();
+    expect(band().getBoundingClientRect().height, "closed").toBe(0);
+    expect(band().firstElementChild!.hasAttribute("inert"), "closed").toBe(true);
+    // A real transition to run, not a swap dressed up as one.
+    expect(getComputedStyle(band()).transitionDuration).not.toBe("0s");
+
+    await act(async () => cog().click());
+    const atOnce = band().getBoundingClientRect().height;
+    expect(band().firstElementChild!.hasAttribute("inert"), "open").toBe(false);
+
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 400));
+    });
+    const open = band().getBoundingClientRect().height;
+    expect(open, "settles at the height of what is in it").toBeGreaterThan(0);
+    // The whole claim: it was not already there when the click returned.
+    expect(atOnce, "arrived rather than rolled").toBeLessThan(open);
+  });
+
   it("shows the grading tables only when they are asked for", async () => {
     /* They are the deepest thing on the page and the slowest to read, and the
        scores band answers "how did that go" without them. Driven through the

@@ -669,15 +669,20 @@ export function ReviewScreen({
         )}
       </header>
 
-      {chartSettings && (
-        <section className="chartsettings">
+      {/* Always in the tree, open or not: a band that is only rendered while
+          open has nothing to roll down FROM, and a closed one has to be
+          unreachable rather than merely invisible — `inert` takes it out of
+          the tab order and off the accessibility tree together, which two
+          attributes doing half each would eventually disagree about. */}
+      <section className="chartsettings" data-open={String(chartSettings)}>
+        <div inert={!chartSettings}>
           <ChartSettingsPanel
             settings={settings}
             runs={stack.length}
             onChange={onChange}
           />
-        </section>
-      )}
+        </div>
+      </section>
 
       <Controls
         settings={settings}

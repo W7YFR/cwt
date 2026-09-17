@@ -369,10 +369,41 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 }
 
 /* The band the corner button opens, under the header and above everything the
-   settings in it are about. */
+   settings in it are about.
+
+   It rolls down rather than appearing, because it appears between two things
+   that were already on screen and pushes everything under it down the page —
+   the chart most of all. Done instantly that reads as the page having jumped;
+   rolled open it reads as a band arriving, and the eye follows the chart to
+   where it went instead of having to find it again.
+
+   Through the grid track rather than through a height, which is what makes it
+   work without a number in it: `auto` is not a length and cannot be animated
+   to, and any max-height guessed here would be a guess about how many
+   checkboxes fit on a line at a window width nobody has told us. A single-row
+   grid going 0fr to 1fr resolves to the content's own height at both ends.
+
+   It stays in the tree either way so it has something to animate FROM, which
+   is why the closed band is inert: a panel rolled up is not a panel you can
+   reach with a tab key. */
 .chartsettings {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease;
+}
+.chartsettings[data-open="true"] { grid-template-rows: 1fr; }
+/* The clip the roll happens inside. On the track's own child, since that is
+   the box the track is sizing. */
+.chartsettings > div { overflow: hidden; }
+/* Inside the clip, so the rule under the band is revealed with the band rather
+   than sitting across the page waiting for it. */
+.chartsettings .viewpanel {
   padding: 10px 20px 12px;
   border-bottom: 1px solid var(--line);
+}
+/* Asked not to animate: still opens, just already open. */
+@media (prefers-reduced-motion: reduce) {
+  .chartsettings { transition: none; }
 }
 /* A band of its own under the row. `100%` on a wrapping flex row is what puts
    it there — it cannot share a line with anything, whatever the window is
