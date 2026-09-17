@@ -551,7 +551,6 @@ const showDownloads = () => tickSetting("show-downloads");
     await mount();
 
     const src = container.querySelector<HTMLElement>(".src")!;
-    const header = container.querySelector<HTMLElement>("header")!;
     expect(src.textContent).toBe(long);
 
     const brand = container.querySelector<HTMLElement>(".brand")!.getBoundingClientRect();
@@ -560,8 +559,12 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(src.getBoundingClientRect().top).toBeGreaterThanOrEqual(brand.bottom - 1);
     expect(src.getBoundingClientRect().top).toBeGreaterThanOrEqual(bar.bottom - 1);
 
-    // Below the brand in the document too, not merely pushed under it.
-    expect(header.lastElementChild).toBe(src);
+    /* Below the brand in the document too, not merely pushed under it. After
+       the record controls rather than last in the header: the corner button is
+       out of flow and sits after everything, which says nothing about where
+       the name is laid out. */
+    const bars = container.querySelector<HTMLElement>(".recordbar")!;
+    expect(bars.compareDocumentPosition(src) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     // And the record controls sit where they would with no name at all.
     const withName = bar.left;
@@ -659,6 +662,31 @@ const showDownloads = () => tickSetting("show-downloads");
     // and would count as a pixel of space that is not space.
     const rule = parseFloat(getComputedStyle(band).borderBottomWidth) || 0;
     expect(inner.top - outer.top).toBeCloseTo(outer.bottom - rule - inner.bottom, 0);
+  });
+
+  it("reaches the corner button where the eye finds it, last in the header", async () => {
+    /* The button is out of flow, so where it is drawn says nothing about where
+       the keyboard finds it — only its place in the document does, and those
+       two were opposite ends of the header. Tabbing onto the review page put
+       you straight into chart settings, past the way home and every record
+       control, with the focus ring jumping to the far corner first. */
+    await served();
+    await mount();
+
+    /* Document order, which IS the order Tab walks for everything here: no
+       control on the page carries a positive tabindex, and nothing sets one. */
+    const reachable = (root: ParentNode) =>
+      [...root.querySelectorAll<HTMLElement>("button, select, input, a[href], [tabindex]")]
+        .filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
+
+    const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+    const inHeader = reachable(container.querySelector<HTMLElement>("header")!);
+
+    expect(inHeader.length, "the header has controls to come first").toBeGreaterThan(1);
+    expect(inHeader.at(-1), "the corner is reached last").toBe(cog);
+
+    // And the first stop on the page is the way home, which the corner took.
+    expect(reachable(container)[0]).toBe(container.querySelector(".brandmark"));
   });
 
   it("ends the corner button on the page's own right margin", async () => {
@@ -1021,6 +1049,47 @@ const showDownloads = () => tickSetting("show-downloads");
     ) as unknown as typeof fetch;
     await mount();
     expect(container.textContent).toContain("Start recording");
+  });
+
+  it("never lands the keyboard on the file dialog itself", async () => {
+    /* Both ways in are a visible button that opens a hidden <input type=file>.
+       The input is clipped to a 1px box, so in the tab order it is a stop on
+       nothing: no visible focus ring, nothing to read, and Enter opens a file
+       dialog you did not ask for.
+
+       Both halves are the claim. Taking it out of the tab order would be easy
+       to do by hiding the whole feature from the keyboard, which is worse than
+       the problem. */
+    for (const [screen, opener] of [
+      ["landing", ".way.drop button"],
+      ["review", "[data-testid='open-file']"],
+    ] as const) {
+      if (screen === "review") await served();
+      await mount();
+      /* Opening a file is barred once a session has attempts in it, and a
+         barred button cannot take focus — so clear first and ask about the
+         control when it is actually on offer. */
+      if (screen === "review") {
+        await act(async () =>
+          container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.click(),
+        );
+      }
+
+      const inputs = [...container.querySelectorAll<HTMLInputElement>("input[type=file]")];
+      expect(inputs.length, `the ${screen} screen opens files`).toBeGreaterThan(0);
+      for (const input of inputs) {
+        expect(input.tabIndex, `the ${screen} dialog is skipped`).toBeLessThan(0);
+      }
+
+      const button = container.querySelector<HTMLButtonElement>(opener)!;
+      expect(button.tabIndex, `the ${screen} button is reachable`).toBeGreaterThanOrEqual(0);
+      button.focus();
+      expect(document.activeElement, `the ${screen} button takes focus`).toBe(button);
+
+      root?.unmount();
+      root = null;
+      container.innerHTML = "";
+    }
   });
 
   it("makes a closed upload look closed, not merely quiet", async () => {
