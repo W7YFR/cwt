@@ -226,19 +226,6 @@ export const PACE_LEAD_DEFAULT_SEC = 3;
 export const PACE_LEAD_MIN_SEC = 1;
 export const PACE_LEAD_MAX_SEC = 10;
 
-/** How long the flash card stays lit, seconds. Long enough to catch out of the
- *  corner of an eye, short enough to be over before the next character. */
-export const FLASH_SEC = 0.12;
-
-/** How far ahead of the beat the card flashes, milliseconds.
- *
- * Not zero, which is the honest default and the useless one: a cue that fires
- * exactly on the beat leaves you late by your own reaction time on every
- * character, and that reads as the cue being wrong rather than as something to
- * dial in. Two hundred milliseconds is roughly a visual reaction — a guess,
- * and the control exists because the guess is wrong for somebody. */
-export const FLASH_LEAD_DEFAULT_MS = 25;
-
 /** How long after the target's last character a paced recording stops itself.
  *
  * You declared the message and the pace, so where the take ends is already
@@ -250,5 +237,3 @@ export const FLASH_LEAD_DEFAULT_MS = 25;
  * the cursor will cut the take short. That is the honest behavior for a clock
  * you asked to be held to, and Restart is one key away. */
 export const PACED_STOP_AFTER_SEC = 1;
-export const FLASH_LEAD_MIN_MS = 0;
-export const FLASH_LEAD_MAX_MS = 1000;

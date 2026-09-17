@@ -98,20 +98,10 @@ export const FLASH_CARD_HELP =
   "chart\u2019s captions are small, moving, and nowhere near where you are " +
   "looking. It shows what comes next, never what you just sent.";
 
-export const FLASH_CUE_HELP =
-  "Light the card on the beat as well as showing it. The card is a " +
-  "reference you glance at; the flash is a cue you react to, which is a " +
-  "different skill.";
-
 export const WORD_PREVIEW_HELP =
   "Spell the word under the card, greening each letter as it passes. The " +
   "card shows one character at a time, which says nothing about where a word " +
   "ends.";
-
-export const FLASH_LEAD_HELP =
-  "How far ahead of the beat the card lights. Reacting takes time, so a cue " +
-  "on the beat leaves you late by that much every character. The countdown " +
-  "is not moved by it.";
 
 export const PACE_LEAD_HELP =
   "How long the count-in runs before the cursor reaches the first " +

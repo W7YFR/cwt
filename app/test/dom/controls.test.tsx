@@ -550,25 +550,16 @@ describe("controls", () => {
     expect(screen.getByLabelText(/pacing cursor/i)).toBeEnabled();
   });
 
-  it("keeps the flash card and its cue as two separate choices", async () => {
-    /* A reference you glance at and a cue you react to are different things,
-       and the cue's lead is a setting for nothing with no cue to lead. */
-    const user = userEvent.setup();
+  it("offers nothing that makes the card flash", async () => {
+    /* The card used to strobe on the beat, with a dial for how far ahead. A
+       bright flash several times a second is a hazard for anyone
+       photosensitive, and the card reads fine without one. */
     const onChange = vi.fn();
     const { rerender } = renderView({ onChange, open: true });
-    expect(screen.queryByLabelText(/flash cue/i)).toBeNull();
-    expect(screen.queryByLabelText(/flash lead/i)).toBeNull();
-
-    await user.click(screen.getByLabelText(/flash card/i));
-    expect(onChange).toHaveBeenCalledWith({ flashCard: true });
-
-    rerender(view({ flashCard: true, flashCue: false }, onChange));
-    expect(screen.getByLabelText(/flash cue/i)).toBeTruthy();
-    // No lead without a flash to lead.
-    expect(screen.queryByLabelText(/flash lead/i)).toBeNull();
-
-    rerender(view({ flashCard: true, flashCue: true }, onChange));
-    expect(screen.getByLabelText(/flash lead/i)).toBeTruthy();
+    rerender(view({ flashCard: true }, onChange));
+    for (const gone of [/flash cue/i, /flash lead/i]) {
+      expect(screen.queryByLabelText(gone), String(gone)).toBeNull();
+    }
   });
 
   it("offers the word preview only with a card to put it under", async () => {
@@ -577,10 +568,7 @@ describe("controls", () => {
     const { rerender } = renderView({ onChange, open: true });
     expect(screen.queryByLabelText(/word preview/i)).toBeNull();
 
-    /* It hangs off the card rather than off the cue: it is something to read,
-       not something to react to, so the flash being off is no reason to
-       withhold it. */
-    rerender(view({ flashCard: true, flashCue: false }, onChange));
+    rerender(view({ flashCard: true }, onChange));
     await user.click(screen.getByLabelText(/word preview/i));
     expect(onChange).toHaveBeenCalledWith({ wordPreview: true });
   });
