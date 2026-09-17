@@ -276,22 +276,36 @@ export function ReviewScreen({
      * The per-character view packs the slots evenly so the columns line up,
      * which is the one thing you do not want under a cursor: the cursor moves
      * in real time and that axis does not, so the two disagree about how far
-     * along you are. On the absolute axis a second of silence is a second of
-     * chart, and the cursor and the marks mean the same thing. Afterwards the
+     * along you are. On the clock a second of silence is a second of chart,
+     * and the cursor and the marks mean the same thing. Afterwards the
      * opposite is true — what you want then is the comparison, letter against
-     * letter. So it goes out on the way in and comes back on the way out.
+     * letter.
+     *
+     * Asked for rather than imposed. It moves the chart out from under you at
+     * the moment you have a hand on the paddle, and whether that is worth a
+     * cursor that agrees with itself is not a call this can make for somebody.
+     *
+     * And it puts back the view that was in force, not a view of its own
+     * choosing: you may have been in overlay, and coming back to a third thing
+     * is the swap happening twice.
      *
      * `onChange` is held in a ref because App rebuilds it on every render: as
      * a dependency it would tear this effect down and run its cleanup between
      * every pair of frames, which is the two views fighting rather than a view
-     * being set. */
+     * being set. The view it restores is held the same way, and read at the
+     * moment the recording starts — as a dependency it would make the effect
+     * re-run on the change it just made. */
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const viewRef = useRef(settings.view);
+  viewRef.current = settings.view;
   useEffect(() => {
-    if (!rec.recorder || !settings.paceCursor) return;
+    if (!rec.recorder || !settings.paceCursor || !settings.paceAbsolute) return;
+    const was = viewRef.current;
+    if (was === "absolute") return;
     onChangeRef.current({ view: "absolute" });
-    return () => onChangeRef.current({ view: "per-char" });
-  }, [rec.recorder, settings.paceCursor]);
+    return () => onChangeRef.current({ view: was });
+  }, [rec.recorder, settings.paceCursor, settings.paceAbsolute]);
 
   /** Where the target's first character begins.
    *

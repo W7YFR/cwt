@@ -30,6 +30,7 @@ import {
   RUN_SORT_HELP,
   WORD_PREVIEW_HELP,
   GAIN_HELP,
+  PACE_ABSOLUTE_HELP,
   PACE_CURSOR_HELP,
   PACE_LEAD_HELP,
   ZOOM_HELP,
@@ -528,8 +529,23 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                 </label>
               </div>
 
-              {/* Only with the cursor on. A count-in for a cursor that is not
-                  running is a setting for nothing. */}
+              {/* Both only with the cursor on. A count-in for a cursor that
+                  is not running, and an axis swapped for its benefit, are
+                  settings for nothing. */}
+              {s.paceCursor && (
+                <div className="group">
+                  <label className="check" title={PACE_ABSOLUTE_HELP}>
+                    <input
+                      type="checkbox"
+                      id="pace-absolute"
+                      checked={s.paceAbsolute}
+                      onChange={(e) => onChange({ paceAbsolute: e.target.checked })}
+                    />{" "}
+                    Clock axis while pacing
+                  </label>
+                </div>
+              )}
+
               {s.paceCursor && (
                 <div className="group">
                   <NumberField

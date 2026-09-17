@@ -382,6 +382,7 @@ export interface Prefs {
   collapseRests?: boolean;
   paceCursor?: boolean;
   paceLeadSec?: number;
+  paceAbsolute?: boolean;
   charMarkers?: boolean;
   runScores?: boolean;
   advancedGrading?: boolean;

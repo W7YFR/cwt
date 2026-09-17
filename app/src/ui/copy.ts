@@ -81,6 +81,14 @@ export const PACE_CURSOR_HELP =
   "about the recording changes — the cursor is a guide, not a gate, and " +
   "falling behind it costs nothing but the drift plot showing it afterwards.";
 
+export const PACE_ABSOLUTE_HELP =
+  "While a paced recording runs, show the chart on the clock and put your view " +
+  "back afterward. The cursor moves in real time and the per-character axis " +
+  "does not \u2014 it packs the slots evenly so the columns line up \u2014 so " +
+  "the two disagree about how far along you are. On the clock a second of " +
+  "silence is a second of chart. Off if you would rather the chart held still: " +
+  "it swaps at the moment your hand is on the paddle.";
+
 export const CHAR_MARKERS_HELP =
   "Draw each character as a fixed-width tick at the moment it starts, instead " +
   "of the dits and dahs inside it. The width carries nothing: what is being " +

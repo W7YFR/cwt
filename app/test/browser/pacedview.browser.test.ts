@@ -173,6 +173,27 @@ describe("the view while pacing", () => {
     expect(app.seen.length).toBeLessThan(4);
   });
 
+  it("puts back the view it took, not a view of its own", async () => {
+    /* You may have been in overlay. Coming back to per-character is the swap
+       happening twice — once to record against and once for no reason at all. */
+    const app = mount({ paceCursor: true, view: "overlay" });
+    await record();
+    expect(app.view()).toBe("absolute");
+    await stop();
+    expect(app.view()).toBe("overlay");
+  });
+
+  it("holds the chart still when the swap is turned off", async () => {
+    /* It moves the chart out from under you at the moment your hand is on the
+       paddle, and whether that is worth a cursor that agrees with itself is
+       not a call the app gets to make for somebody. */
+    const app = mount({ paceCursor: true, paceAbsolute: false, view: "per-char" });
+    await record();
+    expect(app.view()).toBe("per-char");
+    await stop();
+    expect(app.view()).toBe("per-char");
+  });
+
   it("leaves the view alone when nothing is pacing the chart", async () => {
     /* The flash card runs on the same schedule but never touches the chart, so
        it is no reason to take a view away from somebody. */

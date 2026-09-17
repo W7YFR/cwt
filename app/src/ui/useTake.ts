@@ -141,6 +141,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     collapseRests: p.collapseRests ?? base.collapseRests,
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
+    paceAbsolute: p.paceAbsolute ?? base.paceAbsolute,
     charMarkers: p.charMarkers ?? base.charMarkers,
     runScores: p.runScores ?? base.runScores,
     advancedGrading: p.advancedGrading ?? base.advancedGrading,
@@ -182,6 +183,7 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     collapseRests: prev.collapseRests,
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
+    paceAbsolute: prev.paceAbsolute,
     charMarkers: prev.charMarkers,
     runScores: prev.runScores,
     advancedGrading: prev.advancedGrading,
@@ -215,6 +217,7 @@ export function useTake(): TakeState {
       collapseRests: true,
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
+      paceAbsolute: true,
       charMarkers: false,
       /* On, because it is what a stack is for: several attempts side by side
          and which went better readable without clicking through them. */
@@ -291,6 +294,7 @@ export function useTake(): TakeState {
         collapseRests: next.collapseRests,
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
+        paceAbsolute: next.paceAbsolute,
         charMarkers: next.charMarkers,
         runScores: next.runScores,
         advancedGrading: next.advancedGrading,

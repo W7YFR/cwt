@@ -285,6 +285,19 @@ export interface ReviewSettings {
   paceCursor: boolean;
   /** Seconds of count-in before that cursor sets off. */
   paceLeadSec: number;
+  /** Show the clock axis while a paced recording runs, and put the view back
+   *  afterward.
+   *
+   * On by default, because the cursor and the per-character axis disagree by
+   * construction: the cursor moves in real time and that axis packs the slots
+   * evenly so the columns line up. On the clock a second of silence is a
+   * second of chart, and the two mean the same thing.
+   *
+   * A setting rather than a rule all the same. It moves the chart out from
+   * under you at the moment you have a hand on the paddle, and whether that is
+   * worth a cursor that agrees with itself is not something this can decide
+   * for somebody. */
+  paceAbsolute: boolean;
   /** Draw each character as one marker rather than as its dits and dahs. */
   charMarkers: boolean;
   /** Put each attempt's two scores in the gutter beside its name.

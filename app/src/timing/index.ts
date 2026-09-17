@@ -101,6 +101,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     collapseRests: true,
     paceCursor: false,
     paceLeadSec: PACE_LEAD_DEFAULT_SEC,
+    paceAbsolute: true,
     charMarkers: false,
     runScores: true,
     captionAll: false,

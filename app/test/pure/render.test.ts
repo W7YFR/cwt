@@ -591,6 +591,7 @@ describe("the pacing cursor's count-in", () => {
      simply appear on the beat — which is a count-in you cannot count along
      with. */
   const LEAD = 2;
+  const PPU_LEAD = 14;
   const review = reviewFrom(caseNamed(SLOPPY)).review;
 
   const withLead = (view: ViewMode, ppu: number) =>
@@ -614,6 +615,51 @@ describe("the pacing cursor's count-in", () => {
       leadSec: 0,
     });
     expect(zero).toEqual(plain);
+  });
+
+  it("keeps the two tracks on the same columns while it is reserved", () => {
+    /* Per-character is the view where this could go wrong on its own. The
+       target there is drawn from the columns every attempt shares, and each
+       attempt from its own items — and the count-in moves the items. Left
+       behind, the reference sat a whole count-in to the left of the sending it
+       is the reference for, and a view whose entire purpose is that the two
+       line up lined nothing up.
+
+       Pacing in this view is worth having: the axis is not a clock, but the
+       cursor still arrives on the character it is about. */
+    const cols = measureColumns([review.slots], PPU_LEAD);
+    const captions = (leadSec: number) => {
+      const layout = buildLayout(review, {
+        view: "per-char",
+        ppu: PPU_LEAD,
+        durationSec: review.take.durationSec,
+        columns: cols,
+        run: 0,
+        leadSec,
+        tailSec: leadSec,
+      });
+      const base = sceneFor(review, "per-char", PPU_LEAD, 9000);
+      const ctx = recordingCtx();
+      draw(ctx, {
+        ...base,
+        layout,
+        columns: cols,
+        leadSec,
+        runs: [{ ...base.runs[0]!, layout }],
+      });
+      const at = (y: number) =>
+        ctx.ofType("fillText").filter((c) => c.args[1] === y).map((c) => c.args[0]);
+      return { tgt: at(Y_TGT_LABEL + LABEL_H - CAP_CHAR), you: at(Y_YOU_LABEL + CAP_CHAR) };
+    };
+
+    const none = captions(0);
+    expect(none.tgt.length).toBeGreaterThan(2);
+    expect(none.tgt).toEqual(none.you);
+
+    const led = captions(LEAD);
+    expect(led.tgt).toEqual(led.you);
+    // And it really did move, or the two agreeing proves nothing.
+    expect(led.tgt[0]!).toBeGreaterThan(none.tgt[0]!);
   });
 
   it.each(VIEWS)("puts the first character a count-in further along (%s)", (view) => {
