@@ -14,6 +14,7 @@
 import { useCallback, useState } from "react";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
+import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import {
   ADVANCED_GRADING_HELP,
   CAPTION_ALL_HELP,
@@ -32,6 +33,7 @@ import {
   GAIN_HELP,
   PACE_ABSOLUTE_HELP,
   PACE_CURSOR_HELP,
+  TIMES_HELP,
   ZEN_MODE_HELP,
   ZEN_PACING_HELP,
   PACE_LEAD_HELP,
@@ -166,60 +168,81 @@ export function Controls(props: ControlsProps): React.ReactElement {
         />
       </div>
 
-      <div className="group grow">
-        <label htmlFor="expected">Intended message</label>
-        {/* Says what the box is FOR, which is the thing worth knowing when it
-            is empty: with nothing here there is no source of truth, so the
-            grade falls back to the decoder's own reading of you and the
-            accuracy figure is a meaningless 100%. It belongs in the
-            placeholder rather than beside the label — it is only on screen
-            while the box is empty, which is exactly when a placeholder is, and
-            text that appears and disappears next to a label has to wrap
-            somewhere the label does not. Inside the box it has a whole row to
-            itself and clips instead of reflowing the row above it. */}
-        {/* The clear button sits inside the box's right edge rather than
-            beside it: this group is the one that absorbs the row's slack, and
-            a button next to the field would take the room back from the only
-            thing that wanted it. */}
-        <div className="clearable">
-          <input
-            type="text"
-            id="expected"
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="The source of truth to grade against"
-            value={s.expected}
-            ref={expected.ref}
-            onChange={expected.onChange}
+      {/* The message and how many of it, on one line. A wrapper, because the
+          message group claims a whole row by itself — it is the one control
+          here whose useful width has no upper bound — so the two share a line
+          by being one item on it, with the box taking whatever the count
+          does not. */}
+      <div className="msgrow">
+        <div className="group grow">
+          <label htmlFor="expected">Intended message</label>
+          {/* Says what the box is FOR, which is the thing worth knowing when it
+              is empty: with nothing here there is no source of truth, so the
+              grade falls back to the decoder's own reading of you and the
+              accuracy figure is a meaningless 100%. It belongs in the
+              placeholder rather than beside the label — it is only on screen
+              while the box is empty, which is exactly when a placeholder is, and
+              text that appears and disappears next to a label has to wrap
+              somewhere the label does not. Inside the box it has a whole row to
+              itself and clips instead of reflowing the row above it. */}
+          {/* The clear button sits inside the box's right edge rather than
+              beside it: this group is the one that absorbs the row's slack, and
+              a button next to the field would take the room back from the only
+              thing that wanted it. */}
+          <div className="clearable">
+            <input
+              type="text"
+              id="expected"
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="The source of truth to grade against"
+              value={s.expected}
+              ref={expected.ref}
+              onChange={expected.onChange}
+            />
+            {s.expected !== "" && (
+              <button
+                type="button"
+                className="clearbtn"
+                data-testid="clear-expected"
+                aria-label="Clear intended message"
+                title="Clear"
+                onClick={() => {
+                  onChange({ expected: "" });
+                  expected.ref.current?.focus();
+                }}
+              >
+                {/* Drawn rather than typed. A glyph is placed by the font's
+                    own metrics — its ink sits above the baseline, not on the
+                    center line of the box around it — so an × centered as text
+                    reads as riding high in the field. A shape centers on the
+                    geometry. */}
+                <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false">
+                  <path
+                    d="M3.2 3.2 L8.8 8.8 M8.8 3.2 L3.2 8.8"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="group">
+          <NumberField
+            id="times"
+            name="Times"
+            unit=""
+            help={TIMES_HELP}
+            value={s.times}
+            min={TIMES_MIN}
+            max={TIMES_MAX}
+            step={1}
+            onChange={(v) => onChange({ times: v })}
           />
-          {s.expected !== "" && (
-            <button
-              type="button"
-              className="clearbtn"
-              data-testid="clear-expected"
-              aria-label="Clear intended message"
-              title="Clear"
-              onClick={() => {
-                onChange({ expected: "" });
-                expected.ref.current?.focus();
-              }}
-            >
-              {/* Drawn rather than typed. A glyph is placed by the font's
-                  own metrics — its ink sits above the baseline, not on the
-                  center line of the box around it — so an × centered as text
-                  reads as riding high in the field. A shape centers on the
-                  geometry. */}
-              <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true" focusable="false">
-                <path
-                  d="M3.2 3.2 L8.8 8.8 M8.8 3.2 L3.2 8.8"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          )}
         </div>
       </div>
 
@@ -240,6 +263,7 @@ function NumberField({
   id,
   name,
   unit,
+  spoken,
   help,
   value,
   min,
@@ -250,6 +274,9 @@ function NumberField({
   id: string;
   name: string;
   unit: string;
+  /** The unit said out loud, for the accessible name. Defaults to the symbol,
+   *  which is right for a word like "times" and wrong for "s". */
+  spoken?: string;
   help: string;
   value: number;
   min: number;
@@ -277,7 +304,7 @@ function NumberField({
            than the furniture and the number itself had nowhere to go. */
         style={{ width: `calc(${String(max).length}ch + 3em)` }}
         value={text ?? String(value)}
-        aria-label={`${name} in ${unit === "s" ? "seconds" : "milliseconds"}`}
+        aria-label={unit ? `${name} in ${spoken ?? unit}` : name}
         onChange={(e) => {
           setText(e.target.value);
           const v = Number(e.target.value);
@@ -287,7 +314,7 @@ function NumberField({
         // Back to showing what was actually committed, clamp included.
         onBlur={() => setText(null)}
       />
-      <span className="unit">{unit}</span>
+      {unit !== "" && <span className="unit">{unit}</span>}
     </label>
   );
 }
@@ -578,6 +605,7 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                     id="pace-lead"
                     name="Delay start"
                     unit="s"
+                    spoken="seconds"
                     help={PACE_LEAD_HELP}
                     value={s.paceLeadSec}
                     min={PACE_LEAD_MIN_SEC}
@@ -641,6 +669,7 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                     id="flash-lead"
                     name="Flash lead"
                     unit="ms"
+                    spoken="milliseconds"
                     help={FLASH_LEAD_HELP}
                     value={s.flashLeadMs}
                     min={FLASH_LEAD_MIN_MS}

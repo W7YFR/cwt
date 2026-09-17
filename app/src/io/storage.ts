@@ -379,6 +379,7 @@ export interface Prefs {
   farnsworthWpm?: number;
   expected?: string;
   view?: string;
+  times?: number;
   collapseRests?: boolean;
   paceCursor?: boolean;
   paceLeadSec?: number;

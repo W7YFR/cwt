@@ -144,6 +144,15 @@ export const PACE_LEAD_HELP =
   "count is time to get a hand back to the paddle, not a delay, and the dead " +
   "air at the front is trimmed off anyway.";
 
+export const TIMES_HELP =
+  "How many times you send the message in one take. The box above still holds " +
+  "one copy \u2014 that is what you are practicing, and typing it out five " +
+  "times to drill five of them is copying rather than practice. This is how " +
+  "many of them make up an attempt, so the target you hear, the row the chart " +
+  "draws and what your sending is graded against all carry that many, " +
+  "separated by a word gap. Repetition is most of how sending is practiced: " +
+  "the first pass is rarely the one that goes wrong.";
+
 export const GAIN_HELP =
   "Applied at playback only — the recording and any download stay at the level " +
   "you recorded.";

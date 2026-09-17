@@ -778,6 +778,29 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(zen().checked, "the next visit starts off").toBe(false);
   });
 
+  it("puts the repeat count beside the message, not under it", async () => {
+    /* The message group claims a whole row by itself — it is the only control
+       here whose useful width has no upper bound — so a small field after it
+       spends a whole band of the page on one number. Sharing the line, it also
+       has to stop where every other row stops: held to the groups' 130px
+       floor, the label stretched and left a hand's width of nothing between
+       the number and the edge. */
+    await served();
+    await mount();
+
+    const box = container.querySelector<HTMLElement>("#expected")!.getBoundingClientRect();
+    const times = container.querySelector<HTMLElement>("#times")!.getBoundingClientRect();
+    const row = container.querySelector<HTMLElement>(".msgrow")!.getBoundingClientRect();
+
+    // Beside it, on the same line.
+    expect(times.left, "to the right of the message").toBeGreaterThan(box.right);
+    expect(times.top).toBeLessThan(box.bottom);
+    expect(times.bottom).toBeGreaterThan(box.top);
+
+    // And nothing after it but the margin every other row keeps.
+    expect(times.right).toBeCloseTo(row.right, 0);
+  });
+
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.

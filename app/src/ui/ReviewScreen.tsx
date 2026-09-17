@@ -784,6 +784,7 @@ export function ReviewScreen({
       {settings.zenMode && recording && liveClock && (
         <ZenMode
           message={settings.expected}
+          times={settings.times}
           elapsed={liveClock}
           level={rec.level}
           busy={rec.busy}

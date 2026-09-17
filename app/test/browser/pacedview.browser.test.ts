@@ -222,6 +222,43 @@ describe("zen mode", () => {
     expect(app.view()).toBe("per-char");
   });
 
+  it("fits every pass on the sheet, at a size that reads", async () => {
+    /* The sheet exists so you never have to touch the page while sending, and
+       one you have to scroll is one you have to touch. Sized by arithmetic it
+       overflowed: the message wraps at a width that depends on the font the
+       browser actually picked, so a pass the formula counted as one line was
+       two. It is measured now, and this is the measurement.
+
+       Checked at the counts, not at one: the failure only appears once there
+       is more than fits at full size. */
+    for (const times of [1, 3, 8]) {
+      mount({ zenMode: true, times, expected: "CQ CQ DE W7YFR K" });
+      await record();
+
+      const text = sheet()!.querySelector<HTMLElement>(".zenmessage")!;
+      const passes = text.querySelectorAll<HTMLElement>(".zenpass");
+      expect(passes.length, `${times} passes drawn`).toBe(times);
+      expect(
+        text.scrollHeight,
+        `${times} passes fit without scrolling`,
+      ).toBeLessThanOrEqual(text.clientHeight + 1);
+
+      /* And they read as separate passes. A long message wraps, so the space
+         between two passes has to be bigger than the space inside one — packed
+         tighter, the whole thing is a block of text with no way to see where a
+         pass ends. */
+      if (times > 1) {
+        const gap = passes[1]!.getBoundingClientRect().top
+          - passes[0]!.getBoundingClientRect().bottom;
+        const line = parseFloat(getComputedStyle(text).lineHeight)
+          - parseFloat(getComputedStyle(text).fontSize);
+        expect(gap, `${times} passes are told apart`).toBeGreaterThan(line);
+      }
+
+      await stop();
+    }
+  });
+
   it("stops the take from where the sheet puts the button", async () => {
     /* The sheet is over the record bar, so the bar's own Stop is unreachable.
        Pressed here through the same name, which is what makes this a test of

@@ -279,6 +279,16 @@ export interface ReviewSettings {
   farnsworthWpm: number;
   tolerance: number;
   expected: string;
+  /** How many times the intended message is sent in one take.
+   *
+   * The message itself stays a single instance — it is what you are practicing
+   * and it is what the box shows. This is how many of them make up one
+   * attempt, and it applies wherever the target is REALIZED: the audio you
+   * play, the row the chart draws, the pacing schedule, and what your sending
+   * is graded against. Repetition is most of how sending is practiced, and
+   * typing a callsign out five times to grade five of them is copying, not
+   * practice. */
+  times: number;
   collapseRests: boolean;
   /** Run a pacing cursor along the target track while recording. Off by
    *  default: it is a practice aid, not a way of reading the chart. */

@@ -16,13 +16,28 @@
  * spending the rest of the recording path already declines.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import { passCount } from "@/timing";
 import { fmtElapsed } from "./format";
 import { LevelMeter } from "./Record";
 
+/** The type never goes below this, however many passes are asked for: past it
+ *  the sheet stops being something you can read at a glance, which is the only
+ *  thing it is for. Under that it scrolls, which is the better failure. */
+const MIN_PX = 16;
+const MAX_PX = 104;
+
 export interface ZenModeProps {
-  /** The message being sent, already upper-cased by the session. */
+  /** The message being sent, already upper-cased by the session. One
+   *  instance, as everywhere else it is read. */
   readonly message: string;
+  /** How many passes of it make up this take.
+   *
+   * Drawn as that many lines rather than as one repeated string: what is on
+   * screen is what you are about to send, and run together you cannot see
+   * where one pass ends and the next begins — which is the one thing about a
+   * repeat you need to be able to see. */
+  readonly times: number;
   /** The recorder's clock, read per frame while one is running. */
   readonly elapsed: () => number;
   /** Input level, 0 to 1. The one thing this sheet covers that cannot be
@@ -39,6 +54,7 @@ export interface ZenModeProps {
 
 export function ZenMode({
   message,
+  times,
   elapsed,
   level,
   busy,
@@ -46,7 +62,12 @@ export function ZenMode({
   onRestart,
   onDiscard,
 }: ZenModeProps): React.ReactElement {
+  /* One entry per pass, counted by the same function the target's own repeat
+     counts with — so the sheet and the audio cannot disagree about how many
+     there are. */
+  const passes = Array.from({ length: passCount(times) }, (_, i) => i);
   const box = useRef<HTMLDivElement>(null);
+  const text = useRef<HTMLDivElement>(null);
   const clock = useRef<HTMLSpanElement>(null);
 
   /* Focus the sheet itself, not a button. Enter finishes the take from
@@ -55,6 +76,42 @@ export function ZenMode({
   useEffect(() => {
     box.current?.focus();
   }, []);
+
+  /* Type as large as fits, found by measuring rather than by arithmetic.
+   *
+   * Three things decide whether it fits — how many passes, how long the
+   * message is, and how wide the window is — and only the first two are
+   * knowable in CSS. Every formula tried against the real thing failed
+   * somewhere: the message wraps at a width that depends on the font the
+   * browser actually picked, and a wrapped pass is two lines where the
+   * arithmetic counted one. So this asks the box.
+   *
+   * A binary search over the size, eight steps, on open and on resize. Not per
+   * frame and not while you send: nothing here changes once the sheet is up.
+   */
+  useLayoutEffect(() => {
+    const el = text.current;
+    if (!el) return;
+
+    const fit = () => {
+      let low = MIN_PX;
+      let high = MAX_PX;
+      for (let step = 0; step < 8; step++) {
+        const mid = (low + high) / 2;
+        el.style.fontSize = `${mid}px`;
+        // Vertical only: wrapping is allowed, and a wrapped pass shows up here
+        // as the extra height it costs.
+        if (el.scrollHeight <= el.clientHeight) low = mid;
+        else high = mid;
+      }
+      el.style.fontSize = `${low}px`;
+    };
+
+    fit();
+    const watch = new ResizeObserver(fit);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [message, times]);
 
   useEffect(() => {
     let raf = 0;
@@ -86,9 +143,22 @@ export function ZenMode({
             document by the recorder, so they answer here exactly as they do
             behind this sheet — which is the point: your hand is on a paddle,
             not on this dialog. */}
-        <p className="zenmessage" data-testid="zen-message">
-          {message || <span className="zennothing">No message set for this session</span>}
-        </p>
+        {/* Sized to fit — see the effect above. */}
+        <div
+          className="zenmessage"
+          data-testid="zen-message"
+          ref={text}
+        >
+          {message ? (
+            passes.map((_, at) => (
+              <p className="zenpass" key={at}>
+                {message}
+              </p>
+            ))
+          ) : (
+            <p className="zennothing">No message set for this session</p>
+          )}
+        </div>
 
         <div className="zenfoot">
           {/* No waiting/sending states on this one: there is no count-in in

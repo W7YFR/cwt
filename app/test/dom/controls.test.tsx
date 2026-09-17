@@ -14,7 +14,7 @@ import {
   Controls,
   ViewControls,
 } from "@/ui/Controls";
-import { defaultSettings } from "@/timing";
+import { defaultSettings, TIMES_MAX, TIMES_MIN } from "@/timing";
 import { PACE_LEAD_MAX_SEC } from "@/render/geometry";
 import type { ReviewSettings } from "@/types";
 import { caseNamed, SLOPPY } from "../fixture";
@@ -169,6 +169,27 @@ describe("controls", () => {
       />,
     );
     expect(widthsFor(wide.container)).toEqual(narrowWidths);
+  });
+
+  it("commits a repeat count, clamped to what can be built", () => {
+    /* The field is held as text while it is being edited, so what is under
+       test is what gets COMMITTED — typing past the ceiling has to settle at
+       the ceiling rather than at whatever was typed. */
+    const seen: ReviewSettings[] = [];
+    render(<Harness onSettings={(s) => seen.push(s)} />);
+    const times = document.getElementById("times") as HTMLInputElement;
+
+    fireEvent.change(times, { target: { value: "3" } });
+    expect(seen.at(-1)!.times).toBe(3);
+
+    fireEvent.change(times, { target: { value: "999" } });
+    expect(seen.at(-1)!.times).toBe(TIMES_MAX);
+
+    fireEvent.change(times, { target: { value: "0" } });
+    expect(seen.at(-1)!.times).toBe(TIMES_MIN);
+
+    // And the message it repeats is untouched by any of it.
+    expect(seen.at(-1)!.expected).toBe(seen[0]!.expected);
   });
 
   it("will not let the overall speed exceed the character speed", () => {

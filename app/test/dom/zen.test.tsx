@@ -33,7 +33,7 @@ describe("the zen sheet", () => {
     const user = userEvent.setup();
     const acts = { onFinish: vi.fn(), onRestart: vi.fn(), onDiscard: vi.fn() };
     render(
-      <ZenMode message="CQ DE W7YFR" elapsed={() => 0} level={0} busy={false} {...acts} />,
+      <ZenMode message="CQ DE W7YFR" times={1} elapsed={() => 0} level={0} busy={false} {...acts} />,
     );
 
     for (const [handle, fired] of [
@@ -46,10 +46,55 @@ describe("the zen sheet", () => {
     }
   });
 
+  it("shows every pass it is asking for, as passes", () => {
+    /* Run together as one string you cannot see where a pass ends, which is
+       the one thing about a repeat worth seeing. */
+    render(
+      <ZenMode
+        message="CQ DE W7YFR"
+        times={4}
+        elapsed={() => 0}
+        level={0}
+        busy={false}
+        onFinish={vi.fn()}
+        onRestart={vi.fn()}
+        onDiscard={vi.fn()}
+      />,
+    );
+    const passes = screen.getByTestId("zen-message").querySelectorAll(".zenpass");
+    expect(passes.length).toBe(4);
+    for (const pass of passes) expect(pass.textContent).toBe("CQ DE W7YFR");
+  });
+
+  it("never draws fewer passes than one", () => {
+    // Clamped the way the target's own repeat is, so the sheet and the audio
+    // cannot disagree about how many there are.
+    for (const times of [0, -2, 0.5, Number.NaN]) {
+      const view = render(
+        <ZenMode
+          message="CQ"
+          times={times}
+          elapsed={() => 0}
+          level={0}
+          busy={false}
+          onFinish={vi.fn()}
+          onRestart={vi.fn()}
+          onDiscard={vi.fn()}
+        />,
+      );
+      expect(
+        view.container.querySelectorAll(".zenpass").length,
+        `times ${times}`,
+      ).toBe(1);
+      view.unmount();
+    }
+  });
+
   it("shows the message it is covering the page for", () => {
     render(
       <ZenMode
         message="CQ DE W7YFR"
+        times={1}
         elapsed={() => 0}
         level={0}
         busy={false}
@@ -65,6 +110,7 @@ describe("the zen sheet", () => {
     render(
       <ZenMode
         message=""
+        times={1}
         elapsed={() => 0}
         level={0}
         busy={false}
@@ -81,6 +127,7 @@ describe("the zen sheet", () => {
     render(
       <ZenMode
         message="CQ"
+        times={1}
         elapsed={() => 0}
         level={0}
         busy
@@ -105,6 +152,7 @@ describe("the zen sheet", () => {
       return (
         <ZenMode
           message="CQ DE W7YFR"
+          times={1}
           elapsed={() => rec.recorder!.elapsed()}
           level={rec.level}
           busy={rec.busy}

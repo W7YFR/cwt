@@ -473,6 +473,22 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    sentence somebody typed, it is the widest thing on the row, and sharing a
    line it was what everything else's width was negotiated against. */
 .group.grow { flex: 1 1 100%; }
+/* The message and the count it is sent, on the line the message would have
+   taken alone. Same gap as the row above, so the pair reads as two controls in
+   that row rather than as a thing of its own; stretched, so the count's field
+   lands on the message box's own center line the way the two-band scheme puts
+   everything else there. */
+.msgrow {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 10px 22px;
+}
+/* The 130px floor above is for a group carrying a caption over a control, and
+   this one is a two-word label beside a two-digit box. Held to it, the label
+   stretched and left a hand's width of nothing between the number and the edge
+   of the page. */
+.msgrow .group:not(.grow) { min-width: 0; flex: 0 0 auto; }
 .group .caption,
 .group label {
   font-size: 11px;
@@ -1140,19 +1156,38 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   overflow-y: auto;
   margin: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* Wider than the 1.35 line-height inside a pass, and that is the point: a
+     long message wraps, and with the passes packed tighter than their own
+     wrapped lines the whole thing read as one block of text with no way to see
+     where a pass ended. */
+  gap: .7em;
   text-align: center;
   /* Wide word spacing: what is being read here is one character at a time and
      the word boundaries are what you key differently. */
   word-spacing: .5em;
   letter-spacing: .06em;
   line-height: 1.35;
-  font-size: clamp(32px, 7vw, 104px);
+  /* Set by the component, which measures. Whether the passes fit depends on
+     how many there are, how long the message is, and how wide the window is,
+     and the message wraps at a width that depends on the font the browser
+     actually picked — so no expression here can be right for all three. This
+     is the starting point it searches down from. */
+  font-size: 104px;
   font-weight: 600;
   color: var(--ink);
 }
-.zennothing { font-size: 15px; font-weight: 400; color: var(--ink-faint); }
+.zenpass { margin: 0; }
+.zennothing {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: normal;
+  word-spacing: normal;
+  color: var(--ink-faint);
+}
 
 .zenfoot {
   display: flex;

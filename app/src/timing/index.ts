@@ -32,9 +32,50 @@ export * from "./timeline";
  *   4. grade, which reads only `targetKind`.
  * Swapping 2 and 3 would have the pairing read classes the pairing itself
  * produced. */
+/** How many times one message may make up a take.
+ *
+ * The ceiling is about what the browser is asked to do rather than about
+ * practice: every repeat is more target audio to synthesize and more chart to
+ * draw, and the whole target is built at once. Twenty passes of a callsign is
+ * already a long drill. */
+export const TIMES_MIN = 1;
+export const TIMES_MAX = 20;
+
+/** The message as it will actually be sent: one instance, or several.
+ *
+ * Joined by a single space, which the ideal timeline reads as a word gap —
+ * the same silence that separates the words inside it, because that is what a
+ * repeat sounds like. There is nothing else it could be: a gap longer than a
+ * word gap is a rest, which is not graded, and a shorter one would say the
+ * last character of one pass and the first of the next belong to one word.
+ *
+ * Only ever applied to a message you supplied. With the box empty the target
+ * falls back to your own decode, and repeating THAT would claim you meant to
+ * send, five times, whatever came out once. */
+/** How many passes a setting actually asks for.
+ *
+ * Shared, so the audio, the grading and the sheet you read while sending
+ * cannot disagree about it. They did: the obvious clamp is
+ * `Math.max(1, Math.floor(times))`, which for a NaN is NaN — harmless where it
+ * was compared against 1, and an empty sheet where it was used as a length. */
+export function passCount(times: number): number {
+  return Number.isFinite(times) ? Math.min(Math.max(Math.floor(times), TIMES_MIN), TIMES_MAX) : TIMES_MIN;
+}
+
+export function targetText(expected: string, times: number): string {
+  const one = expected.trim();
+  const n = passCount(times);
+  return one && n > 1 ? Array.from({ length: n }, () => one).join(" ") : one;
+}
+
 export function reviewTake(take: Take, settings: ReviewSettings): Review {
   const ref = targetTiming(settings.charWpm, settings.farnsworthWpm);
-  const expected = settings.expected.trim();
+  /* The one place the repeat is applied. Everything downstream of here — the
+     ideal timeline, the row the chart draws, the audio the player synthesizes
+     from it, the pacing schedule, and the text the decode is compared against
+     — reads this rather than the box, so none of them has to know the setting
+     exists. */
+  const expected = targetText(settings.expected, settings.times);
 
   const actual = buildTimeline(
     take.segments,
@@ -98,6 +139,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     farnsworthWpm: take.target.farnsworthWpm,
     tolerance: 0.3,
     expected: take.expected ?? take.decoded,
+    times: 1,
     collapseRests: true,
     paceCursor: false,
     paceLeadSec: PACE_LEAD_DEFAULT_SEC,
