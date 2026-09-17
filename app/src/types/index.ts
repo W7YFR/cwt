@@ -79,6 +79,16 @@ export type BlockKind =
   | "pause";
 
 /** The five classes that actually get graded, in report order. */
+/** The `source` of a take captured through the microphone. A sentinel rather
+ *  than a label: the header hides it, because it says the same thing every
+ *  time, but a download still needs a filename stem.
+ *
+ * Here rather than with the rest of the take-building because `timing` has to
+ * tell a recording from a file — a setting about what you are ABOUT to send
+ * cannot apply to audio that was sent before the app saw it — and `io` already
+ * imports `timing`. */
+export const MIC_SOURCE = "microphone";
+
 export const GRADED_KINDS = [
   "dit",
   "dah",

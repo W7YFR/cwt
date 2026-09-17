@@ -80,7 +80,9 @@ times to drill five of them is copying rather than practice. Everything the
 target is realized as carries that many, separated by a word gap: the audio you
 play, the row the chart draws, the pacing schedule, and what your sending is
 graded against. Repetition is most of how sending is practiced, and the first
-pass is rarely the one that goes wrong.
+pass is rarely the one that goes wrong. It applies only to takes you key: a
+recording opened from disk holds whatever it holds, so the control is barred
+and the grading ignores it.
 
 A session is several attempts at **one message at one speed** — that's what
 makes the rows comparable. **New session** is where those change; the intended

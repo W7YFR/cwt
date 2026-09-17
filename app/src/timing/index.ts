@@ -7,7 +7,15 @@
  */
 
 import { FLASH_LEAD_DEFAULT_MS, PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
-import type { Review, ReviewSettings, Segment, Take, Timeline, Timing } from "@/types";
+import {
+  MIC_SOURCE,
+  type Review,
+  type ReviewSettings,
+  type Segment,
+  type Take,
+  type Timeline,
+  type Timing,
+} from "@/types";
 import { compareText } from "./align";
 import { grade } from "./grade";
 import { pair, retarget } from "./pair";
@@ -74,8 +82,16 @@ export function reviewTake(take: Take, settings: ReviewSettings): Review {
      ideal timeline, the row the chart draws, the audio the player synthesizes
      from it, the pacing schedule, and the text the decode is compared against
      — reads this rather than the box, so none of them has to know the setting
-     exists. */
-  const expected = targetText(settings.expected, settings.times);
+     exists.
+
+     And not for a file. `times` says how many passes you are ABOUT to send,
+     which is a fact about a take being made; a recording opened from disk
+     holds whatever it holds, and grading one pass of it against five is a
+     failing score for something the operator never did. Barred in the panel
+     too, but decided here, so it cannot come back by the setting being changed
+     while the file is on screen. */
+  const passes = take.source === MIC_SOURCE ? settings.times : 1;
+  const expected = targetText(settings.expected, passes);
 
   const actual = buildTimeline(
     take.segments,

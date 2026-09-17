@@ -706,6 +706,7 @@ export function ReviewScreen({
         playing={playing}
         clock={clock}
         canPlayYou={!blank}
+        fromFile={loaded.take.source !== MIC_SOURCE}
         onPlayYou={() => void playYou()}
         onPlayTarget={() => playTarget()}
         onStop={stop}

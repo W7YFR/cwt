@@ -33,6 +33,7 @@ import {
   GAIN_HELP,
   PACE_ABSOLUTE_HELP,
   PACE_CURSOR_HELP,
+  TIMES_FILE_HELP,
   TIMES_HELP,
   ZEN_MODE_HELP,
   ZEN_PACING_HELP,
@@ -56,6 +57,10 @@ export interface ControlsProps {
   /** False when there is no recording to play — see `blankTake`. */
   canPlayYou: boolean;
   clock: number | null;
+  /** This session was opened from a file rather than keyed. A file holds
+   *  whatever it holds, so how many passes you are about to send is not a
+   *  question about it. */
+  fromFile: boolean;
   onPlayYou(): void;
   onPlayTarget(): void;
   onStop(): void;
@@ -231,16 +236,21 @@ export function Controls(props: ControlsProps): React.ReactElement {
           </div>
         </div>
 
+        {/* Barred rather than hidden for a file. Gone, the row reflows and the
+            message box grows the moment a file is opened, which reads as the
+            page having changed its mind about something. Barred, it says what
+            it is: a question that does not apply to this take. */}
         <div className="group">
           <NumberField
             id="times"
             name="Times"
             unit=""
-            help={TIMES_HELP}
+            help={props.fromFile ? TIMES_FILE_HELP : TIMES_HELP}
             value={s.times}
             min={TIMES_MIN}
             max={TIMES_MAX}
             step={1}
+            disabled={props.fromFile}
             onChange={(v) => onChange({ times: v })}
           />
         </div>
@@ -269,11 +279,13 @@ function NumberField({
   min,
   max,
   step,
+  disabled,
   onChange,
 }: {
   id: string;
   name: string;
   unit: string;
+  disabled?: boolean;
   /** The unit said out loud, for the accessible name. Defaults to the symbol,
    *  which is right for a word like "times" and wrong for "s". */
   spoken?: string;
@@ -286,7 +298,7 @@ function NumberField({
 }): React.ReactElement {
   const [text, setText] = useState<string | null>(null);
   return (
-    <label className="field row" title={help}>
+    <label className="field row" data-disabled={disabled === true} title={help}>
       <span className="fieldname">{name}</span>
       <input
         type="number"
@@ -294,6 +306,7 @@ function NumberField({
         min={min}
         max={max}
         step={step}
+        disabled={disabled === true}
         /* Sized by the widest number it can hold, so a field in seconds and a
            field in milliseconds are not the same box with three empty digits
            in one of them.

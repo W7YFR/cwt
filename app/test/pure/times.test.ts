@@ -11,7 +11,9 @@
 import { describe, expect, it } from "vitest";
 import { reviewTake, targetText } from "@/timing";
 import { buildJsonReport } from "@/io/report";
-import { caseNamed, reviewFrom, takeFrom, SLOPPY } from "../fixture";
+import { MIC_SOURCE, type Take } from "@/types";
+import { defaultSettings } from "@/timing";
+import { caseNamed, takeFrom, SLOPPY } from "../fixture";
 
 describe("targetText", () => {
   it("joins the passes with the gap that separates words", () => {
@@ -40,8 +42,18 @@ describe("targetText", () => {
 });
 
 describe("a take sent more than once", () => {
-  const take = takeFrom(caseNamed(SLOPPY));
-  const at = (times: number) => reviewFrom(caseNamed(SLOPPY), { expected: "CQ DE W7YFR", times });
+  /* Keyed, not opened. The oracle fixtures carry their own filename as the
+     source, which is exactly the case `times` does not apply to — so a take
+     that repeats has to say it came through the microphone. */
+  const take: Take = { ...takeFrom(caseNamed(SLOPPY)), source: MIC_SOURCE };
+  const at = (times: number) => {
+    const settings = {
+      ...defaultSettings(take),
+      expected: "CQ DE W7YFR",
+      times,
+    };
+    return { settings, review: reviewTake(take, settings) };
+  };
 
   it("builds a target that long, and grades against it", () => {
     const one = at(1).review;
@@ -75,6 +87,21 @@ describe("a take sent more than once", () => {
     const report = buildJsonReport(review, settings);
     expect(report.review.times).toBe(5);
     expect(report.review.expected).toBe("CQ DE W7YFR");
+  });
+
+  it("does not repeat a recording opened from disk", () => {
+    /* The bug this exists to stop: `times` says how many passes you are ABOUT
+       to send. A file holds whatever it holds, so grading one pass of it
+       against five is a failing score for something nobody did. */
+    const opened: Take = { ...take, source: "cq-de-w7yfr.wav" };
+    const settings = { ...defaultSettings(opened), expected: "CQ DE W7YFR", times: 5 };
+
+    const graded = reviewTake(opened, settings);
+    const once = reviewTake(opened, { ...settings, times: 1 });
+
+    expect(graded.ideal.duration).toBe(once.ideal.duration);
+    expect(graded.comparison!.nExpected).toBe(once.comparison!.nExpected);
+    expect(graded.comparison!.accuracy).toBe(once.comparison!.accuracy);
   });
 
   it("changes nothing at all when it is one", () => {

@@ -153,6 +153,12 @@ export const TIMES_HELP =
   "separated by a word gap. Repetition is most of how sending is practiced: " +
   "the first pass is rarely the one that goes wrong.";
 
+export const TIMES_FILE_HELP =
+  "Not for a recording opened from disk. It says how many passes you are " +
+  "about to send, and a file holds whatever it already holds \u2014 grading " +
+  "one pass of it against five would be a failing score for something nobody " +
+  "did.";
+
 export const GAIN_HELP =
   "Applied at playback only — the recording and any download stay at the level " +
   "you recorded.";

@@ -549,6 +549,16 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    can, and the only way to learn otherwise is to click it and watch nothing
    happen. The tooltip on the label says which setting is doing the barring. */
 .group label.check:has(input:disabled) { opacity: .45; cursor: default; }
+/* Same for a number field barred by what the session is. Dimmed as a whole
+   rather than just the box: the name beside it is half of what is barred, and
+   a bright caption over a dead input reads as a control that failed. */
+.group label.field[data-disabled="true"] { opacity: .45; cursor: default; }
+/* And the label is what the pointer lands on, so the tooltip saying WHY it is
+   barred is the label's own rather than something the browser has to find by
+   walking up from a disabled control. Left alone, the input is the hit target
+   and whether a title is inherited off one is not a thing to depend on — a
+   control that is barred for a reason has to be able to give the reason. */
+.group label.field[data-disabled="true"] input { pointer-events: none; }
 /* A label beside its box rather than above it, in a row of captions above
    theirs. It is a caption all the same, so it is set like one — without this
    it inherits the wizard's larger body size and reads as a different kind of

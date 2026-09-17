@@ -23,9 +23,12 @@ import { takeFrom } from "../fixture";
 function Harness({
   initial,
   onSettings,
+  fromFile,
 }: {
   initial?: Partial<ReviewSettings>;
   onSettings?: (s: ReviewSettings) => void;
+  /** This session was opened from a file rather than keyed. */
+  fromFile?: boolean;
 }) {
   const take = takeFrom(caseNamed(SLOPPY));
   const [settings, setSettings] = useState<ReviewSettings>({
@@ -47,6 +50,7 @@ function Harness({
       }
       playing={null}
       canPlayYou
+      fromFile={fromFile === true}
       clock={null}
       onPlayYou={() => {}}
       onPlayTarget={() => {}}
@@ -190,6 +194,33 @@ describe("controls", () => {
 
     // And the message it repeats is untouched by any of it.
     expect(seen.at(-1)!.expected).toBe(seen[0]!.expected);
+  });
+
+  it("does not ask how many passes a file holds", () => {
+    /* `times` says how many you are ABOUT to send, and a file was sent before
+       the app saw it. The grading ignores it either way — this is the control
+       saying so rather than sitting there apparently set to five. */
+    const keyed = render(<Harness />);
+    const offered = document.getElementById("times") as HTMLInputElement;
+    expect(offered, "offered for a take you key").toBeEnabled();
+    const keyedTitle = offered.closest("label")!.getAttribute("title");
+    keyed.unmount();
+
+    render(<Harness fromFile />);
+    const times = document.getElementById("times") as HTMLInputElement;
+    expect(times, "barred for one you opened").toBeDisabled();
+
+    /* And it says why. A control barred for a reason has to be able to give
+       the reason — the two states are different sentences, not the same one
+       with the box greyed. */
+    const barred = times.closest("label")!.getAttribute("title");
+    expect(barred, "the barred field explains itself").toBeTruthy();
+    expect(barred, "and not with the copy for a take you key").not.toBe(
+      keyedTitle,
+    );
+    /* What it would grade as is the pure tier's question — `fireEvent.change`
+       dispatches straight at the element, so a disabled input answers it here
+       and would not in a browser. */
   });
 
   it("will not let the overall speed exceed the character speed", () => {
@@ -386,6 +417,7 @@ describe("controls", () => {
       settings: base,
       onChange: () => {},
       canPlayYou: true,
+      fromFile: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
@@ -403,6 +435,7 @@ describe("controls", () => {
       settings: defaultSettings(take),
       onChange: () => {},
       canPlayYou: true,
+      fromFile: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},
@@ -424,6 +457,7 @@ describe("controls", () => {
       onChange: () => {},
       playing: null,
       canPlayYou: true,
+      fromFile: false,
       clock: null,
       onPlayYou: () => {},
       onPlayTarget: () => {},

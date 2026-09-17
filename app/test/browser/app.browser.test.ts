@@ -801,6 +801,35 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(times.right).toBeCloseTo(row.right, 0);
   });
 
+  it("lets the pointer reach the reason a barred field is barred", async () => {
+    /* The title was already on the label and already said why. What it was not
+       was reachable: the disabled input is the hit target, and whether a
+       browser walks up from a disabled control to find an ancestor's tooltip is
+       not a thing to depend on. A control barred for a reason has to be able to
+       give the reason. */
+    await served();
+    await mount();
+
+    const times = container.querySelector<HTMLInputElement>("#times")!;
+    const label = times.closest("label")!;
+    const at = () => {
+      const box = times.getBoundingClientRect();
+      return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    };
+
+    /* This session was opened from a recording, which is the case the field is
+       barred for. The label is what the pointer lands on, and the label is
+       where the tooltip is. */
+    expect(times.disabled, "an opened recording bars it").toBe(true);
+    expect(at(), "the label takes the pointer").toBe(label);
+    expect(label.getAttribute("title"), "and carries the reason").toBeTruthy();
+
+    // Offered, the box itself is what you point at — it is a control again.
+    times.disabled = false;
+    label.setAttribute("data-disabled", "false");
+    expect(at(), "the box takes the pointer").toBe(times);
+  });
+
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.
