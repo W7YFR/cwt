@@ -189,8 +189,9 @@ export const SHOW_DOWNLOADS_HELP =
   "chart as a PNG, and every number on the page as JSON.";
 
 export const SHOW_HINTS_HELP =
-  "The two notes under the chart: what clicking, scrolling and dragging do, " +
-  "and which keys work. The color key stays either way.";
+  "The notes saying what clicking, scrolling and dragging do, which keys " +
+  "work, and what hovering a deviation gets you. The color key stays either " +
+  "way \u2014 it is a legend, not an instruction.";
 
 export const SHOW_RUNS_HELP =
   "How many of the session\u2019s attempts the chart draws. All of them is " +

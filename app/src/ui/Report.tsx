@@ -16,6 +16,11 @@ import { CLASS_HELP, CLASS_LABEL, DEVIATION_NOTE, DEVIATION_SCOPE_NOTE } from ".
 export interface ReportProps {
   review: Review;
   tolerance: number;
+  /** Show the note saying what hovering and clicking a value do. The same
+   *  switch the two notes under the chart are on: it is the same kind of
+   *  thing, and one instruction that stays after you have turned the others
+   *  off is furniture. */
+  showHints: boolean;
   onPlayDeviation(side: "you" | "tgt", idx: number, kind: Focus["kind"]): void;
   onFocus(focus: Focus | null): void;
 }
@@ -39,6 +44,7 @@ function ClassCell({
 export function Report({
   review,
   tolerance,
+  showHints,
   onPlayDeviation,
   onFocus,
 }: ReportProps): React.ReactElement {
@@ -171,7 +177,11 @@ export function Report({
                 })}
               </tbody>
             </table>
-            <p className="note">{DEVIATION_SCOPE_NOTE}</p>
+            {showHints && (
+              <p className="note" data-testid="deviation-hint">
+                {DEVIATION_SCOPE_NOTE}
+              </p>
+            )}
           </>
         ) : (
           <p className="note empty">

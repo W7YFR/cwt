@@ -19,6 +19,7 @@ describe("the report", () => {
       <Report
         review={review}
         tolerance={settings.tolerance}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={() => {}}
       />,
@@ -37,6 +38,7 @@ describe("the report", () => {
       <Report
         review={review}
         tolerance={settings.tolerance}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={() => {}}
       />,
@@ -58,6 +60,7 @@ describe("the report", () => {
       <Report
         review={review}
         tolerance={settings.tolerance}
+        showHints
         onPlayDeviation={(side, idx, kind) => played.push([side, idx, kind])}
         onFocus={() => {}}
       />,
@@ -81,6 +84,7 @@ describe("the report", () => {
       <Report
         review={review}
         tolerance={settings.tolerance}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={onFocus}
       />,
@@ -107,6 +111,7 @@ describe("the report", () => {
       <Report
         review={clean}
         tolerance={cleanSettings.tolerance}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={() => {}}
       />,
@@ -123,6 +128,7 @@ describe("the report", () => {
       <Report
         review={withText}
         tolerance={0.3}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={() => {}}
       />,
@@ -134,6 +140,7 @@ describe("the report", () => {
       <Report
         review={noText}
         tolerance={0.3}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={() => {}}
       />,
@@ -157,6 +164,7 @@ describe("the report", () => {
         <Report
           review={blank(expected)}
           tolerance={0.3}
+          showHints
           onPlayDeviation={() => {}}
           onFocus={() => {}}
         />,
@@ -185,6 +193,7 @@ describe("the report", () => {
       <Report
         review={review}
         tolerance={0.3}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={() => {}}
       />,
@@ -201,6 +210,7 @@ describe("the report", () => {
       <Report
         review={rested}
         tolerance={0.3}
+        showHints
         onPlayDeviation={() => {}}
         onFocus={() => {}}
       />,

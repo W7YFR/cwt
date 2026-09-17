@@ -363,14 +363,23 @@ const showDownloads = () => tickSetting("show-downloads");
        are instructions, and an instruction is furniture once you know it. */
     await served();
     await mount();
-    const howto = () => container.querySelector(".legend.howto");
-    const keys = () => container.querySelector("[data-testid='hotkeys']");
-    expect(howto()).not.toBeNull();
-    expect(keys()).not.toBeNull();
+    /* Every note the switch covers, wherever it sits on the page. The one over
+       the deviations is down in the report rather than under the chart, and
+       being somewhere else is no reason for it to be the one instruction that
+       stays after you have turned instructions off. */
+    const notes = {
+      howto: () => container.querySelector(".legend.howto"),
+      keys: () => container.querySelector("[data-testid='hotkeys']"),
+      deviations: () => container.querySelector("[data-testid='deviation-hint']"),
+    };
+    for (const [what, at] of Object.entries(notes)) {
+      expect(at(), `${what} is shown`).not.toBeNull();
+    }
 
     await tickSetting("show-hints");
-    expect(howto()).toBeNull();
-    expect(keys()).toBeNull();
+    for (const [what, at] of Object.entries(notes)) {
+      expect(at(), `${what} goes with them`).toBeNull();
+    }
     // The swatches stay: that is what the colors on the chart mean.
     expect(container.querySelector(".legend .sw")).not.toBeNull();
   });

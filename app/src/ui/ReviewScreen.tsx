@@ -891,6 +891,7 @@ export function ReviewScreen({
         <Report
           review={review}
           tolerance={settings.tolerance}
+          showHints={settings.showHints}
           onPlayDeviation={playDeviation}
           onFocus={setFocus}
         />
