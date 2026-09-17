@@ -800,8 +800,6 @@ export function ReviewScreen({
       {settings.flashCard && !settings.zenMode && (
         <FlashCard
           beats={beats}
-          cue={settings.flashCue}
-          leadSec={settings.flashLeadMs / 1000}
           elapsed={liveClock}
           words={settings.wordPreview ? words : EMPTY_WORDS}
         />

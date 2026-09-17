@@ -382,12 +382,6 @@ export interface ReviewSettings {
   zenMode: boolean;
   /** Show the next character to send, large, with a countdown to it. */
   flashCard: boolean;
-  /** Flash that card on the beat. Separate from showing it: the card is a
-   *  reference you glance at, the flash is a cue you react to. */
-  flashCue: boolean;
-  /** How far ahead of the beat the flash fires, milliseconds — your reaction
-   *  time, which is yours. */
-  flashLeadMs: number;
   /** Spell the word being sent under the card, greening each letter as it
    *  passes. The card alone says nothing about where a word ends. */
   wordPreview: boolean;

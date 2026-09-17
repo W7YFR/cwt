@@ -1,4 +1,4 @@
-/* The next character, and the cue that says now.
+/* The next character you are due to send.
  *
  * Driven by feeding it a clock, because that is what it is: a reading of one
  * schedule against the recorder's own time. Nothing here renders the review —
@@ -9,7 +9,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { act, render, screen, cleanup } from "@testing-library/react";
 import { FlashCard, type Beat, type Word } from "@/ui/FlashCard";
-import { FLASH_SEC } from "@/render/geometry";
 
 /* The card reads the clock on its own animation frames and writes straight to
    the DOM — no state, no re-render — so a test has to drive frames rather than
@@ -41,7 +40,6 @@ const WORDS: Word[] = [
 
 const letter = () => screen.getByTestId("flashcard-letter").textContent;
 const clock = () => screen.getByTestId("flashcard-clock").textContent;
-const lit = () => screen.getByTestId("flashcard").classList.contains("now");
 
 afterEach(() => {
   cleanup();
@@ -54,8 +52,6 @@ function mount(over: Partial<React.ComponentProps<typeof FlashCard>> = {}) {
   const view = render(
     <FlashCard
       beats={BEATS}
-      cue
-      leadSec={0.2}
       elapsed={() => now}
       words={[]}
       {...over}
@@ -92,45 +88,16 @@ describe("the flash card", () => {
     expect(clock()).toBe("0.1s");
   });
 
-  it("keeps the character up through its own cue", () => {
-    /* The flash fires early, and what you are looking at while you send is
-       the thing you are sending — advancing on the flash would put the NEXT
-       character in front of you at the moment you key this one. */
+  it("never lights up", () => {
+    /* It used to strobe on every beat. A bright flash several times a second
+       is a hazard for anyone photosensitive, and a reference you glance at
+       does not need one — reading what comes next is what the card is for. */
     const card = mount();
-    card.at(3 - 0.1);
-    expect(lit()).toBe(true);
-    expect(letter()).toBe("C");
-  });
-
-  it("lights ahead of the beat, by the amount it was given", () => {
-    const card = mount({ leadSec: 0.5 });
-    card.at(3 - 0.6);
-    expect(lit(), "too early").toBe(false);
-    card.at(3 - 0.5 + FLASH_SEC / 2);
-    expect(lit(), "on the lead").toBe(true);
-    card.at(3 - 0.5 + FLASH_SEC * 2);
-    expect(lit(), "and over").toBe(false);
-  });
-
-  it("does not move the countdown with the flash", () => {
-    /* Two different ideas of "now" on one card would be worse than no cue at
-       all. The clock is the clock; only the flash runs early. */
-    const early = mount({ leadSec: 0.5 });
-    early.at(2.5);
-    const withLead = clock();
-    cleanup();
-
-    const none = mount({ leadSec: 0 });
-    none.at(2.5);
-    expect(clock()).toBe(withLead);
-  });
-
-  it("shows the card without lighting it when the cue is off", () => {
-    // Two separate things: a reference you glance at, and a cue you react to.
-    const card = mount({ cue: false });
-    card.at(3 - 0.1);
-    expect(letter()).toBe("C");
-    expect(lit()).toBe(false);
+    const card_ = screen.getByTestId("flashcard");
+    for (const t of [0, 2.5, 3 - 0.1, 3, 3.01, 4, 6, 7]) {
+      card.at(t);
+      expect(card_.className, `at ${t}s`).not.toContain("now");
+    }
   });
 
   it("sits armed when nothing is recording", () => {
@@ -138,7 +105,6 @@ describe("the flash card", () => {
     mount({ elapsed: null });
     expect(letter()).toBe("C");
     expect(clock()).toBe("—");
-    expect(lit()).toBe(false);
   });
 
   it("has nothing left to say after the last character", () => {
@@ -146,7 +112,6 @@ describe("the flash card", () => {
     card.at(7);
     expect(letter()).toBe("·");
     expect(clock()).toBe("—");
-    expect(lit()).toBe(false);
   });
 });
 

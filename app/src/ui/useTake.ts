@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeWav } from "@/audio/wav";
 import { decodeAudioFile } from "@/dsp";
-import { FLASH_LEAD_DEFAULT_MS, PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
+import { PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
 import {
   MIC_SOURCE,
   analyzeClip,
@@ -152,8 +152,6 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     showRuns: p.showRuns ?? base.showRuns,
     captionAll: p.captionAll ?? base.captionAll,
     flashCard: p.flashCard ?? base.flashCard,
-    flashCue: p.flashCue ?? base.flashCue,
-    flashLeadMs: p.flashLeadMs ?? base.flashLeadMs,
     wordPreview: p.wordPreview ?? base.wordPreview,
     runSort: (p.runSort as ReviewSettings["runSort"]) ?? base.runSort,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
@@ -196,8 +194,6 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     captionAll: prev.captionAll,
     zenMode: prev.zenMode,
     flashCard: prev.flashCard,
-    flashCue: prev.flashCue,
-    flashLeadMs: prev.flashLeadMs,
     wordPreview: prev.wordPreview,
     runSort: prev.runSort,
     view: prev.view,
@@ -239,8 +235,6 @@ export function useTake(): TakeState {
       captionAll: false,
       zenMode: false,
       flashCard: false,
-      flashCue: true,
-      flashLeadMs: FLASH_LEAD_DEFAULT_MS,
       wordPreview: false,
       runSort: "oldest",
       gainDb: 0,
@@ -310,8 +304,6 @@ export function useTake(): TakeState {
         showRuns: next.showRuns,
         captionAll: next.captionAll,
         flashCard: next.flashCard,
-        flashCue: next.flashCue,
-        flashLeadMs: next.flashLeadMs,
         wordPreview: next.wordPreview,
         runSort: next.runSort,
         view: next.view,

@@ -6,7 +6,7 @@
  * review re-derivable from a saved file with no audio present.
  */
 
-import { FLASH_LEAD_DEFAULT_MS, PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
+import { PACE_LEAD_DEFAULT_SEC } from "@/render/geometry";
 import {
   MIC_SOURCE,
   type Review,
@@ -170,8 +170,6 @@ export function defaultSettings(take: Take): ReviewSettings {
     showRuns: "all",
     zenMode: false,
     flashCard: false,
-    flashCue: true,
-    flashLeadMs: FLASH_LEAD_DEFAULT_MS,
     wordPreview: false,
     runSort: "oldest",
     gainDb: 0,

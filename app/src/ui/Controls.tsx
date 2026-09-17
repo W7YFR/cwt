@@ -21,8 +21,6 @@ import {
   CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
   FLASH_CARD_HELP,
-  FLASH_CUE_HELP,
-  FLASH_LEAD_HELP,
   RUN_SCORES_HELP,
   SHOW_CHART_CONTROLS_HELP,
   SHOW_DOWNLOADS_HELP,
@@ -41,8 +39,6 @@ import {
   ZOOM_HELP,
 } from "./copy";
 import {
-  FLASH_LEAD_MAX_MS,
-  FLASH_LEAD_MIN_MS,
   PACE_LEAD_MAX_SEC,
   PACE_LEAD_MIN_SEC,
 } from "@/render/geometry";
@@ -645,23 +641,8 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                 </label>
               </div>
 
-              {/* All three only with the card up — a cue for something not on
-                  screen, a lead on a cue that never fires, and a word preview
-                  under a card that is not there, are settings for nothing. */}
-              {s.flashCard && (
-                <div className="group">
-                  <label className="check" title={FLASH_CUE_HELP}>
-                    <input
-                      type="checkbox"
-                      id="flash-cue"
-                      checked={s.flashCue}
-                      onChange={(e) => onChange({ flashCue: e.target.checked })}
-                    />{" "}
-                    Flash cue
-                  </label>
-                </div>
-              )}
-
+              {/* Only with the card up: a word preview under a card that is
+                  not there is a setting for nothing. */}
               {s.flashCard && (
                 <div className="group">
                   <label className="check" title={WORD_PREVIEW_HELP}>
@@ -673,23 +654,6 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                     />{" "}
                     Word preview
                   </label>
-                </div>
-              )}
-
-              {s.flashCard && s.flashCue && (
-                <div className="group">
-                  <NumberField
-                    id="flash-lead"
-                    name="Flash lead"
-                    unit="ms"
-                    spoken="milliseconds"
-                    help={FLASH_LEAD_HELP}
-                    value={s.flashLeadMs}
-                    min={FLASH_LEAD_MIN_MS}
-                    max={FLASH_LEAD_MAX_MS}
-                    step={10}
-                    onChange={(v) => onChange({ flashLeadMs: v })}
-                  />
                 </div>
               )}
             </div>

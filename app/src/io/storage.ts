@@ -393,8 +393,6 @@ export interface Prefs {
   showRuns?: "all" | "last5" | "last3" | "last";
   captionAll?: boolean;
   flashCard?: boolean;
-  flashCue?: boolean;
-  flashLeadMs?: number;
   wordPreview?: boolean;
   runSort?: string;
 }
