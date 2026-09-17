@@ -578,6 +578,57 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(short.left).toBeCloseTo(withName, 1);
   });
 
+  it("keeps the grades and the way out of the run on one line", async () => {
+    /* The band holds two grades and five measurements. Left to reflow, which
+       line a figure landed on was a fact about the window rather than about
+       the figure — and on a narrow one the single button among them ended up
+       alone on a line of nothing else.
+
+       Measured at a width that cannot hold the lot, because that is the only
+       width where the claim means anything. */
+    await served();
+    await mount();
+    container.style.width = "620px";
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 50));
+    });
+
+    const head = container.querySelector<HTMLElement>(".scorehead")!;
+    const detail = container.querySelector<HTMLElement>(".scoredetail")!;
+    const drop = container.querySelector<HTMLElement>("[data-testid='drop-run']");
+    const consistent = [...head.querySelectorAll<HTMLElement>(".score")].find((el) =>
+      el.textContent!.includes("consistent"),
+    )!;
+
+    /* Two rows with boxes of their own, which is the whole mechanism: wrappers
+       that lay their children out into the band around them would put every
+       assertion below against a zero-sized rectangle and pass on nothing. */
+    for (const [what, row] of [["head", head], ["rest", detail]] as const) {
+      expect(getComputedStyle(row).display, `the ${what} is a row`).toBe("flex");
+      expect(row.getBoundingClientRect().height, `the ${what} is a row`).toBeGreaterThan(0);
+    }
+    expect(detail.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      head.getBoundingClientRect().bottom - 1,
+    );
+    // And the window really is too narrow to have held the lot on one line.
+    expect(head.scrollWidth + detail.scrollWidth).toBeGreaterThan(
+      container.getBoundingClientRect().width,
+    );
+
+    /* The grades and the button share the head's line, and the button is at
+       the end of it — an action among readings. */
+    const line = consistent.getBoundingClientRect();
+    if (drop) {
+      const box = drop.getBoundingClientRect();
+      expect(box.top).toBeLessThan(line.bottom);
+      expect(box.right).toBeCloseTo(head.getBoundingClientRect().right, 0);
+    }
+    // And nothing from underneath crept up onto it.
+    for (const el of detail.querySelectorAll<HTMLElement>(".score")) {
+      expect(el.getBoundingClientRect().top).toBeGreaterThanOrEqual(line.bottom - 1);
+    }
+  });
+
   it("puts the scores on a row of their own, left-aligned", async () => {
     /* They used to be pushed to the right of the top row, which worked when
        that row held a brand and a record button. It now also holds a device

@@ -189,15 +189,29 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
+/* Two rows, not one that wraps.
+ *
+ * The band holds two grades and five measurements. Left to reflow, which line
+ * a figure landed on was a fact about the window rather than about the figure,
+ * and on a narrow one the single button among them ended up alone on a line of
+ * its own. Split, the head is always the same three things and the way out of
+ * the run; everything that supports them is under it. Each row still wraps
+ * within itself — that is the only wrapping left that tells you nothing. */
 .scores {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+.scorehead,
+.scoredetail {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 18px;
 }
 .score { display: flex; align-items: baseline; gap: 6px; }
-/* An action among readings, so it sits apart from them and at the far end. */
-.scores { width: 100%; }
 /* Square and icon-only — see `.iconbtn`, which it wears — so it reads as one
    action at the end of a row of readings rather than as a sentence competing
    with them. Quiet until it is under the pointer: it throws a recording away,
