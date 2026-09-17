@@ -407,7 +407,12 @@ export function App(): React.ReactElement {
 function Footer(): React.ReactElement {
   return (
     <footer className="colophon">
-      © {new Date().getFullYear()} W7YFR
+      © {new Date().getFullYear()}{" "}
+      {/* The call sign is the author, and a call sign's canonical page is its
+          QRZ entry — the one place a ham looks something up. */}
+      <a href="https://www.qrz.com/db/W7YFR" target="_blank" rel="noreferrer">
+        W7YFR
+      </a>
     </footer>
   );
 }

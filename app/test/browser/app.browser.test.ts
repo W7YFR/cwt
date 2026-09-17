@@ -689,6 +689,12 @@ const showDownloads = () => tickSetting("show-downloads");
     const foot = container.querySelector<HTMLElement>(".colophon")!;
     expect(foot.textContent).toContain(String(new Date().getFullYear()));
     expect(foot.textContent).toContain("W7YFR");
+
+    // And the call sign goes where a call sign goes, in a tab of its own so a
+    // session in progress is not navigated away from.
+    const sign = foot.querySelector<HTMLAnchorElement>("a")!;
+    expect(sign.href).toBe("https://www.qrz.com/db/W7YFR");
+    expect(sign.target).toBe("_blank");
   });
 
   it("lines up every control in the settings rows", async () => {

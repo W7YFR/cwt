@@ -1465,6 +1465,19 @@ button.primary { border-color: var(--you); color: var(--ink); }
   color: var(--ink-faint);
 }
 
+/* Underlined rather than colored: this sits in the quietest text on the page
+   and a link color here would make the author louder than the app. */
+.colophon a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.colophon a:hover,
+.colophon a:focus-visible {
+  color: var(--ink);
+}
+
 /* What was asked for and what came back, above the arithmetic about them.
    Monospaced and on their own lines: these are call signs and the point is
    comparing them character by character. */
