@@ -464,6 +464,37 @@ describe("controls", () => {
     expect(onChange).toHaveBeenCalledWith({ charMarkers: true });
   });
 
+  it("makes zen mode and the paced aids exclusive, both ways", async () => {
+    /* One puts a beat in front of you, the other takes the page away. Turning
+       zen on CLEARS the other two rather than quietly outranking them: a box
+       left ticked while something else ignores it is a setting that lies about
+       what pressing record will do. */
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderView({ onChange, open: true });
+
+    rerender(view({ paceCursor: true, flashCard: true }, onChange));
+    await user.click(screen.getByLabelText(/zen mode/i));
+    expect(onChange).toHaveBeenCalledWith({
+      zenMode: true,
+      paceCursor: false,
+      flashCard: false,
+    });
+
+    // And with it on, neither can be turned back on behind its back.
+    rerender(view({ zenMode: true }, onChange));
+    for (const aid of [/pacing cursor/i, /flash card/i]) {
+      expect(screen.getByLabelText(aid)).toBeDisabled();
+    }
+
+    // Turning it off gives them back, and takes nothing else with it.
+    onChange.mockClear();
+    await user.click(screen.getByLabelText(/zen mode/i));
+    expect(onChange).toHaveBeenCalledWith({ zenMode: false });
+    rerender(view({ zenMode: false }, onChange));
+    expect(screen.getByLabelText(/pacing cursor/i)).toBeEnabled();
+  });
+
   it("keeps the flash card and its cue as two separate choices", async () => {
     /* A reference you glance at and a cue you react to are different things,
        and the cue's lead is a setting for nothing with no cue to lead. */

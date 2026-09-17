@@ -203,6 +203,56 @@ describe("the view while pacing", () => {
   });
 });
 
+describe("zen mode", () => {
+  const sheet = () => host.querySelector("[data-testid='zen']");
+
+  it("covers the page for the take, and gives it back", async () => {
+    const app = mount({ zenMode: true, view: "per-char" });
+    expect(sheet()).toBeNull();
+
+    await record();
+    expect(sheet(), "the sheet is up while the take runs").toBeTruthy();
+    // And it carries the message, which is the whole reason it is there.
+    expect(host.querySelector("[data-testid='zen-message']")!.textContent)
+      .toBe("CQ DE W7YFR");
+
+    await stop();
+    expect(sheet(), "and gone once the paddle is down").toBeNull();
+    // Nothing of the paced aids' doing: the view is where it was left.
+    expect(app.view()).toBe("per-char");
+  });
+
+  it("stops the take from where the sheet puts the button", async () => {
+    /* The sheet is over the record bar, so the bar's own Stop is unreachable.
+       Pressed here through the same name, which is what makes this a test of
+       the sheet's copy of it rather than of the one underneath. */
+    mount({ zenMode: true });
+    await record();
+    const stopper = sheet()!.querySelector<HTMLButtonElement>("[data-testid='zen-stop']")!;
+    await act(async () => {
+      stopper.click();
+      await new Promise((r) => setTimeout(r, 150));
+    });
+    expect(sheet()).toBeNull();
+  });
+
+  it("runs no count-in behind the sheet, whatever was set before", async () => {
+    /* A preference saved before zen mode existed would otherwise arm the
+       pacing loop — which swaps the axis, moves a cursor along a chart nobody
+       can see, and stops the take at the end of the message. */
+    const app = mount({ zenMode: true, paceCursor: true, paceAbsolute: true, view: "per-char" });
+    await record();
+    expect(sheet()).toBeTruthy();
+    expect(app.view(), "the axis is left alone").toBe("per-char");
+    /* The record bar's light, behind the sheet. It counts down while a paced
+       take is waiting to begin and reads the clock once it is under way, so
+       never reaching "waiting" is the count-in never having been armed. */
+    const light = host.querySelector<HTMLElement>("[data-testid='reclight']")!;
+    expect(light.dataset.state, "no count-in").toBe("sending");
+    await stop();
+  });
+});
+
 describe("what the chart shows while recording", () => {
   const height = () => host.querySelector("canvas")!.getBoundingClientRect().height;
 

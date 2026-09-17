@@ -192,6 +192,7 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     showChartControls: prev.showChartControls,
     showRuns: prev.showRuns,
     captionAll: prev.captionAll,
+    zenMode: prev.zenMode,
     flashCard: prev.flashCard,
     flashCue: prev.flashCue,
     flashLeadMs: prev.flashLeadMs,
@@ -233,6 +234,7 @@ export function useTake(): TakeState {
       /* Off. One row of text is a caption; six is a wall, and the rows under
          it are the thing being compared. */
       captionAll: false,
+      zenMode: false,
       flashCard: false,
       flashCue: true,
       flashLeadMs: FLASH_LEAD_DEFAULT_MS,
@@ -500,7 +502,15 @@ export function useTake(): TakeState {
          Rebuilding them from a take would drop the intended message, which is
          the one thing every attempt in the session shares. */
       const kept = entries[pick]?.settings ?? entries[entries.length - 1]?.settings;
-      const next = kept ?? openingSettings(lanes[pick]!.take, settingsRef.current);
+      /* Zen mode is the exception, and coming back is exactly when it matters:
+         it takes the whole page away on the next record, and a session restored
+         from a tab closed last week would do that with nothing on screen
+         connecting it to a box ticked then. Every other setting is worth
+         waking up in; this one is chosen for the sitting. */
+      const next = {
+        ...(kept ?? openingSettings(lanes[pick]!.take, settingsRef.current)),
+        zenMode: false,
+      };
       settingsRef.current = next;
       setSettingsRaw(next);
     },

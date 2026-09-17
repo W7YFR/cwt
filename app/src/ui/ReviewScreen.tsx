@@ -21,6 +21,7 @@ import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
 import { ChartSettingsButton, ChartSettingsPanel, Controls, ViewControls } from "./Controls";
 import { FlashCard } from "./FlashCard";
+import { ZenMode } from "./ZenMode";
 import { beatsFor, pacedEnd, pacedStart, wordsFor, type Word } from "./pacing";
 import { RecordBar } from "./Record";
 import { Report } from "./Report";
@@ -300,12 +301,13 @@ export function ReviewScreen({
   const viewRef = useRef(settings.view);
   viewRef.current = settings.view;
   useEffect(() => {
-    if (!rec.recorder || !settings.paceCursor || !settings.paceAbsolute) return;
+    if (!rec.recorder || settings.zenMode) return;
+    if (!settings.paceCursor || !settings.paceAbsolute) return;
     const was = viewRef.current;
     if (was === "absolute") return;
     onChangeRef.current({ view: "absolute" });
     return () => onChangeRef.current({ view: was });
-  }, [rec.recorder, settings.paceCursor, settings.paceAbsolute]);
+  }, [rec.recorder, settings.paceCursor, settings.paceAbsolute, settings.zenMode]);
 
   /** Where the target's first character begins.
    *
@@ -321,7 +323,11 @@ export function ReviewScreen({
     /* Either aid arms the count-in: they are two readings of one schedule, and
        making the card depend on the cursor would have turned two toggles into
        three. Only the cursor touches the chart. */
-    const paced = settings.paceCursor || settings.flashCard;
+    /* Zen mode bars both, and says so here as well as in the panel: the
+       checkboxes are cleared when it is turned on, but a stored preference
+       from before it existed would otherwise arm a count-in behind a sheet
+       that has no beat on it. */
+    const paced = !settings.zenMode && (settings.paceCursor || settings.flashCard);
     if (!recorder || !paced || !chart) {
       setLeadLeft(null);
       handle.chart?.setFollow("clamped");
@@ -395,6 +401,7 @@ export function ReviewScreen({
     settings.flashCard,
     settings.paceCursor,
     settings.paceLeadSec,
+    settings.zenMode,
   ]);
 
   /* When each character should be keyed, on the recorder's own clock.
@@ -772,7 +779,23 @@ export function ReviewScreen({
         />
       )}
 
-      {settings.flashCard && (
+      {/* Over everything, while the take runs. The record bar it covers is
+          reproduced inside it, keys and all. */}
+      {settings.zenMode && recording && liveClock && (
+        <ZenMode
+          message={settings.expected}
+          elapsed={liveClock}
+          level={rec.level}
+          busy={rec.busy}
+          onFinish={() => void rec.finish()}
+          onRestart={rec.restart}
+          onDiscard={() => void rec.discard()}
+        />
+      )}
+
+      {/* Barred by Zen mode for the same reason the count-in is, and for one
+          more: this sheet is over it, so it would be a card nobody can see. */}
+      {settings.flashCard && !settings.zenMode && (
         <FlashCard
           beats={beats}
           cue={settings.flashCue}

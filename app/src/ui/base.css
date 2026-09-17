@@ -528,6 +528,11 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   align-items: center;
   cursor: pointer;
 }
+/* A checkbox barred by another setting, dimmed the way a barred button is.
+   Without this a setting that cannot be turned on looks exactly like one that
+   can, and the only way to learn otherwise is to click it and watch nothing
+   happen. The tooltip on the label says which setting is doing the barring. */
+.group label.check:has(input:disabled) { opacity: .45; cursor: default; }
 /* A label beside its box rather than above it, in a row of captions above
    theirs. It is a caption all the same, so it is set like one — without this
    it inherits the wizard's larger body size and reads as a different kind of
@@ -1107,6 +1112,57 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 /* Focus goes here on open so Escape has somewhere to land, and a ring around
    the whole sheet reads as an error rather than as a place to type. */
 .soundpath:focus { outline: none; }
+
+/* ---- zen mode ------------------------------------------------------------ */
+
+/* Opaque, where every other sheet is a dim over the page. The others are about
+   the thing behind them and are worth seeing through; this one exists to take
+   the page away. */
+.zensheet { background: var(--bg); padding: 0; }
+.zen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  gap: 24px;
+}
+.zen:focus { outline: none; }
+
+/* The message fills what is left after the controls have taken theirs, and is
+   sized against the viewport rather than in points: what "large enough to read
+   without looking" means depends on how far away the screen is, and the window
+   is the only thing here that knows anything about that. */
+.zenmessage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  /* Wide word spacing: what is being read here is one character at a time and
+     the word boundaries are what you key differently. */
+  word-spacing: .5em;
+  letter-spacing: .06em;
+  line-height: 1.35;
+  font-size: clamp(32px, 7vw, 104px);
+  font-weight: 600;
+  color: var(--ink);
+}
+.zennothing { font-size: 15px; font-weight: 400; color: var(--ink-faint); }
+
+.zenfoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 20px;
+}
+.zenbuttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.zen .meter { width: 120px; height: 6px; }
 
 /* ---- recording ---------------------------------------------------------- */
 .recording {

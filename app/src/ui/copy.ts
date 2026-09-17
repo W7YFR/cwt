@@ -99,6 +99,19 @@ export const CHAR_MARKERS_HELP =
   "own elements and the gap that led into it, and the report below still " +
   "breaks every element out.";
 
+export const ZEN_MODE_HELP =
+  "While you record, put the message on screen by itself: large type, the " +
+  "clock, and the way to stop. Everything else \u2014 the chart, the scores, " +
+  "the settings \u2014 goes away until you are done. It is the opposite of " +
+  "the paced aids rather than another one of them, so it cannot run with " +
+  "them: there is no beat to follow and no count-in, and the take ends when " +
+  "you say it does. For sending at your own speed and reading what you are " +
+  "sending, which is most of what practice actually is. Stays on until you turn it off or start over, and is off again next time you open the app.";
+
+export const ZEN_PACING_HELP =
+  "Not while Zen mode is on. One puts a beat in front of you and the other " +
+  "takes everything away, including the chart the cursor runs along.";
+
 export const FLASH_CARD_HELP =
   "The next character you are due to send, large, with a countdown to it. At " +
   "speed the chart's captions are small, moving, and exactly where you cannot " +

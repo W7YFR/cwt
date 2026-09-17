@@ -32,6 +32,8 @@ import {
   GAIN_HELP,
   PACE_ABSOLUTE_HELP,
   PACE_CURSOR_HELP,
+  ZEN_MODE_HELP,
+  ZEN_PACING_HELP,
   PACE_LEAD_HELP,
   ZOOM_HELP,
 } from "./copy";
@@ -517,12 +519,36 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
           <div className="panelrow" data-panel="practice">
             <span className="uplabel">Practice aids</span>
             <div className="panelgroups">
+              {/* First, because it is the one that turns the others off. */}
               <div className="group">
-                <label className="check" title={PACE_CURSOR_HELP}>
+                <label className="check" title={ZEN_MODE_HELP}>
+                  <input
+                    type="checkbox"
+                    id="zen-mode"
+                    checked={s.zenMode}
+                    /* Turning it on clears the paced aids rather than merely
+                       overriding them. A checkbox left ticked while something
+                       else quietly ignores it is a setting that lies about
+                       what will happen when you press record. */
+                    onChange={(e) =>
+                      onChange(
+                        e.target.checked
+                          ? { zenMode: true, paceCursor: false, flashCard: false }
+                          : { zenMode: false },
+                      )
+                    }
+                  />{" "}
+                  Zen mode
+                </label>
+              </div>
+
+              <div className="group">
+                <label className="check" title={s.zenMode ? ZEN_PACING_HELP : PACE_CURSOR_HELP}>
                   <input
                     type="checkbox"
                     id="pace-cursor"
                     checked={s.paceCursor}
+                    disabled={s.zenMode}
                     onChange={(e) => onChange({ paceCursor: e.target.checked })}
                   />{" "}
                   Pacing cursor
@@ -562,12 +588,16 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                 </div>
               )}
 
+              {/* Barred by Zen mode for the same reason the cursor is: it
+                  runs on the same count-in and stops the take at the end of
+                  the message, which is pacing however it is drawn. */}
               <div className="group">
-                <label className="check" title={FLASH_CARD_HELP}>
+                <label className="check" title={s.zenMode ? ZEN_PACING_HELP : FLASH_CARD_HELP}>
                   <input
                     type="checkbox"
                     id="flash-card"
                     checked={s.flashCard}
+                    disabled={s.zenMode}
                     onChange={(e) => onChange({ flashCard: e.target.checked })}
                   />{" "}
                   Flash card

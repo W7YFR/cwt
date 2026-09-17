@@ -110,6 +110,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     showHints: true,
     showChartControls: true,
     showRuns: "all",
+    zenMode: false,
     flashCard: false,
     flashCue: true,
     flashLeadMs: FLASH_LEAD_DEFAULT_MS,

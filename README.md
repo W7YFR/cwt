@@ -61,6 +61,18 @@ drawn, newest first while you're still going, most consistent first when you're
 hunting for the one that went right. A run keeps the number it was recorded
 with wherever it lands.
 
+Under the cog are the **practice aids**, which run while you record. The
+**pacing cursor** walks the target track in real time after a count-in, and the
+**flash card** puts the character you owe next on screen large. **Zen mode** is
+the other kind: it clears the page for the take and leaves only the message in
+type you can read at a glance, with the clock, the level and the way to stop.
+It can't run with the other two — there is no beat to meet, and the take ends
+when you say it does — so turning it on switches them off. The keys work the
+same behind it: enter finishes, r restarts, esc throws the take away. Unlike
+every other aid it isn't remembered: it stays on through the sitting you turn
+it on in and is off again next time, because a box ticked last week blanking
+the screen mid-record is not a setting anyone would connect to a choice.
+
 A session is several attempts at **one message at one speed** — that's what
 makes the rows comparable. **New session** is where those change; the intended
 message stays editable for fixing a typo, where re-grading

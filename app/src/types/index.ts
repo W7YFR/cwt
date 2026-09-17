@@ -346,6 +346,20 @@ export interface ReviewSettings {
    * what it costs is a page of text where you may only have wanted one row
    * of it. */
   captionAll: boolean;
+  /** Put the message on screen by itself while you record, and nothing else.
+   *
+   * The opposite of the paced aids rather than another one of them: no beat to
+   * follow, no count-in, no chart moving under a cursor — the text you are
+   * sending, large, and the way to stop. Mutually exclusive with pacing, which
+   * is the whole point of it.
+   *
+   * Deliberately NOT saved with the other aids. It is the only setting on the
+   * page that takes the page away, and one that had been remembered from some
+   * earlier visit would blank the screen on a record nobody connected to a
+   * checkbox they ticked days ago. Chosen for the sitting you are in — it
+   * carries from take to take within one, so a zen session is not a box to
+   * re-tick after every attempt. */
+  zenMode: boolean;
   /** Show the next character to send, large, with a countdown to it. */
   flashCard: boolean;
   /** Flash that card on the beat. Separate from showing it: the card is a

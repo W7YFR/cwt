@@ -743,6 +743,41 @@ const showDownloads = () => tickSetting("show-downloads");
     }
   });
 
+  it("asks for zen mode every sitting rather than remembering it", async () => {
+    /* It is the only setting on the page that takes the page away. Remembered
+       with the other aids, a box ticked days ago blanks the screen on the next
+       record and nothing on screen connects the two. Every other practice aid
+       is saved; this one is chosen. */
+    await served();
+    await mount();
+
+    const open = () =>
+      act(async () => {
+        container.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click();
+      });
+    const zen = () => container.querySelector<HTMLInputElement>("#zen-mode")!;
+
+    await open();
+    await act(async () => {
+      zen().click();
+    });
+    expect(zen().checked, "it is on for this sitting").toBe(true);
+
+    // Past the settings debounce, so anything that was going to be written has.
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 600));
+    });
+    expect(Object.keys(loadPrefs()), "nothing of it is saved").not.toContain("zenMode");
+
+    // And the next visit opens without it.
+    act(() => root!.unmount());
+    root = null;
+    container.innerHTML = "";
+    await mount();
+    await open();
+    expect(zen().checked, "the next visit starts off").toBe(false);
+  });
+
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.
