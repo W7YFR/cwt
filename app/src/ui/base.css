@@ -9,6 +9,15 @@
   --ink-dim: #97a3b6;
   --ink-faint: #66708a;
   --you: #6aa9ff;
+  /* The same blue, stood back from. A hovered control takes the full --you,
+     so an emphasis drawn in it is a control that looks permanently hovered and
+     answers a pointer with nothing — the eye is told "this one" and then told
+     it again, which is the same as not being told. Mixed toward the resting
+     border rather than faded toward the panel: it stays the accent, at less of
+     it, and hovering still has somewhere to go. Derived rather than written
+     out, so the light theme's blue carries through with no second value to
+     keep in step. */
+  --you-quiet: color-mix(in srgb, var(--you) 55%, var(--line));
   --tgt: #8b95a7;
   --ok: #3fb950;
   --warn: #d29922;
@@ -1076,9 +1085,12 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   font-size: 12px;
   color: var(--ink-faint);
 }
-.dialog .speeds { display: flex; gap: 16px; flex-wrap: wrap; }
-.dialog .speeds .group { flex: 1 1 160px; }
-.dialog .speeds input { width: 100%; }
+/* The row of numbers a session is fixed at: both speeds and the pass count.
+   Wraps rather than shrinking, so a narrow dialog drops one onto its own line
+   instead of squeezing three steppers down to nothing. */
+.dialog .numbers { display: flex; gap: 16px; flex-wrap: wrap; }
+.dialog .numbers .group { flex: 1 1 120px; }
+.dialog .numbers input { width: 100%; }
 .dialog .confirm { margin-top: 6px; }
 
 /* A page to read rather than a form to fill in, so it is set as prose: a
@@ -1319,8 +1331,11 @@ button.link {
 }
 button.link:hover:not(:disabled) { color: var(--ink); border-color: transparent; }
 
-/* The one action in a group that the rest lead up to. */
-button.primary { border-color: var(--you); color: var(--ink); }
+/* The one action in a group that the rest lead up to — in the accent, but
+   below the strength hover uses, so that pointing at it still does something.
+   The hover rule wins on specificity rather than on order, so this stays put
+   wherever it is read. */
+button.primary { border-color: var(--you-quiet); color: var(--ink); }
 
 .visually-hidden {
   position: absolute;

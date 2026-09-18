@@ -4,8 +4,10 @@
  * mid-session. This is better: a warning tells you that you might be doing the
  * wrong thing and then lets you do it anyway, whereas a way to say "new
  * session" is the right thing, named. So what matters here is that it collects
- * everything a session is — one message, one speed — and hands it over in one
- * act.
+ * everything a session is — one message, one speed, one number of passes —
+ * and hands it over in one act. Two acts, strictly: it also offers to open the
+ * microphone on the way out, because the click after this dialog is almost
+ * always the record button.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -21,6 +23,7 @@ function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
       expected="CQ DE W7YFR"
       charWpm={20}
       farnsworthWpm={20}
+      times={1}
       onStart={onStart}
       onCancel={onCancel}
       {...over}
@@ -37,17 +40,75 @@ describe("starting a new session", () => {
     expect(document.activeElement).toBe(text());
   });
 
-  it("hands over the message and both speeds together", async () => {
+  it("hands over the message, both speeds and the pass count together", async () => {
     const user = userEvent.setup();
     const { onStart } = open();
     await user.clear(text());
     await user.type(text(), "paris paris");
     await user.click(screen.getByTestId("start-session"));
-    expect(onStart).toHaveBeenCalledWith({
-      expected: "PARIS PARIS",
-      charWpm: 20,
-      farnsworthWpm: 20,
-    });
+    expect(onStart).toHaveBeenCalledWith(
+      { expected: "PARIS PARIS", charWpm: 20, farnsworthWpm: 20, times: 1 },
+      false,
+    );
+  });
+
+  it("offers to open the microphone on the same click", async () => {
+    /* Saving and then reaching for the record button is two acts for one
+       intention, and the second one is the same click every time. The dot
+       collects the session and asks for the microphone together — same
+       payload, so nothing about what the session IS can differ between the
+       two ways out. */
+    const user = userEvent.setup();
+    const { onStart } = open({ expected: "CQ TEST", times: 2 });
+    await user.click(screen.getByTestId("start-session-recording"));
+    expect(onStart).toHaveBeenCalledWith(
+      { expected: "CQ TEST", charWpm: 20, farnsworthWpm: 20, times: 2 },
+      true,
+    );
+  });
+
+  it("says which of the two it is, out loud", () => {
+    /* One is a dot with no text in it. Screen-reader users get the whole
+       choice or they get one button and a mystery. */
+    open();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /save and record/i })).toBeTruthy();
+  });
+
+  it("takes Enter as saving, not as recording", async () => {
+    /* Enter is how the speed boxes are left, and opening the microphone is
+       not something to do by accident on the way out of a number field. */
+    const user = userEvent.setup();
+    const { onStart } = open();
+    await user.click(screen.getByLabelText(/character speed/i));
+    await user.keyboard("{Enter}");
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(onStart.mock.calls[0]![1]).toBe(false);
+  });
+
+  it("collects how many passes make up an attempt", async () => {
+    /* Part of what a session is fixed at, like the speed: a stack whose rows
+       are one pass and five passes is not comparable either. It opens at
+       whatever the session before it ran, so the common case is to leave it
+       alone. */
+    const user = userEvent.setup();
+    const { onStart } = open({ times: 3 });
+    const box = screen.getByLabelText(/times/i) as HTMLInputElement;
+    expect(box.value).toBe("3");
+    await user.clear(box);
+    await user.type(box, "5");
+    await user.click(screen.getByTestId("start-session"));
+    expect(onStart.mock.calls[0]![0].times).toBe(5);
+  });
+
+  it("hands over a pass count the rest of the app can use as a length", async () => {
+    /* Emptying the box leaves nothing under the caret to parse, and a NaN
+       reaching the target builder is an empty sheet rather than a short one. */
+    const user = userEvent.setup();
+    const { onStart } = open({ times: 3 });
+    await user.clear(screen.getByLabelText(/times/i));
+    await user.click(screen.getByTestId("start-session"));
+    expect(onStart.mock.calls[0]![0].times).toBe(3);
   });
 
   it("shows the message the way it will be sent", async () => {

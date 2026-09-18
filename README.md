@@ -275,6 +275,14 @@ recordings in `app/test/data`.
   instead: same segment count, every boundary within 1.5 ms, the same decoded
   text, and a measured speed within half a wpm of what the recording was
   *actually* sent at.
+
+  Four numbers in `cq-de-w7yfr` were re-derived rather than inherited: the
+  measured character gap and the three figures that follow from it. The
+  original derivation counted the dead air at the ends of the recording as
+  spacing, and on that one file the pads happen to be the same size as its real
+  character gaps, so they passed for two more of them. An independent reference
+  is only worth having while it is independent *and* right; this one was the
+  first, and the mark-derived numbers beside it are untouched.
 - **The clean-path lock** (`app/test/lock/`) holds the DSP to its own previous
   answer, bit for bit. The oracle's 1.5 ms would let a change move every
   boundary on every clean recording and still pass; work on poor-quality audio
