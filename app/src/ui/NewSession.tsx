@@ -160,19 +160,19 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
             the next click after Save would have been the record button
             anyway.
 
-            So the dot carries the emphasis. The blue border marks the action
-            the rest of a group lead up to, and what this dialog leads up to is
-            sending — Save is the way out for when you are not ready to yet.
-            Last in the row and carrying the same red dot as every other way
-            into the microphone, so the emphasis is the only thing that had to
-            be learned. */}
+            Neither is emphasized. The dot is last in the row, where the eye
+            ends up, and it carries the same red dot as every other way into
+            the microphone — which is already enough to tell it from the button
+            beside it. An accent border on top of that would be a second way of
+            saying the same thing, and the app keeps that one for rows where
+            the buttons are alike enough to need it. */}
         <div className="confirm">
           <button onClick={props.onCancel}>Cancel</button>
           <button data-testid="start-session" onClick={() => start(false)}>
             Save
           </button>
           <button
-            className="iconbtn primary"
+            className="iconbtn"
             data-testid="start-session-recording"
             aria-label="Save and record"
             title="Save and start recording straight away"

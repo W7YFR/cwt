@@ -169,18 +169,20 @@ describe("a new session that starts recording", () => {
     expect(recording()).toBe(false);
   });
 
-  it("puts the emphasis on sending", async () => {
-    /* The blue border marks the action a group leads up to, and this dialog
-       leads up to sending. Read off the rendered page rather than off the
-       class list: `.iconbtn` is a shape and `.primary` is a color, and which
-       of the two wins is a question about the stylesheet, not about the
-       markup. */
+  it("tells the two apart by the dot, not by an accent", async () => {
+    /* Three ordinary buttons. The dot is recognizable as a way into the
+       microphone because it carries the same red dot every other one does, and
+       a colored border on top of that would be a second way of saying it.
+       Read off the rendered page rather than off the class list: which of a
+       shape class and a color class wins is a question about the stylesheet,
+       not about the markup. */
     mount();
     await press("New session");
-    const emphasis = (label: string) =>
-      getComputedStyle(button(label)).borderTopColor;
-    expect(emphasis("Save and record")).not.toBe(emphasis("Save"));
-    expect(emphasis("Save")).toBe(emphasis("Cancel"));
+    const border = (label: string) => getComputedStyle(button(label)).borderTopColor;
+    expect(border("Save and record")).toBe(border("Save"));
+    expect(border("Save")).toBe(border("Cancel"));
+    // The dot itself is what distinguishes it, and it is still there.
+    expect(button("Save and record").querySelector(".recdot")).not.toBe(null);
   });
 
   it("closes either way", async () => {
