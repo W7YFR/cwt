@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from "node:url";
    vitest's defineConfig knows the type of it. */
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import type { Plugin } from "vite";
 /* The provider is a package rather than a string: vitest moved each browser
    driver out into its own, so naming one in the config is also what pulls it
    in. */
@@ -27,12 +28,54 @@ import { playwright } from "@vitest/browser-playwright";
    `npm test` runs pure + dom, because those need no browser download. The
    browser tier is `npm run test:browser` and needs `npx playwright install
    chromium` once. */
+/* The dev server's own socket, through the app's CSP.
+ *
+ * index.html declares `connect-src 'none'` — the app talks to nothing, ever,
+ * and the policy says so rather than leaving it to be inferred. That is true
+ * of the app and false of the dev server, whose hot-update channel is a
+ * WebSocket to localhost: the browser blocks it, the client logs "connecting"
+ * forever, and every edit sits on the server until the page is reloaded by
+ * hand. It reads exactly like hot reloading having been turned off.
+ *
+ * So the loosening lives here rather than in the HTML, and `apply: "serve"`
+ * is the whole point of it: the built page keeps the policy it was written
+ * with, and no shipped byte knows this plugin exists. */
+function devCsp(): Plugin {
+  const OPEN = "connect-src 'self' ws: wss:";
+  /* The tag first, the directive inside it second. The prose above the tag
+     quotes the directive it is explaining, so a pattern loose enough to find
+     `connect-src` anywhere in the page finds the comment instead — and
+     rewriting THAT swallowed the tag into the comment, which switched the
+     whole policy off in dev while looking like it had done the small thing.
+     The policy is full of single quotes, so the tag is matched as a tag rather
+     than by trying to spell an attribute value that contains them. */
+  const META = /<meta[^>]*http-equiv=["']Content-Security-Policy["'][^>]*>/i;
+  return {
+    name: "dev-csp",
+    apply: "serve",
+    transformIndexHtml(html) {
+      const tag = html.match(META)?.[0];
+      // A page with no policy at all is not the app's — the test runner serves
+      // its own — and has nothing to loosen. Not a problem, so not a warning.
+      if (!tag) return html;
+      if (!/connect-src/.test(tag)) {
+        // A policy that no longer names the directive, on the other hand, is
+        // this plugin quietly doing nothing. Silence there would be a dev
+        // server that mysteriously stops hot-reloading again.
+        console.warn("[dev-csp] no connect-src in the page policy — HMR may be blocked");
+        return html;
+      }
+      return html.replace(tag, tag.replace(/connect-src[^;"]*/, OPEN));
+    },
+  };
+}
+
 export default defineConfig({
   root: "app",
   // Relative, so the build works at the domain root or under any subpath —
   // one page, no router, nothing to resolve against wrongly.
   base: "./",
-  plugins: [react()],
+  plugins: [react(), devCsp()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./app/src", import.meta.url)),
