@@ -10,7 +10,7 @@
  * canvas will start re-rendering on state it does not care about.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
 import type { HitResult, Focus } from "@/render/focus";
 import { HEIGHT } from "@/render/geometry";
@@ -51,8 +51,24 @@ export interface ChartProps {
   handle: ChartHandle;
 }
 
-interface Tip {
-  html: string;
+/** A tooltip's content, as data rather than as markup.
+ *
+ * `char` is kept apart from the rest because it is the one piece that is not a
+ * number we formatted. It comes from the morse table, and that table's prosigns
+ * are written in angle brackets — `<AR>`, `<SK>`, `<SOS>`. Interpolated into a
+ * string of HTML those parse as tags and the name silently disappears, which is
+ * exactly what this tooltip used to do. Handed to React as a child it is text,
+ * and React escapes it. */
+interface TipContent {
+  /** The character or prosign under the pointer. */
+  char: string;
+  /** What that element is graded as, when there is something to say. */
+  note?: string;
+  /** The measured figures, one to a line beneath the heading. */
+  lines: string[];
+}
+
+interface Tip extends TipContent {
   x: number;
   y: number;
 }
@@ -63,8 +79,8 @@ interface Tip {
  * what a marker is about — naming the element under the pointer would describe
  * something that is not on screen, and would put the dit-and-dah count back in
  * front of somebody who turned it off. */
-function tipForChar(hit: HitResult, unitSec: number): string {
-  const lines = [`<b>${hit.char.char}</b>`, `starts at ${hit.char.t0.toFixed(2)}s`];
+function tipForChar(hit: HitResult, unitSec: number): TipContent {
+  const lines = [`starts at ${hit.char.t0.toFixed(2)}s`];
   const g = hit.char.leadGap;
   if (g && g.targetUnits > 0 && hit.row === "you") {
     const pct = (g.units / g.targetUnits - 1) * 100;
@@ -76,18 +92,15 @@ function tipForChar(hit: HitResult, unitSec: number): string {
   let units = 0;
   for (const b of hit.char.blocks) units += b.units;
   lines.push(`runs ${(units * unitSec * 1000).toFixed(0)} ms`);
-  return lines.join("<br>");
+  return { char: hit.char.char, lines };
 }
 
-function tipFor(hit: HitResult, unitSec: number): string {
+function tipFor(hit: HitResult, unitSec: number): TipContent {
   const b = hit.block;
   const ms = b.units * unitSec * 1000;
   // Name the class it is *graded* as, so the target figure below makes sense,
   // and say what the decoder actually read when the two disagree.
-  const lines = [
-    `<b>${hit.char.char}</b> — ${CLASS_LONG[b.targetKind]}`,
-    `${ms.toFixed(0)} ms / ${b.units.toFixed(2)}u`,
-  ];
+  const lines = [`${ms.toFixed(0)} ms / ${b.units.toFixed(2)}u`];
   if (b.targetUnits > 0 && hit.row === "you") {
     const pct = (b.units / b.targetUnits - 1) * 100;
     lines.push(
@@ -96,7 +109,7 @@ function tipFor(hit: HitResult, unitSec: number): string {
   }
   if (b.targetKind !== b.kind) lines.push(`read as ${CLASS_LONG[b.kind]}`);
   if (hit.row === "you") lines.push(`at ${b.t0.toFixed(2)}s`);
-  return lines.join("<br>");
+  return { char: hit.char.char, note: CLASS_LONG[b.targetKind], lines };
 }
 
 export function ChartView({
@@ -163,12 +176,12 @@ export function ChartView({
       onZoom: (...a) => cb.current.onZoom?.(...a),
       onScroll: (...a) => cb.current.onScroll?.(...a),
       onHover: (hit, x, y) => {
-        const html = hit
+        const content = hit
           ? blocksRef.current
             ? tipForChar(hit, unitRef.current)
             : tipFor(hit, unitRef.current)
           : null;
-        setTip(html ? { html, x, y } : null);
+        setTip(content ? { ...content, x, y } : null);
       },
     });
     chartRef.current = chart;
@@ -218,10 +231,16 @@ export function ChartView({
             left: Math.min(tip.x + 14, window.innerWidth - 288),
             top: tip.y + 16,
           }}
-          // The tooltip is assembled from measured numbers and a character the
-          // decoder produced, never from anything a user typed.
-          dangerouslySetInnerHTML={{ __html: tip.html }}
-        />
+        >
+          <b>{tip.char}</b>
+          {tip.note ? ` — ${tip.note}` : null}
+          {tip.lines.map((line, i) => (
+            <Fragment key={i}>
+              <br />
+              {line}
+            </Fragment>
+          ))}
+        </div>
       )}
     </>
   );

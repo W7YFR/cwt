@@ -16,6 +16,9 @@ app/.vitest/
 *.swp
 .DS_Store
 
+.claude/
+CLAUDE.local.md
+
 # Local audio scratch (recordings live elsewhere; don't commit samples)
 *.wav
 *.mp3

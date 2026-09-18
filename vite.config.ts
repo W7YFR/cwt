@@ -42,7 +42,10 @@ export default defineConfig({
     outDir: "../dist",
     emptyOutDir: true,
     target: "es2022",
-    sourcemap: true,
+    // Off: the site is public and the source is on GitHub, so shipping .map
+    // files next to the bundle adds weight without adding anything readable
+    // that a reader could not already get from the repo.
+    sourcemap: false,
   },
   test: {
     globals: true,

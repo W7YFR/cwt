@@ -1,8 +1,15 @@
 # Test fixtures
 
-Short **real** CW recordings used by `tests/test_fixture.py`. They exercise the
-decoder against genuine keying (envelope shape, timing jitter, background noise)
-that the synthetic tests can't reproduce.
+Short **real** CW recordings. They exercise the decoder against genuine keying
+(envelope shape, timing jitter, background noise) that the synthetic tests can't
+reproduce.
+
+They reach the tests as *oracle cases* rather than by being decoded afresh each
+run: `app/test/oracle/` holds one JSON per recording — segments, tone, expected
+text — and `index.json` lists them. `app/test/pure/oracle-dsp.test.ts` holds
+this decoder to those numbers within a stated tolerance, and everything in the
+pure and DOM tiers builds its reviews from the same cases via
+`ORACLE_CASES` (`app/test/oracle-data.ts`).
 
 Keep them small and generic — a few seconds, mono, ideally 8 kHz so the file is
 well under ~200 KB. Content uses the example callsign `AB1CD` (no real stations).
@@ -60,11 +67,17 @@ keeps the committed file tiny. A couple of seconds of message plus a little
 leading/trailing silence is plenty. Real hand-sent or off-air audio is even more
 valuable than tool-generated — the point is to test on non-ideal keying.
 
-To add a fixture: drop the WAV here and add a row to `FIXTURES` in
-`tests/test_fixture.py` with its expected message and speed.
+To add a fixture: drop the WAV here, put its oracle JSON in `app/test/oracle/`,
+and list that file in `app/test/oracle/index.json`. Wiring it into the index is
+not optional bookkeeping — `app/test/pure/fixtures.test.ts` compares the index
+against `ORACLE_CASES` and fails if a dumped case never got wired in, which is
+the one way a new recording can sit on disk while every tier quietly goes on
+testing the subset that came before it.
 
-**Fixtures must be intact recordings.** `test_fixture_has_no_dropouts` rejects
-any file with dropped audio buffers — they click, shorten dits and dahs, and
-read back faster than they were keyed, which would silently poison the speed
-assertions. If a capture fails that check, the recording is the problem, not
-the decoder: capture it again with a different input path.
+**Fixtures must be intact recordings.** A file with dropped audio buffers clicks,
+shortens dits and dahs, and reads back faster than it was keyed — which would
+silently poison the speed assertions rather than failing them. Nothing checks
+for this automatically any more (the check went with the Python implementation),
+so it is on you at capture time: if a recording sounds like it stuttered, it did,
+and the recording is the problem rather than the decoder. Capture it again with a
+different input path.
