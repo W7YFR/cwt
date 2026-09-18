@@ -146,10 +146,37 @@ export function estimateTiming(
   expected?: string | null,
 ): Timing {
   const marks = segs.filter((s) => s[0] === 1).map((s) => s[1]);
-  const gaps = segs.filter((s) => s[0] === 0).map((s) => s[1]);
   if (marks.length === 0) {
     throw new Error("No keyed tone detected — check tone frequency / input.");
   }
+
+  /* Only the silences BETWEEN marks measure spacing.
+   *
+   * A recording opens and closes with dead air — the capture starts when you
+   * click and ends when you click, and even after trimming there is half a
+   * second of pad left at each end by design. Those two silences are not gaps
+   * between anything: nothing was keyed on one side of them, so they say
+   * nothing about how the sender spaced their sending.
+   *
+   * Counted, they are simply outliers among dozens of real gaps and the
+   * clustering below absorbs them. But send ONE character — a prosign, a
+   * single letter drilled on its own — and there are no real inter-character
+   * gaps at all, so the two pads become the entire evidence for the character
+   * gap: half a second of it, read as enormously Farnsworthed sending. A
+   * clean <BK> at 25 wpm was reported as 25 wpm characters at 13 overall,
+   * which for a single character cannot be true at any speed — with no gaps
+   * inside it, the overall rate IS the character rate. */
+  let firstMark = -1;
+  let lastMark = -1;
+  for (let i = 0; i < segs.length; i++) {
+    if (segs[i]![0] !== 1) continue;
+    if (firstMark < 0) firstMark = i;
+    lastMark = i;
+  }
+  const gaps = segs
+    .slice(firstMark, lastMark + 1)
+    .filter((s) => s[0] === 0)
+    .map((s) => s[1]);
 
   // --- Marks: cluster into dit and dah. ---------------------------------- //
   const markCenters = kmeans1d(marks, 2);
