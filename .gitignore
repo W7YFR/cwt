@@ -10,8 +10,13 @@ node_modules/
 # every run that fails. Artifacts of a run, not of the project.
 app/.vitest/
 
-# Editor / OS cruft
-.vscode/
+# Editor / OS cruft. .vscode is ignored by its contents rather than wholesale:
+# settings.json carries the setting that keeps everyone's editor on the same
+# compiler as CI (see the file), which is worth nothing at all if it cannot
+# travel with the repo. Personal files in there still stay personal.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.swp
 .DS_Store
