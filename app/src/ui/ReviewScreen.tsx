@@ -78,6 +78,7 @@ export interface ReviewScreenProps {
     expected: string;
     charWpm: number;
     farnsworthWpm: number;
+    times: number;
   }): void;
   onBack(): void;
 }
@@ -772,6 +773,7 @@ export function ReviewScreen({
           expected={settings.expected}
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
+          times={settings.times}
           onCancel={() => setStarting(false)}
           onStart={(next) => {
             setStarting(false);

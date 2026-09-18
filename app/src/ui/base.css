@@ -1076,9 +1076,12 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   font-size: 12px;
   color: var(--ink-faint);
 }
-.dialog .speeds { display: flex; gap: 16px; flex-wrap: wrap; }
-.dialog .speeds .group { flex: 1 1 160px; }
-.dialog .speeds input { width: 100%; }
+/* The row of numbers a session is fixed at: both speeds and the pass count.
+   Wraps rather than shrinking, so a narrow dialog drops one onto its own line
+   instead of squeezing three steppers down to nothing. */
+.dialog .numbers { display: flex; gap: 16px; flex-wrap: wrap; }
+.dialog .numbers .group { flex: 1 1 120px; }
+.dialog .numbers input { width: 100%; }
 .dialog .confirm { margin-top: 6px; }
 
 /* A page to read rather than a form to fill in, so it is set as prose: a

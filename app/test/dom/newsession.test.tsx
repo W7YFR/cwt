@@ -4,8 +4,8 @@
  * mid-session. This is better: a warning tells you that you might be doing the
  * wrong thing and then lets you do it anyway, whereas a way to say "new
  * session" is the right thing, named. So what matters here is that it collects
- * everything a session is — one message, one speed — and hands it over in one
- * act.
+ * everything a session is — one message, one speed, one number of passes —
+ * and hands it over in one act.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -21,6 +21,7 @@ function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
       expected="CQ DE W7YFR"
       charWpm={20}
       farnsworthWpm={20}
+      times={1}
       onStart={onStart}
       onCancel={onCancel}
       {...over}
@@ -37,7 +38,7 @@ describe("starting a new session", () => {
     expect(document.activeElement).toBe(text());
   });
 
-  it("hands over the message and both speeds together", async () => {
+  it("hands over the message, both speeds and the pass count together", async () => {
     const user = userEvent.setup();
     const { onStart } = open();
     await user.clear(text());
@@ -47,7 +48,33 @@ describe("starting a new session", () => {
       expected: "PARIS PARIS",
       charWpm: 20,
       farnsworthWpm: 20,
+      times: 1,
     });
+  });
+
+  it("collects how many passes make up an attempt", async () => {
+    /* Part of what a session is fixed at, like the speed: a stack whose rows
+       are one pass and five passes is not comparable either. It opens at
+       whatever the session before it ran, so the common case is to leave it
+       alone. */
+    const user = userEvent.setup();
+    const { onStart } = open({ times: 3 });
+    const box = screen.getByLabelText(/times/i) as HTMLInputElement;
+    expect(box.value).toBe("3");
+    await user.clear(box);
+    await user.type(box, "5");
+    await user.click(screen.getByTestId("start-session"));
+    expect(onStart.mock.calls[0]![0].times).toBe(5);
+  });
+
+  it("hands over a pass count the rest of the app can use as a length", async () => {
+    /* Emptying the box leaves nothing under the caret to parse, and a NaN
+       reaching the target builder is an empty sheet rather than a short one. */
+    const user = userEvent.setup();
+    const { onStart } = open({ times: 3 });
+    await user.clear(screen.getByLabelText(/times/i));
+    await user.click(screen.getByTestId("start-session"));
+    expect(onStart.mock.calls[0]![0].times).toBe(3);
   });
 
   it("shows the message the way it will be sent", async () => {

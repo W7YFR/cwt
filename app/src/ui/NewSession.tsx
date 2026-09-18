@@ -1,8 +1,8 @@
 /* Starting a session on purpose.
  *
- * A session is several attempts at ONE message at ONE speed — that is what
- * makes its rows comparable and its drift traces worth putting on the same
- * axis. Changing the target halfway through is therefore a bigger act than
+ * A session is several attempts at ONE message, at ONE speed, over the same
+ * number of passes — that is what makes its rows comparable and its drift
+ * traces worth putting on the same axis. Changing the target halfway through is therefore a bigger act than
  * editing a text box, and it used to be available only as that: type over the
  * intended message and every attempt already recorded is re-graded against
  * text it never aimed at.
@@ -19,13 +19,22 @@
  */
 
 import { useEffect, useState } from "react";
+import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
+import { TIMES_HELP } from "./copy";
 import { useUpperField } from "./useUpperField";
 
 export interface NewSessionProps {
   charWpm: number;
   farnsworthWpm: number;
+  /** How many passes of the message make up one attempt — see ReviewSettings. */
+  times: number;
   expected: string;
-  onStart(next: { expected: string; charWpm: number; farnsworthWpm: number }): void;
+  onStart(next: {
+    expected: string;
+    charWpm: number;
+    farnsworthWpm: number;
+    times: number;
+  }): void;
   onCancel(): void;
 }
 
@@ -38,6 +47,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   const [text, setText] = useState(props.expected.toUpperCase());
   const [charWpm, setCharWpm] = useState(props.charWpm);
   const [farnsworthWpm, setFarnsworthWpm] = useState(props.farnsworthWpm);
+  const [times, setTimes] = useState(props.times);
   /* Upper case as it is typed, not only once Start is pressed. The message is
      upper-cased on the way out either way, and a box that shows one thing
      while promising another is the sort of small lie that makes you check. */
@@ -58,6 +68,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
       // Overall speed can never exceed character speed. Clamped here rather
       // than refused, so a leftover Farnsworth setting cannot block a start.
       farnsworthWpm: Math.min(farnsworthWpm, charWpm),
+      times: passCount(times),
     });
 
   return (
@@ -83,8 +94,8 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
         <h2 id="newsession-title">New session</h2>
         <p className="hint">
           Everything recorded so far is cleared. The attempts in a session are
-          all at one message and one speed, which is what lets them be read
-          against each other.
+          all at one message, one speed and one number of passes, which is what
+          lets them be read against each other.
         </p>
 
         <label htmlFor="ns-text">Target message</label>
@@ -98,18 +109,35 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
           onChange={sent.onChange}
         />
 
-        <div className="speeds">
+        {/* The three numbers a session is fixed at, in one row. Times belongs
+            here and not only in the control row above the chart: it is as much
+            a property of what the attempts are as the speed is, and a stack of
+            rows where some are one pass and some are five is no more
+            comparable than a stack at two speeds. */}
+        <div className="numbers">
           <div className="group">
             <label htmlFor="ns-wpm">Character speed</label>
-            <SpeedField id="ns-wpm" value={charWpm} onChange={setCharWpm} />
+            <CountField id="ns-wpm" value={charWpm} onChange={setCharWpm} min={5} />
           </div>
           <div className="group">
             <label htmlFor="ns-farns">Overall speed</label>
-            <SpeedField
+            <CountField
               id="ns-farns"
               value={farnsworthWpm}
               onChange={setFarnsworthWpm}
+              min={5}
               max={charWpm}
+            />
+          </div>
+          <div className="group" title={TIMES_HELP}>
+            <label htmlFor="ns-times">Times</label>
+            <CountField
+              id="ns-times"
+              value={times}
+              onChange={setTimes}
+              min={TIMES_MIN}
+              max={TIMES_MAX}
+              hardMax={TIMES_MAX}
             />
           </div>
         </div>
@@ -125,35 +153,44 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   );
 }
 
-/** A speed in words per minute.
+/** A whole number: a speed in words per minute, or a count of passes.
  *
  * Held as text while it is being edited, for the reason `NumberField` is: a
  * control that falls back to the committed value on anything unparseable puts
- * the old number straight back under the caret. */
-function SpeedField({
+ * the old number straight back under the caret.
+ *
+ * `max` is the ceiling the value is committed under, which for the overall
+ * speed is the character speed and moves as that one is typed; `hardMax` is
+ * what the box itself says, and stays put so the stepper does not shrink
+ * under the pointer. */
+function CountField({
   id,
   value,
   onChange,
+  min,
   max = 60,
+  hardMax = 60,
 }: {
   id: string;
   value: number;
   onChange(v: number): void;
+  min: number;
   max?: number;
+  hardMax?: number;
 }): React.ReactElement {
   const [draft, setDraft] = useState<string | null>(null);
   return (
     <input
       type="number"
       id={id}
-      min={5}
-      max={60}
+      min={min}
+      max={hardMax}
       step={1}
       value={draft ?? value}
       onChange={(e) => {
         setDraft(e.target.value);
         const n = Number(e.target.value);
-        if (Number.isFinite(n) && n >= 5) onChange(Math.min(n, max));
+        if (Number.isFinite(n) && n >= min) onChange(Math.min(n, max));
       }}
       onBlur={() => setDraft(null)}
     />
