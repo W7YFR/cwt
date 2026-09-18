@@ -5,7 +5,9 @@
  * wrong thing and then lets you do it anyway, whereas a way to say "new
  * session" is the right thing, named. So what matters here is that it collects
  * everything a session is — one message, one speed, one number of passes —
- * and hands it over in one act.
+ * and hands it over in one act. Two acts, strictly: it also offers to open the
+ * microphone on the way out, because the click after this dialog is almost
+ * always the record button.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -44,12 +46,44 @@ describe("starting a new session", () => {
     await user.clear(text());
     await user.type(text(), "paris paris");
     await user.click(screen.getByTestId("start-session"));
-    expect(onStart).toHaveBeenCalledWith({
-      expected: "PARIS PARIS",
-      charWpm: 20,
-      farnsworthWpm: 20,
-      times: 1,
-    });
+    expect(onStart).toHaveBeenCalledWith(
+      { expected: "PARIS PARIS", charWpm: 20, farnsworthWpm: 20, times: 1 },
+      false,
+    );
+  });
+
+  it("offers to open the microphone on the same click", async () => {
+    /* Saving and then reaching for the record button is two acts for one
+       intention, and the second one is the same click every time. The dot
+       collects the session and asks for the microphone together — same
+       payload, so nothing about what the session IS can differ between the
+       two ways out. */
+    const user = userEvent.setup();
+    const { onStart } = open({ expected: "CQ TEST", times: 2 });
+    await user.click(screen.getByTestId("start-session-recording"));
+    expect(onStart).toHaveBeenCalledWith(
+      { expected: "CQ TEST", charWpm: 20, farnsworthWpm: 20, times: 2 },
+      true,
+    );
+  });
+
+  it("says which of the two it is, out loud", () => {
+    /* One is a dot with no text in it. Screen-reader users get the whole
+       choice or they get one button and a mystery. */
+    open();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /save and record/i })).toBeTruthy();
+  });
+
+  it("takes Enter as saving, not as recording", async () => {
+    /* Enter is how the speed boxes are left, and opening the microphone is
+       not something to do by accident on the way out of a number field. */
+    const user = userEvent.setup();
+    const { onStart } = open();
+    await user.click(screen.getByLabelText(/character speed/i));
+    await user.keyboard("{Enter}");
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(onStart.mock.calls[0]![1]).toBe(false);
   });
 
   it("collects how many passes make up an attempt", async () => {

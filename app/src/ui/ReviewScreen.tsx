@@ -775,9 +775,16 @@ export function ReviewScreen({
           farnsworthWpm={settings.farnsworthWpm}
           times={settings.times}
           onCancel={() => setStarting(false)}
-          onStart={(next) => {
+          onStart={(next, record) => {
             setStarting(false);
             onNewSession(next);
+            /* The session is declared and the microphone opens on the same
+               click. Safe in this order because the state change above lands
+               before the device does: `start` awaits getUserMedia, so the
+               blank take and the new target are already on screen by the time
+               anything is being captured — the pacing cursor included, which
+               would otherwise count in against the message this replaced. */
+            if (record) void rec.start();
           }}
         />
       )}

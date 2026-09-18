@@ -21,6 +21,7 @@
 import { useEffect, useState } from "react";
 import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
+import { RecDot } from "./Record";
 import { useUpperField } from "./useUpperField";
 
 export interface NewSessionProps {
@@ -29,12 +30,18 @@ export interface NewSessionProps {
   /** How many passes of the message make up one attempt — see ReviewSettings. */
   times: number;
   expected: string;
-  onStart(next: {
-    expected: string;
-    charWpm: number;
-    farnsworthWpm: number;
-    times: number;
-  }): void;
+  /** Begin the session. `record` asks for the microphone to open as the
+   *  dialog closes — the same act, without the trip back through the record
+   *  bar to press the button that was always going to be pressed next. */
+  onStart(
+    next: {
+      expected: string;
+      charWpm: number;
+      farnsworthWpm: number;
+      times: number;
+    },
+    record: boolean,
+  ): void;
   onCancel(): void;
 }
 
@@ -61,15 +68,18 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
     box.current?.select();
   }, []);
 
-  const start = () =>
-    props.onStart({
-      expected: oneLine(text),
-      charWpm,
-      // Overall speed can never exceed character speed. Clamped here rather
-      // than refused, so a leftover Farnsworth setting cannot block a start.
-      farnsworthWpm: Math.min(farnsworthWpm, charWpm),
-      times: passCount(times),
-    });
+  const start = (record: boolean) =>
+    props.onStart(
+      {
+        expected: oneLine(text),
+        charWpm,
+        // Overall speed can never exceed character speed. Clamped here rather
+        // than refused, so a leftover Farnsworth setting cannot block a start.
+        farnsworthWpm: Math.min(farnsworthWpm, charWpm),
+        times: passCount(times),
+      },
+      record,
+    );
 
   return (
     <div
@@ -88,7 +98,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
           if (e.key === "Escape") props.onCancel();
           // Enter sends from the speed boxes; in the textarea it is a newline,
           // which collapses away anyway and is not worth stealing.
-          if (e.key === "Enter" && e.target !== box.current) start();
+          if (e.key === "Enter" && e.target !== box.current) start(false);
         }}
       >
         <h2 id="newsession-title">New session</h2>
@@ -142,10 +152,33 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
           </div>
         </div>
 
+        {/* Two ways out, because there are two things you came to do.
+            Save settles what the session is and leaves you on the review with
+            the target ready to play — the right ending when you want to hear
+            it first, or set it up now and send later. The dot is the other
+            case, and the common one: you know what you are about to send, and
+            the next click after Save would have been the record button
+            anyway.
+
+            So the dot carries the emphasis. The blue border marks the action
+            the rest of a group lead up to, and what this dialog leads up to is
+            sending — Save is the way out for when you are not ready to yet.
+            Last in the row and carrying the same red dot as every other way
+            into the microphone, so the emphasis is the only thing that had to
+            be learned. */}
         <div className="confirm">
           <button onClick={props.onCancel}>Cancel</button>
-          <button className="primary" data-testid="start-session" onClick={start}>
-            Start
+          <button data-testid="start-session" onClick={() => start(false)}>
+            Save
+          </button>
+          <button
+            className="iconbtn primary"
+            data-testid="start-session-recording"
+            aria-label="Save and record"
+            title="Save and start recording straight away"
+            onClick={() => start(true)}
+          >
+            <RecDot />
           </button>
         </div>
       </div>
