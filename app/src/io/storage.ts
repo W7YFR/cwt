@@ -397,10 +397,99 @@ export interface Prefs {
   runSort?: string;
 }
 
+/* What each preference has to look like coming back off the wire.
+ *
+ * `Prefs` is a description of what we wrote, not a guarantee about what we will
+ * read. Storage is a string keyed by origin: a half-finished write, a hand-edit
+ * in devtools, an older build of this app, or — on a GitHub Pages project site,
+ * where every project on the account shares one `*.github.io` origin — some
+ * other page entirely can all leave something else under this key. Casting that
+ * straight to `Prefs` puts whatever it actually is in front of render.
+ *
+ * Typed as an exhaustive `Record<keyof Prefs, ...>`, so adding a preference
+ * without saying how to recognize it fails to compile rather than silently
+ * arriving unchecked. */
+type Check = (value: unknown) => boolean;
+
+const isStr: Check = (v) => typeof v === "string";
+/* Finite, so neither a NaN nor an Infinity smuggled in by a future encoding can
+   reach arithmetic and turn a whole screen of figures into NaN. */
+const isNum: Check = (v) => typeof v === "number" && Number.isFinite(v);
+const isBool: Check = (v) => typeof v === "boolean";
+const oneOf =
+  (...allowed: readonly string[]): Check =>
+  (v) =>
+    typeof v === "string" && allowed.includes(v);
+
+/** `{ ids, selected }`, with `selected` an index into `ids` rather than merely
+ *  a number — an out-of-range one would read a take that is not there. */
+const isSession: Check = (v) => {
+  if (typeof v !== "object" || v === null) return false;
+  const s = v as { ids?: unknown; selected?: unknown };
+  return (
+    Array.isArray(s.ids) &&
+    s.ids.every(isStr) &&
+    typeof s.selected === "number" &&
+    Number.isInteger(s.selected) &&
+    s.selected >= 0 &&
+    s.selected < s.ids.length
+  );
+};
+
+const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
+  deviceId: isStr,
+  profileId: isStr,
+  currentId: isStr,
+  session: isSession,
+  keyerWpm: isNum,
+  gainDb: isNum,
+  tolerance: isNum,
+  charWpm: isNum,
+  farnsworthWpm: isNum,
+  expected: isStr,
+  view: isStr,
+  times: isNum,
+  collapseRests: isBool,
+  paceCursor: isBool,
+  paceLeadSec: isNum,
+  paceAbsolute: isBool,
+  charMarkers: isBool,
+  runScores: isBool,
+  advancedGrading: isBool,
+  showDownloads: isBool,
+  showHints: isBool,
+  showChartControls: isBool,
+  showRuns: oneOf("all", "last5", "last3", "last"),
+  captionAll: isBool,
+  flashCard: isBool,
+  wordPreview: isBool,
+  runSort: isStr,
+};
+
 export function loadPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    return raw ? (JSON.parse(raw) as Prefs) : {};
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+    const source = parsed as Record<string, unknown>;
+
+    // Field by field rather than all-or-nothing, the same bargain `loadProfiles`
+    // strikes: these preferences are independent of each other, and a corrupt
+    // `view` is no reason to also forget which microphone you record on. What
+    // fails is dropped, and its caller falls back to that field's own default.
+    //
+    // Building the result from PREF_SHAPE's keys rather than from the parsed
+    // object's is also what keeps a stored key we have never heard of — and any
+    // `__proto__`-shaped one — from being copied across at all.
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(PREF_SHAPE) as (keyof Prefs)[]) {
+      const value = source[key];
+      if (value !== undefined && PREF_SHAPE[key](value)) out[key] = value;
+    }
+    return out as Prefs;
   } catch {
     // A corrupt or blocked store is not worth failing the app over.
     return {};

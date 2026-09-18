@@ -4,6 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
+<!-- A strict policy, and a cheap one: this app makes no network requests of
+     any kind, so `connect-src 'none'` is a description of it rather than a
+     restriction. Whatever you record never had a way off the machine, and now
+     that is enforced rather than merely true.
+
+     Three entries are load-bearing and none of them are guessable:
+
+       script-src ... blob:  the microphone's AudioWorklet is compiled from a
+                             source string and loaded through a blob URL (see
+                             capture/mic.ts). Drop `blob:` and recording breaks
+                             with nothing in the UI to say why.
+       style-src 'unsafe-inline'
+                             React writes `style={{...}}` as an inline style
+                             attribute, which `style-src-attr` governs.
+       img-src ... data:     the select-menu chevrons in base.css are data: SVGs.
+
+     `frame-ancestors` is absent on purpose: it is ignored in a meta policy and
+     has to arrive as a real header, which GitHub Pages cannot send. Same for
+     Permissions-Policy and X-Content-Type-Options — putting them here would
+     look like protection without being any. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'">
+<!-- The one outbound link is the author's QRZ page; it carries rel="noreferrer"
+     itself, and this makes that the default for anything added later. -->
+<meta name="referrer" content="no-referrer">
 <title>CWT — CW Trainer</title>
 <!-- Relative, not root-absolute: GitHub Pages serves a project site from
      /<repo>/, and an icon at /favicon.ico would be looked for on the domain

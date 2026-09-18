@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "types": ["vitest/globals", "node"],
+    "types": ["vitest/globals", "node", "vite/client"],
 
     /* The point of adopting TypeScript here is that the data shapes are
        checked, so none of this is negotiable per-file. */
@@ -24,9 +24,8 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
 
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["app/src/*"]
+      "@/*": ["./app/src/*"]
     }
   },
   "include": ["app/src", "app/test", "vite.config.ts"]
