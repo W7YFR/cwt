@@ -75,6 +75,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # No cache and nothing installed — the script is plain node with no
+      # dependencies. This is here so it runs on the node the project declares
+      # rather than whatever the runner image happens to ship, which is the
+      # same reason the other jobs read the version from package.json.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+
       # The branch name is the signal rather than the commit, since GitHub
       # checks out a throwaway merge commit here whose subject says nothing
       # about anybody's intent.
@@ -95,7 +103,11 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          # Read from package.json rather than written here. `engines.node`
+          # says which runtime this project is, and a number in a workflow is
+          # a second answer to that question that nobody updates at the same
+          # time as the first.
+          node-version-file: package.json
           cache: npm
 
       # `ci` rather than `install`: the lockfile is the input, and a build that
@@ -123,7 +135,11 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          # Read from package.json rather than written here. `engines.node`
+          # says which runtime this project is, and a number in a workflow is
+          # a second answer to that question that nobody updates at the same
+          # time as the first.
+          node-version-file: package.json
           cache: npm
       - run: npm ci
 

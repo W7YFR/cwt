@@ -225,6 +225,17 @@ make test-all      # all of it, including real Chromium
 make serve:latest  # build, then serve it at localhost:4173
 ```
 
+### Which Node
+
+`engines.node` in package.json says it, and that is the only place it is
+written down: CI reads the same field through `node-version-file`, so a
+workflow cannot drift from the project.
+`@types/node` tracks the same
+major, or the typecheck is checking against an API surface that is not the one
+running the tests.
+
+npm warns if your Node does not satisfy it. 
+
 ### The module layout
 
 ```
