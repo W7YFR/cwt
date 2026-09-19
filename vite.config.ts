@@ -115,6 +115,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "browser",
+          setupFiles: ["./test/setup-browser.ts"],
           include: ["src/**/*.browser.test.ts", "test/browser/**/*.test.ts"],
           browser: {
             enabled: true,

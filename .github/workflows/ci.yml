@@ -1,0 +1,176 @@
+# Test every pull request; build and publish every push to main.
+#
+# One workflow rather than two, so the deploy genuinely depends on the tests:
+# `deploy` needs `build` needs `test`, and a red test stops the site from
+# moving. Two separate workflows would run side by side and a bad merge could
+# publish while its tests were still going red.
+#
+# Nothing here can write to the repository. There is no token beyond the
+# read-only default, no deploy key, no secret of any kind — which is the point:
+# the version bump that would otherwise need write access is made by a person
+# on a branch (`make bump`), and the `version` job below only checks that it is
+# there. A pull request that runs hostile code in CI — and on `pull_request` it
+# may, that is what the trigger means — finds an empty cupboard.
+#
+# The major versions are not in step with each other and that is fine:
+# `upload-pages-artifact` is a composite action with no node runtime, and v3 is
+# what GitHub's own Pages starter pairs with `deploy-pages@v5`. The others are
+# on v5 because v4 declared `using: node20`, which the runners have deprecated
+# — a workflow on v4 still runs, on node24, and says so in every log.
+#
+# Actions are referenced by tag, and every one of them is first-party
+# `actions/*`. That is the condition, not an accident: a tag is a movable ref,
+# so using one means trusting whoever can move it, and for GitHub's own actions
+# that bar is high enough — while the alternative, pinning commit SHAs, freezes
+# security fixes out until somebody remembers to look. Adding a THIRD-PARTY
+# action changes that calculation completely and it should be pinned to a SHA,
+# because the attacks that happen in the wild are tags moved on small
+# repositories with one maintainer.
+#
+# The trigger is `pull_request`, never `pull_request_target`. That one word is
+# the difference: `pull_request_target` runs with secrets and write access in
+# the base repository's context, and combined with checking out the incoming
+# code it is how the credential-harvesting attacks on Actions actually work.
+# There is nothing here to harvest, and it stays that way by not using it.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # So a deploy can be re-run without an empty commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys serialize on a single group, and in-flight ones are left to finish
+# rather than cancelled, so a half-uploaded artifact never becomes the live
+# site.
+#
+# PR runs deliberately get a different group, one per branch. Sharing the deploy
+# group looked tidier and was a trap: GitHub keeps at most one running plus one
+# pending per group and cancels the previously pending one, so a third PR
+# arriving would cancel a second PR whose tests had not run yet. That PR then
+# reports "cancelled" rather than "failed", which is not a state anybody reads
+# as "untested". Per-branch, with cancel-in-progress on, gives the behavior
+# that actually helps: pushing a fixup supersedes your own stale run and nobody
+# else's.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Is the version bump in this branch? Required alongside `test`, and first
+  # because it is the cheap one — no install, no browser, just node reading two
+  # files. Forgetting `make bump` comes back in seconds rather than after the
+  # full suite.
+  version:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # Deep, because the check reads package.json as of the base commit and a
+      # depth-1 clone does not contain it.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # No cache and nothing installed — the script is plain node with no
+      # dependencies. This is here so it runs on the node the project declares
+      # rather than whatever the runner image happens to ship, which is the
+      # same reason the other jobs read the version from package.json.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+
+      # The branch name is the signal rather than the commit, since GitHub
+      # checks out a throwaway merge commit here whose subject says nothing
+      # about anybody's intent.
+      - name: Check the version bump
+        id: version
+        run: node scripts/version.mjs --check --branch "$HEAD_REF" --base "$BASE_SHA"
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+      - name: Say what it will release
+        run: echo "Merging this releases **v${{ steps.version.outputs.version }}** (${{ steps.version.outputs.level }} bump from ${{ steps.version.outputs.previous }})." >> "$GITHUB_STEP_SUMMARY"
+
+  # The gate. Required in the ruleset on main, along with `version`.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # Read from package.json rather than written here. `engines.node`
+          # says which runtime this project is, and a number in a workflow is
+          # a second answer to that question that nobody updates at the same
+          # time as the first.
+          node-version-file: package.json
+          cache: npm
+
+      # `ci` rather than `install`: the lockfile is the input, and a build that
+      # quietly resolved a different tree than the one tested is not the build
+      # anyone asked for.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # Pure + DOM. Milliseconds, no browser needed.
+      - run: npm test
+
+      # The third tier needs a real Chromium — jsdom has no canvas and no Web
+      # Audio, so the rendering and capture paths are only actually exercised
+      # here. `--with-deps` because a bare runner lacks the shared libraries
+      # the browser links against.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+
+  build:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # Read from package.json rather than written here. `engines.node`
+          # says which runtime this project is, and a number in a workflow is
+          # a second answer to that question that nobody updates at the same
+          # time as the first.
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+
+      # The version in the footer comes from package.json, which this commit
+      # already carries — the branch brought it in. Nothing to compute here.
+      - run: npm run build
+
+      # No configure-pages step. Its job is to hand a framework the base path
+      # to bake in, and `base: "./"` in vite.config.ts means every asset is
+      # already addressed relatively — the built site works at a domain root or
+      # any subpath without being told which. It also reads the Pages config
+      # over the API, which this job's token has no permission for. Deploying
+      # needs the artifact and deploy-pages, and nothing else.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Say what was published
+        run: echo "Published **v$(node -p "require('./package.json').version")**." >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Scoped to this job, so only the step that actually publishes can write —
+    # and what it writes is the Pages site, not the repository.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

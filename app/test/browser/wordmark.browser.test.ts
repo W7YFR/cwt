@@ -22,8 +22,6 @@ let host: HTMLDivElement;
 let root: Root | null = null;
 
 beforeEach(() => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
   host = document.createElement("div");
   // The rules are scoped to the landing screen, which is where the big form
   // appears.
@@ -41,7 +39,12 @@ afterEach(() => {
 });
 
 async function draw(index: number): Promise<HTMLElement> {
-  root = createRoot(host);
+  /* One root for the host, re-rendered — not a fresh root per drawing. The
+     catalog test draws all of them in a loop, and a second createRoot() on a
+     container that already has one is React telling you it will not do what
+     you meant: forty-five of those, and the measurements after the first were
+     of a root nobody was updating. */
+  root ??= createRoot(host);
   const r = root;
   await act(async () => {
     r.render(createElement(Wordmark, { art: WORDMARKS[index]! }));

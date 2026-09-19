@@ -64,6 +64,27 @@ lock: node_modules ## Re-record what the DSP says about clean audio (deliberate!
 typecheck: node_modules ## Typecheck without emitting
 	npm run typecheck
 
+# ---- releasing ------------------------------------------------------------ #
+
+# The version moves on a branch, before the pull request, and CI only checks
+# that it moved. Nothing in the pipeline can write to the repository — no token,
+# no deploy key — which is only true because this step is a person's job.
+#
+# The bump comes from the branch you are standing on: feat/ is a minor, fix/
+# and chore/ are patches.
+.PHONY: bump\:dry
+bump\:dry: ## Say what this branch would release, change nothing
+	node scripts/version.mjs --dry-run --branch "$$(git rev-parse --abbrev-ref HEAD)"
+
+.PHONY: bump
+bump: ## Bump the version for this branch and commit it (run before the PR)
+	node scripts/version.mjs --commit --branch "$$(git rev-parse --abbrev-ref HEAD)"
+
+.PHONY: tag
+tag: ## Tag the current version at HEAD (on main, after merging)
+	@v=$$(node -p "require('./package.json').version"); \
+		git tag -a "v$$v" -m "v$$v" && echo "tagged v$$v — \`git push --tags\` when you mean it"
+
 # ---- housekeeping --------------------------------------------------------- #
 
 .PHONY: clean

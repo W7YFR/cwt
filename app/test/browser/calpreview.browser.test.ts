@@ -61,8 +61,6 @@ let container: HTMLDivElement;
 let root: Root | null = null;
 
 beforeEach(() => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
   container = document.createElement("div");
   // The charts size themselves to their host, and a zero-width host draws
   // nothing — which would pass every "did it render" check and no real one.

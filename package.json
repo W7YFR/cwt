@@ -1,10 +1,13 @@
 {
   "name": "cwt",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Browser CW keying trainer: record, decode, and grade your sending.",
   "license": "MIT",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -16,13 +19,15 @@
     "test:dom": "vitest run --project dom",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
-    "lock": "LOCK_RECORD=1 vitest run --project pure clean-path"
+    "lock": "LOCK_RECORD=1 vitest run --project pure clean-path",
+    "bump": "node scripts/version.mjs --commit --branch \"$(git rev-parse --abbrev-ref HEAD)\"",
+    "bump:dry": "node scripts/version.mjs --dry-run --branch \"$(git rev-parse --abbrev-ref HEAD)\""
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
-    "@types/node": "^22.20.2",
+    "@types/node": "^24.13.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

@@ -225,6 +225,17 @@ make test-all      # all of it, including real Chromium
 make serve:latest  # build, then serve it at localhost:4173
 ```
 
+### Which Node
+
+`engines.node` in package.json says it, and that is the only place it is
+written down: CI reads the same field through `node-version-file`, so a
+workflow cannot drift from the project.
+`@types/node` tracks the same
+major, or the typecheck is checking against an API surface that is not the one
+running the tests.
+
+npm warns if your Node does not satisfy it. 
+
 ### The module layout
 
 ```
@@ -303,6 +314,66 @@ resamples to the rate of the context it's called on, so decoding through a plain
 the sample rate out of the WAV header first and decodes into an offline context
 at exactly that rate; other formats get one fixed rate, so the answer still
 doesn't depend on the machine.
+
+### Versioning
+
+The version lives in `package.json` and shows up in the page footer, so a bug
+report can name the build it came from. It moves on your branch, before the
+pull request:
+
+```
+make bump:dry   # what this branch would release, nothing written
+make bump       # write it and make the release commit
+```
+
+`scripts/version.mjs` takes the bump from the branch you are standing on —
+`feat/` is a minor, `fix/` and `chore/` are patches, an unrecognized prefix is
+a patch rather than an error. It writes `package.json`, keeps the lockfile in
+step, and commits the pair as `chore: release vX.Y.Z`. That commit rides in
+with the change, so merging is what publishes the new version, and `main` is
+never written to by a machine.
+
+CI's only job about versions is to check that you did it. The `version` job
+compares the merged result against the base and fails if the bump is missing or
+weaker than the branch prefix asks for, naming the command that fixes it. A
+*stronger* bump passes: somebody who ran `--release major` on a `fix/` branch
+meant it.
+
+While the major is 0 a breaking change bumps the minor, because pre-1.0 that is
+the breaking axis; going to 1.0.0 is `--release major`, on purpose, by hand.
+
+Two people cannot both claim `0.2.0`: whichever branch merges second fails the
+check, and rebasing on `main` drops the now-duplicate release commit so
+`make bump` gives it the next number.
+
+Tags are not automatic. `make tag` annotates the current version at `HEAD`,
+which is a thing to do on `main` after merging, if you want one.
+
+#### Why CI cannot write anything
+
+Every job in `.github/workflows/ci.yml` runs with `contents: read`. There is no
+token, no deploy key, and no secret in the repository — the only elevated
+permission anywhere is `pages: write` on the job that uploads the built site,
+which cannot touch the repository at all.
+
+That is the reason the bump is yours to make rather than the pipeline's. A
+workflow that moved the version would need write access to `main`, and write
+access is the thing worth stealing. The attacks people get hit with here are
+not subtle: a pull request edits the workflow, CI runs it, and the job's
+credentials leave the building. On the `pull_request` trigger GitHub gives a
+fork's job no secrets and a read-only token, so there is nothing to take — but
+that guarantee is specifically about `pull_request`. **Never change it to
+`pull_request_target`**, which runs with the base repository's secrets and
+write access; that trigger, combined with checking out the incoming code, is
+how those attacks actually work.
+
+The repository settings that complete this, neither of which lives in the repo:
+
+- **Pages source: GitHub Actions** (Settings → Pages), or `deploy-pages` has
+  nothing to publish to.
+- **A ruleset on `main`** (Settings → Rules) requiring the `test` and `version`
+  checks and a pull request, with force-pushes and deletion blocked. Repository
+  admins are in the bypass list, so a direct push still works when you mean it.
 
 ### Deploying
 

@@ -14,6 +14,7 @@ import { loadPrefs, recallTake, rememberTake } from "@/io/storage";
 import { encodeWavBuffer } from "@/audio/wav";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
+import { APP_VERSION } from "@/build-info";
 import { caseNamed, takeFrom, SLOPPY } from "../fixture";
 /* The real stylesheet. Layout is part of what this file checks — which row the
    filename lands on, whether the drop veil swallows the drop it advertises —
@@ -109,17 +110,11 @@ let container: HTMLDivElement;
 let root: Root | null = null;
 
 beforeEach(() => {
-  /* React refuses to run act() outside an environment that has opted in, and
-     without the flag nothing renders at all — which reads as every assertion
-     failing against an empty page rather than as a setup problem.
-
-     Mounted through react-dom directly rather than through Testing Library:
+  /* Mounted through react-dom directly rather than through Testing Library:
      under the browser runner the library is pre-bundled with its own copy of
      React, and hooks called against a second copy fail with a null internals
      object. The DOM tier uses the library and is the right place for anything
      that wants its queries; this one only needs a root. */
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
   container = document.createElement("div");
   document.body.appendChild(container);
   localStorage.clear();
@@ -853,6 +848,14 @@ const showDownloads = () => tickSetting("show-downloads");
     const sign = foot.querySelector<HTMLAnchorElement>("a")!;
     expect(sign.href).toBe("https://www.qrz.com/db/W7YFR");
     expect(sign.target).toBe("_blank");
+
+    /* And which build it is, so a bug report can name one. Fixed at build
+       time rather than read at render — unlike the year above — because it is
+       a fact about this bundle. Asserted against the pattern as well as
+       against the constant: `v"0.1.0"`, quotes and all, is what this tier
+       showed when the version arrived through vite's `define`. */
+    expect(foot.textContent).toContain(`v${APP_VERSION}`);
+    expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   it("lines up every control in the settings rows", async () => {
@@ -1216,7 +1219,12 @@ const showDownloads = () => tickSetting("show-downloads");
       button.focus();
       expect(document.activeElement, `the ${screen} button takes focus`).toBe(button);
 
-      root?.unmount();
+      /* Through act, like the afterEach does: unmounting runs effect cleanups,
+         and those are state updates like any other. Bare, it is six "update
+         was not wrapped in act" lines and a test that stopped meaning what it
+         says. */
+      const mounted = root;
+      if (mounted) act(() => mounted.unmount());
       root = null;
       container.innerHTML = "";
     }

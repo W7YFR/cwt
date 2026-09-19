@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { failOnConsoleError } from "./console-guard";
 
 /* jsdom setup for the DOM tier.
  *
@@ -47,3 +48,7 @@ window.cancelAnimationFrame = ((id: number) =>
 // React 19 + Testing Library: unmount between tests so a component's effects
 // cannot outlive the test that mounted them.
 afterEach(() => cleanup());
+
+// And the same rule the browser tier is held to: React's console.error is a
+// statement that a test is not testing what it says.
+failOnConsoleError();
