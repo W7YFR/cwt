@@ -12,6 +12,12 @@
 # there. A pull request that runs hostile code in CI — and on `pull_request` it
 # may, that is what the trigger means — finds an empty cupboard.
 #
+# The major versions are not in step with each other and that is fine:
+# `upload-pages-artifact` is a composite action with no node runtime, and v3 is
+# what GitHub's own Pages starter pairs with `deploy-pages@v5`. The others are
+# on v5 because v4 declared `using: node20`, which the runners have deprecated
+# — a workflow on v4 still runs, on node24, and says so in every log.
+#
 # Actions are referenced by tag, and every one of them is first-party
 # `actions/*`. That is the condition, not an accident: a tag is a movable ref,
 # so using one means trusting whoever can move it, and for GitHub's own actions
@@ -65,7 +71,7 @@ jobs:
     steps:
       # Deep, because the check reads package.json as of the base commit and a
       # depth-1 clone does not contain it.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -86,8 +92,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -114,8 +120,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -151,4 +157,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
