@@ -110,17 +110,11 @@ let container: HTMLDivElement;
 let root: Root | null = null;
 
 beforeEach(() => {
-  /* React refuses to run act() outside an environment that has opted in, and
-     without the flag nothing renders at all — which reads as every assertion
-     failing against an empty page rather than as a setup problem.
-
-     Mounted through react-dom directly rather than through Testing Library:
+  /* Mounted through react-dom directly rather than through Testing Library:
      under the browser runner the library is pre-bundled with its own copy of
      React, and hooks called against a second copy fail with a null internals
      object. The DOM tier uses the library and is the right place for anything
      that wants its queries; this one only needs a root. */
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
   container = document.createElement("div");
   document.body.appendChild(container);
   localStorage.clear();
@@ -1225,7 +1219,12 @@ const showDownloads = () => tickSetting("show-downloads");
       button.focus();
       expect(document.activeElement, `the ${screen} button takes focus`).toBe(button);
 
-      root?.unmount();
+      /* Through act, like the afterEach does: unmounting runs effect cleanups,
+         and those are state updates like any other. Bare, it is six "update
+         was not wrapped in act" lines and a test that stopped meaning what it
+         says. */
+      const mounted = root;
+      if (mounted) act(() => mounted.unmount());
       root = null;
       container.innerHTML = "";
     }
