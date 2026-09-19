@@ -17,6 +17,14 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 
+    /* For scripts/version.mjs. It is plain JS so that `node scripts/version.mjs`
+       needs no build step at all — a release tool that has to be compiled
+       before it can bump a version is a release tool with a bootstrapping
+       problem. checkJs is what keeps that from being an escape hatch: its
+       JSDoc types are checked under the same strictness as everything else. */
+    "allowJs": true,
+    "checkJs": true,
+
     "skipLibCheck": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
@@ -28,5 +36,5 @@
       "@/*": ["./app/src/*"]
     }
   },
-  "include": ["app/src", "app/test", "vite.config.ts"]
+  "include": ["app/src", "app/test", "scripts", "vite.config.ts"]
 }

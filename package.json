@@ -16,7 +16,9 @@
     "test:dom": "vitest run --project dom",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
-    "lock": "LOCK_RECORD=1 vitest run --project pure clean-path"
+    "lock": "LOCK_RECORD=1 vitest run --project pure clean-path",
+    "bump": "node scripts/version.mjs --commit --branch \"$(git rev-parse --abbrev-ref HEAD)\"",
+    "bump:dry": "node scripts/version.mjs --dry-run --branch \"$(git rev-parse --abbrev-ref HEAD)\""
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

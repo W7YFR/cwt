@@ -14,6 +14,7 @@ import { loadPrefs, recallTake, rememberTake } from "@/io/storage";
 import { encodeWavBuffer } from "@/audio/wav";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
+import { APP_VERSION } from "@/build-info";
 import { caseNamed, takeFrom, SLOPPY } from "../fixture";
 /* The real stylesheet. Layout is part of what this file checks — which row the
    filename lands on, whether the drop veil swallows the drop it advertises —
@@ -853,6 +854,14 @@ const showDownloads = () => tickSetting("show-downloads");
     const sign = foot.querySelector<HTMLAnchorElement>("a")!;
     expect(sign.href).toBe("https://www.qrz.com/db/W7YFR");
     expect(sign.target).toBe("_blank");
+
+    /* And which build it is, so a bug report can name one. Fixed at build
+       time rather than read at render — unlike the year above — because it is
+       a fact about this bundle. Asserted against the pattern as well as
+       against the constant: `v"0.1.0"`, quotes and all, is what this tier
+       showed when the version arrived through vite's `define`. */
+    expect(foot.textContent).toContain(`v${APP_VERSION}`);
+    expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   it("lines up every control in the settings rows", async () => {

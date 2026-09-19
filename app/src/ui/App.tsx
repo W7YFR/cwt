@@ -18,6 +18,7 @@ import {
   savePrefs,
 } from "@/io/storage";
 import type { AudioClip } from "@/types";
+import { APP_VERSION } from "@/build-info";
 import { Calibrate } from "./Calibrate";
 import { Landing } from "./Landing";
 import { Settings } from "./Settings";
@@ -402,8 +403,9 @@ export function App(): React.ReactElement {
   );
 }
 
-/** Read at render rather than baked in at build time, so a page left open over
- *  New Year does not claim last year's copyright. */
+/** The year is read at render rather than baked in at build time, so a page
+ *  left open over New Year does not claim last year's copyright. The version
+ *  is the opposite and has to be: it is a fact about this build. */
 function Footer(): React.ReactElement {
   return (
     <footer className="colophon">
@@ -412,7 +414,11 @@ function Footer(): React.ReactElement {
           QRZ entry — the one place a ham looks something up. */}
       <a href="https://www.qrz.com/db/W7YFR" target="_blank" rel="noreferrer">
         W7YFR
-      </a>
+      </a>{" "}
+      {/* So a bug report can say which app it is about. Kept to the number —
+          this is the quietest text on the page and it earns its place by being
+          readable when someone goes looking for it, not by being noticed. */}
+      · v{APP_VERSION}
     </footer>
   );
 }
