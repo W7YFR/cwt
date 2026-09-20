@@ -50,6 +50,12 @@ test-results/
 # screenshot is taken; nothing here asserts on images.
 app/test/**/__screenshots__/
 
+# The dev server's certificate and its key, for testing on a real device over
+# the LAN (`make dev-device`). Issued locally, valid only for this machine's
+# own addresses, and regenerated whenever those change — there is nothing here
+# worth keeping and a private key is not a thing to commit in any case.
+.devcert/
+
 # Local scratch
 /data/
 /docs/

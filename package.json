@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:device": "node scripts/devcert.mjs && vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

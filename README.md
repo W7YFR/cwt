@@ -220,6 +220,7 @@ one thing that cannot be inferred without being told what was sent.
 ```
 make help          # everything below, with descriptions
 make dev           # app with hot reload
+make dev-device    # ...over https on the LAN, so a phone can use the mic
 make test          # pure + DOM tiers
 make test-all      # all of it, including real Chromium
 make serve:latest  # build, then serve it at localhost:4173
@@ -235,6 +236,109 @@ major, or the typecheck is checking against an API surface that is not the one
 running the tests.
 
 npm warns if your Node does not satisfy it. 
+
+### Testing on a real device
+
+Browsers hand out the microphone only to a *secure context*, which means https
+or localhost. A phone on your network is neither — it reaches your machine at
+`http://192.168.x.x:5173` — and there `navigator.mediaDevices` is not merely
+restricted, it is absent. The symptom is a browser that appears unable to
+record at all, which is a long way from the rule that caused it.
+
+So `make dev-device` issues a certificate and serves over https:
+
+```
+make dev-device
+```
+
+It prints the URLs to open and re-issues automatically when your addresses
+change, which is what moving between networks looks like from the outside.
+
+**Once, on this machine:**
+
+```
+brew install mkcert nss
+mkcert -install        # asks for your password: it trusts the CA locally
+```
+
+**Once, on the phone.** `make dev-device` prints the path to `rootCA.pem`.
+AirDrop it to the device, then:
+
+1. Settings → Profile Downloaded → Install
+2. Settings → General → About → **Certificate Trust Settings** → turn on full
+   trust for mkcert
+
+Step 2 is the one people skip, and skipping it installs the certificate
+without trusting it — which fails in a way that looks like the certificate
+being wrong rather than untrusted.
+
+A self-signed certificate you click past is not a substitute. Safari lets you
+proceed, but what it then grants a page it was told not to trust is not
+documented, and you do not want that uncertainty underneath a permissions bug.
+
+#### Removing it again
+
+The CA is a real trust anchor: while it is installed, anything holding its
+private key can issue certificates your devices believe. It lives only on your
+machine, but it is worth removing when you are done with it rather than leaving
+it in a phone indefinitely.
+
+On this machine:
+
+```
+make uninstall:cert
+```
+
+That removes this project's certificate and key, then asks before touching the
+authority — which is the machine's rather than this project's, so removing it
+also un-trusts every other project that has run `mkcert -install`. It refuses
+outright unless the directory mkcert names really is a CA directory.
+
+This used to be documented as `mkcert -uninstall` followed by
+`rm -rf "$(mkcert -CAROOT)"`. Don't: with mkcert already uninstalled that
+expands to `rm -rf ""`, which on macOS succeeds and deletes nothing — so it
+reports the authority gone while your devices still trust it.
+
+On the phone: Settings → General → VPN & Device Management → the mkcert profile
+→ Remove Profile. Nothing on this machine can do that for you, and until it is
+done the device still trusts anything the authority signed.
+
+With `.devcert/` gone, the dev server goes back to plain http — the https is
+conditional on those files existing, so `make dev` is unaffected either way.
+
+### Debugging on the device
+
+Safari's Web Inspector attaches over USB, which is the only way to see a
+console on a phone.
+
+1. On the phone: Settings → Safari → Advanced → **Web Inspector** on
+2. On the Mac: Safari → Settings → Advanced → **Show features for web
+   developers**
+3. Connect by USB, then Safari's **Develop** menu → your device → the page
+
+The app logs nothing in ordinary use, so an empty console means it is working,
+not that the connection failed. To get output, add `?micdebug` to the URL:
+
+```
+https://192.168.x.x:5173/?micdebug
+```
+
+That turns on two things. A readout pinned to the bottom of the screen —
+secure context, what the permission query answers, what `useMicAccess` resolves
+to, the recorder's `needAccess`/`blocked`/`probing`, and the raw device list
+with empty ids and labels spelled out rather than shown as gaps. It folds into
+a corner with **hide**, because pinned to the bottom it covers the button that
+leaves the landing page.
+
+And a timestamped transcript in the console: every permission query and its
+answer, every device enumeration, and every open or refusal, in order. The
+sequence is usually what matters — the readout is a snapshot, and the
+interesting moment is over before there is anything to tap `re-read` with.
+Both are inert without the flag.
+
+One thing to know while testing a permission flow: browsers remember the grant
+for the life of the page, and Safari's per-site default is to ask again on the
+next load. A private tab is the cheapest way to get the prompt back.
 
 ### The module layout
 
