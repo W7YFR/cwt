@@ -43,6 +43,70 @@ export interface LandingProps {
   onPractice(): void;
 }
 
+/** The author's callsign, drawn — the same six rows the site at w7yfr.com
+ *  puts at the top of its own front page.
+ *
+ *  Copied rather than shared: the two are separate repositories with no build
+ *  between them, so there is no import that could carry it. Kept byte for byte
+ *  all the same, because the point of it is that somebody arriving here from
+ *  there recognises the mark as the same one.
+ *
+ *  Every row is the same width, which is what makes the block a rectangle and
+ *  `--cols` honest — see wordmarks.ts, where the app's own drawings say the
+ *  same thing at more length. */
+const CALLSIGN_ART = `██╗    ██╗███████╗██╗   ██╗███████╗██████╗ 
+██║    ██║╚════██║╚██╗ ██╔╝██╔════╝██╔══██╗
+██║ █╗ ██║    ██╔╝ ╚████╔╝ █████╗  ██████╔╝
+██║███╗██║   ██╔╝   ╚██╔╝  ██╔══╝  ██╔══██╗
+╚███╔███╔╝   ██║     ██║   ██║     ██║  ██║
+ ╚══╝╚══╝    ╚═╝     ╚═╝   ╚═╝     ╚═╝  ╚═╝`;
+
+const CALLSIGN_ROWS = CALLSIGN_ART.split("\n").length;
+const CALLSIGN_COLS = CALLSIGN_ART.split("\n")[0]!.length;
+
+/** Out to the site this one hangs off.
+ *
+ * In the corner rather than in the flow, and the corner the settings button is
+ * not in. What it points at is not part of the app — it is the place the app
+ * lives — so it belongs at the edge of the page rather than among the three
+ * ways in, which are what this screen is for.
+ *
+ * Only on the landing screen. Once a recording is on the page there is a
+ * header with its own way home, and a second one two rows above it would be a
+ * link out of a session somebody is in the middle of.
+ *
+ * Drawn at the same size and in the same ink as the name in the review
+ * header, hover included, because at a glance they are the same kind of
+ * thing: a small drawing of a name that takes you somewhere. */
+function CallsignLink(): React.ReactElement {
+  return (
+    <a
+      className="callsign"
+      href="https://www.w7yfr.com"
+      // The drawing carries the name for anyone who can see it; this is the
+      // same name for anyone who cannot. The art itself is hidden, or a
+      // screen reader reads six rows of box-drawing characters aloud.
+      aria-label="W7YFR — back to w7yfr.com"
+    >
+      {/* The shape goes on the drawing, the way `Wordmark` and `Brandmark`
+          both do it — the size calc reads it, and it is a fact about the art
+          rather than about the link wrapped round it. */}
+      <span
+        className="art"
+        aria-hidden="true"
+        style={
+          {
+            "--cols": String(CALLSIGN_COLS),
+            "--rows": String(CALLSIGN_ROWS),
+          } as React.CSSProperties
+        }
+      >
+        {CALLSIGN_ART}
+      </span>
+    </a>
+  );
+}
+
 export function Landing(props: LandingProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   const [help, setHelp] = useState(false);
@@ -69,6 +133,7 @@ export function Landing(props: LandingProps): React.ReactElement {
 
   return (
     <div className="landing">
+      <CallsignLink />
       <Wordmark art={visitWordmark()} />
 
       <p className="lede">
@@ -122,6 +187,48 @@ export function Landing(props: LandingProps): React.ReactElement {
                 Enter finishes the take · R starts over · Esc throws it away
               </p>
             </div>
+          ) : rec.probing ? (
+            /* Nothing, for the frame it takes to find out. Which control
+               belongs here is read off the device list, and every default
+               this could fall back to is a control that might be wrong — the
+               one it used to fall back to was a working record button. */
+            null
+          ) : rec.blocked ? (
+            /* Not a record button that cannot record.
+               Nothing on this page can lift a block — the browser keeps that
+               control for itself, deliberately — so a button here would be
+               one that opens a prompt nobody is shown and fails silently.
+               Saying what happened and where the switch is, is the only
+               useful thing this card can do. */
+            <p className="blocked" data-testid="mic-denied">
+              Microphone access is blocked for this site, so there is nothing
+              to record from. Allow it in your browser&rsquo;s settings for
+              this page, then reload. You can still open a recording you
+              already have.
+            </p>
+          ) : rec.needAccess ? (
+            /* Asking is its own step, before anything is recorded.
+               Until the browser has said yes it will not name the inputs, so
+               the picker above correctly draws nothing and the only control
+               on the screen is a record button — which then raises the prompt
+               and, the moment it is granted, starts a take on whatever the
+               default input happens to be. That is two decisions taken by one
+               click, and the one it takes for you is the one this screen is
+               here to let you make: which microphone. */
+            <>
+              <button
+                className="big"
+                data-testid="grant-mic"
+                onClick={() => void rec.grantAccess()}
+                title="Ask the browser for the microphone, so your inputs can be listed"
+              >
+                Grant Mic Access
+              </button>
+              <p className="hint">
+                Your inputs cannot be listed until the browser has allowed it.
+                Nothing is recorded by asking.
+              </p>
+            </>
           ) : (
             <>
               {/* Input first, then the button that uses it. Choosing what to
@@ -147,9 +254,6 @@ export function Landing(props: LandingProps): React.ReactElement {
                 onCalibrate={props.onCalibrate}
                 onHelp={() => setHelp(true)}
               />
-              {rec.needPermission && (
-                <p>Device names appear once you have allowed microphone access.</p>
-              )}
             </>
           )}
         </div>

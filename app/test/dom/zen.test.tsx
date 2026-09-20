@@ -18,7 +18,15 @@ beforeEach(() => {
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: {
-      enumerateDevices: vi.fn().mockResolvedValue([]),
+      /* A named input: that is how the page knows the microphone has already
+         been allowed, and R only records once it does. Withheld names put the
+         key on its other errand — asking for access — which is a different
+         test, in recordkey-access. */
+      enumerateDevices: vi
+        .fn()
+        .mockResolvedValue([
+          { kind: "audioinput", deviceId: "default", label: "Built-in Microphone", groupId: "g" },
+        ]),
       getUserMedia: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -148,7 +156,10 @@ describe("the zen sheet", () => {
         onError: vi.fn(),
         startKey: true,
       });
-      if (!rec.recorder) return null;
+      /* Nothing to draw until a take is running — but the key is inert until
+         the recorder has read the device list, so the test needs something to
+         wait on before it presses R. */
+      if (!rec.recorder) return rec.probing ? null : <span data-testid="armed" />;
       return (
         <ZenMode
           message="CQ DE W7YFR"
@@ -163,6 +174,13 @@ describe("the zen sheet", () => {
       );
     }
 
+    /* A budget, because these wait on a chain of promises rather than on one:
+       the device list, then the recorder opening, then the key being answered.
+       The default second is the whole chain's and is fine on an idle machine —
+       one of these failed once in a full run, where the pure tier is using
+       every core, and has not since. The budget is not what is under test. */
+    const SETTLE = { timeout: 5000 };
+
     async function recording() {
       const handle = {
         elapsed: () => 0,
@@ -173,10 +191,11 @@ describe("the zen sheet", () => {
       };
       vi.spyOn(mic, "startRecording").mockResolvedValue(handle);
       render(<Harness />);
+      await screen.findByTestId("armed");
       await act(async () => {
         fireEvent.keyDown(document.body, { key: "r" });
       });
-      await waitFor(() => expect(screen.getByTestId("zen")).toBeTruthy());
+      await waitFor(() => expect(screen.getByTestId("zen")).toBeTruthy(), SETTLE);
       return handle;
     }
 
@@ -196,7 +215,7 @@ describe("the zen sheet", () => {
       await act(async () => {
         fireEvent.keyDown(document.activeElement!, { key });
       });
-      await waitFor(() => expect(handle[called]).toHaveBeenCalled());
+      await waitFor(() => expect(handle[called]).toHaveBeenCalled(), SETTLE);
     });
   });
 });

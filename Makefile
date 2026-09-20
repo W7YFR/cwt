@@ -64,6 +64,16 @@ lock: node_modules ## Re-record what the DSP says about clean audio (deliberate!
 typecheck: node_modules ## Typecheck without emitting
 	npm run typecheck
 
+# The drawing lives in app/public/favicon.svg and nowhere else. The .ico and
+# the three PNG tiles are rasterisations of it, so they are generated rather
+# than drawn — edited by hand they drift from the source and nothing notices.
+#
+# Not part of `build`: it needs librsvg and ImageMagick, which are not
+# dependencies of the app, and the shape changes about once a year.
+.PHONY: icons
+icons: ## Rebuild the .ico and PNG tiles from app/public/favicon.svg
+	node scripts/icons.mjs
+
 # ---- releasing ------------------------------------------------------------ #
 
 # The version moves on a branch, before the pull request, and CI only checks

@@ -63,6 +63,28 @@ export async function listInputs(): Promise<InputDevice[]> {
     }));
 }
 
+/** Ask for the microphone, and hand it straight back.
+ *
+ * There is no "request" on the Permissions API for a microphone, so raising
+ * the prompt means opening a device — and this opens one only to be told yes
+ * or no, then stops the track. Nothing is captured and nothing is kept.
+ *
+ * Plain `{ audio: true }` rather than the constraints `startRecording` uses:
+ * none of them matter to a stream that is about to be thrown away, and asking
+ * for a particular device here would mean naming one while the names are
+ * still being withheld — which is the very thing this call exists to fix.
+ *
+ * Rejects the way `getUserMedia` does, so a refusal reads the same whether it
+ * arrived here or on the first take.
+ */
+export async function requestMicAccess(): Promise<void> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("this browser cannot record audio");
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  for (const track of stream.getTracks()) track.stop();
+}
+
 /** What the browser will say about the microphone before one is opened.
  *
  * "unknown" is not "prompt": it means the browser would not answer the

@@ -27,6 +27,15 @@ const TAKE = takeFrom(caseNamed(SLOPPY));
  *
  * The same place a previous visit would have left it, which is the only way in
  * there now — so the delivery under test is the delivery that exists. */
+/** Wait until the database holds the take the next mount is meant to restore. */
+async function storedSourceIs(source: string) {
+  for (let i = 0; i < 100; i++) {
+    if ((await recallTake())?.take.source === source) return;
+    await new Promise((res) => setTimeout(res, 20));
+  }
+  throw new Error(`the stored take never became ${source}`);
+}
+
 async function served(take = TAKE) {
   const audio = encodeWavBuffer(
     synthesize("CQ DE W7YFR", targetTiming(25, 25), { rate: 8000 }).samples,
@@ -162,6 +171,29 @@ async function drop(name: string) {
   });
 }
 
+/** Wait for the landing screen's Record card to know its own mind.
+ *
+ * Which control belongs in that card — record, ask for access, or a line
+ * saying the browser has blocked it — is read off the device list, and until
+ * that comes back the card holds nothing but its heading. That is a second
+ * round trip after the database read, and a fixed wait that covered the first
+ * did not reliably cover both: the card was still empty at 40ms and full by
+ * 200ms on this machine, which is the kind of margin that passes here and
+ * fails in CI.
+ *
+ * Returns immediately when there is no landing screen to wait for, so the
+ * takes that mount straight into the review are unaffected. */
+async function landingSettled() {
+  for (let i = 0; i < 100; i++) {
+    const card = container.querySelector(".ways > .way");
+    // Its heading alone means the card is still deciding.
+    if (!card || card.childElementCount > 1) return;
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 20));
+    });
+  }
+}
+
 async function mount() {
   root = createRoot(container);
   const r = root;
@@ -172,6 +204,7 @@ async function mount() {
   await act(async () => {
     await new Promise((res) => setTimeout(res, 40));
   });
+  await landingSettled();
 }
 
 describe("the app", () => {
@@ -242,6 +275,8 @@ describe("the app", () => {
       release();
       await new Promise((res) => setTimeout(res, 80));
     });
+    // The gate is down; the Record card still has its own lookup to finish.
+    await landingSettled();
     expect(container.textContent).toContain("Start recording");
     expect(container.textContent).not.toMatch(/loading|looking/i);
   });
@@ -450,26 +485,37 @@ const showDownloads = () => tickSetting("show-downloads");
     await act(async () => {
       brand.click();
     });
+    // A fresh landing screen, so a fresh look at the device list.
+    await landingSettled();
     expect(container.textContent).toContain("Start recording");
   });
 
+  /* Two tests rather than one with an unmount in the middle of it.
+   *
+   * They are two halves of one claim — a name earns header room and the word
+   * "microphone" does not — so they were written as one, which meant tearing
+   * the app down and seeding the database again inside a single test body.
+   * Remembering a take is fire-and-forget, and the write the first app left in
+   * flight would land on top of the second seed and hand the second mount the
+   * recording the first one was showing. Between tests that hazard is already
+   * handled, by the `afterEach` above and the comment in it; in the middle of
+   * one, nothing was covering it. */
   it("does not waste header room saying the recording came from a microphone", async () => {
-    // A filename earns its place up there. "microphone" is the same word every
-    // time and is already implied by the fact that you just recorded.
+    // "microphone" is the same word every time and is already implied by the
+    // fact that you just recorded.
     await served({ ...TAKE, source: "microphone" });
     await mount();
     expect(container.querySelector("header")!.textContent).not.toMatch(/microphone/i);
     // Still a review, and still able to name the take for a download.
     expect(container.textContent).toContain("consistent");
+  });
 
-    act(() => root!.unmount());
-    root = null;
-    container.remove();
-    container = document.createElement("div");
-    document.body.appendChild(container);
-
-    // A file keeps its name, which is the case the header is for.
+  it("keeps a filename in the header, which is what the room is for", async () => {
     await served();
+    // Seeded, and then checked rather than assumed: if a write from the
+    // previous test ever did leak past the teardown, this says so in one line
+    // instead of failing later as a header with the wrong name in it.
+    await storedSourceIs(TAKE.source);
     await mount();
     expect(container.querySelector("header")!.textContent).toContain(TAKE.source);
   });
@@ -834,6 +880,34 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(at(), "the box takes the pointer").toBe(times);
   });
 
+  it("puts the callsign in the corner without moving anything under it", async () => {
+    /* Out of flow, in the page's own top-left, and inside the padding the
+       landing screen already reserves — so adding it did not push the
+       wordmark down. Geometry, because that is the whole claim. */
+    await mount();
+    const link = container.querySelector<HTMLElement>("a.callsign")!;
+    expect(link.getAttribute("href")).toBe("https://www.w7yfr.com");
+
+    const box = link.getBoundingClientRect();
+    expect(Math.round(box.top)).toBe(14);
+    expect(Math.round(box.left)).toBe(20);
+    // Fitted to a row height, like the drawing in the review header.
+    expect(Math.round(box.height)).toBe(26);
+
+    // The landing reserves 40 above its first child; 14 + 26 is exactly that,
+    // so the name below starts where it would have with no corner mark at all.
+    const wordmark = container.querySelector<HTMLElement>(".wordmark")!;
+    expect(wordmark.getBoundingClientRect().top).toBeGreaterThanOrEqual(box.bottom);
+
+    /* It is the review header's mark in every respect but which name it
+       draws, hover included — two small drawings of two names, both links,
+       and a second treatment for one of them would be a difference that means
+       nothing. */
+    expect(getComputedStyle(link).color).toBe(
+      getComputedStyle(container.querySelector<HTMLElement>(".landing .wordmark .art")!).color,
+    );
+  });
+
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.
@@ -856,6 +930,18 @@ const showDownloads = () => tickSetting("show-downloads");
        showed when the version arrived through vite's `define`. */
     expect(foot.textContent).toContain(`v${APP_VERSION}`);
     expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+
+    /* The number is a way in to the source, because that is what somebody who
+       stops to read a version in a footer is after — the code, or somewhere to
+       say what just went wrong. The repository's front page, not the tag that
+       matches: a tag answers "what changed in this one", which is a question
+       nobody arrives here holding. */
+    const repo = [...foot.querySelectorAll("a")].find((a) =>
+      a.textContent?.includes(APP_VERSION),
+    )!;
+    expect(repo, "the version is a link").toBeTruthy();
+    expect(repo.href).toBe("https://github.com/W7YFR/cwt");
+    expect(repo.target).toBe("_blank");
   });
 
   it("lines up every control in the settings rows", async () => {

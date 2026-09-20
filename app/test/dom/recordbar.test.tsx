@@ -15,7 +15,10 @@ import type { Profile } from "@/io/profiles";
 
 const IDLE: RecorderHandle = {
   devices: [],
-  needPermission: false,
+  probing: false,
+  needAccess: false,
+  blocked: false,
+  grantAccess: async () => {},
   recorder: null,
   elapsed: 0,
   level: 0,
@@ -61,6 +64,50 @@ const PROFILE: Profile = {
   maxWpm: 30,
   recordedAt: "2026-09-01T10:00:00+00:00",
 };
+
+/* The one button on this bar that needs a microphone, and the three things it
+   can mean. The landing screen splits ask-versus-record across two buttons
+   because it has the room; here the split is in what the click does, and the
+   states have to agree or the two screens teach different lessons. */
+describe("the record button and the state of the microphone", () => {
+  it("records, once there is a microphone to record from", () => {
+    const start = vi.fn();
+    bar({ rec: { ...IDLE, start } });
+    const button = screen.getByTestId("record-another");
+    expect(button).toBeEnabled();
+    button.click();
+    expect(start).toHaveBeenCalled();
+  });
+
+  it("asks for access first rather than recording blind", () => {
+    const start = vi.fn();
+    const grantAccess = vi.fn();
+    bar({ rec: { ...IDLE, needAccess: true, start, grantAccess } });
+    const button = screen.getByTestId("record-another");
+    // Live, because there is something useful behind it.
+    expect(button).toBeEnabled();
+    button.click();
+    /* The whole point: a take started here would come from whatever the
+       default input happens to be, chosen by nobody. */
+    expect(grantAccess).toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it("is barred, and says why, when the browser has blocked the microphone", () => {
+    const start = vi.fn();
+    const grantAccess = vi.fn();
+    bar({ rec: { ...IDLE, blocked: true, start, grantAccess } });
+    const button = screen.getByTestId("record-another");
+    /* Nothing on the page can lift a block, so a live button would open a
+       prompt the browser never shows and read as broken. */
+    expect(button).toBeDisabled();
+    expect(button.getAttribute("title")).toMatch(/settings/i);
+    expect(button.getAttribute("aria-label")).toMatch(/blocked/i);
+    button.click();
+    expect(start).not.toHaveBeenCalled();
+    expect(grantAccess).not.toHaveBeenCalled();
+  });
+});
 
 describe("the record bar in a session", () => {
   it("offers a new session, which is a different act from clearing", () => {
@@ -115,6 +162,42 @@ describe("the record bar in a session", () => {
     expect(container.querySelector("[data-testid='calpick']")).toContainElement(button);
     button.click();
     expect(onCalibrate).toHaveBeenCalled();
+  });
+
+  it("still offers calibrating when the take came from a file", () => {
+    /* The reported bug: opening a file left the device picker on the
+       configuration row and took the calibrate button away with it, because
+       the button hung off the calibration picker and a file has none — it is
+       read exactly as recorded. But calibrating is about the input, not about
+       the take in front of you, and which microphone plus what to correct it
+       by are the two halves of one setup. */
+    const onCalibrate = vi.fn();
+    bar({ onCalibrate, configuring: true, appliesToTake: false, source: "a.wav" });
+
+    // No picker to hang off, and the way in is there all the same.
+    expect(screen.queryByLabelText(/^calibration$/i)).toBeNull();
+    expect(screen.getByTestId("calchip")).toBeInTheDocument();
+    const button = screen.getByTestId("calibrate");
+    button.click();
+    expect(onCalibrate).toHaveBeenCalled();
+  });
+
+  it("does not claim a file is being read under a calibration", () => {
+    /* The same button, and one word of its explanation different. A file is
+       read exactly as recorded, so the saved measurement is not in use on
+       what is on screen — and the microphone take beside it is the one place
+       that claim is true. */
+    const both = { onCalibrate: () => {}, configuring: true, profiles: [PROFILE], profileId: "p1" };
+
+    bar({ ...both, appliesToTake: true });
+    expect(screen.getByTestId("calibrate").getAttribute("title")).toMatch(/in use/i);
+
+    cleanup();
+    bar({ ...both, appliesToTake: false, source: "a.wav" });
+    const title = screen.getByTestId("calibrate").getAttribute("title")!;
+    expect(title).not.toMatch(/in use/i);
+    // Still says which one it would be measuring again.
+    expect(title).toMatch(PROFILE.nickname);
   });
 
   it("keeps the setup behind the configuration it belongs to", () => {

@@ -200,11 +200,18 @@ describe("the calibration preview", () => {
       const y = r.top + r.height / 2;
       const send = (type: string, x: number, target: EventTarget) =>
         target.dispatchEvent(
-          new MouseEvent(type, { clientX: r.left + x, clientY: y, bubbles: true }),
+          new PointerEvent(type, {
+            clientX: r.left + x,
+            clientY: y,
+            pointerId: 1,
+            isPrimary: true,
+            pointerType: "mouse",
+            bubbles: true,
+          }),
         );
-      send("mousedown", fromX, canvas);
-      send("mousemove", toX, window);
-      send("mouseup", toX, window);
+      send("pointerdown", fromX, canvas);
+      send("pointermove", toX, window);
+      send("pointerup", toX, window);
     };
 
     drag(canvases[0]!, 700, 400);

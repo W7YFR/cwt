@@ -1,17 +1,80 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="CWT">
-  <!-- A dit and a dah: the letter A, and the two things everything else here
-       is made of. Proportioned the way the chart draws them — 1 unit, 1 unit
-       of gap, 3 units — so the icon is a small piece of the thing it opens.
+  <!-- The name, half spelled and half sent. "CW" is written out; the T under
+       it is a dah, which is the whole of the letter in Morse — so the mark
+       reads as CWT to anyone, and as CWT twice over to anyone who can hear it.
 
-       No background, so it sits on a browser tab of either color. The tiles
-       with a ground of their own are the PNGs, where a transparent icon would
-       be composited onto whatever the platform felt like. -->
-  <style>
-    .mark { fill: #1f6feb; }
-    @media (prefers-color-scheme: dark) { .mark { fill: #6aa9ff; } }
-  </style>
-  <g class="mark">
-    <rect x="4" y="20" width="8" height="8" rx="2.5"/>
-    <rect x="20" y="20" width="24" height="8" rx="2.5"/>
+       The dah is the one the icon has always had and keeps its 8 units of
+       height, but not its rounded ends. Those made sense while it was the
+       whole mark — it was a piece of the chart, drawn the way the chart draws
+       one. Beside two letters cut square it was the only soft thing on the
+       tile, which read as a bar from a different drawing rather than as the
+       third character of this one. Widened to the width of the letters above
+       it, too, because a bar that stops short of them reads as an underline
+       that ran out rather than as a letter in its own right.
+
+       Letters are stroked paths, not text. A <text> element renders in
+       whatever font the machine happens to have, which for an icon means a
+       different mark on every platform and no mark at all where the font is
+       missing. These are geometry, so they are the same everywhere.
+
+       Cut flat, not rounded, everywhere. Round caps gave every terminal a soft
+       end and the letters read as chubby against the rest of the app, which is
+       ASCII art and slab shapes. `butt` caps put a straight edge on every
+       terminal; the low miter limit bevels every join flat, which keeps the
+       W's apex inside the cap line instead of spiking past it; and the dah
+       below has square corners for the same reason the letters do. One rule,
+       applied to all three characters — the alternative was a corner radius on
+       the one shape that could carry it, which is how it looked wrong.
+
+       Taller than they are wide, which is why the C is an ellipse and not a
+       circle. Drawn on a square the pair sat low and squat against a 48-unit
+       tile: 22 units of cap height to 16 of C and 20 of W gives them
+       somewhere to stand. The dah keeps its 8, so the block reads as two
+       tall letters over a bar rather than as three bands of a similar size.
+
+       On its own dark ground, which is the same ground w7yfr.com draws its
+       own favicon on: #12151a, and a corner radius of an eighth and a
+       sixteenth of the side — 6 of 32 there, 9 of 48 here, the same
+       proportion. This site is a page of that one, and two tabs open beside
+       each other should look like they belong to the same person.
+
+       It used to be transparent and pick its ink from `prefers-color-scheme`,
+       so it could sit on a browser tab of either colour. A ground makes that
+       question moot and one answer right everywhere: the mark is always the
+       light blue, because what is behind it is always dark. It also makes this
+       file the whole of every icon the app ships — the PNG tiles are now
+       rasterisations of it and nothing else, where before they were this
+       drawing with a background bolted on by the build. -->
+  <rect width="48" height="48" rx="9" fill="#12151a"/>
+  <g color="#6aa9ff">
+    <g
+      fill="none"
+      stroke="currentColor"
+      stroke-width="5"
+      stroke-linecap="butt"
+      stroke-linejoin="miter"
+      stroke-miterlimit="1.4"
+    >
+      <!-- C: an elliptical arc, open on the right between ±34° of its own
+           centre. A narrower gap than a friendly round C wants, because flat
+           terminals read as a wider opening than round ones do at the same
+           angle. -->
+      <path d="M 17.03 13.00 A 5.64 8.50 0 1 0 17.03 22.50"/>
+      <!-- W: four strokes, with the middle apex high enough to read as a W
+           rather than as a u with a notch in it.
+
+           Its centreline runs past the cap lines the C sits between — from
+           7.15 to 28.30 against the C's 6.75 to 28.75 — and it has to, or the
+           letter comes out visibly shorter than its neighbour. Half the stroke
+           is the right inset only for a stroke that ends level. These do not:
+           a butt cap is cut square to the direction of travel, so on a slanted
+           stem it lands at an angle and the highest corner of it sits above
+           where the centreline stops, while the bevelled joins at the feet
+           pull the other way. The numbers below were measured off the render
+           rather than derived, because the join geometry is what decides them. -->
+      <path d="M 26.49 7.15 L 29.75 28.30 L 33.89 8.85 L 38.03 28.30 L 41.29 7.15"/>
+    </g>
+    <!-- T. -->
+    <rect x="4.21" y="33.25" width="39.58" height="8" fill="currentColor"/>
   </g>
 </svg>

@@ -417,8 +417,18 @@ function Footer(): React.ReactElement {
       </a>{" "}
       {/* So a bug report can say which app it is about. Kept to the number —
           this is the quietest text on the page and it earns its place by being
-          readable when someone goes looking for it, not by being noticed. */}
-      · v{APP_VERSION}
+          readable when someone goes looking for it, not by being noticed.
+
+          It links to the repository rather than to the release that matches
+          it: a tag is where you go to read what changed in one version, and
+          nobody arrives at a number in a footer wanting that. They arrive
+          wanting the source, or somewhere to report what just went wrong, and
+          both of those are the repository's front page. The number stays the
+          label because it is the fact worth carrying into a bug report. */}
+      ·{" "}
+      <a href="https://github.com/W7YFR/cwt" target="_blank" rel="noreferrer">
+        v{APP_VERSION}
+      </a>
     </footer>
   );
 }

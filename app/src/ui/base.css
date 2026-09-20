@@ -80,16 +80,29 @@ header {
   background: var(--panel);
 }
 h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+/* The foot of the header: what the recording is called, and how it is being
+   read. A full-width row, so no length of name can move anything above it —
+   that claim used to belong to the name alone, and the note it now shares the
+   line with had to sit at the end of the button row for want of anywhere
+   better. On a wide screen there is room for both here several times over. */
+.srcrow {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  /* The header's own column gap, so the note sits off the name by the same
+     distance everything else in this band sits off its neighbour. */
+  gap: 4px 20px;
+  min-width: 0;
+}
 .src {
   color: var(--ink-dim);
   font-weight: 400;
   font-family: var(--mono);
   font-size: 12px;
   margin: 0;
-  /* Its own full-width row at the foot of the header, so no length of name can
-     move anything above it. A name with no spaces still has to wrap rather
-     than widen the page. */
-  flex-basis: 100%;
+  /* A name with no spaces still has to wrap rather than widen the page. */
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -133,9 +146,20 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   align-items: center;
   gap: 10px;
   min-height: var(--control-h);
+  /* Wraps rather than overflows. Nothing in this row has a width the app
+     controls — the buttons are words and the row is as long as the words are
+     — so on a narrow screen the choice is between a second line and a line
+     that runs off the edge of the page. */
+  flex-wrap: wrap;
 }
 .recordbar .hint { white-space: nowrap; }
-.recordbar button { font-size: 12px; padding: 0 10px; }
+/* Never narrower than what is written on them, and never re-flowed inside
+   their own borders. Left to shrink, "New session" broke across two lines and
+   made the whole band taller to fit one button's second word. */
+.recordbar button { font-size: 12px; padding: 0 10px; white-space: nowrap; flex: 0 0 auto; }
+/* The three transport buttons, kept together. Its gap is the row's, so with
+   room for one line this is invisible; without it, they move as a block. */
+.recbtns { display: flex; align-items: center; gap: 10px; }
 /* A button that is only its icon. Square, so Record and Open read as a pair
    rather than as two differently-shaped things that happen to sit together. */
 .iconbtn {
@@ -178,6 +202,44 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .recordbar .reclight[data-state="sending"] { color: var(--ok); }
 .recordbar .meter { width: 90px; height: 6px; }
 .recordbar select { font-size: 12px; padding: 4px 26px 4px 6px; background-position: right 9px center; }
+
+/* The review header on a narrow screen.
+ *
+ * The first width breakpoint in the app, and it exists because this one band
+ * is the only place whose contents have no give: a brand, two icon buttons,
+ * two word buttons, a line of status and a filename, none of which can be
+ * made shorter. At a phone's width they were being squeezed instead of
+ * moved — buttons re-flowing their own labels across two lines, the status
+ * running off the right edge — so the fix is to stop squeezing and start
+ * stacking.
+ *
+ * 700px rather than a device width: it is where this row actually runs out of
+ * room, which is a fact about the words in it and not about anybody's phone.
+ */
+@media (max-width: 700px) {
+  /* Each of these takes a whole line, in the order they are read: what you
+     can do, what you are looking at, and how it is being read. */
+  .recordbar { flex-basis: 100%; }
+
+  /* The name and its note stack rather than sharing a line. Beside each other
+     they are two short things on a row too narrow for either. */
+  .srcrow { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+  /* The calibration picker belongs to a microphone take, which has no name to
+     sit beside — so it stays in the control row and takes a line there. */
+  .calpick { flex-basis: 100%; flex-wrap: wrap; }
+  .calpick select { max-width: 100%; }
+
+  /* Recording: the clock and the level keep the first line to themselves.
+     They are the two things being watched while a hand is on the paddle, and
+     a button wrapping above them moved them down the screen mid-take. */
+  .recbtns { flex-basis: 100%; }
+  .recordbar.recording .meter { flex: 1 1 auto; min-width: 60px; }
+
+  /* Keystrokes, on a screen that has none. It is the longest thing in the
+     band and the least use here. */
+  .recordbar .hint { display: none; }
+}
 
 /* A band of its own, left-aligned, always.
  *
@@ -699,7 +761,18 @@ button.alt.on { background: var(--tgt); border-color: var(--tgt); }
   border-radius: 8px;
   overflow: hidden;
 }
-canvas { display: block; touch-action: none; }
+/* `pan-y`, not `none`.
+   The chart is one long horizontal strip inside a page that scrolls
+   vertically, and those are two different gestures that can share the screen:
+   the browser keeps up-and-down, which is how you get to the report under the
+   chart with a finger anywhere on it, and side-to-side arrives here as
+   pointer events and pans the view. `none` claimed both and left the page
+   unscrollable wherever the chart was, which on a phone is most of it.
+
+   `pinch-zoom` is deliberate too: the browser's own zoom is how somebody who
+   cannot read this at the size it is drawn makes it bigger, and a canvas that
+   swallows the gesture takes that away. */
+canvas { display: block; touch-action: pan-y pinch-zoom; }
 canvas.grabbing { cursor: grabbing; }
 /* Over a run's name in the gutter, which picks that row up. */
 canvas.picking { cursor: pointer; }
@@ -857,6 +930,8 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 /* ---- landing ------------------------------------------------------------ */
 .landing {
   flex: 1;
+  /* So the callsign in the corner has something to be in the corner of. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -867,6 +942,41 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   padding: 40px 20px;
   text-align: center;
 }
+/* The way out to the site this one lives on, in the corner opposite the one
+   the settings button takes everywhere else.
+
+   The same offsets as `.cornerbtn`: 14 from the top and 20 from the side, so
+   the two corners of the app agree even though no screen shows both. That also
+   makes it land exactly inside the landing's own top padding — 14 above it and
+   26 of drawing is the 40 the page reserves — so nothing below moves to make
+   room for it.
+
+   Drawn and coloured like the name in the review header, hover and all. Two
+   small drawings of two names, both of them links; a third treatment for the
+   second one would be a difference that means nothing. */
+.callsign {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  display: block;
+  color: var(--you);
+  text-decoration: none;
+  border: none;
+}
+.callsign:hover, .callsign:focus-visible { color: var(--ink); }
+.callsign .art {
+  display: block;
+  white-space: pre;
+  font-family: var(--mono);
+  /* Fitted to a row height, like the header's drawing and for the same
+     reason — the cell advance is what sets the width, and a width fitted to
+     the page would make a six-row block as tall as the wordmark under it. */
+  font-size: calc(var(--callsign-h, 26px) / var(--rows, 6));
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
 /* The wordmark: one of sixteen drawings of CWT, with the same three letters
    keyed underneath. Three things make the art art, and it falls apart without
    any of them — a monospace face, `white-space: pre`, and `line-height: 1` so
@@ -981,6 +1091,17 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   color: var(--ink-dim);
 }
 .way p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
+/* A state, not a caption. This is the whole of what the Record card can say
+   once the browser has blocked the microphone — there is no control under it,
+   because none of them would do anything — so it carries the card on its own
+   and is coloured like the condition it reports rather than like the small
+   print it sits at the size of. */
+.way .blocked {
+  color: var(--warn);
+  text-align: center;
+  padding: 4px 0;
+  max-width: 320px;
+}
 /* The ways in. One width between them, so three buttons doing the same kind of
    thing on one screen read as three of a kind rather than as a hierarchy
    nobody intended — the widest was the one in the widest card, which is an
@@ -1813,7 +1934,9 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
 .calpick .hint { font-size: 11px; }
 /* Smaller than the buttons in the bar it sits in, because it belongs to the
-   picker beside it rather than to the row of actions — Record and New session
-   are what this header is for, and a third button their size would read as a
-   third thing of the same weight. */
-.recordbar .calpick .cal { font-size: 11px; padding: 3px 8px; }
+   setup rather than to the row of actions — Record and New session are what
+   this header is for, and a third button their size would read as a third
+   thing of the same weight. The same size wherever it appears: beside the
+   calibration picker on a microphone take, and beside the device picker on one
+   opened from a file. */
+.cal { font-size: 11px; padding: 3px 8px; }

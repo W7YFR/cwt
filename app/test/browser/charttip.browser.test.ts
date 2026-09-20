@@ -85,7 +85,16 @@ function headingsAlongRow(charMarkers: boolean): {
   for (let x = GUTTER; x < WIDTH - GUTTER; x += 2) {
     act(() => {
       canvas.dispatchEvent(
-        new MouseEvent("mousemove", { clientX: rect.left + x, clientY: y, bubbles: true }),
+        new PointerEvent("pointermove", {
+          clientX: rect.left + x,
+          clientY: y,
+          pointerId: 1,
+          isPrimary: true,
+          // Not "touch": a finger has no hover state, and the chart says so
+          // by declining to drive a tooltip from one.
+          pointerType: "mouse",
+          bubbles: true,
+        }),
       );
     });
     const tip = document.querySelector<HTMLElement>('[role="tooltip"]');

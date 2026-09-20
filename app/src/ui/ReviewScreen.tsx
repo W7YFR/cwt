@@ -660,16 +660,11 @@ export function ReviewScreen({
              but never join one. */
           canOpenFile={blank}
           onNewSession={() => setStarting(true)}
+          /* Drawn by the bar, on the row it shares with the note about how
+             the file is being read — see `source` there. A filename earns
+             that room; "microphone" does not, and the bar drops it. */
+          source={loaded.take.source}
         />
-        {/* Last, and on a row of its own: a filename is the one thing here
-            whose width nobody controls, and beside the brand it pushed the
-            record controls around by however long it happened to be.
-
-            A filename earns the room; "microphone" does not — it is the same
-            word every time and is already implied by having just recorded. */}
-        {loaded.take.source !== MIC_SOURCE && (
-          <p className="src">{loaded.take.source}</p>
-        )}
 
         {/* The corner of the header, and last in it — which is where the eye
             finds it and so where the tab order has to reach it. Lifted out of
