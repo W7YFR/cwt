@@ -1199,6 +1199,39 @@ const showDownloads = () => tickSetting("show-downloads");
     });
   });
 
+  it("arrives at the top of the review, not wherever the last screen was", async () => {
+    /* There is no router here and no page load: one screen is swapped for
+       another inside a page the browser never replaces. So the scroll position
+       of the screen being left is still in force on the one arriving, and
+       recording from halfway down the landing screen opened the review halfway
+       down the review — on a screen whose first rows are the chart everything
+       else refers to.
+
+       Only this tier can see it: jsdom has no layout, so nothing scrolls there
+       and `scrollTop` reads zero however the code behaves. */
+    localStorage.setItem("cwt:prefs", JSON.stringify({ expected: "CQ DE W7YFR" }));
+    await mount();
+
+    // Something to scroll. The landing screen is a viewport tall by design, so
+    // without this there is nowhere to be but the top.
+    const spacer = document.createElement("div");
+    spacer.style.height = "3000px";
+    document.body.appendChild(spacer);
+    try {
+      const scroller = document.scrollingElement!;
+      scroller.scrollTop = 800;
+      expect(scroller.scrollTop, "the page did not scroll — the test is not testing").toBe(800);
+
+      const go = container.querySelector<HTMLButtonElement>("[data-testid='practice']")!;
+      await act(async () => go.click());
+
+      expect(container.querySelector("header"), "did not reach the review").not.toBeNull();
+      expect(scroller.scrollTop).toBe(0);
+    } finally {
+      spacer.remove();
+    }
+  });
+
   it("starts a practice from a cold start, with the message it was given", async () => {
     /* The loop begins before there is any recording: say what you are going to
        send, hear the target, set the pace, then key it. Reachable only through

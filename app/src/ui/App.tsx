@@ -138,6 +138,41 @@ export function App(): React.ReactElement {
     return () => window.clearTimeout(timer);
   }, [booting]);
 
+  /* Which of the screens is on the page.
+   *
+   * The same chain the render ends in, named once so something other than JSX
+   * can ask. Changing screens is this app's whole navigation — there is no
+   * router and no URL to change — so it is also the only place a "page" can be
+   * said to have been arrived at. */
+  const screen = opening
+    ? "opening"
+    : booting && !take.loaded
+      ? "booting"
+      : configuring
+        ? "settings"
+        : calibrating
+          ? "calibrate"
+          : take.loaded && take.review
+            ? "review"
+            : "landing";
+
+  /* Arriving at a screen means arriving at the top of it.
+   *
+   * A browser scrolls to the top when a page is replaced; nothing replaces a
+   * page here, so the scroll position of the screen being left is simply still
+   * in force on the one arriving. Recording from halfway down the landing
+   * screen therefore opened the review halfway down the review — which, on a
+   * screen whose first rows are the chart everything else refers to, reads as
+   * having landed somewhere in the middle of something.
+   *
+   * `scrollingElement` rather than `window.scrollTo`: the body is the scroller
+   * here, this is a property rather than a call, and it is the one form that
+   * does not log its way through a jsdom that has no layout to scroll. */
+  useEffect(() => {
+    const scroller = document.scrollingElement ?? document.documentElement;
+    scroller.scrollTop = 0;
+  }, [screen]);
+
   const chooseDevice = useCallback((id: string | undefined) => {
     setDeviceId(id);
     const next = { ...loadPrefs() };
