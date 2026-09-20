@@ -16,3 +16,14 @@ import { version } from "../../package.json";
 /** The app's version, e.g. `0.2.1`. No leading `v` — callers add one if they
  *  want the ham-radio-adjacent habit of writing versions with it. */
 export const APP_VERSION: string = version;
+
+/** Whether this is the dev server rather than a build.
+ *
+ * A function rather than a constant, and read at the call rather than at
+ * import: a constant is evaluated once when the module loads, which is before
+ * any test can say which of the two it means to be testing. Vite substitutes
+ * `import.meta.env.DEV` either way, so the built bundle still folds this to
+ * `false` and drops whatever it guards. */
+export function isDevBuild(): boolean {
+  return import.meta.env.DEV;
+}

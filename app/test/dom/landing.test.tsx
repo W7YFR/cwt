@@ -368,7 +368,16 @@ describe("the landing screen", () => {
   });
 
   describe("the way back to the site this one lives on", () => {
+    /* The tests run on the dev server's terms — `import.meta.env.DEV` is true
+       under vitest — so the built page is the case that has to be asked for.
+       Both are asked for here: which of them is being described is the whole
+       difference between the two tests below. */
+    const asBuilt = () => vi.stubEnv("DEV", false);
+
+    afterEach(() => vi.unstubAllEnvs());
+
     it("draws the callsign, and points it home", async () => {
+      asBuilt();
       renderLanding();
       await settled();
       const link = document.querySelector<HTMLAnchorElement>("a.callsign")!;
@@ -377,12 +386,29 @@ describe("the landing screen", () => {
       expect(link.getAttribute("aria-label")).toMatch(/W7YFR/);
     });
 
+    it("goes nowhere on the dev server", async () => {
+      /* It sits in the corner a thumb reaches for, and following it on a phone
+         means leaving the LAN for the public site — with the way back being an
+         address with a port in it, retyped. The drawing stays; only the
+         destination goes.
+
+         Not an `<a>` without an href either: that is still announced as a link
+         and then does nothing. */
+      renderLanding();
+      await settled();
+      expect(document.querySelector("a.callsign")).toBeNull();
+      const mark = document.querySelector<HTMLElement>(".callsign")!;
+      expect(mark, "the drawing is still there").toBeTruthy();
+      expect(mark.getAttribute("role")).toBe("img");
+      expect(mark.getAttribute("aria-label")).toMatch(/W7YFR/);
+    });
+
     it("says the name rather than reading the drawing out", async () => {
       renderLanding();
       await settled();
       /* Six rows of box-drawing characters read aloud one at a time is not a
-         name. The link carries it; the art is scenery. */
-      const art = document.querySelector<HTMLElement>("a.callsign .art")!;
+         name. Whatever wraps the art carries it; the art is scenery. */
+      const art = document.querySelector<HTMLElement>(".callsign .art")!;
       expect(art.getAttribute("aria-hidden")).toBe("true");
       expect(art.textContent).toContain("█");
     });
@@ -393,7 +419,7 @@ describe("the landing screen", () => {
       /* Every row padded to one width, so `--cols` is as wide as the block
          looks — the font size is derived from it. A row truncated in an edit
          shows up here rather than as a letter quietly out of place. */
-      const art = document.querySelector<HTMLElement>("a.callsign .art")!;
+      const art = document.querySelector<HTMLElement>(".callsign .art")!;
       const rows = art.textContent!.split("\n");
       expect(new Set(rows.map((r) => r.length)).size, "rows differ in width").toBe(1);
       expect(art.style.getPropertyValue("--rows")).toBe(String(rows.length));

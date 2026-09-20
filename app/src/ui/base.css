@@ -939,7 +939,21 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
      would push the top of an over-tall page off the screen, out of reach. */
   justify-content: safe center;
   gap: 22px;
-  padding: 40px 20px;
+  /* The callsign's box, named here because the padding below is derived from
+     it and `.callsign` is absolutely positioned — out of flow, so nothing
+     about it reserves the room it occupies. */
+  --callsign-top: 14px;
+  --callsign-h: 26px;
+  --callsign-gap: 14px;
+  /* Enough room for the callsign, plus a gap that is actually a gap.
+     
+     This was a flat 40px, which is exactly where the callsign ends: 14 from
+     the top plus 26 of drawing. The two were touching by arithmetic rather
+     than sitting apart by intent, and on a narrow screen — where the wordmark
+     under it grows to 90vw and the first row of the art rides up against the
+     padding — they read as one block of overlapping text. Derived, the gap
+     cannot be squeezed out by a change to either number above. */
+  padding: calc(var(--callsign-top) + var(--callsign-h) + var(--callsign-gap)) 20px 40px;
   text-align: center;
 }
 /* The way out to the site this one lives on, in the corner opposite the one
@@ -956,7 +970,9 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
    second one would be a difference that means nothing. */
 .callsign {
   position: absolute;
-  top: 14px;
+  /* The same number the padding above is derived from, so moving it moves the
+     room made for it too. */
+  top: var(--callsign-top, 14px);
   left: 20px;
   display: block;
   color: var(--you);

@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useRef, useState } from "react";
+import { isDevBuild } from "@/build-info";
 import { ACCEPTED } from "@/capture/file";
 import { MIC_SOURCE } from "@/io/take";
 import { orderProfiles, type Profile } from "@/io/profiles";
@@ -78,8 +79,44 @@ const CALLSIGN_COLS = CALLSIGN_ART.split("\n")[0]!.length;
  *
  * Drawn at the same size and in the same ink as the name in the review
  * header, hover included, because at a glance they are the same kind of
- * thing: a small drawing of a name that takes you somewhere. */
+ * thing: a small drawing of a name that takes you somewhere.
+ *
+ * Except on the dev server, where it goes nowhere. It sits in the corner a
+ * thumb reaches for, and following it means leaving the thing being worked on
+ * — on a phone that is a browser navigating off the LAN to the public site,
+ * and the way back is retyping an address with a port in it. The drawing
+ * stays, because its other job is being part of the screen being looked at. */
 function CallsignLink(): React.ReactElement {
+  const art = (
+    /* The shape goes on the drawing, the way `Wordmark` and `Brandmark` both
+       do it — the size calc reads it, and it is a fact about the art rather
+       than about whatever is wrapped round it. */
+    <span
+      className="art"
+      aria-hidden="true"
+      style={
+        {
+          "--cols": String(CALLSIGN_COLS),
+          "--rows": String(CALLSIGN_ROWS),
+        } as React.CSSProperties
+      }
+    >
+      {CALLSIGN_ART}
+    </span>
+  );
+
+  if (isDevBuild()) {
+    /* Not a disabled link: a dead `<a>` is still a link to a keyboard and to
+       a screen reader, announced as somewhere to go and then going nowhere.
+       Without the href it is what it looks like — a drawing — and the name is
+       still said, because the art itself cannot say it. */
+    return (
+      <span className="callsign" role="img" aria-label="W7YFR" data-dev="true">
+        {art}
+      </span>
+    );
+  }
+
   return (
     <a
       className="callsign"
@@ -89,21 +126,7 @@ function CallsignLink(): React.ReactElement {
       // screen reader reads six rows of box-drawing characters aloud.
       aria-label="W7YFR — back to w7yfr.com"
     >
-      {/* The shape goes on the drawing, the way `Wordmark` and `Brandmark`
-          both do it — the size calc reads it, and it is a fact about the art
-          rather than about the link wrapped round it. */}
-      <span
-        className="art"
-        aria-hidden="true"
-        style={
-          {
-            "--cols": String(CALLSIGN_COLS),
-            "--rows": String(CALLSIGN_ROWS),
-          } as React.CSSProperties
-        }
-      >
-        {CALLSIGN_ART}
-      </span>
+      {art}
     </a>
   );
 }
