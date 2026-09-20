@@ -32,20 +32,21 @@
        somewhere to stand. The dah keeps its 8, so the block reads as two
        tall letters over a bar rather than as three bands of a similar size.
 
-       No background, so it sits on a browser tab of either color. The tiles
-       with a ground of their own are the PNGs, where a transparent icon would
-       be composited onto whatever the platform felt like — and those are
-       generated from this file by `make icons`, so this is the only place the
-       shape is written down. -->
-  <style>
-    /* On `color`, so one declaration feeds both the stroked letters and the
-       filled dah below. Set on fill and stroke separately, a rule in here
-       would also override the `fill="none"` the letters need — CSS beats a
-       presentation attribute — and quietly fill in the C. */
-    .mark { color: #1f6feb; }
-    @media (prefers-color-scheme: dark) { .mark { color: #6aa9ff; } }
-  </style>
-  <g class="mark">
+       On its own dark ground, which is the same ground w7yfr.com draws its
+       own favicon on: #12151a, and a corner radius of an eighth and a
+       sixteenth of the side — 6 of 32 there, 9 of 48 here, the same
+       proportion. This site is a page of that one, and two tabs open beside
+       each other should look like they belong to the same person.
+
+       It used to be transparent and pick its ink from `prefers-color-scheme`,
+       so it could sit on a browser tab of either colour. A ground makes that
+       question moot and one answer right everywhere: the mark is always the
+       light blue, because what is behind it is always dark. It also makes this
+       file the whole of every icon the app ships — the PNG tiles are now
+       rasterisations of it and nothing else, where before they were this
+       drawing with a background bolted on by the build. -->
+  <rect width="48" height="48" rx="9" fill="#12151a"/>
+  <g color="#6aa9ff">
     <g
       fill="none"
       stroke="currentColor"
