@@ -43,6 +43,70 @@ export interface LandingProps {
   onPractice(): void;
 }
 
+/** The author's callsign, drawn — the same six rows the site at w7yfr.com
+ *  puts at the top of its own front page.
+ *
+ *  Copied rather than shared: the two are separate repositories with no build
+ *  between them, so there is no import that could carry it. Kept byte for byte
+ *  all the same, because the point of it is that somebody arriving here from
+ *  there recognises the mark as the same one.
+ *
+ *  Every row is the same width, which is what makes the block a rectangle and
+ *  `--cols` honest — see wordmarks.ts, where the app's own drawings say the
+ *  same thing at more length. */
+const CALLSIGN_ART = `██╗    ██╗███████╗██╗   ██╗███████╗██████╗ 
+██║    ██║╚════██║╚██╗ ██╔╝██╔════╝██╔══██╗
+██║ █╗ ██║    ██╔╝ ╚████╔╝ █████╗  ██████╔╝
+██║███╗██║   ██╔╝   ╚██╔╝  ██╔══╝  ██╔══██╗
+╚███╔███╔╝   ██║     ██║   ██║     ██║  ██║
+ ╚══╝╚══╝    ╚═╝     ╚═╝   ╚═╝     ╚═╝  ╚═╝`;
+
+const CALLSIGN_ROWS = CALLSIGN_ART.split("\n").length;
+const CALLSIGN_COLS = CALLSIGN_ART.split("\n")[0]!.length;
+
+/** Out to the site this one hangs off.
+ *
+ * In the corner rather than in the flow, and the corner the settings button is
+ * not in. What it points at is not part of the app — it is the place the app
+ * lives — so it belongs at the edge of the page rather than among the three
+ * ways in, which are what this screen is for.
+ *
+ * Only on the landing screen. Once a recording is on the page there is a
+ * header with its own way home, and a second one two rows above it would be a
+ * link out of a session somebody is in the middle of.
+ *
+ * Drawn at the same size and in the same ink as the name in the review
+ * header, hover included, because at a glance they are the same kind of
+ * thing: a small drawing of a name that takes you somewhere. */
+function CallsignLink(): React.ReactElement {
+  return (
+    <a
+      className="callsign"
+      href="https://www.w7yfr.com"
+      // The drawing carries the name for anyone who can see it; this is the
+      // same name for anyone who cannot. The art itself is hidden, or a
+      // screen reader reads six rows of box-drawing characters aloud.
+      aria-label="W7YFR — back to w7yfr.com"
+    >
+      {/* The shape goes on the drawing, the way `Wordmark` and `Brandmark`
+          both do it — the size calc reads it, and it is a fact about the art
+          rather than about the link wrapped round it. */}
+      <span
+        className="art"
+        aria-hidden="true"
+        style={
+          {
+            "--cols": String(CALLSIGN_COLS),
+            "--rows": String(CALLSIGN_ROWS),
+          } as React.CSSProperties
+        }
+      >
+        {CALLSIGN_ART}
+      </span>
+    </a>
+  );
+}
+
 export function Landing(props: LandingProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   const [help, setHelp] = useState(false);
@@ -69,6 +133,7 @@ export function Landing(props: LandingProps): React.ReactElement {
 
   return (
     <div className="landing">
+      <CallsignLink />
       <Wordmark art={visitWordmark()} />
 
       <p className="lede">

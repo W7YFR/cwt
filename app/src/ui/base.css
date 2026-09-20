@@ -930,6 +930,8 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 /* ---- landing ------------------------------------------------------------ */
 .landing {
   flex: 1;
+  /* So the callsign in the corner has something to be in the corner of. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -940,6 +942,41 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   padding: 40px 20px;
   text-align: center;
 }
+/* The way out to the site this one lives on, in the corner opposite the one
+   the settings button takes everywhere else.
+
+   The same offsets as `.cornerbtn`: 14 from the top and 20 from the side, so
+   the two corners of the app agree even though no screen shows both. That also
+   makes it land exactly inside the landing's own top padding — 14 above it and
+   26 of drawing is the 40 the page reserves — so nothing below moves to make
+   room for it.
+
+   Drawn and coloured like the name in the review header, hover and all. Two
+   small drawings of two names, both of them links; a third treatment for the
+   second one would be a difference that means nothing. */
+.callsign {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  display: block;
+  color: var(--you);
+  text-decoration: none;
+  border: none;
+}
+.callsign:hover, .callsign:focus-visible { color: var(--ink); }
+.callsign .art {
+  display: block;
+  white-space: pre;
+  font-family: var(--mono);
+  /* Fitted to a row height, like the header's drawing and for the same
+     reason — the cell advance is what sets the width, and a width fitted to
+     the page would make a six-row block as tall as the wordmark under it. */
+  font-size: calc(var(--callsign-h, 26px) / var(--rows, 6));
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
 /* The wordmark: one of sixteen drawings of CWT, with the same three letters
    keyed underneath. Three things make the art art, and it falls apart without
    any of them — a monospace face, `white-space: pre`, and `line-height: 1` so

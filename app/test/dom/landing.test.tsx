@@ -363,6 +363,40 @@ describe("the landing screen", () => {
     expect(screen.getByRole("option", { name: "BlackHole 2ch" })).toBeInTheDocument();
   });
 
+  describe("the way back to the site this one lives on", () => {
+    it("draws the callsign, and points it home", async () => {
+      renderLanding();
+      await settled();
+      const link = document.querySelector<HTMLAnchorElement>("a.callsign")!;
+      expect(link, "the callsign is a link").toBeTruthy();
+      expect(link.getAttribute("href")).toBe("https://www.w7yfr.com");
+      expect(link.getAttribute("aria-label")).toMatch(/W7YFR/);
+    });
+
+    it("says the name rather than reading the drawing out", async () => {
+      renderLanding();
+      await settled();
+      /* Six rows of box-drawing characters read aloud one at a time is not a
+         name. The link carries it; the art is scenery. */
+      const art = document.querySelector<HTMLElement>("a.callsign .art")!;
+      expect(art.getAttribute("aria-hidden")).toBe("true");
+      expect(art.textContent).toContain("█");
+    });
+
+    it("keeps the drawing a rectangle, which is what sizes it", async () => {
+      renderLanding();
+      await settled();
+      /* Every row padded to one width, so `--cols` is as wide as the block
+         looks — the font size is derived from it. A row truncated in an edit
+         shows up here rather than as a letter quietly out of place. */
+      const art = document.querySelector<HTMLElement>("a.callsign .art")!;
+      const rows = art.textContent!.split("\n");
+      expect(new Set(rows.map((r) => r.length)).size, "rows differ in width").toBe(1);
+      expect(art.style.getPropertyValue("--rows")).toBe(String(rows.length));
+      expect(art.style.getPropertyValue("--cols")).toBe(String(rows[0]!.length));
+    });
+  });
+
   /* Before the browser has said yes, the inputs are there but anonymous — so
      the picker has nothing to show and the record button would be doing two
      things at once. This is the screen that separates them. */

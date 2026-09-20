@@ -880,6 +880,34 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(at(), "the box takes the pointer").toBe(times);
   });
 
+  it("puts the callsign in the corner without moving anything under it", async () => {
+    /* Out of flow, in the page's own top-left, and inside the padding the
+       landing screen already reserves — so adding it did not push the
+       wordmark down. Geometry, because that is the whole claim. */
+    await mount();
+    const link = container.querySelector<HTMLElement>("a.callsign")!;
+    expect(link.getAttribute("href")).toBe("https://www.w7yfr.com");
+
+    const box = link.getBoundingClientRect();
+    expect(Math.round(box.top)).toBe(14);
+    expect(Math.round(box.left)).toBe(20);
+    // Fitted to a row height, like the drawing in the review header.
+    expect(Math.round(box.height)).toBe(26);
+
+    // The landing reserves 40 above its first child; 14 + 26 is exactly that,
+    // so the name below starts where it would have with no corner mark at all.
+    const wordmark = container.querySelector<HTMLElement>(".wordmark")!;
+    expect(wordmark.getBoundingClientRect().top).toBeGreaterThanOrEqual(box.bottom);
+
+    /* It is the review header's mark in every respect but which name it
+       draws, hover included — two small drawings of two names, both links,
+       and a second treatment for one of them would be a difference that means
+       nothing. */
+    expect(getComputedStyle(link).color).toBe(
+      getComputedStyle(container.querySelector<HTMLElement>(".landing .wordmark .art")!).color,
+    );
+  });
+
   it("signs every screen", async () => {
     // Read at render, not baked in at build time, so a page left open over
     // New Year does not claim last year's copyright.
@@ -902,6 +930,18 @@ const showDownloads = () => tickSetting("show-downloads");
        showed when the version arrived through vite's `define`. */
     expect(foot.textContent).toContain(`v${APP_VERSION}`);
     expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+
+    /* The number is a way in to the source, because that is what somebody who
+       stops to read a version in a footer is after — the code, or somewhere to
+       say what just went wrong. The repository's front page, not the tag that
+       matches: a tag answers "what changed in this one", which is a question
+       nobody arrives here holding. */
+    const repo = [...foot.querySelectorAll("a")].find((a) =>
+      a.textContent?.includes(APP_VERSION),
+    )!;
+    expect(repo, "the version is a link").toBeTruthy();
+    expect(repo.href).toBe("https://github.com/W7YFR/cwt");
+    expect(repo.target).toBe("_blank");
   });
 
   it("lines up every control in the settings rows", async () => {
