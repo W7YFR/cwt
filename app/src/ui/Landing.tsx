@@ -122,6 +122,29 @@ export function Landing(props: LandingProps): React.ReactElement {
                 Enter finishes the take · R starts over · Esc throws it away
               </p>
             </div>
+          ) : rec.needAccess ? (
+            /* Asking is its own step, before anything is recorded.
+               Until the browser has said yes it will not name the inputs, so
+               the picker above correctly draws nothing and the only control
+               on the screen is a record button — which then raises the prompt
+               and, the moment it is granted, starts a take on whatever the
+               default input happens to be. That is two decisions taken by one
+               click, and the one it takes for you is the one this screen is
+               here to let you make: which microphone. */
+            <>
+              <button
+                className="big"
+                data-testid="grant-mic"
+                onClick={() => void rec.grantAccess()}
+                title="Ask the browser for the microphone, so your inputs can be listed"
+              >
+                Grant Mic Access
+              </button>
+              <p className="hint">
+                Your inputs cannot be listed until the browser has allowed it.
+                Nothing is recorded by asking.
+              </p>
+            </>
           ) : (
             <>
               {/* Input first, then the button that uses it. Choosing what to
@@ -147,9 +170,6 @@ export function Landing(props: LandingProps): React.ReactElement {
                 onCalibrate={props.onCalibrate}
                 onHelp={() => setHelp(true)}
               />
-              {rec.needPermission && (
-                <p>Device names appear once you have allowed microphone access.</p>
-              )}
             </>
           )}
         </div>

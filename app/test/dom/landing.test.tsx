@@ -29,18 +29,43 @@ function renderLanding(overrides: Partial<React.ComponentProps<typeof Landing>> 
   return { ...render(<Landing {...props} />), props };
 }
 
-beforeEach(() => {
-  // jsdom has no media devices at all. Absent is the honest default — these
-  // tests are about what the page does, not about what the browser can do.
+/** One microphone, named.
+ *
+ * A name is the whole point of the fixture: the browser withholds them until
+ * permission has been granted, so a list of named inputs is how this page
+ * knows it is past that gate. An empty list would put every test below on the
+ * "Grant Mic Access" screen, which is a different screen with a different
+ * button on it.
+ *
+ * One rather than several, so the device picker stays hidden — it only draws
+ * where there is a choice to make, and these tests are not about the choice.
+ */
+const GRANTED = [
+  { deviceId: "default", kind: "audioinput", label: "Built-in Microphone", groupId: "g" },
+];
+
+/** What a browser hands back before it has been allowed the microphone: the
+ *  inputs are there, with the names stripped off. */
+const UNGRANTED = [{ deviceId: "", kind: "audioinput", label: "", groupId: "" }];
+
+function mockDevices(devices: unknown[]) {
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: {
-      enumerateDevices: vi.fn().mockResolvedValue([]),
+      enumerateDevices: vi.fn().mockResolvedValue(devices),
       getUserMedia: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     },
   });
+}
+
+beforeEach(() => {
+  // jsdom has no media devices at all, so every test says what it wants the
+  // browser to be. Granted is the default: it is the state the page spends
+  // all of its life in, and the one before it is a single screen with a
+  // single button.
+  mockDevices(GRANTED);
 });
 
 /* The device lookup is an effect that resolves a promise, so its state update
@@ -324,15 +349,73 @@ describe("the landing screen", () => {
     expect(screen.getByRole("option", { name: "BlackHole 2ch" })).toBeInTheDocument();
   });
 
-  it("explains blank device names rather than showing a list of them", async () => {
-    (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { kind: "audioinput", deviceId: "a", label: "" },
-      { kind: "audioinput", deviceId: "b", label: "" },
-    ]);
-    renderLanding();
-    // The browser withholds labels until permission is granted; that is not a
-    // bug, but a list of blanks is useless without saying why.
-    expect(await screen.findByText(/once you have allowed/i)).toBeInTheDocument();
+  /* Before the browser has said yes, the inputs are there but anonymous — so
+     the picker has nothing to show and the record button would be doing two
+     things at once. This is the screen that separates them. */
+  describe("before microphone access has been granted", () => {
+    it("asks for access instead of offering to record", async () => {
+      mockDevices(UNGRANTED);
+      renderLanding();
+      expect(await screen.findByTestId("grant-mic")).toBeInTheDocument();
+      // The whole point: not one click that both asks and records.
+      expect(screen.queryByRole("button", { name: /Start recording/i })).toBeNull();
+      // And nothing claiming to be a choice while the names are withheld.
+      expect(screen.queryByLabelText("Input device")).toBeNull();
+    });
+
+    it("asks without recording anything", async () => {
+      mockDevices(UNGRANTED);
+      const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
+      const stop = vi.fn();
+      getUserMedia.mockResolvedValue({ getTracks: () => [{ stop }] });
+      const start = vi.spyOn(mic, "startRecording");
+
+      const user = userEvent.setup();
+      renderLanding();
+      await user.click(await screen.findByTestId("grant-mic"));
+
+      // A stream opened only to be told yes, and handed straight back.
+      expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+      expect(stop).toHaveBeenCalled();
+      // Emphatically not a take.
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it("shows the picker and the record button once the names arrive", async () => {
+      mockDevices(UNGRANTED);
+      const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
+      getUserMedia.mockImplementation(async () => {
+        // Granting is what makes the browser willing to name them, so the
+        // list the page re-reads afterwards is a different list.
+        (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
+          { kind: "audioinput", deviceId: "a", label: "Built-in Microphone", groupId: "g" },
+          { kind: "audioinput", deviceId: "b", label: "BlackHole 2ch", groupId: "g" },
+        ]);
+        return { getTracks: () => [{ stop: vi.fn() }] };
+      });
+
+      const user = userEvent.setup();
+      renderLanding();
+      await user.click(await screen.findByTestId("grant-mic"));
+
+      expect(await screen.findByLabelText("Input device")).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "BlackHole 2ch" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Start recording/i }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("grant-mic")).toBeNull();
+    });
+
+    it("says so in words a person can act on when the prompt is refused", async () => {
+      mockDevices(UNGRANTED);
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new DOMException("Permission denied", "NotAllowedError"),
+      );
+      const user = userEvent.setup();
+      const { props } = renderLanding();
+      await user.click(await screen.findByTestId("grant-mic"));
+      expect(props.onError).toHaveBeenCalledWith(expect.stringMatching(/denied/i));
+    });
   });
 
 

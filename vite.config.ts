@@ -119,7 +119,21 @@ export default defineConfig({
           include: ["src/**/*.browser.test.ts", "test/browser/**/*.test.ts"],
           browser: {
             enabled: true,
-            provider: playwright(),
+            /* The microphone granted up front, because otherwise this tier
+               boots into the one screen that exists to ask for it. A fresh
+               Chromium answers the permission query with "prompt", the landing
+               page correctly offers "Grant Mic Access" instead of a record
+               button, and every test that used the record button as its way of
+               saying "we are on the landing screen" fails for a reason that has
+               nothing to do with what it was testing.
+
+               Granted is also the honest setting: it is the state the app
+               spends all of its life in. The screen before it is covered in the
+               dom tier, where the browser can be made to withhold the names on
+               purpose. */
+            provider: playwright({
+              contextOptions: { permissions: ["microphone"] },
+            }),
             headless: true,
             instances: [{ browser: "chromium" }],
           },

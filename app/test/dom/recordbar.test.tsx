@@ -15,7 +15,8 @@ import type { Profile } from "@/io/profiles";
 
 const IDLE: RecorderHandle = {
   devices: [],
-  needPermission: false,
+  needAccess: false,
+  grantAccess: async () => {},
   recorder: null,
   elapsed: 0,
   level: 0,
