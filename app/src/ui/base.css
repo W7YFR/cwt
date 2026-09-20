@@ -80,16 +80,29 @@ header {
   background: var(--panel);
 }
 h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+/* The foot of the header: what the recording is called, and how it is being
+   read. A full-width row, so no length of name can move anything above it —
+   that claim used to belong to the name alone, and the note it now shares the
+   line with had to sit at the end of the button row for want of anywhere
+   better. On a wide screen there is room for both here several times over. */
+.srcrow {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  /* The header's own column gap, so the note sits off the name by the same
+     distance everything else in this band sits off its neighbour. */
+  gap: 4px 20px;
+  min-width: 0;
+}
 .src {
   color: var(--ink-dim);
   font-weight: 400;
   font-family: var(--mono);
   font-size: 12px;
   margin: 0;
-  /* Its own full-width row at the foot of the header, so no length of name can
-     move anything above it. A name with no spaces still has to wrap rather
-     than widen the page. */
-  flex-basis: 100%;
+  /* A name with no spaces still has to wrap rather than widen the page. */
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -133,9 +146,20 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   align-items: center;
   gap: 10px;
   min-height: var(--control-h);
+  /* Wraps rather than overflows. Nothing in this row has a width the app
+     controls — the buttons are words and the row is as long as the words are
+     — so on a narrow screen the choice is between a second line and a line
+     that runs off the edge of the page. */
+  flex-wrap: wrap;
 }
 .recordbar .hint { white-space: nowrap; }
-.recordbar button { font-size: 12px; padding: 0 10px; }
+/* Never narrower than what is written on them, and never re-flowed inside
+   their own borders. Left to shrink, "New session" broke across two lines and
+   made the whole band taller to fit one button's second word. */
+.recordbar button { font-size: 12px; padding: 0 10px; white-space: nowrap; flex: 0 0 auto; }
+/* The three transport buttons, kept together. Its gap is the row's, so with
+   room for one line this is invisible; without it, they move as a block. */
+.recbtns { display: flex; align-items: center; gap: 10px; }
 /* A button that is only its icon. Square, so Record and Open read as a pair
    rather than as two differently-shaped things that happen to sit together. */
 .iconbtn {
@@ -178,6 +202,44 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .recordbar .reclight[data-state="sending"] { color: var(--ok); }
 .recordbar .meter { width: 90px; height: 6px; }
 .recordbar select { font-size: 12px; padding: 4px 26px 4px 6px; background-position: right 9px center; }
+
+/* The review header on a narrow screen.
+ *
+ * The first width breakpoint in the app, and it exists because this one band
+ * is the only place whose contents have no give: a brand, two icon buttons,
+ * two word buttons, a line of status and a filename, none of which can be
+ * made shorter. At a phone's width they were being squeezed instead of
+ * moved — buttons re-flowing their own labels across two lines, the status
+ * running off the right edge — so the fix is to stop squeezing and start
+ * stacking.
+ *
+ * 700px rather than a device width: it is where this row actually runs out of
+ * room, which is a fact about the words in it and not about anybody's phone.
+ */
+@media (max-width: 700px) {
+  /* Each of these takes a whole line, in the order they are read: what you
+     can do, what you are looking at, and how it is being read. */
+  .recordbar { flex-basis: 100%; }
+
+  /* The name and its note stack rather than sharing a line. Beside each other
+     they are two short things on a row too narrow for either. */
+  .srcrow { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+  /* The calibration picker belongs to a microphone take, which has no name to
+     sit beside — so it stays in the control row and takes a line there. */
+  .calpick { flex-basis: 100%; flex-wrap: wrap; }
+  .calpick select { max-width: 100%; }
+
+  /* Recording: the clock and the level keep the first line to themselves.
+     They are the two things being watched while a hand is on the paddle, and
+     a button wrapping above them moved them down the screen mid-take. */
+  .recbtns { flex-basis: 100%; }
+  .recordbar.recording .meter { flex: 1 1 auto; min-width: 60px; }
+
+  /* Keystrokes, on a screen that has none. It is the longest thing in the
+     band and the least use here. */
+  .recordbar .hint { display: none; }
+}
 
 /* A band of its own, left-aligned, always.
  *
@@ -1827,4 +1889,4 @@ button.danger { border-color: var(--bad); color: var(--bad); }
    picker beside it rather than to the row of actions — Record and New session
    are what this header is for, and a third button their size would read as a
    third thing of the same weight. */
-.recordbar .calpick .cal { font-size: 11px; padding: 3px 8px; }
+.calpick .cal { font-size: 11px; padding: 3px 8px; }
