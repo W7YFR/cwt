@@ -15,10 +15,19 @@ import * as mic from "@/capture/mic";
 import { useRecorder } from "@/ui/useRecorder";
 
 beforeEach(() => {
+  /* A named input, which is how the page knows the microphone has already
+     been allowed. Withheld names mean the opposite, and there R asks for
+     access rather than recording — the same three states the button has. That
+     is `recordkey-access.test.tsx`; this file is about the key once there is
+     something for it to do. */
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: {
-      enumerateDevices: vi.fn().mockResolvedValue([]),
+      enumerateDevices: vi
+        .fn()
+        .mockResolvedValue([
+          { kind: "audioinput", deviceId: "default", label: "Built-in Microphone", groupId: "g" },
+        ]),
       getUserMedia: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -50,8 +59,15 @@ function listening(startKey: boolean, onStart?: () => void) {
   return { start, view };
 }
 
-const settled = () =>
-  waitFor(() => expect(navigator.mediaDevices.enumerateDevices).toHaveBeenCalled());
+/* Waiting for the answer, not for the question.
+ *
+ * The key is inert until the recorder has read the device list — which of its
+ * three errands R is on is decided by what comes back — so a barrier that only
+ * proves the lookup was *issued* is one a `fireEvent` can beat. It did: the
+ * press landed while the state was still at its mount-time default and the key
+ * quietly did nothing. */
+const settled = (view: { result: { current: { probing: boolean } } }) =>
+  waitFor(() => expect(view.result.current.probing).toBe(false));
 
 const pressR = () =>
   act(async () => {
@@ -60,15 +76,15 @@ const pressR = () =>
 
 describe("the record key", () => {
   it("starts a recording for a screen that asked to listen for it", async () => {
-    const { start } = listening(true);
-    await settled();
+    const { start, view } = listening(true);
+    await settled(view);
     await pressR();
     expect(start).toHaveBeenCalledTimes(1);
   });
 
   it("stays silent for one that did not", async () => {
-    const { start } = listening(false);
-    await settled();
+    const { start, view } = listening(false);
+    await settled(view);
     await pressR();
     expect(start).not.toHaveBeenCalled();
   });
@@ -83,8 +99,8 @@ describe("the record key", () => {
        device is open, and opening one takes long enough for the difference to
        be audible. */
     const clear = vi.fn();
-    const { start } = listening(true, clear);
-    await settled();
+    const { start, view } = listening(true, clear);
+    await settled(view);
     await pressR();
     expect(clear).toHaveBeenCalled();
     expect(start).toHaveBeenCalledTimes(1);
@@ -98,7 +114,7 @@ describe("the record key", () => {
        button behind it, and a recording started from back there would answer a
        question nobody asked. */
     const start = vi.spyOn(mic, "startRecording");
-    const { rerender } = renderHook(
+    const view = renderHook(
       ({ on }: { on: boolean }) =>
         useRecorder({
           deviceId: undefined,
@@ -108,7 +124,8 @@ describe("the record key", () => {
         }),
       { initialProps: { on: true } },
     );
-    await settled();
+    const { rerender } = view;
+    await settled(view);
 
     rerender({ on: false });
     await pressR();

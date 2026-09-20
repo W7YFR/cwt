@@ -122,6 +122,25 @@ export function Landing(props: LandingProps): React.ReactElement {
                 Enter finishes the take · R starts over · Esc throws it away
               </p>
             </div>
+          ) : rec.probing ? (
+            /* Nothing, for the frame it takes to find out. Which control
+               belongs here is read off the device list, and every default
+               this could fall back to is a control that might be wrong — the
+               one it used to fall back to was a working record button. */
+            null
+          ) : rec.blocked ? (
+            /* Not a record button that cannot record.
+               Nothing on this page can lift a block — the browser keeps that
+               control for itself, deliberately — so a button here would be
+               one that opens a prompt nobody is shown and fails silently.
+               Saying what happened and where the switch is, is the only
+               useful thing this card can do. */
+            <p className="blocked" data-testid="mic-denied">
+              Microphone access is blocked for this site, so there is nothing
+              to record from. Allow it in your browser&rsquo;s settings for
+              this page, then reload. You can still open a recording you
+              already have.
+            </p>
           ) : rec.needAccess ? (
             /* Asking is its own step, before anything is recorded.
                Until the browser has said yes it will not name the inputs, so

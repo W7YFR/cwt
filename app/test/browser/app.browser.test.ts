@@ -27,6 +27,15 @@ const TAKE = takeFrom(caseNamed(SLOPPY));
  *
  * The same place a previous visit would have left it, which is the only way in
  * there now — so the delivery under test is the delivery that exists. */
+/** Wait until the database holds the take the next mount is meant to restore. */
+async function storedSourceIs(source: string) {
+  for (let i = 0; i < 100; i++) {
+    if ((await recallTake())?.take.source === source) return;
+    await new Promise((res) => setTimeout(res, 20));
+  }
+  throw new Error(`the stored take never became ${source}`);
+}
+
 async function served(take = TAKE) {
   const audio = encodeWavBuffer(
     synthesize("CQ DE W7YFR", targetTiming(25, 25), { rate: 8000 }).samples,
@@ -162,6 +171,29 @@ async function drop(name: string) {
   });
 }
 
+/** Wait for the landing screen's Record card to know its own mind.
+ *
+ * Which control belongs in that card — record, ask for access, or a line
+ * saying the browser has blocked it — is read off the device list, and until
+ * that comes back the card holds nothing but its heading. That is a second
+ * round trip after the database read, and a fixed wait that covered the first
+ * did not reliably cover both: the card was still empty at 40ms and full by
+ * 200ms on this machine, which is the kind of margin that passes here and
+ * fails in CI.
+ *
+ * Returns immediately when there is no landing screen to wait for, so the
+ * takes that mount straight into the review are unaffected. */
+async function landingSettled() {
+  for (let i = 0; i < 100; i++) {
+    const card = container.querySelector(".ways > .way");
+    // Its heading alone means the card is still deciding.
+    if (!card || card.childElementCount > 1) return;
+    await act(async () => {
+      await new Promise((res) => setTimeout(res, 20));
+    });
+  }
+}
+
 async function mount() {
   root = createRoot(container);
   const r = root;
@@ -172,6 +204,7 @@ async function mount() {
   await act(async () => {
     await new Promise((res) => setTimeout(res, 40));
   });
+  await landingSettled();
 }
 
 describe("the app", () => {
@@ -242,6 +275,8 @@ describe("the app", () => {
       release();
       await new Promise((res) => setTimeout(res, 80));
     });
+    // The gate is down; the Record card still has its own lookup to finish.
+    await landingSettled();
     expect(container.textContent).toContain("Start recording");
     expect(container.textContent).not.toMatch(/loading|looking/i);
   });
@@ -450,6 +485,8 @@ const showDownloads = () => tickSetting("show-downloads");
     await act(async () => {
       brand.click();
     });
+    // A fresh landing screen, so a fresh look at the device list.
+    await landingSettled();
     expect(container.textContent).toContain("Start recording");
   });
 
@@ -468,8 +505,16 @@ const showDownloads = () => tickSetting("show-downloads");
     container = document.createElement("div");
     document.body.appendChild(container);
 
+    /* The app that was just unmounted saves the session it was showing, and
+       that write is asynchronous. Seeding on top of a write still in flight
+       is a race the seed loses — and loses permanently, because nothing
+       re-seeds afterwards — so let it land first. */
+    await storedSourceIs("microphone");
+
     // A file keeps its name, which is the case the header is for.
     await served();
+    // Seeded, and then checked rather than assumed.
+    await storedSourceIs(TAKE.source);
     await mount();
     expect(container.querySelector("header")!.textContent).toContain(TAKE.source);
   });

@@ -239,12 +239,34 @@ export function RecordBar({
           />
         </>
       )}
+      {/* One button, three things it can mean, because there is only ever one
+          of them true and a second button for the rare ones would be two
+          controls that are never both useful.
+
+          Blocked, it is barred: nothing on the page can lift that, so a live
+          button would open a prompt the browser never shows. Unasked, it asks
+          — the landing screen separates the two for the same reason, and here
+          the separation is in what the click does rather than in which button
+          you clicked. Otherwise it records, which is what it is for. */}
       <button
         className="iconbtn"
-        onClick={() => void rec.start()}
-        disabled={rec.busy}
-        aria-label="Record another"
-        title="Record another — or press R"
+        data-testid="record-another"
+        onClick={() => void (rec.needAccess ? rec.grantAccess() : rec.start())}
+        disabled={rec.busy || rec.blocked || rec.probing}
+        aria-label={
+          rec.blocked
+            ? "Recording unavailable — microphone blocked"
+            : rec.needAccess
+              ? "Allow the microphone"
+              : "Record another"
+        }
+        title={
+          rec.blocked
+            ? "Microphone access is blocked for this site. Allow it in your browser's settings for this page, then reload."
+            : rec.needAccess
+              ? "Allow the microphone first — nothing is recorded by asking"
+              : "Record another — or press R"
+        }
       >
         <RecDot />
       </button>

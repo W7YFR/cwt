@@ -49,6 +49,14 @@ export interface UseRecorderOptions {
 export interface RecorderHandle {
   /** Every input the browser will admit to. */
   devices: InputDevice[];
+  /** True until the first look at the device list has come back.
+   *
+   *  Every state below is read off that list, and before it arrives the
+   *  honest answer to all of them is "not yet" — not the answer they happen
+   *  to default to. Without this the first paint of the landing screen is a
+   *  live record button, replaced a frame later by the one that asks for
+   *  permission: the wrong control, and briefly a working one. */
+  probing: boolean;
   /** True when the browser has not let this page near the microphone yet.
    *
    *  The tell is the device list: withheld entirely, or handed back with the
@@ -57,6 +65,15 @@ export interface RecorderHandle {
    *  beside it would be raising the permission prompt and starting a take on
    *  whatever the default input happens to be, in a single click. */
   needAccess: boolean;
+  /** True when the browser will not hand over the microphone at all.
+   *
+   *  A different fact from `needAccess`, and the difference is whether there
+   *  is anything to click: an unasked microphone is one prompt away, a
+   *  blocked one cannot be reached from the page at all and only the
+   *  browser's own site settings will change that. Every way in is barred
+   *  while this holds, because each of them would open the prompt, be refused
+   *  without showing anything, and read as a dead button. */
+  blocked: boolean;
   /** Non-null while capturing. */
   recorder: Recorder | null;
   elapsed: number;
@@ -74,13 +91,23 @@ export interface RecorderHandle {
   discard(): Promise<void>;
 }
 
+/** Whether the browser refused, as opposed to failing to find a device.
+ *
+ * The name is the reliable half — `NotAllowedError` is what every browser
+ * raises for a refusal — and the message is checked too because the wrapper
+ * this app throws for an unusable environment carries no name at all. */
+function isRefusal(e: unknown): boolean {
+  if (e instanceof DOMException && e.name === "NotAllowedError") return true;
+  return /denied|NotAllowed/i.test(e instanceof Error ? e.message : String(e));
+}
+
 /** What to say when a device will not open.
  *
  * One place, because a refusal is the same fact whether it arrived from the
  * permission prompt or from the first take, and two copies of it drift. */
 function micError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
-  return /denied|NotAllowed/i.test(msg)
+  return isRefusal(e)
     ? "Microphone access was denied. Allow it in the address bar, then try again."
     : `Could not open the microphone: ${msg}`;
 }
@@ -98,6 +125,17 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
   const [devices, setDevices] = useState<InputDevice[]>([]);
   /** The device list came back with nothing in it worth picking between. */
   const [unnamed, setUnnamed] = useState(false);
+  /* Asked, and told no.
+   *
+   * Remembered here because only Chromium will say so on its own: Firefox and
+   * Safari reject the permission query for the microphone, so a refusal that
+   * happened a second ago is invisible to `watchMicAccess` and the page would
+   * go on offering to ask. The browser's own answer still wins where there is
+   * one — coming back with the site settings changed clears this, because the
+   * query reports "granted" and nothing below consults this flag any more. */
+  const [refused, setRefused] = useState(false);
+  /** Whether the device list has been read even once. */
+  const [probed, setProbed] = useState(false);
   const [recorder, setRecorder] = useState<Recorder | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
@@ -121,6 +159,10 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     } catch {
       setDevices([]);
       setUnnamed(true);
+    } finally {
+      // Asked and answered, however it went. A lookup that threw is still a
+      // lookup, and leaving this false would hold the screen forever.
+      setProbed(true);
     }
   }, []);
 
@@ -145,8 +187,10 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
    * explained by the banner at the top of the app. Neither is a prompt worth
    * offering. */
   const access = useMicAccess();
-  const needAccess =
-    access === "granted" || access === "denied"
+  const blocked = access === "denied" || (access !== "granted" && refused);
+  const needAccess = blocked
+    ? false
+    : access === "granted"
       ? false
       : access === "prompt"
         ? true
@@ -179,6 +223,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       // re-reading the moment a recording starts.
       void refreshDevices();
     } catch (e) {
+      if (isRefusal(e)) setRefused(true);
       onError(micError(e));
     }
   }, [deviceId, onError, onStart, refreshDevices]);
@@ -186,7 +231,9 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
   const grantAccess = useCallback(async () => {
     try {
       await requestMicAccess();
+      setRefused(false);
     } catch (e) {
+      if (isRefusal(e)) setRefused(true);
       onError(micError(e));
     } finally {
       /* Either way. Granted, the names arrive and the picker has something to
@@ -254,8 +301,14 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
         // Busy is a recording being analyzed — the same state that disables
         // the button this key stands in for.
         if (!bareR(ev) || busy) return;
+        /* And the same three states that button has, for the same reason:
+           the key and the button are two ways in to one thing, and a rule
+           only one of them obeys is not a rule. Blocked, there is nothing
+           for either to do; unasked, both ask rather than recording from a
+           device that has not been chosen yet. */
+        if (blocked || !probed) return;
         ev.preventDefault();
-        void start();
+        void (needAccess ? grantAccess() : start());
         return;
       }
       if (ev.key === "Enter") {
@@ -271,11 +324,25 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [busy, discard, finish, recorder, restart, start, startKey]);
+  }, [
+    blocked,
+    probed,
+    busy,
+    discard,
+    finish,
+    grantAccess,
+    needAccess,
+    recorder,
+    restart,
+    start,
+    startKey,
+  ]);
 
   return {
     devices,
+    probing: !probed,
     needAccess,
+    blocked,
     grantAccess,
     recorder,
     elapsed,

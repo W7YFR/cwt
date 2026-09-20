@@ -71,9 +71,22 @@ beforeEach(() => {
 /* The device lookup is an effect that resolves a promise, so its state update
  * lands after a synchronous test body has already asserted — React reports
  * that as an un-acted update. Waiting for it once keeps the output clean and
- * the assertions honest about what has rendered. */
+ * the assertions honest about what has rendered.
+ *
+ * Waiting for the *answer*, not for the question. This used to wait only for
+ * `enumerateDevices` to have been called, which is a barrier a synchronous
+ * query can still beat: the Record card renders nothing until the list comes
+ * back, because which of its three controls belongs there is read off that
+ * list. A test that got past the old barrier and then reached for the record
+ * button was reaching into the frame before there was one. */
 async function settled() {
-  await waitFor(() => expect(navigator.mediaDevices.enumerateDevices).toHaveBeenCalled());
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: /Start recording/i }) ??
+        screen.queryByTestId("grant-mic") ??
+        screen.queryByTestId("mic-denied"),
+    ).not.toBeNull(),
+  );
 }
 
 /* Spies restored globally rather than at the end of each test that makes one.
@@ -323,6 +336,7 @@ describe("the landing screen", () => {
       new DOMException("Permission denied", "NotAllowedError"),
     );
     renderLanding({ onError });
+    await settled();
     await user.click(screen.getByRole("button", { name: /Start recording/i }));
     await waitFor(() => expect(onError).toHaveBeenCalled());
     expect(onError.mock.calls[0]![0]).toMatch(/denied/i);
@@ -406,6 +420,28 @@ describe("the landing screen", () => {
       expect(screen.queryByTestId("grant-mic")).toBeNull();
     });
 
+    it("stops offering to record once the browser has refused", async () => {
+      mockDevices(UNGRANTED);
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new DOMException("Permission denied", "NotAllowedError"),
+      );
+      const user = userEvent.setup();
+      renderLanding();
+      await user.click(await screen.findByTestId("grant-mic"));
+
+      /* Nothing on this page can lift a block, so every button that reaches
+         for the microphone is a button that fails silently. What is left is
+         saying where the switch actually is. */
+      const blocked = await screen.findByTestId("mic-denied");
+      expect(blocked.textContent).toMatch(/blocked/i);
+      expect(blocked.textContent).toMatch(/settings/i);
+      expect(screen.queryByTestId("grant-mic")).toBeNull();
+      expect(screen.queryByRole("button", { name: /Start recording/i })).toBeNull();
+
+      // And the other way in is untouched: a file does not need a microphone.
+      expect(screen.getByRole("button", { name: /Choose a file/i })).toBeInTheDocument();
+    });
+
     it("says so in words a person can act on when the prompt is refused", async () => {
       mockDevices(UNGRANTED);
       (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -442,6 +478,7 @@ describe("the landing screen", () => {
 
     it("says so, in a real button, when nothing has been calibrated", async () => {
       const { props } = renderLanding();
+      await settled();
       expect(screen.getByTestId("calstatus").dataset.state).toBe("none");
       // A button, not link-shaped text: the first report from real use was
       // that the way in could not be found.
@@ -449,13 +486,13 @@ describe("the landing screen", () => {
       const calibrate = buttons.find((b) => b.textContent?.match(/calibrat/i))!;
       await userEvent.click(calibrate);
       expect(props.onCalibrate).toHaveBeenCalled();
-      await settled();
     });
 
     it("names the one in use, with what it measured", async () => {
       // The number belongs beside the name: two positions of one microphone
       // have equally plausible names and nothing alike in their measurements.
       renderLanding({ profiles: [PROFILE], profileId: "p1", deviceId: "webcam" });
+      await settled();
       expect(screen.getByTestId("calstatus").dataset.state).toBe("active");
       expect(screen.getByTestId("calname").textContent).toBe(PROFILE.nickname);
       const numbers = screen.getByTestId("calnum").textContent!;
@@ -471,6 +508,7 @@ describe("the landing screen", () => {
     it("opens with a message", async () => {
       const user = userEvent.setup();
       const { props } = renderLanding({ expected: "CQ DE W7YFR" });
+      await settled();
       await user.click(screen.getByTestId("practice"));
       expect(props.onPractice).toHaveBeenCalled();
     });
@@ -482,6 +520,7 @@ describe("the landing screen", () => {
          so than the room itself saying it. */
       const user = userEvent.setup();
       const { props } = renderLanding({ expected: "" });
+      await settled();
       expect(screen.getByTestId("practice")).toBeEnabled();
       await user.click(screen.getByTestId("practice"));
       expect(props.onPractice).toHaveBeenCalled();
@@ -491,12 +530,14 @@ describe("the landing screen", () => {
     it("flags a profile in use that was measured on another input", async () => {
       // The exact mistake named profiles exist to prevent.
       renderLanding({ profiles: [PROFILE], profileId: "p1", deviceId: "yeti" });
+      await settled();
       expect(screen.getByTestId("calstatus").dataset.state).toBe("elsewhere");
       await settled();
     });
 
     it("offers the saved ones, and no calibration among them", async () => {
       const { props } = renderLanding({ profiles: [PROFILE], profileId: "p1" });
+      await settled();
       const select = screen.getByLabelText(/microphone calibration/i);
       await userEvent.selectOptions(select, "");
       expect(props.onProfileChange).toHaveBeenCalledWith(undefined);
@@ -511,6 +552,7 @@ describe("the landing screen", () => {
       it("opens from the calibration panel and gives the screen back", async () => {
         const user = userEvent.setup();
         renderLanding();
+        await settled();
         expect(screen.queryByTestId("sound-path")).toBeNull();
 
         await user.click(screen.getByTestId("sound-path-open"));
@@ -524,6 +566,7 @@ describe("the landing screen", () => {
       it("closes on Escape, like every other sheet", async () => {
         const user = userEvent.setup();
         renderLanding();
+        await settled();
         await user.click(screen.getByTestId("sound-path-open"));
         // Focus has to be inside it or the key never reaches the handler.
         expect(screen.getByTestId("sound-path")).toBe(document.activeElement);
@@ -536,11 +579,11 @@ describe("the landing screen", () => {
         // A page to read. Nothing in it is a control over the recording.
         const user = userEvent.setup();
         const { props } = renderLanding({ profiles: [PROFILE], profileId: "p1" });
+        await settled();
         await user.click(screen.getByTestId("sound-path-open"));
         await user.click(screen.getByTestId("sound-path-close"));
         expect(props.onProfileChange).not.toHaveBeenCalled();
         expect(props.onCalibrate).not.toHaveBeenCalled();
-        await settled();
       });
     });
   });

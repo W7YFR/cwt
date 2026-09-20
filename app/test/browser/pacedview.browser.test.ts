@@ -145,10 +145,27 @@ function press(label: string) {
     const had = Array.from(host.querySelectorAll("button")).map(named);
     throw new Error(`no "${label}" button; screen had ${JSON.stringify(had)}`);
   }
-  return act(async () => {
-    button.click();
-    await new Promise((r) => setTimeout(r, 150));
-  });
+  return (async () => {
+    /* Pressable, not merely present. The record button is barred until the
+       recorder has read the device list — which of its three errands a click
+       is on depends on what comes back — and on this tier that is a real
+       round trip. Clicking through it is a click that does nothing, which
+       shows up later as a take that never started.
+
+       One `act` per turn of the wait rather than one around the whole of it:
+       act flushes on the way out, so a loop that polls inside a single scope
+       is polling a tree that cannot re-render until the loop has given up. */
+    for (let i = 0; i < 100 && button.disabled; i++) {
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+    }
+    if (button.disabled) throw new Error(`"${label}" never became pressable`);
+    await act(async () => {
+      button.click();
+      await new Promise((r) => setTimeout(r, 150));
+    });
+  })();
 }
 
 const record = () => press("Record");

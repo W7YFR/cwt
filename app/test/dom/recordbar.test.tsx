@@ -15,7 +15,9 @@ import type { Profile } from "@/io/profiles";
 
 const IDLE: RecorderHandle = {
   devices: [],
+  probing: false,
   needAccess: false,
+  blocked: false,
   grantAccess: async () => {},
   recorder: null,
   elapsed: 0,
@@ -62,6 +64,50 @@ const PROFILE: Profile = {
   maxWpm: 30,
   recordedAt: "2026-09-01T10:00:00+00:00",
 };
+
+/* The one button on this bar that needs a microphone, and the three things it
+   can mean. The landing screen splits ask-versus-record across two buttons
+   because it has the room; here the split is in what the click does, and the
+   states have to agree or the two screens teach different lessons. */
+describe("the record button and the state of the microphone", () => {
+  it("records, once there is a microphone to record from", () => {
+    const start = vi.fn();
+    bar({ rec: { ...IDLE, start } });
+    const button = screen.getByTestId("record-another");
+    expect(button).toBeEnabled();
+    button.click();
+    expect(start).toHaveBeenCalled();
+  });
+
+  it("asks for access first rather than recording blind", () => {
+    const start = vi.fn();
+    const grantAccess = vi.fn();
+    bar({ rec: { ...IDLE, needAccess: true, start, grantAccess } });
+    const button = screen.getByTestId("record-another");
+    // Live, because there is something useful behind it.
+    expect(button).toBeEnabled();
+    button.click();
+    /* The whole point: a take started here would come from whatever the
+       default input happens to be, chosen by nobody. */
+    expect(grantAccess).toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it("is barred, and says why, when the browser has blocked the microphone", () => {
+    const start = vi.fn();
+    const grantAccess = vi.fn();
+    bar({ rec: { ...IDLE, blocked: true, start, grantAccess } });
+    const button = screen.getByTestId("record-another");
+    /* Nothing on the page can lift a block, so a live button would open a
+       prompt the browser never shows and read as broken. */
+    expect(button).toBeDisabled();
+    expect(button.getAttribute("title")).toMatch(/settings/i);
+    expect(button.getAttribute("aria-label")).toMatch(/blocked/i);
+    button.click();
+    expect(start).not.toHaveBeenCalled();
+    expect(grantAccess).not.toHaveBeenCalled();
+  });
+});
 
 describe("the record bar in a session", () => {
   it("offers a new session, which is a different act from clearing", () => {

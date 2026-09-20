@@ -18,7 +18,15 @@ beforeEach(() => {
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: {
-      enumerateDevices: vi.fn().mockResolvedValue([]),
+      /* A named input: that is how the page knows the microphone has already
+         been allowed, and R only records once it does. Withheld names put the
+         key on its other errand — asking for access — which is a different
+         test, in recordkey-access. */
+      enumerateDevices: vi
+        .fn()
+        .mockResolvedValue([
+          { kind: "audioinput", deviceId: "default", label: "Built-in Microphone", groupId: "g" },
+        ]),
       getUserMedia: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -148,7 +156,10 @@ describe("the zen sheet", () => {
         onError: vi.fn(),
         startKey: true,
       });
-      if (!rec.recorder) return null;
+      /* Nothing to draw until a take is running — but the key is inert until
+         the recorder has read the device list, so the test needs something to
+         wait on before it presses R. */
+      if (!rec.recorder) return rec.probing ? null : <span data-testid="armed" />;
       return (
         <ZenMode
           message="CQ DE W7YFR"
@@ -173,6 +184,7 @@ describe("the zen sheet", () => {
       };
       vi.spyOn(mic, "startRecording").mockResolvedValue(handle);
       render(<Harness />);
+      await screen.findByTestId("armed");
       await act(async () => {
         fireEvent.keyDown(document.body, { key: "r" });
       });

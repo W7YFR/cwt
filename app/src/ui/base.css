@@ -981,6 +981,17 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   color: var(--ink-dim);
 }
 .way p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
+/* A state, not a caption. This is the whole of what the Record card can say
+   once the browser has blocked the microphone — there is no control under it,
+   because none of them would do anything — so it carries the card on its own
+   and is coloured like the condition it reports rather than like the small
+   print it sits at the size of. */
+.way .blocked {
+  color: var(--warn);
+  text-align: center;
+  padding: 4px 0;
+  max-width: 320px;
+}
 /* The ways in. One width between them, so three buttons doing the same kind of
    thing on one screen read as three of a kind rather than as a hierarchy
    nobody intended — the widest was the one in the widest card, which is an
