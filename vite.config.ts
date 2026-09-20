@@ -107,6 +107,32 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     ...devHttps(),
+    fs: {
+      /* What the dev server is allowed to read off the disk and hand out.
+         
+         Vite's default is the whole workspace — which it finds by walking up
+         from the root looking for a package.json, landing on the repository.
+         That is the right default for a server on localhost and the wrong one
+         for `make dev-device`, which puts this on the LAN on purpose: anything
+         under the repository root is then readable by anything on the network.
+         The certificate and its key are already covered by Vite's own `deny`,
+         which refuses a .crt or a .pem anywhere; this is the rest of it.
+         
+         Absolute, because a relative entry here is resolved against the
+         *project root* — which is `app/` — so "app" would name `app/app` and
+         quietly allow nothing at all.
+         
+         Three entries rather than one, because the app does not live entirely
+         in `app/`: the packages it imports are in the repository's own
+         `node_modules`, and `build-info.ts` reads the version out of the root
+         `package.json`, which is the one place the version lives. Narrowing to
+         `app/` alone serves a white page and a 403 in the console. */
+      allow: [
+        fileURLToPath(new URL("./app", import.meta.url)),
+        fileURLToPath(new URL("./node_modules", import.meta.url)),
+        fileURLToPath(new URL("./package.json", import.meta.url)),
+      ],
+    },
   },
   resolve: {
     alias: {
