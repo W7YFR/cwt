@@ -160,6 +160,22 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* The three transport buttons, kept together. Its gap is the row's, so with
    room for one line this is invisible; without it, they move as a block. */
 .recbtns { display: flex; align-items: center; gap: 10px; }
+/* The drawn icons — see Icons.tsx, which replaced the characters these used
+   to be. Sized in `em` there, so they follow whatever font size the control
+   around them sets and nothing here has to name a pixel.
+
+   The nudge is the one thing a character got for free: a glyph sits on the
+   text baseline with its mass above it, and an `em` box sits ON the baseline,
+   which leaves an icon riding high beside a word. This puts it back. Harmless
+   where the icon is alone in a flex-centered button, because there is no
+   baseline in play there. */
+.icon {
+  vertical-align: -0.145em;
+  /* The line box, not the glyph box: without this a tall line-height pushes
+     the icon around inside buttons whose text sets one. */
+  flex: none;
+}
+
 /* A button that is only its icon. Square, so Record and Open read as a pair
    rather than as two differently-shaped things that happen to sit together. */
 .iconbtn {
@@ -413,11 +429,15 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   top: 14px;
   right: 20px;
   z-index: 5;
-  /* A shade over the 14px the other icon buttons set. The gear is drawn with
-     teeth and an eye and carries far more air inside its em than an arrow or a
-     dot does, so at the same type size it reads smaller than they do. Matched
-     by eye, which is the only thing that can match it. */
-  font-size: 17px;
+  /* The 14px every other icon button sets, and no more.
+     
+     This was 17 — a compensation for the ⚙ character, which carried so much
+     air inside its em that it read smaller than the arrows and dots beside it.
+     The character is gone, and the drawing that replaced it is balanced
+     against the rest of the set inside its own grid (see Icons.tsx), so the
+     compensation was left applying to something that no longer needed it and
+     the corner ended up with the largest thing on the screen in it. */
+  font-size: 14px;
   color: var(--ink-dim);
 }
 /* Open reads as held down rather than as colored in: it is a place you are,

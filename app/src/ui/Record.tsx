@@ -12,6 +12,7 @@ import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
 import { profilesFor, type Profile } from "@/io/profiles";
 import { fmtElapsed } from "./format";
+import { IconCog, IconRecord, IconUpload } from "./Icons";
 import { MicDebug } from "./MicDebug";
 import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import type { RecorderHandle } from "./useRecorder";
@@ -24,8 +25,8 @@ import type { RecorderHandle } from "./useRecorder";
  * assistive tech: the label beside it already says what it does. */
 export function RecDot(): React.ReactElement {
   return (
-    <span className="recdot" aria-hidden="true">
-      ●
+    <span className="recdot">
+      <IconRecord />
     </span>
   );
 }
@@ -46,7 +47,7 @@ export function Cog({ onClick }: { onClick(): void }): React.ReactElement {
       aria-label="Configuration"
       data-testid="cog"
     >
-      <span aria-hidden="true">⚙</span>
+      <IconCog />
     </button>
   );
 }
@@ -287,7 +288,7 @@ export function RecordBar({
               title={canOpenFile ? OPEN_FILE_HELP : OPEN_FILE_CLOSED}
               onClick={() => fileInput.current?.click()}
             >
-              <span aria-hidden="true">↑</span>
+              <IconUpload />
             </button>
             {/* The button is the control; this is only the file dialog it
                 opens. Left in the tab order it is a stop on nothing: focus

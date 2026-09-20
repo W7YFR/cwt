@@ -45,6 +45,7 @@ import {
   type Profile,
 } from "@/io/profiles";
 import type { AudioClip } from "@/types";
+import { IconPlay, IconStop } from "./Icons";
 import { Cog, DevicePicker, LevelMeter, RecDot } from "./Record";
 import { APP_NAME } from "./Wordmark";
 import { useRecorder } from "./useRecorder";
@@ -696,7 +697,7 @@ function Sections({
             data-section={p.key}
             onClick={() => play(p.key, p.fromSec, p.toSec)}
           >
-            <i className="ico">{playing === p.key ? "■" : "▶"}</i>
+            <i className="ico">{playing === p.key ? <IconStop /> : <IconPlay />}</i>
             {p.label}
           </button>
         ))}

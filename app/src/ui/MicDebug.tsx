@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION } from "@/build-info";
 import { micDebugOn } from "@/micdebug";
+import { IconChevron } from "./Icons";
 import type { RecorderHandle } from "./useRecorder";
 import { useMicAccess } from "./useMicAccess";
 
@@ -127,7 +128,7 @@ export function MicDebug({ rec }: { rec: RecorderHandle }): React.ReactElement |
         {/* The one value worth carrying while folded: which branch the screen
             is in. It is the whole question the panel exists to answer, and
             seeing it change is often the entire check. */}
-        mic ▴ needAccess={String(rec.needAccess)}
+        <IconChevron up /> mic needAccess={String(rec.needAccess)}
       </button>
     );
   }
@@ -141,7 +142,7 @@ export function MicDebug({ rec }: { rec: RecorderHandle }): React.ReactElement |
           aria-label="Hide the microphone readout"
           onClick={() => fold(true)}
         >
-          hide ▾
+          hide <IconChevron />
         </button>
       </div>
       <Row k="build" v={`v${APP_VERSION}`} />

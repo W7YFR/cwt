@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IconDownload } from "./Icons";
 import { createPlayer, type PlaySide, type Player } from "@/audio/player";
 import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
@@ -738,26 +739,26 @@ export function ReviewScreen({
             disabled={blank}
             title="The recording, as made"
           >
-            ↓ Your audio
+            <IconDownload /> Your audio
           </button>
           <button
             onClick={() => void downloadTarget()}
             title="Perfect keying of the intended message, rendered at the current speed"
           >
-            ↓ Target audio
+            <IconDownload /> Target audio
           </button>
           <button
             onClick={downloadPng}
             title="The whole analysis, not just the visible part"
           >
-            ↓ Chart PNG
+            <IconDownload /> Chart PNG
           </button>
           <button
             onClick={downloadJson}
             disabled={blank}
             title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
           >
-            ↓ JSON report
+            <IconDownload /> JSON report
           </button>
           <span className="hint">{status}</span>
         </div>
