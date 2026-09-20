@@ -164,6 +164,42 @@ describe("the record bar in a session", () => {
     expect(onCalibrate).toHaveBeenCalled();
   });
 
+  it("still offers calibrating when the take came from a file", () => {
+    /* The reported bug: opening a file left the device picker on the
+       configuration row and took the calibrate button away with it, because
+       the button hung off the calibration picker and a file has none — it is
+       read exactly as recorded. But calibrating is about the input, not about
+       the take in front of you, and which microphone plus what to correct it
+       by are the two halves of one setup. */
+    const onCalibrate = vi.fn();
+    bar({ onCalibrate, configuring: true, appliesToTake: false, source: "a.wav" });
+
+    // No picker to hang off, and the way in is there all the same.
+    expect(screen.queryByLabelText(/^calibration$/i)).toBeNull();
+    expect(screen.getByTestId("calchip")).toBeInTheDocument();
+    const button = screen.getByTestId("calibrate");
+    button.click();
+    expect(onCalibrate).toHaveBeenCalled();
+  });
+
+  it("does not claim a file is being read under a calibration", () => {
+    /* The same button, and one word of its explanation different. A file is
+       read exactly as recorded, so the saved measurement is not in use on
+       what is on screen — and the microphone take beside it is the one place
+       that claim is true. */
+    const both = { onCalibrate: () => {}, configuring: true, profiles: [PROFILE], profileId: "p1" };
+
+    bar({ ...both, appliesToTake: true });
+    expect(screen.getByTestId("calibrate").getAttribute("title")).toMatch(/in use/i);
+
+    cleanup();
+    bar({ ...both, appliesToTake: false, source: "a.wav" });
+    const title = screen.getByTestId("calibrate").getAttribute("title")!;
+    expect(title).not.toMatch(/in use/i);
+    // Still says which one it would be measuring again.
+    expect(title).toMatch(PROFILE.nickname);
+  });
+
   it("keeps the setup behind the configuration it belongs to", () => {
     /* Which microphone, and what to correct it by. You cannot reach this
        screen without having answered the first, and the answer holds until

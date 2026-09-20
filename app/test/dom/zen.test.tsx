@@ -174,6 +174,13 @@ describe("the zen sheet", () => {
       );
     }
 
+    /* A budget, because these wait on a chain of promises rather than on one:
+       the device list, then the recorder opening, then the key being answered.
+       The default second is the whole chain's and is fine on an idle machine —
+       one of these failed once in a full run, where the pure tier is using
+       every core, and has not since. The budget is not what is under test. */
+    const SETTLE = { timeout: 5000 };
+
     async function recording() {
       const handle = {
         elapsed: () => 0,
@@ -188,7 +195,7 @@ describe("the zen sheet", () => {
       await act(async () => {
         fireEvent.keyDown(document.body, { key: "r" });
       });
-      await waitFor(() => expect(screen.getByTestId("zen")).toBeTruthy());
+      await waitFor(() => expect(screen.getByTestId("zen")).toBeTruthy(), SETTLE);
       return handle;
     }
 
@@ -208,7 +215,7 @@ describe("the zen sheet", () => {
       await act(async () => {
         fireEvent.keyDown(document.activeElement!, { key });
       });
-      await waitFor(() => expect(handle[called]).toHaveBeenCalled());
+      await waitFor(() => expect(handle[called]).toHaveBeenCalled(), SETTLE);
     });
   });
 });

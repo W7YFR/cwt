@@ -93,6 +93,48 @@ export function DevicePicker({
   );
 }
 
+/** The way into the calibration wizard.
+ *
+ * Its own component because two places offer it, and they offer it for two
+ * different reasons: beside the calibration picker, which is where you find
+ * out there is nothing to apply, and beside the device picker, which is the
+ * only setup control a take opened from a file has. Written once so the two
+ * cannot drift into being two differently-worded buttons for one act.
+ */
+function CalibrateButton({
+  active,
+  applied,
+  onClick,
+}: {
+  /** The calibration saved for this input, if there is one. */
+  active: Profile | null;
+  /** Whether that calibration is being applied to what is on screen.
+   *
+   * False for a take opened from a file: the measurement still exists and
+   * recalibrating still means something, but a file is read exactly as
+   * recorded — so "in use" would be a claim about the numbers on this page
+   * that is not true of them. */
+  applied: boolean;
+  onClick(): void;
+}): React.ReactElement {
+  return (
+    <button
+      className="cal"
+      data-testid="calibrate"
+      onClick={onClick}
+      title={
+        active
+          ? applied
+            ? `Measure this microphone again — in use: ${active.nickname}`
+            : `Measure this microphone again — saved: ${active.nickname}`
+          : "Measure this microphone, so your timing is yours and not the sound path's"
+      }
+    >
+      {active ? "Recalibrate" : "Calibrate"}
+    </button>
+  );
+}
+
 export function LevelMeter({ level }: { level: number }): React.ReactElement {
   return (
     <div className="meter" aria-hidden="true">
@@ -313,7 +355,20 @@ export function RecordBar({
           </button>
         )}
         {configuring && (
-          <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
+          <>
+            <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
+            {/* A file is read exactly as recorded, so there is no calibration
+                picker here for the way in to hang off — and it was hanging off
+                it, which meant opening a file quietly took away the only way
+                to measure a microphone from this screen. Calibrating is about
+                the input, not about the take in front of you: what is behind
+                the settings button is which microphone and what to correct it
+                by, and both halves of that should be here whichever way the
+                recording arrived. */}
+            {!appliesToTake && onCalibrate && (
+              <CalibrateButton active={active} applied={false} onClick={onCalibrate} />
+            )}
+          </>
         )}
 
       </div>
@@ -362,18 +417,7 @@ export function RecordBar({
               which is where you are standing when the picker in front of you
               says there is nothing to apply. */}
           {configuring && onCalibrate && (
-            <button
-              className="cal"
-              data-testid="calibrate"
-              onClick={onCalibrate}
-              title={
-                active
-                  ? `Measure this microphone again — in use: ${active.nickname}`
-                  : "Measure this microphone, so your timing is yours and not the sound path's"
-              }
-            >
-              {active ? "Recalibrate" : "Calibrate"}
-            </button>
+            <CalibrateButton active={active} applied onClick={onCalibrate} />
           )}
           {/* Only while it is happening. Changing the calibration re-reads the
               recording on screen, which takes long enough to need saying —

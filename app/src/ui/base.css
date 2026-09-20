@@ -1886,7 +1886,9 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
 .calpick .hint { font-size: 11px; }
 /* Smaller than the buttons in the bar it sits in, because it belongs to the
-   picker beside it rather than to the row of actions — Record and New session
-   are what this header is for, and a third button their size would read as a
-   third thing of the same weight. */
-.calpick .cal { font-size: 11px; padding: 3px 8px; }
+   setup rather than to the row of actions — Record and New session are what
+   this header is for, and a third button their size would read as a third
+   thing of the same weight. The same size wherever it appears: beside the
+   calibration picker on a microphone take, and beside the device picker on one
+   opened from a file. */
+.cal { font-size: 11px; padding: 3px 8px; }
