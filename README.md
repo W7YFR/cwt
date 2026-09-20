@@ -294,11 +294,6 @@ authority — which is the machine's rather than this project's, so removing it
 also un-trusts every other project that has run `mkcert -install`. It refuses
 outright unless the directory mkcert names really is a CA directory.
 
-This used to be documented as `mkcert -uninstall` followed by
-`rm -rf "$(mkcert -CAROOT)"`. Don't: with mkcert already uninstalled that
-expands to `rm -rf ""`, which on macOS succeeds and deletes nothing — so it
-reports the authority gone while your devices still trust it.
-
 On the phone: Settings → General → VPN & Device Management → the mkcert profile
 → Remove Profile. Nothing on this machine can do that for you, and until it is
 done the device still trusts anything the authority signed.
