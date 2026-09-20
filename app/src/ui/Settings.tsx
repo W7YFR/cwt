@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { IconDownload } from "./Icons";
 import {
   deleteProfile,
   isAdjusted,
@@ -161,7 +162,7 @@ export function Settings(props: SettingsProps): React.ReactElement {
                       });
                     }}
                   >
-                    ↓ Save
+                    <IconDownload /> Save
                   </button>
                   <button
                     data-testid="delete-recording"

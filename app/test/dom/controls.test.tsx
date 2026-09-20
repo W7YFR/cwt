@@ -443,9 +443,13 @@ describe("controls", () => {
     };
     const { rerender } = render(<Controls {...common} playing={null} />);
     const button = screen.getByRole("button", { name: /Your sending/ });
-    expect(button.querySelector(".ico")!.textContent).toBe("▶");
+    /* The icon by name rather than by what it draws: these are SVGs now, so
+       there is no text to read, and `data-icon` says which one is there
+       without pinning the drawing itself. */
+    const icon = () => button.querySelector(".ico [data-icon]")!.getAttribute("data-icon");
+    expect(icon()).toBe("play");
     rerender(<Controls {...common} playing="you" />);
-    expect(button.querySelector(".ico")!.textContent).toBe("■");
+    expect(icon()).toBe("stop");
     // The words either side of the icon are unchanged, which is what keeps the
     // button's width — and everything to its right — from moving.
     expect(button.textContent).toContain("Your sending");

@@ -20,8 +20,9 @@ import {
   type InputDevice,
   type Recorder,
 } from "@/capture/mic";
+import { micLog } from "@/micdebug";
 import type { AudioClip } from "@/types";
-import { useMicAccess } from "./useMicAccess";
+import { noteMicOpened, noteMicRefused, useMicAccess } from "./useMicAccess";
 
 export interface UseRecorderOptions {
   deviceId: string | undefined;
@@ -63,7 +64,11 @@ export interface RecorderHandle {
    *  names stripped off. Either way there is nothing to choose between, so a
    *  screen that offers a picker is offering an empty one — and the button
    *  beside it would be raising the permission prompt and starting a take on
-   *  whatever the default input happens to be, in a single click. */
+   *  whatever the default input happens to be, in a single click.
+   *
+   *  How many inputs that list appears to hold means nothing until the names
+   *  arrive with it. One anonymized entry is what a browser hands back to
+   *  withhold six of them. */
   needAccess: boolean;
   /** True when the browser will not hand over the microphone at all.
    *
@@ -188,6 +193,27 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
    * offering. */
   const access = useMicAccess();
   const blocked = access === "denied" || (access !== "granted" && refused);
+  /* A count cannot be read off a list that has been anonymized.
+     
+     This briefly skipped the asking step when the browser reported exactly one
+     input, on the reasoning that one input is not a choice and so there is
+     nothing for the step to protect. The reasoning is fine; the premise was
+     not. Before permission, Chrome hands back a single placeholder entry
+     however many microphones are actually attached — `{id:(empty)
+     label:(empty)}`, which is the same thing an iPhone with one microphone
+     hands back, byte for byte. So the shortcut read "one input" on a desktop
+     with several and took away the only control that would ever have named
+     them.
+     
+     There is no safe version of it either: a list whose names have arrived is
+     a list that can be counted, but by then permission has been granted and
+     `access` already says so a line above. The count is only trustworthy once
+     it no longer matters.
+     
+     Which leaves the phone with the step it does not need — one microphone, so
+     nothing to pick once it is granted. That is a wasted tap and not a bug:
+     the step now clears itself the moment the grant lands, which is the thing
+     that was actually broken, and it reads the same on every platform. */
   const needAccess = blocked
     ? false
     : access === "granted"
@@ -219,11 +245,21 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
         },
       });
       setRecorder(rec);
+      /* A device opened, which is the browser having said yes — the one
+         answer every browser gives, including the ones that will not answer
+         the permission query. Worth saying out loud for the screen after this
+         one, which builds its own recorder and would otherwise start over
+         from "not asked yet". */
+      noteMicOpened();
       // Labels arrive once permission is granted, so the picker is worth
       // re-reading the moment a recording starts.
       void refreshDevices();
     } catch (e) {
-      if (isRefusal(e)) setRefused(true);
+      micLog("start() failed", e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      if (isRefusal(e)) {
+        setRefused(true);
+        noteMicRefused();
+      }
       onError(micError(e));
     }
   }, [deviceId, onError, onStart, refreshDevices]);
@@ -232,8 +268,18 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     try {
       await requestMicAccess();
       setRefused(false);
+      /* The whole point of the button, recorded as a fact rather than left
+         to be inferred from the device list a moment later. That inference is
+         what failed on iOS: the permission sheet was allowed and the list
+         below came back looking exactly as it did before the prompt, so the
+         screen went on offering to ask. See `useMicAccess`. */
+      noteMicOpened();
     } catch (e) {
-      if (isRefusal(e)) setRefused(true);
+      micLog("grantAccess() failed", e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      if (isRefusal(e)) {
+        setRefused(true);
+        noteMicRefused();
+      }
       onError(micError(e));
     } finally {
       /* Either way. Granted, the names arrive and the picker has something to

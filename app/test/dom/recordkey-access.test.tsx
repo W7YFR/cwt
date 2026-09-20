@@ -120,6 +120,7 @@ describe("the record key before access has been granted", () => {
     getUserMedia.mockImplementation(async () => {
       (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
         { kind: "audioinput", deviceId: "a", label: "Built-in Microphone", groupId: "g" },
+        { kind: "audioinput", deviceId: "b", label: "BlackHole 2ch", groupId: "g" },
       ]);
       return { getTracks: () => [{ stop: vi.fn() }] };
     });
@@ -134,5 +135,85 @@ describe("the record key before access has been granted", () => {
     // The same key, now meaning what it usually means.
     await pressR();
     expect(start).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* The browser that says yes and changes nothing.
+ *
+ * Everything above reads permission off the device list, which is sound
+ * wherever the names arrive with the grant. This is the defensive case for
+ * where they do not: a grant the device list never reflects is still a grant,
+ * because `getUserMedia` resolving is the browser saying yes more directly
+ * than any list of names.
+ *
+ * Not iOS, despite being written for it. Safari was measured doing the
+ * opposite — the names arrive with the capture and stay — and what actually
+ * breaks there is a permission status that answers once and never updates,
+ * which is `micpermission.test.tsx`. This is kept because the fact it pins is
+ * true of any browser and cost nothing to hold on to.
+ */
+describe("a browser that never names the inputs", () => {
+  /** getUserMedia says yes; enumerateDevices goes on saying nothing. */
+  const allowSilently = () => {
+    const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
+    getUserMedia.mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
+    return getUserMedia;
+  };
+
+  it("takes the grant itself as the answer", async () => {
+    allowSilently();
+    const { view } = hook();
+    await ready(view);
+    expect(view.result.current.needAccess).toBe(true);
+
+    await act(async () => {
+      await view.result.current.grantAccess();
+    });
+
+    // The names never came, and they are not what was being waited for.
+    expect(view.result.current.devices.every((d) => /^Input \d+$/.test(d.label))).toBe(true);
+    await waitFor(() => expect(view.result.current.needAccess).toBe(false), SETTLE);
+    expect(view.result.current.blocked).toBe(false);
+  });
+
+  it("carries the grant to the screen after the one that asked", async () => {
+    const getUserMedia = allowSilently();
+    const first = hook();
+    await ready(first.view);
+    await act(async () => {
+      await first.view.result.current.grantAccess();
+    });
+    await waitFor(() => expect(first.view.result.current.needAccess).toBe(false), SETTLE);
+    first.view.unmount();
+
+    /* A different screen, and so a different recorder: the landing page asks,
+       and the review screen that replaces it is where the recording happens.
+       Asking again there would be the same button one screen later, for a
+       permission the browser has already given. */
+    const second = hook();
+    await ready(second.view);
+    expect(second.view.result.current.needAccess).toBe(false);
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the grant back when a later take is refused", async () => {
+    const getUserMedia = allowSilently();
+    const { view } = hook();
+    await ready(view);
+    await act(async () => {
+      await view.result.current.grantAccess();
+    });
+    await waitFor(() => expect(view.result.current.needAccess).toBe(false), SETTLE);
+
+    /* Revoked from the browser's own settings, which is invisible here until
+       something reaches for a device. Remembering the old yes past that point
+       would leave a record button that cannot record. */
+    getUserMedia.mockRejectedValue(new DOMException("Permission denied", "NotAllowedError"));
+    await act(async () => {
+      await view.result.current.start();
+    });
+
+    await waitFor(() => expect(view.result.current.blocked).toBe(true), SETTLE);
+    expect(view.result.current.needAccess).toBe(false);
   });
 });

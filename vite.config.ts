@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 /* From vitest rather than vite: the `test` key below is vitest's, and only
    vitest's defineConfig knows the type of it. */
@@ -70,12 +71,69 @@ function devCsp(): Plugin {
   };
 }
 
+/* https for the dev server, when there is a certificate to do it with.
+ *
+ * Only a phone needs this. The microphone is offered to secure contexts only,
+ * and a device on the LAN reaches this machine by address rather than as
+ * localhost — so without a certificate `navigator.mediaDevices` is simply
+ * absent there, which reads as a browser that cannot record rather than as the
+ * rule it is. `npm run dev:device` issues one; see `scripts/devcert.mjs`.
+ *
+ * Conditional on the files rather than on a flag, so the ordinary `make dev`
+ * is untouched on a machine that has never run that script, and nothing has to
+ * be remembered on a machine that has. Serve-time only either way: the build
+ * has no server in it. */
+/* Spread into `server` rather than assigned, because an explicit
+   `https: undefined` is not the same as no `https` key at all — the config is
+   typed under `exactOptionalPropertyTypes`, which is the setting saying so. */
+function devHttps(): { https?: { cert: Buffer; key: Buffer } } {
+  const cert = fileURLToPath(new URL("./.devcert/cert.pem", import.meta.url));
+  const key = fileURLToPath(new URL("./.devcert/key.pem", import.meta.url));
+  if (!existsSync(cert) || !existsSync(key)) return {};
+  return { https: { cert: readFileSync(cert), key: readFileSync(key) } };
+}
+
 export default defineConfig({
   root: "app",
   // Relative, so the build works at the domain root or under any subpath —
   // one page, no router, nothing to resolve against wrongly.
   base: "./",
   plugins: [react(), devCsp()],
+  server: {
+    /* The port is named rather than left to drift, because it is written on
+       the certificate's address in the instructions and in the Makefile's
+       help. A dev server that quietly moves to 5174 when 5173 is busy would
+       be a URL that no longer matches either. */
+    port: 5173,
+    strictPort: true,
+    ...devHttps(),
+    fs: {
+      /* What the dev server is allowed to read off the disk and hand out.
+         
+         Vite's default is the whole workspace — which it finds by walking up
+         from the root looking for a package.json, landing on the repository.
+         That is the right default for a server on localhost and the wrong one
+         for `make dev-device`, which puts this on the LAN on purpose: anything
+         under the repository root is then readable by anything on the network.
+         The certificate and its key are already covered by Vite's own `deny`,
+         which refuses a .crt or a .pem anywhere; this is the rest of it.
+         
+         Absolute, because a relative entry here is resolved against the
+         *project root* — which is `app/` — so "app" would name `app/app` and
+         quietly allow nothing at all.
+         
+         Three entries rather than one, because the app does not live entirely
+         in `app/`: the packages it imports are in the repository's own
+         `node_modules`, and `build-info.ts` reads the version out of the root
+         `package.json`, which is the one place the version lives. Narrowing to
+         `app/` alone serves a white page and a 403 in the console. */
+      allow: [
+        fileURLToPath(new URL("./app", import.meta.url)),
+        fileURLToPath(new URL("./node_modules", import.meta.url)),
+        fileURLToPath(new URL("./package.json", import.meta.url)),
+      ],
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./app/src", import.meta.url)),

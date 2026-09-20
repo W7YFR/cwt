@@ -160,6 +160,22 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* The three transport buttons, kept together. Its gap is the row's, so with
    room for one line this is invisible; without it, they move as a block. */
 .recbtns { display: flex; align-items: center; gap: 10px; }
+/* The drawn icons — see Icons.tsx, which replaced the characters these used
+   to be. Sized in `em` there, so they follow whatever font size the control
+   around them sets and nothing here has to name a pixel.
+
+   The nudge is the one thing a character got for free: a glyph sits on the
+   text baseline with its mass above it, and an `em` box sits ON the baseline,
+   which leaves an icon riding high beside a word. This puts it back. Harmless
+   where the icon is alone in a flex-centered button, because there is no
+   baseline in play there. */
+.icon {
+  vertical-align: -0.145em;
+  /* The line box, not the glyph box: without this a tall line-height pushes
+     the icon around inside buttons whose text sets one. */
+  flex: none;
+}
+
 /* A button that is only its icon. Square, so Record and Open read as a pair
    rather than as two differently-shaped things that happen to sit together. */
 .iconbtn {
@@ -413,11 +429,15 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   top: 14px;
   right: 20px;
   z-index: 5;
-  /* A shade over the 14px the other icon buttons set. The gear is drawn with
-     teeth and an eye and carries far more air inside its em than an arrow or a
-     dot does, so at the same type size it reads smaller than they do. Matched
-     by eye, which is the only thing that can match it. */
-  font-size: 17px;
+  /* The 14px every other icon button sets, and no more.
+     
+     This was 17 — a compensation for the ⚙ character, which carried so much
+     air inside its em that it read smaller than the arrows and dots beside it.
+     The character is gone, and the drawing that replaced it is balanced
+     against the rest of the set inside its own grid (see Icons.tsx), so the
+     compensation was left applying to something that no longer needed it and
+     the corner ended up with the largest thing on the screen in it. */
+  font-size: 14px;
   color: var(--ink-dim);
 }
 /* Open reads as held down rather than as colored in: it is a place you are,
@@ -939,7 +959,21 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
      would push the top of an over-tall page off the screen, out of reach. */
   justify-content: safe center;
   gap: 22px;
-  padding: 40px 20px;
+  /* The callsign's box, named here because the padding below is derived from
+     it and `.callsign` is absolutely positioned — out of flow, so nothing
+     about it reserves the room it occupies. */
+  --callsign-top: 14px;
+  --callsign-h: 26px;
+  --callsign-gap: 14px;
+  /* Enough room for the callsign, plus a gap that is actually a gap.
+     
+     This was a flat 40px, which is exactly where the callsign ends: 14 from
+     the top plus 26 of drawing. The two were touching by arithmetic rather
+     than sitting apart by intent, and on a narrow screen — where the wordmark
+     under it grows to 90vw and the first row of the art rides up against the
+     padding — they read as one block of overlapping text. Derived, the gap
+     cannot be squeezed out by a change to either number above. */
+  padding: calc(var(--callsign-top) + var(--callsign-h) + var(--callsign-gap)) 20px 40px;
   text-align: center;
 }
 /* The way out to the site this one lives on, in the corner opposite the one
@@ -956,7 +990,9 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
    second one would be a difference that means nothing. */
 .callsign {
   position: absolute;
-  top: 14px;
+  /* The same number the padding above is derived from, so moving it moves the
+     room made for it too. */
+  top: var(--callsign-top, 14px);
   left: 20px;
   display: block;
   color: var(--you);
@@ -1940,3 +1976,62 @@ button.danger { border-color: var(--bad); color: var(--bad); }
    calibration picker on a microphone take, and beside the device picker on one
    opened from a file. */
 .cal { font-size: 11px; padding: 3px 8px; }
+
+/* ---- the microphone readout --------------------------------------------- */
+
+/* Debug tooling, behind `?micdebug` in the URL, and styled here rather than in
+   the component for the ordinary reason: it is static appearance, and the
+   inline styles in this app are all computed values — a meter's width, a
+   chart's geometry, a field sized to its longest number. Written in the
+   component it also hardcoded its own colors, which made it a permanently dark
+   slab on a page that has a light theme.
+
+   It floats over the app rather than sitting in the layout, because it has to
+   be readable on whichever screen is being debugged and neither of them has a
+   space set aside for it. Which is also why it folds: pinned to the bottom, it
+   covered the button that leaves the landing page. */
+.micdebug {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 60;
+  max-height: 45vh;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 12px/1.45 var(--mono);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+}
+.micdebug .bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+/* The key half of each line, dimmed so the values are what the eye lands on —
+   the readout is scanned rather than read, usually for one value that has
+   changed since the last look. */
+.micdebug .k { color: var(--ink-dim); }
+.micdebug button { font: inherit; padding: 4px 8px; }
+.micdebug .reread { margin-top: 6px; }
+
+/* Folded: a corner it shares with nothing, rather than a smaller slab across
+   the same edge. Out of the way is the whole point of the control. */
+.micdebug-tab {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 60;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 12px/1 var(--mono);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+}

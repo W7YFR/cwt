@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useState } from "react";
+import { IconCog, IconPlay, IconStop } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
@@ -88,7 +89,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
             disabled={!props.canPlayYou}
             aria-pressed={props.playing === "you"}
           >
-            <i className="ico">{props.playing === "you" ? "■" : "▶"}</i>
+            <i className="ico">{props.playing === "you" ? <IconStop /> : <IconPlay />}</i>
             Your sending
           </button>
           <button
@@ -96,11 +97,11 @@ export function Controls(props: ControlsProps): React.ReactElement {
             onClick={props.onPlayTarget}
             aria-pressed={props.playing === "tgt"}
           >
-            <i className="ico">{props.playing === "tgt" ? "■" : "▶"}</i>
+            <i className="ico">{props.playing === "tgt" ? <IconStop /> : <IconPlay />}</i>
             Target
           </button>
           <button onClick={props.onStop} disabled={!props.playing} aria-label="Stop">
-            ■
+            <IconStop />
           </button>
           <span className="clock">{fmtSeconds(props.clock ?? 0)}</span>
         </div>
@@ -479,7 +480,7 @@ export function ChartSettingsButton({
       title="Chart settings"
       onClick={onToggle}
     >
-      <span aria-hidden="true">⚙</span>
+      <IconCog />
     </button>
   );
 }

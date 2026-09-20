@@ -20,6 +20,25 @@ node_modules: package.json ## (internal) install JS dependencies
 dev: node_modules ## Run the app with hot reload at localhost:5173
 	npm run dev
 
+# The microphone is offered to secure contexts only, so a phone on the LAN —
+# which reaches this machine by address, not as localhost — gets no microphone
+# at all over plain http. This issues a certificate from a local authority and
+# serves over https so a real device can be tested without deploying anything.
+# One-time setup, printed by the script: `brew install mkcert nss`,
+# `mkcert -install`, then trust the same authority on the phone.
+.PHONY: dev-device
+dev-device: node_modules ## Run with https on the LAN, so a phone can use the mic
+	npm run dev:device
+
+# The authority is the machine's, not this project's: every other project that
+# has run `mkcert -install` trusts it too. So this asks before removing it, and
+# refuses outright unless the path mkcert reports really is a CA directory —
+# the documented `rm -rf "$$(mkcert -CAROOT)"` is a silent no-op when mkcert is
+# missing, which tells you the CA is gone while your devices still trust it.
+.PHONY: uninstall\:cert
+uninstall\:cert: ## Remove the dev certificate, and the local CA behind it
+	node scripts/devcert.mjs --uninstall
+
 .PHONY: build
 build: node_modules ## Build the app into dist/
 	npm run build

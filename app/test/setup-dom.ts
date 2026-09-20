@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 import { failOnConsoleError } from "./console-guard";
+import { resetMicAccessMemory } from "@/ui/useMicAccess";
 
 /* jsdom setup for the DOM tier.
  *
@@ -48,6 +49,12 @@ window.cancelAnimationFrame = ((id: number) =>
 // React 19 + Testing Library: unmount between tests so a component's effects
 // cannot outlive the test that mounted them.
 afterEach(() => cleanup());
+
+/* The one piece of microphone state that is deliberately not per-screen: a
+   granted permission has to outlive the landing page that asked for it. It
+   would outlive the test that granted it too, and a screen that starts out
+   already-allowed is not the screen most of these tests mean to mount. */
+afterEach(() => resetMicAccessMemory());
 
 // And the same rule the browser tier is held to: React's console.error is a
 // statement that a test is not testing what it says.

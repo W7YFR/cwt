@@ -880,32 +880,64 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(at(), "the box takes the pointer").toBe(times);
   });
 
-  it("puts the callsign in the corner without moving anything under it", async () => {
-    /* Out of flow, in the page's own top-left, and inside the padding the
-       landing screen already reserves — so adding it did not push the
-       wordmark down. Geometry, because that is the whole claim. */
+  it("puts the callsign in the corner, clear of the name under it", async () => {
+    /* Out of flow, in the page's own top-left, with the landing screen's top
+       padding derived from its box so there is room for it and a gap besides.
+       Geometry, because that is the whole claim. */
     await mount();
-    const link = container.querySelector<HTMLElement>("a.callsign")!;
-    expect(link.getAttribute("href")).toBe("https://www.w7yfr.com");
+    const mark = container.querySelector<HTMLElement>(".callsign")!;
 
-    const box = link.getBoundingClientRect();
+    const box = mark.getBoundingClientRect();
     expect(Math.round(box.top)).toBe(14);
     expect(Math.round(box.left)).toBe(20);
     // Fitted to a row height, like the drawing in the review header.
     expect(Math.round(box.height)).toBe(26);
 
-    // The landing reserves 40 above its first child; 14 + 26 is exactly that,
-    // so the name below starts where it would have with no corner mark at all.
+    /* A gap, not a shared edge. The padding used to be a flat 40 — which is
+       exactly 14 + 26, so the two were touching by arithmetic rather than
+       sitting apart on purpose, and on a narrow screen they read as one block
+       of overlapping text. Asserted as a real distance so that neither number
+       can be changed back into a coincidence. */
     const wordmark = container.querySelector<HTMLElement>(".wordmark")!;
-    expect(wordmark.getBoundingClientRect().top).toBeGreaterThanOrEqual(box.bottom);
+    expect(wordmark.getBoundingClientRect().top - box.bottom).toBeGreaterThanOrEqual(12);
 
     /* It is the review header's mark in every respect but which name it
-       draws, hover included — two small drawings of two names, both links,
-       and a second treatment for one of them would be a difference that means
-       nothing. */
-    expect(getComputedStyle(link).color).toBe(
+       draws, hover included — two small drawings of two names, and a second
+       treatment for one of them would be a difference that means nothing. */
+    expect(getComputedStyle(mark).color).toBe(
       getComputedStyle(container.querySelector<HTMLElement>(".landing .wordmark .art")!).color,
     );
+  });
+
+  it("keeps its distance from the name at a phone's width", async () => {
+    /* The report was a phone: the wordmark grows to 90vw as the viewport
+       narrows, and the first row of the art rode up against a padding that had
+       no slack in it. The gap has to survive that, which is a different claim
+       from the one above and only visible at this width. */
+    await mount();
+    const narrow = 390;
+    const page = container.querySelector<HTMLElement>(".app")!;
+    page.style.width = `${narrow}px`;
+    try {
+      const mark = container.querySelector<HTMLElement>(".callsign")!;
+      const art = container.querySelector<HTMLElement>(".landing .wordmark .art")!;
+      expect(art.getBoundingClientRect().top - mark.getBoundingClientRect().bottom)
+        .toBeGreaterThan(0);
+    } finally {
+      page.style.width = "";
+    }
+  });
+
+  it("does not offer to navigate away while it is being developed", async () => {
+    /* The corner a thumb reaches for, on the screen being worked on. Following
+       it from a phone on the LAN means the public site, and the way back is an
+       address with a port in it. The tiers all run as the dev server, so this
+       is what they see; `landing.test.tsx` asks for the built page and holds
+       the link. */
+    await mount();
+    expect(container.querySelector("a.callsign")).toBeNull();
+    const mark = container.querySelector<HTMLElement>(".callsign")!;
+    expect(mark.getAttribute("aria-label")).toMatch(/W7YFR/);
   });
 
   it("signs every screen", async () => {
@@ -1165,6 +1197,39 @@ const showDownloads = () => tickSetting("show-downloads");
       // session has no speed of its own for a recording to contradict.
       expect(named(/open a recording/i).disabled, "open a file").toBe(false);
     });
+  });
+
+  it("arrives at the top of the review, not wherever the last screen was", async () => {
+    /* There is no router here and no page load: one screen is swapped for
+       another inside a page the browser never replaces. So the scroll position
+       of the screen being left is still in force on the one arriving, and
+       recording from halfway down the landing screen opened the review halfway
+       down the review — on a screen whose first rows are the chart everything
+       else refers to.
+
+       Only this tier can see it: jsdom has no layout, so nothing scrolls there
+       and `scrollTop` reads zero however the code behaves. */
+    localStorage.setItem("cwt:prefs", JSON.stringify({ expected: "CQ DE W7YFR" }));
+    await mount();
+
+    // Something to scroll. The landing screen is a viewport tall by design, so
+    // without this there is nowhere to be but the top.
+    const spacer = document.createElement("div");
+    spacer.style.height = "3000px";
+    document.body.appendChild(spacer);
+    try {
+      const scroller = document.scrollingElement!;
+      scroller.scrollTop = 800;
+      expect(scroller.scrollTop, "the page did not scroll — the test is not testing").toBe(800);
+
+      const go = container.querySelector<HTMLButtonElement>("[data-testid='practice']")!;
+      await act(async () => go.click());
+
+      expect(container.querySelector("header"), "did not reach the review").not.toBeNull();
+      expect(scroller.scrollTop).toBe(0);
+    } finally {
+      spacer.remove();
+    }
   });
 
   it("starts a practice from a cold start, with the message it was given", async () => {

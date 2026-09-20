@@ -1,6 +1,6 @@
 {
   "name": "cwt",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "description": "Browser CW keying trainer: record, decode, and grade your sending.",
@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:device": "node scripts/devcert.mjs && vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

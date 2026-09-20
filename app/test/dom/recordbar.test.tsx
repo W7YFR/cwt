@@ -248,8 +248,12 @@ describe("opening a recording from the bar", () => {
     bar({ onFile: () => {} });
     const open = screen.getByTestId("open-file");
     const record = screen.getByRole("button", { name: /record another/i });
-    expect(open.textContent?.trim()).toBe("↑");
-    expect(record.textContent?.trim()).toBe("●");
+    /* Drawn rather than typed, so the assertion is on which icon is there.
+       And still no word on either: the icon is the whole of the button. */
+    expect(open.querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("upload");
+    expect(record.querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("record");
+    expect(open.textContent?.trim()).toBe("");
+    expect(record.textContent?.trim()).toBe("");
     // Named for anyone who cannot see the icon.
     expect(open).toHaveAccessibleName(/open a recording/i);
     expect(record).toHaveAccessibleName(/record/i);
