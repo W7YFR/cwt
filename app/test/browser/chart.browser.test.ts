@@ -52,6 +52,104 @@ afterEach(() => {
   host.remove();
 });
 
+/** One pointer's worth of gesture, from whatever kind of pointer you like.
+ *
+ * The chart takes mouse, touch and pen through one path, so the only thing
+ * that changes between them is `pointerType` — which is exactly what these
+ * tests want to vary. */
+function gesture(type: string, pointerType: string, opts: {
+  x: number;
+  y?: number;
+  id?: number;
+  primary?: boolean;
+  target?: EventTarget;
+}) {
+  (opts.target ?? canvas).dispatchEvent(
+    new PointerEvent(type, {
+      clientX: opts.x,
+      clientY: opts.y ?? 80,
+      pointerId: opts.id ?? 1,
+      // The constructor defaults this to false, and the chart ignores
+      // non-primary pointers on purpose — so leaving it out is a test that
+      // silently does nothing.
+      isPrimary: opts.primary ?? true,
+      pointerType,
+      bubbles: true,
+    }),
+  );
+}
+
+/* A finger, which is the case that was missing entirely.
+ *
+ * A tap always worked, because the browser synthesises a click from one, so
+ * every other thing this canvas does responded to touch and only the drag did
+ * not — it was listening for `mousedown`, which a finger never sends. That is
+ * a gap it is easy to look straight past, so it gets its own tests rather than
+ * a `pointerType` argument bolted onto the mouse ones. */
+describe("the chart under a finger", () => {
+  function panning(): ReturnType<typeof vi.fn> {
+    const onScroll = vi.fn();
+    chart.destroy();
+    chart = createChart(host, canvas, { onScroll });
+    chart.update({ review, settings: { ...settings, ppu: 40 }, focus: null });
+    return onScroll;
+  }
+
+  it("pans from a drag, the way a mouse does", () => {
+    const onScroll = panning();
+    gesture("pointerdown", "touch", { x: 400 });
+    gesture("pointermove", "touch", { x: 300, target: window });
+    gesture("pointerup", "touch", { x: 300, target: window });
+
+    expect(onScroll).toHaveBeenCalled();
+    expect(onScroll.mock.calls.at(-1)![0]).toBeGreaterThan(0);
+  });
+
+  it("does not let a second finger take the gesture over", () => {
+    /* The second finger of a pinch lands wherever it lands, and a drag that
+       re-anchored on it would jump the chart to somewhere nobody dragged. */
+    const onScroll = panning();
+    gesture("pointerdown", "touch", { x: 400, id: 1 });
+    gesture("pointerdown", "touch", { x: 100, id: 2, primary: false });
+    gesture("pointermove", "touch", { x: 90, id: 2, target: window });
+    expect(onScroll).not.toHaveBeenCalled();
+
+    // And the first finger still owns it.
+    gesture("pointermove", "touch", { x: 300, id: 1, target: window });
+    expect(onScroll).toHaveBeenCalled();
+  });
+
+  it("lets go when the browser takes the gesture away", () => {
+    /* A page scroll or an edge swipe ends in `pointercancel` and no
+       `pointerup` at all. A drag left standing after one would pan on the next
+       unrelated move — which is a chart that slides when you are not touching
+       it. */
+    const onScroll = panning();
+    gesture("pointerdown", "touch", { x: 400 });
+    gesture("pointercancel", "touch", { x: 400, target: window });
+    gesture("pointermove", "touch", { x: 200, target: window });
+    expect(onScroll).not.toHaveBeenCalled();
+  });
+
+  it("draws no tooltip from a finger", () => {
+    /* Hovering is a state you are in while pointing at something without
+       committing to it, and a finger has no such state. Driven from touch
+       moves, the tooltip would follow the finger through a pan and then sit
+       where it was lifted, describing whatever happened to be under it. */
+    const onHover = vi.fn();
+    chart.destroy();
+    chart = createChart(host, canvas, { onHover });
+    chart.update({ review, settings, focus: null });
+
+    gesture("pointermove", "touch", { x: 400 });
+    expect(onHover).not.toHaveBeenCalled();
+
+    // The same move from a mouse is a hover, and still reported.
+    gesture("pointermove", "mouse", { x: 400 });
+    expect(onHover).toHaveBeenCalled();
+  });
+});
+
 describe("the chart in a browser", () => {
   it("sizes itself in device pixels and paints", () => {
     chart.update({ review, settings, focus: null });
@@ -120,14 +218,30 @@ describe("the chart in a browser", () => {
     chart = createChart(host, canvas, { onPlayChar });
     chart.update({ review, settings: { ...settings, ppu: 40 }, focus: null });
 
+    /* Pointer events, because that is what the chart listens for — one path
+       for mouse, touch and pen. A `MouseEvent("mousedown")` is not a
+       `pointerdown` and the chart would never see it.
+
+       `isPrimary` matters: the constructor defaults it to false, and a
+       non-primary pointer is the second finger of a pinch, which the chart
+       deliberately ignores. */
     const at = (type: string, x: number, target: EventTarget) =>
       target.dispatchEvent(
-        new MouseEvent(type, { clientX: x, clientY: 80, bubbles: true }),
+        type === "click"
+          ? new MouseEvent(type, { clientX: x, clientY: 80, bubbles: true })
+          : new PointerEvent(type, {
+              clientX: x,
+              clientY: 80,
+              pointerId: 1,
+              isPrimary: true,
+              pointerType: "mouse",
+              bubbles: true,
+            }),
       );
 
-    at("mousedown", 400, canvas);
-    at("mousemove", 300, window);
-    at("mouseup", 300, window);
+    at("pointerdown", 400, canvas);
+    at("pointermove", 300, window);
+    at("pointerup", 300, window);
     at("click", 300, canvas);
     // A press that turned into a pan is not a click; without this every drag
     // across the chart would fire off a burst of audio.
@@ -145,11 +259,18 @@ describe("the chart in a browser", () => {
 
     const at = (type: string, x: number, target: EventTarget) =>
       target.dispatchEvent(
-        new MouseEvent(type, { clientX: x, clientY: 80, bubbles: true }),
+        new PointerEvent(type, {
+          clientX: x,
+          clientY: 80,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "mouse",
+          bubbles: true,
+        }),
       );
-    at("mousedown", 400, canvas);
-    at("mousemove", 300, window);
-    at("mouseup", 300, window);
+    at("pointerdown", 400, canvas);
+    at("pointermove", 300, window);
+    at("pointerup", 300, window);
 
     expect(onScroll).toHaveBeenCalled();
     expect(onScroll.mock.calls.at(-1)![0]).toBeGreaterThan(0);

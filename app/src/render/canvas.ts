@@ -394,16 +394,22 @@ export function createChart(
   }
 
   // ---- pointer ----------------------------------------------------------- //
+  /* Pointer events rather than mouse events, which is the whole of what a
+     touch screen needed.
+     A tap arrives as a click either way — the browser synthesises one — so
+     playing a character by touching it always worked, and that made the gap
+     easy to miss: everything on this canvas responded to a finger except the
+     one gesture that is not a tap. Dragging was listening for `mousedown`,
+     which a finger never sends, so the chart could be read and played on a
+     phone but not moved.
+
+     One code path for mouse, touch and pen, because they are one gesture:
+     press, move, release. `pointerType` is consulted in exactly one place
+     below, for hover, which is the one thing a finger genuinely cannot do. */
+  type DragBase = { x0: number; scroll0: number; moved: number; pointerId: number };
   type Drag =
-    | { kind: "pan"; x0: number; scroll0: number; moved: number }
-    | {
-        kind: "thumb";
-        x0: number;
-        scroll0: number;
-        moved: number;
-        thumbW: number;
-        trackW: number;
-      };
+    | ({ kind: "pan" } & DragBase)
+    | ({ kind: "thumb"; thumbW: number; trackW: number } & DragBase);
 
   let drag: Drag | null = null;
   let suppressClick = false;
@@ -459,7 +465,15 @@ export function createChart(
     paint();
   }
 
-  const onMouseDown = (ev: MouseEvent) => {
+  const onPointerDown = (ev: PointerEvent) => {
+    /* One gesture at a time. A second finger landing mid-pan would otherwise
+       take the drag over from where it happened to touch down, and the chart
+       would jump. Non-primary pointers are the rest of a multi-touch gesture
+       — a pinch, most often — and none of them are this. */
+    if (drag || !ev.isPrimary) return;
+    // A right-click is a menu, not a grab. Touch and pen report button 0.
+    if (ev.button > 0) return;
+
     const p = localPos(ev);
     const v = viewport();
     suppressClick = false;
@@ -471,6 +485,7 @@ export function createChart(
           x0: p.x,
           scroll0: scrollX,
           moved: 0,
+          pointerId: ev.pointerId,
           thumbW: th.w,
           trackW: th.trackW,
         };
@@ -482,11 +497,11 @@ export function createChart(
       return;
     }
     if (p.x < GUTTER || p.y < RULER_H) return; // the gutter and ruler aren't pans
-    drag = { kind: "pan", x0: p.x, scroll0: scrollX, moved: 0 };
+    drag = { kind: "pan", x0: p.x, scroll0: scrollX, moved: 0, pointerId: ev.pointerId };
   };
 
-  const onWindowMouseMove = (ev: MouseEvent) => {
-    if (!drag) return;
+  const onWindowPointerMove = (ev: PointerEvent) => {
+    if (!drag || ev.pointerId !== drag.pointerId) return;
     const p = localPos(ev);
     const dx = p.x - drag.x0;
     drag.moved = Math.max(drag.moved, Math.abs(dx));
@@ -501,11 +516,16 @@ export function createChart(
     }
   };
 
-  // Always clear `drag` here — a release outside the canvas fires no click, and
-  // a stuck drag would suppress hovering indefinitely. Whether it counted as a
-  // pan is handed to the click that may follow.
-  const onWindowMouseUp = () => {
-    if (!drag) return;
+  /* Always clear `drag` here — a release outside the canvas fires no click, and
+     a stuck drag would suppress hovering indefinitely. Whether it counted as a
+     pan is handed to the click that may follow.
+
+     Cancellation comes through here too. A touch gesture the browser decides
+     belongs to it — a page scroll, a back-swipe from the edge — ends in
+     `pointercancel` and no `pointerup` at all, and a drag left standing after
+     one would pan on the next unrelated move. */
+  const onWindowPointerUp = (ev: PointerEvent) => {
+    if (!drag || ev.pointerId !== drag.pointerId) return;
     canvas.classList.remove("grabbing");
     suppressClick = drag.moved >= DRAG_SLOP;
     drag = null;
@@ -599,11 +619,18 @@ export function createChart(
     return null;
   }
 
-  const onMouseMove = (ev: MouseEvent) => {
+  const onPointerMove = (ev: PointerEvent) => {
     if (drag && drag.moved >= DRAG_SLOP) {
       callbacks.onHover?.(null, ev.clientX, ev.clientY);
       return;
     }
+    /* The one thing a finger cannot do. Hovering is a state you are in while
+       pointing at something without committing to it, and a touch screen has
+       no such state — the finger is either down or gone. Driven from touch
+       moves anyway, the tooltip would follow the finger through a pan and
+       then sit where it was lifted, describing whatever happened to be under
+       it. Pen is left in: a stylus really does hover. */
+    if (ev.pointerType === "touch") return;
     const p = localPos(ev);
     const over = gutterNameAt(p);
     canvas.classList.toggle("picking", over !== null);
@@ -620,7 +647,7 @@ export function createChart(
     callbacks.onHover?.(h, ev.clientX, ev.clientY);
   };
 
-  const onMouseLeave = (ev: MouseEvent) => {
+  const onPointerLeave = (ev: PointerEvent) => {
     canvas.classList.remove("picking");
     callbacks.onHover?.(null, ev.clientX, ev.clientY);
     if (picking !== null || hoverRow !== null || hover) {
@@ -728,13 +755,19 @@ export function createChart(
     setZoomAt(input.settings.ppu * Math.exp(-ev.deltaY * ZOOM_RATE), localPos(ev).x);
   };
 
-  canvas.addEventListener("mousedown", onMouseDown);
-  canvas.addEventListener("mousemove", onMouseMove);
-  canvas.addEventListener("mouseleave", onMouseLeave);
+  canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerleave", onPointerLeave);
   canvas.addEventListener("click", onClick);
   canvas.addEventListener("wheel", onWheel, { passive: false });
-  window.addEventListener("mousemove", onWindowMouseMove);
-  window.addEventListener("mouseup", onWindowMouseUp);
+  /* On the window, so a drag that leaves the canvas still arrives — the mouse
+     may well be outside it by the time the button comes up, and a release the
+     chart never hears about is a pan that never stops. Touch gets the same
+     thing for free through implicit capture, which retargets the whole
+     gesture to whatever it started on. */
+  window.addEventListener("pointermove", onWindowPointerMove);
+  window.addEventListener("pointerup", onWindowPointerUp);
+  window.addEventListener("pointercancel", onWindowPointerUp);
 
   const observer =
     typeof ResizeObserver === "function" ? new ResizeObserver(() => resize()) : null;
@@ -906,13 +939,14 @@ export function createChart(
 
     destroy() {
       destroyed = true;
-      canvas.removeEventListener("mousedown", onMouseDown);
-      canvas.removeEventListener("mousemove", onMouseMove);
-      canvas.removeEventListener("mouseleave", onMouseLeave);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("click", onClick);
       canvas.removeEventListener("wheel", onWheel);
-      window.removeEventListener("mousemove", onWindowMouseMove);
-      window.removeEventListener("mouseup", onWindowMouseUp);
+      window.removeEventListener("pointermove", onWindowPointerMove);
+      window.removeEventListener("pointerup", onWindowPointerUp);
+      window.removeEventListener("pointercancel", onWindowPointerUp);
       observer?.disconnect();
     },
   };

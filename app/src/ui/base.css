@@ -761,7 +761,18 @@ button.alt.on { background: var(--tgt); border-color: var(--tgt); }
   border-radius: 8px;
   overflow: hidden;
 }
-canvas { display: block; touch-action: none; }
+/* `pan-y`, not `none`.
+   The chart is one long horizontal strip inside a page that scrolls
+   vertically, and those are two different gestures that can share the screen:
+   the browser keeps up-and-down, which is how you get to the report under the
+   chart with a finger anywhere on it, and side-to-side arrives here as
+   pointer events and pans the view. `none` claimed both and left the page
+   unscrollable wherever the chart was, which on a phone is most of it.
+
+   `pinch-zoom` is deliberate too: the browser's own zoom is how somebody who
+   cannot read this at the size it is drawn makes it bigger, and a canvas that
+   swallows the gesture takes that away. */
+canvas { display: block; touch-action: pan-y pinch-zoom; }
 canvas.grabbing { cursor: grabbing; }
 /* Over a run's name in the gutter, which picks that row up. */
 canvas.picking { cursor: pointer; }

@@ -126,9 +126,12 @@ function hovering(y: number): boolean {
   const box = canvas.getBoundingClientRect();
   act(() =>
     canvas.dispatchEvent(
-      new MouseEvent("mousemove", {
+      new PointerEvent("pointermove", {
         clientX: box.left + 8,
         clientY: box.top + y,
+        pointerId: 1,
+        isPrimary: true,
+        pointerType: "mouse",
         bubbles: true,
       }),
     ),

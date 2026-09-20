@@ -490,30 +490,31 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(container.textContent).toContain("Start recording");
   });
 
+  /* Two tests rather than one with an unmount in the middle of it.
+   *
+   * They are two halves of one claim — a name earns header room and the word
+   * "microphone" does not — so they were written as one, which meant tearing
+   * the app down and seeding the database again inside a single test body.
+   * Remembering a take is fire-and-forget, and the write the first app left in
+   * flight would land on top of the second seed and hand the second mount the
+   * recording the first one was showing. Between tests that hazard is already
+   * handled, by the `afterEach` above and the comment in it; in the middle of
+   * one, nothing was covering it. */
   it("does not waste header room saying the recording came from a microphone", async () => {
-    // A filename earns its place up there. "microphone" is the same word every
-    // time and is already implied by the fact that you just recorded.
+    // "microphone" is the same word every time and is already implied by the
+    // fact that you just recorded.
     await served({ ...TAKE, source: "microphone" });
     await mount();
     expect(container.querySelector("header")!.textContent).not.toMatch(/microphone/i);
     // Still a review, and still able to name the take for a download.
     expect(container.textContent).toContain("consistent");
+  });
 
-    act(() => root!.unmount());
-    root = null;
-    container.remove();
-    container = document.createElement("div");
-    document.body.appendChild(container);
-
-    /* The app that was just unmounted saves the session it was showing, and
-       that write is asynchronous. Seeding on top of a write still in flight
-       is a race the seed loses — and loses permanently, because nothing
-       re-seeds afterwards — so let it land first. */
-    await storedSourceIs("microphone");
-
-    // A file keeps its name, which is the case the header is for.
+  it("keeps a filename in the header, which is what the room is for", async () => {
     await served();
-    // Seeded, and then checked rather than assumed.
+    // Seeded, and then checked rather than assumed: if a write from the
+    // previous test ever did leak past the teardown, this says so in one line
+    // instead of failing later as a header with the wrong name in it.
     await storedSourceIs(TAKE.source);
     await mount();
     expect(container.querySelector("header")!.textContent).toContain(TAKE.source);
