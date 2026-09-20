@@ -1940,3 +1940,62 @@ button.danger { border-color: var(--bad); color: var(--bad); }
    calibration picker on a microphone take, and beside the device picker on one
    opened from a file. */
 .cal { font-size: 11px; padding: 3px 8px; }
+
+/* ---- the microphone readout --------------------------------------------- */
+
+/* Debug tooling, behind `?micdebug` in the URL, and styled here rather than in
+   the component for the ordinary reason: it is static appearance, and the
+   inline styles in this app are all computed values — a meter's width, a
+   chart's geometry, a field sized to its longest number. Written in the
+   component it also hardcoded its own colors, which made it a permanently dark
+   slab on a page that has a light theme.
+
+   It floats over the app rather than sitting in the layout, because it has to
+   be readable on whichever screen is being debugged and neither of them has a
+   space set aside for it. Which is also why it folds: pinned to the bottom, it
+   covered the button that leaves the landing page. */
+.micdebug {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 60;
+  max-height: 45vh;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 12px/1.45 var(--mono);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+}
+.micdebug .bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+/* The key half of each line, dimmed so the values are what the eye lands on —
+   the readout is scanned rather than read, usually for one value that has
+   changed since the last look. */
+.micdebug .k { color: var(--ink-dim); }
+.micdebug button { font: inherit; padding: 4px 8px; }
+.micdebug .reread { margin-top: 6px; }
+
+/* Folded: a corner it shares with nothing, rather than a smaller slab across
+   the same edge. Out of the way is the whole point of the control. */
+.micdebug-tab {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 60;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 12px/1 var(--mono);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+}

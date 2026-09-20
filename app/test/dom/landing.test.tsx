@@ -45,7 +45,11 @@ const GRANTED = [
 ];
 
 /** What a browser hands back before it has been allowed the microphone: the
- *  inputs are there, with the names stripped off. */
+ *  inputs are there, with the names stripped off.
+ *
+ *  One entry, which is what Chrome hands back however many are attached — the
+ *  placeholder is not a count, and a rule that read it as one is what
+ *  `micpermission.test.tsx` now holds the line on. */
 const UNGRANTED = [{ deviceId: "", kind: "audioinput", label: "", groupId: "" }];
 
 function mockDevices(devices: unknown[]) {

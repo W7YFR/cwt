@@ -12,6 +12,7 @@ import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
 import { profilesFor, type Profile } from "@/io/profiles";
 import { fmtElapsed } from "./format";
+import { MicDebug } from "./MicDebug";
 import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import type { RecorderHandle } from "./useRecorder";
 
@@ -77,8 +78,13 @@ export function DevicePicker({
       onChange={(e) => onChange(e.target.value || undefined)}
     >
       <option value="">Default input</option>
-      {devices.map((d) => (
-        <option key={d.deviceId} value={d.deviceId}>
+      {/* Keyed by position as well as by id, because the id is not reliably
+          unique: a browser that has granted the microphone but is still
+          withholding the identifiers hands back several inputs with an empty
+          `deviceId`, and React then sees one option that keeps changing its
+          mind. The position is stable for as long as the list is. */}
+      {devices.map((d, i) => (
+        <option key={`${d.deviceId}:${i}`} value={d.deviceId}>
           {d.label}
         </option>
       ))}
@@ -372,6 +378,9 @@ export function RecordBar({
         )}
 
       </div>
+
+      {/* Nothing at all without `?micdebug` in the URL. */}
+      <MicDebug rec={rec} />
 
       {/* Outside the bar, not in it.
 

@@ -11,6 +11,7 @@
  * recording it works the way it does on the command line.
  */
 
+import { describeInputs, micLog } from "@/micdebug";
 import type { AudioClip } from "@/types";
 
 /** Source for the worklet, inlined so there is no second file to ship and no
@@ -53,8 +54,12 @@ export interface InputDevice {
  * the browser refusing to let a page fingerprint the hardware, not a bug, and
  * the UI says so rather than showing a list of blanks. */
 export async function listInputs(): Promise<InputDevice[]> {
-  if (!navigator.mediaDevices?.enumerateDevices) return [];
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    micLog("enumerateDevices: not available");
+    return [];
+  }
   const devices = await navigator.mediaDevices.enumerateDevices();
+  micLog("enumerateDevices →", describeInputs(devices));
   return devices
     .filter((d) => d.kind === "audioinput")
     .map((d, i) => ({
@@ -81,8 +86,11 @@ export async function requestMicAccess(): Promise<void> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("this browser cannot record audio");
   }
+  micLog("requestMicAccess: asking for { audio: true }");
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  micLog("requestMicAccess: granted — stopping the tracks it opened");
   for (const track of stream.getTracks()) track.stop();
+  micLog("requestMicAccess: tracks stopped");
 }
 
 /** What the browser will say about the microphone before one is opened.
@@ -105,6 +113,7 @@ export type MicAccess = "granted" | "denied" | "prompt" | "unknown";
 export function watchMicAccess(onChange: (access: MicAccess) => void): () => void {
   const perms = navigator.permissions;
   if (!perms?.query) {
+    micLog("permissions.query: no navigator.permissions on this browser");
     onChange("unknown");
     return () => {};
   }
@@ -116,12 +125,24 @@ export function watchMicAccess(onChange: (access: MicAccess) => void): () => voi
     .query({ name: "microphone" as PermissionName })
     .then((status) => {
       if (!live) return;
-      const report = (): void => onChange(status.state as MicAccess);
+      micLog(`permissions.query resolved → "${status.state}"`);
+      let first = true;
+      const report = (): void => {
+        // The first call is this code reading the answer; every one after it
+        // is the browser volunteering a change, which is the interesting kind.
+        if (!first) micLog(`permissions change → "${status.state}"`);
+        first = false;
+        onChange(status.state as MicAccess);
+      };
       report();
       status.addEventListener("change", report);
       drop = () => status.removeEventListener("change", report);
     })
-    .catch(() => {
+    .catch((e: unknown) => {
+      micLog(
+        "permissions.query rejected",
+        e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+      );
       if (live) onChange("unknown");
     });
   return () => {
@@ -165,6 +186,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
      — they will gate a long dah and shorten every mark. Auto gain moves the
      level under the threshold detector while it is measuring. None of these are
      defaults you can leave alone for this job. */
+  micLog("startRecording: opening a device", options.deviceId ?? "(default input)");
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       echoCancellation: false,
@@ -174,6 +196,8 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     },
     video: false,
   });
+
+  micLog("startRecording: device open");
 
   const Ctor =
     window.AudioContext ??

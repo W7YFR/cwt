@@ -12,6 +12,7 @@ import { MIC_SOURCE } from "@/io/take";
 import { orderProfiles, type Profile } from "@/io/profiles";
 import type { AudioClip } from "@/types";
 import { fmtElapsed } from "./format";
+import { MicDebug } from "./MicDebug";
 import { DevicePicker, LevelMeter, RecDot } from "./Record";
 import { Wordmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
@@ -257,6 +258,9 @@ export function Landing(props: LandingProps): React.ReactElement {
             </>
           )}
         </div>
+
+        {/* Nothing at all without `?micdebug` in the URL. */}
+        <MicDebug rec={rec} />
 
         <div className="way drop">
           <h2>Or open a recording</h2>
