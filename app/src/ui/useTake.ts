@@ -593,13 +593,19 @@ export function useTake(): TakeState {
     setSelected((prev) => (i >= 0 && i < runsRef.current.length ? i : prev));
   }, []);
 
+  /* Dropping the only run leaves an empty session at the same settings, ready
+     for the next attempt, rather than leaving the review. */
   const dropRun = useCallback((i: number) => {
     const rest = runsRef.current.filter((_, k) => k !== i);
+    if (rest.length === 0) {
+      reset();
+      return;
+    }
     runsRef.current = rest;
     setRuns(rest);
     // Land on the attempt that took its place, or the last one if it was.
     setSelected((prev) => Math.max(0, Math.min(prev > i ? prev - 1 : prev, rest.length - 1)));
-  }, []);
+  }, [reset]);
 
   return {
     loaded,

@@ -52,11 +52,9 @@ export function Scores({
     </div>
   );
 
-  const drop = onDrop && runOf && runOf.of > 1 && (
+  const drop = onDrop && runOf && (
     /* At the end of the head row: it is an action rather than a reading, and
-       it throws a recording away. Only where there is a rest of the session to
-       keep — with one attempt on screen, dropping it and clearing are the same
-       act. */
+       it throws a recording away. */
     <button
       className="iconbtn droprun"
       onClick={onDrop}

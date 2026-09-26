@@ -77,11 +77,9 @@ describe("which attempt the band is about", () => {
 });
 
 describe("dropping a run from the scores", () => {
-  it("is not offered when there is nothing else to keep", () => {
-    /* With one attempt on screen, dropping it and clearing the session are the
-       same act, and two buttons for one question is one too many. */
+  it("is offered for a lone recorded run", () => {
     band({ runOf: { at: 0, of: 1 } });
-    expect(screen.queryByTestId("drop-run")).toBeNull();
+    expect(screen.getByTestId("drop-run")).toBeTruthy();
   });
 
   it("names the attempt it will throw away", () => {
@@ -100,8 +98,7 @@ describe("dropping a run from the scores", () => {
   });
 
   it("stays out of a band with no recording behind it", () => {
-    /* Nothing recorded means one attempt, so there is nothing to drop — and
-       the figures are dashes, which is not a set of numbers to act on. */
+    /* The figures are dashes, which is not a set of numbers to act on. */
     const take = blankTake({ expected: "CQ", charWpm: 20, farnsworthWpm: 20 });
     const settings = defaultSettings(take);
     render(
