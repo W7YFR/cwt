@@ -110,7 +110,16 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    a word rather than as a button so it reads as the title it is, but it is a
    real <button> underneath — a clickable <h1> that is not focusable is a
    control only a mouse can reach. */
-.brand { display: flex; align-items: center; gap: 10px; }
+/* On the first line at a control's height, not centered in the header: a
+   control that wraps to a second line makes the header taller, and the brand
+   stays where it was. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  min-height: var(--control-h);
+}
 .brandmark {
   display: block;
   background: none;
@@ -151,6 +160,11 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
      — so on a narrow screen the choice is between a second line and a line
      that runs off the edge of the page. */
   flex-wrap: wrap;
+  /* Takes the width left beside the brand and wraps inside it, so a control
+     that appears at the end of the row moves only itself to a second line. A
+     basis of its full width would drop the whole row below the brand. */
+  flex: 1 1 0;
+  min-width: 0;
 }
 .recordbar .hint { white-space: nowrap; }
 /* Never narrower than what is written on them, and never re-flowed inside
@@ -452,14 +466,11 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   background: var(--panel);
 }
 
-/* A word button just left of the corner button, on its center line. */
-.cornerside {
-  position: absolute;
-  top: 14px;
-  right: calc(20px + var(--control-h) + 8px);
-  z-index: 5;
-  font-size: 12px;
-  padding: 0 10px;
+/* Room for the corner button, which sits out of the flow. The same on every
+   screen that has one and whether its panel is open or not, so nothing in the
+   header moves. */
+header:has(.cornerbtn) {
+  padding-right: calc(20px + var(--control-h) + 8px);
 }
 
 /* The band the corner button opens, under the header and above everything the
@@ -2114,6 +2125,10 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 }
 .calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
 .calpick .hint { font-size: 11px; }
+/* Out of the flow while empty, so it adds no gap before the next control.
+   Not hidden: a live region that is not rendered does not announce what is
+   written into it. */
+.calpick .hint:empty { position: absolute; }
 /* Smaller than the buttons in the bar it sits in, because it belongs to the
    setup rather than to the row of actions — Record and New session are what
    this header is for, and a third button their size would read as a third

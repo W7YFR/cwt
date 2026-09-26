@@ -656,6 +656,7 @@ export function ReviewScreen({
              Both are answered once and then left alone, and both sat in the
              header being rare. */
           configuring={chartSettings}
+          onAdvanced={onConfigure}
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
           leadLeft={leadLeft}
@@ -689,13 +690,6 @@ export function ReviewScreen({
             Configuration used to live here too. That is about one thing — the
             microphone — and now sits beside Calibrate where it is decided;
             this is about the page in front of you. */}
-        {/* Beside the cog, and only while it is open. Before it in the DOM,
-            so the cog stays the last stop in the header. */}
-        {chartSettings && (
-          <button className="cornerside" data-testid="advanced" onClick={onConfigure}>
-            Advanced
-          </button>
-        )}
         <ChartSettingsButton
           open={chartSettings}
           onToggle={() => setChartSettings((v) => !v)}
