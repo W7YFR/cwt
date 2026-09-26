@@ -1347,6 +1347,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   text-overflow: ellipsis;
   cursor: pointer;
 }
+.drilllist [aria-disabled="true"] { color: var(--ink-faint); cursor: default; }
 .drilllist [data-active="true"] {
   background: var(--panel-2);
   border-left-color: var(--you);

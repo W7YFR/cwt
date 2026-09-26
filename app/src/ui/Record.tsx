@@ -7,10 +7,11 @@
  * screen's larger arrangement live here too, so the two cannot drift.
  */
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
-import { DRILLS, type Drill } from "@/drills";
+import { DRILLS, fillDrills, type Drill } from "@/drills";
+import { loadUser } from "@/io/storage";
 import { profilesFor, type Profile } from "@/io/profiles";
 import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
@@ -233,6 +234,9 @@ export function RecordBar({
   configuring = false,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
+  // Read on mount: the configuration page, where the details change, replaces
+  // this screen while it is open.
+  const drills = useMemo(() => fillDrills(DRILLS, loadUser()), []);
 
   if (rec.recorder) {
     return (
@@ -357,7 +361,7 @@ export function RecordBar({
             New session
           </button>
         )}
-        {onDrill && <DrillPicker drills={DRILLS} onPick={onDrill} floating />}
+        {onDrill && <DrillPicker drills={drills} onPick={onDrill} floating />}
         {onClear && (
           <button
             onClick={onClear}

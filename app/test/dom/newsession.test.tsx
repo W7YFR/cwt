@@ -10,10 +10,11 @@
  * always the record button.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
+import { saveUser, EMPTY_USER } from "@/io/storage";
 import { NewSession, oneLine } from "@/ui/NewSession";
 
 function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
@@ -188,6 +189,7 @@ describe("starting a new session", () => {
 
   describe("picking a drill", () => {
     const drill = DRILLS[1]!;
+    beforeEach(() => localStorage.clear());
 
     it("fills the message and hands it over on Save", async () => {
       const user = userEvent.setup();
@@ -274,6 +276,29 @@ describe("starting a new session", () => {
       const tree = screen.getByRole("tree");
       const group = screen.getByRole("treeitem", { name: "Daily Sending" });
       expect(tree.getAttribute("aria-activedescendant")).toBe(group.id);
+    });
+
+    it("fills a QSO drill from the saved details", async () => {
+      saveUser({ ...EMPTY_USER, name: "ROB", qthRegionShort: "OR" });
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.click(screen.getByTestId("drill-option-qso/name-qth/1"));
+      expect(text().value).toBe("NAME IS ROB ROB <BT> QTH HR OR OR");
+    });
+
+    it("will not pick a QSO drill whose details are missing, and says which", async () => {
+      saveUser({ ...EMPTY_USER, name: "ROB" });
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      const row = screen.getByTestId("drill-option-qso/name-qth/1");
+      expect(row).toHaveAttribute("aria-disabled", "true");
+      expect(row.textContent).toBe("NAME IS ROB ROB <BT> QTH HR [REGION_SHORT] [REGION_SHORT]");
+      expect(row.getAttribute("title")).toMatch(/Region, short/);
+      await user.click(row);
+      expect(screen.getByRole("tree")).toBeTruthy();
+      expect(text().value).toBe("CQ DE W7YFR");
     });
 
     it("groups the options under their section", async () => {

@@ -18,8 +18,9 @@
  * out, so a pasted paragraph is one message.
  */
 
-import { useEffect, useState } from "react";
-import { DRILLS } from "@/drills";
+import { useEffect, useMemo, useState } from "react";
+import { DRILLS, fillDrills } from "@/drills";
+import { loadUser } from "@/io/storage";
 import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
 import { DrillPicker } from "./DrillPicker";
@@ -60,6 +61,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   /* Upper case as it is typed, not only once Start is pressed. The message is
      upper-cased on the way out either way, and a box that shows one thing
      while promising another is the sort of small lie that makes you check. */
+  const drills = useMemo(() => fillDrills(DRILLS, loadUser()), []);
   const sent = useUpperField<HTMLTextAreaElement>(setText);
   const box = sent.ref;
 
@@ -113,7 +115,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
         <div className="fieldrow">
           <label htmlFor="ns-text">Target message</label>
           <DrillPicker
-            drills={DRILLS}
+            drills={drills}
             onPick={(d) => {
               setText(d.text);
               box.current?.focus();

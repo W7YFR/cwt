@@ -10,7 +10,7 @@
  * "start the session" and "close the dialog". */
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { groupDrills, type Drill, type DrillGroup } from "@/drills";
+import { SLOT_LABELS, groupDrills, type Drill, type DrillGroup } from "@/drills";
 
 export interface DrillPickerProps {
   drills: readonly Drill[];
@@ -30,6 +30,13 @@ const STICKY_PX = 28;
 const VIEWPORT_GUTTER_PX = 16;
 
 const groupKey = (g: DrillGroup) => `group:${g.name}`;
+
+/** What a drill that cannot be picked yet is waiting for. */
+function needs(d: Drill): string | undefined {
+  if (!d.missing?.length) return undefined;
+  const fields = d.missing.map((s) => SLOT_LABELS[s]).join(", ");
+  return `Needs ${fields}. Set them in Settings › Advanced.`;
+}
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export function DrillPicker({ drills, onPick, floating = false }: DrillPickerProps): React.ReactElement {
@@ -104,6 +111,7 @@ export function DrillPicker({ drills, onPick, floating = false }: DrillPickerPro
   };
 
   const pick = (d: Drill) => {
+    if (d.missing?.length) return;
     setOpen(false);
     onPick(d);
   };
@@ -255,9 +263,10 @@ export function DrillPicker({ drills, onPick, floating = false }: DrillPickerPro
                             role="treeitem"
                             aria-level={2}
                             aria-selected={active?.key === d.id}
+                            aria-disabled={d.missing?.length ? true : undefined}
                             data-active={active?.key === d.id}
                             data-testid={`drill-option-${d.id}`}
-                            title={d.text}
+                            title={needs(d) ?? d.text}
                             onMouseMove={() => setActiveKey(d.id)}
                             onClick={() => pick(d)}
                           >
