@@ -432,6 +432,11 @@ step, and commits the pair as `chore: release vX.Y.Z`. That commit rides in
 with the change, so merging is what publishes the new version, and `main` is
 never written to by a machine.
 
+A change that touches no build input — only CI, docs, tests or the Makefile —
+builds the same site. It needs no bump, and merging it deploys nothing.
+`make bump` says so and writes nothing. The list of build inputs is
+`BUILD_INPUTS` in `scripts/version.mjs`.
+
 CI's only job about versions is to check that you did it. The `version` job
 compares the merged result against the base and fails if the bump is missing or
 weaker than the branch prefix asks for, naming the command that fixes it. A
@@ -445,8 +450,11 @@ Two people cannot both claim `0.2.0`: whichever branch merges second fails the
 check, and rebasing on `main` drops the now-duplicate release commit so
 `make bump` gives it the next number.
 
-Tags are not automatic. `make tag` annotates the current version at `HEAD`,
-which is a thing to do on `main` after merging, if you want one.
+Tags are not automatic. After the merge, `make release` switches to `main`,
+fast-forwards it, tags the version it finds there, and pushes that one tag.
+It then offers to delete the local branch you ran it from. Run from `main`, it
+offers the branch that the last merge names.
+`make tag` only tags `HEAD` and pushes nothing.
 
 #### Why CI cannot write anything
 

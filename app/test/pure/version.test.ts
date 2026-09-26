@@ -23,6 +23,8 @@ import {
   verifyBump,
   levelFor,
   lockWithVersion,
+  ships,
+  touchedPaths,
   typeOf,
   withVersion,
 } from "../../../scripts/version.mjs";
@@ -252,6 +254,23 @@ describe("checking a branch already carries its bump", () => {
     const weak = verifyBump("0.4.2", "0.4.3", "minor");
     expect(weak.expected).toBe("0.5.0");
     expect(weak.why).toBe("the version is 0.4.3");
+  });
+});
+
+describe("whether a change ships", () => {
+  it("counts app source, public files and build config", () => {
+    for (const p of ["app/src/ui/App.tsx", "app/public/favicon.svg", "app/index.html", "vite.config.ts", "package-lock.json"]) {
+      expect(ships([p])).toBe(true);
+    }
+  });
+
+  it("ignores CI, docs, tests and the Makefile", () => {
+    expect(ships([".github/workflows/ci.yml", "README.md", "app/test/pure/drills.test.ts", "Makefile", "scripts/version.mjs"])).toBe(false);
+  });
+
+  it("drops the paths of release commits, whose package.json edit is the bump", () => {
+    const log = "\0chore: release v1.0.2\n\npackage-lock.json\npackage.json\n\0ci: gate deploy\n\n.github/workflows/ci.yml\n";
+    expect(touchedPaths(log)).toEqual([".github/workflows/ci.yml"]);
   });
 });
 
