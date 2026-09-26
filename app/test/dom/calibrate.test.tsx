@@ -29,6 +29,7 @@ import { BOUNDS, Calibrate, STEPS, TOTAL_SEC, outcomeOf } from "@/ui/Calibrate";
 import type { CalibrationRun } from "@/io/calibration";
 import { DRILLS, cueCount } from "@/io/calibration";
 import { loadProfiles, activeProfile } from "@/io/profiles";
+import { loadSpeed, saveSpeed } from "@/io/storage";
 import { DATA_DIR } from "../oracle-fs";
 import { readWav } from "../wav";
 
@@ -208,6 +209,26 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
 
     renderWizard();
     expect((screen.getByLabelText(/keyer speed/i) as HTMLInputElement).value).toBe("22");
+    expect(loadSpeed()).toEqual({ charWpm: 22, farnsworthWpm: 22 });
+    await settled();
+  });
+
+  it("opens at the speed set on the practice page", async () => {
+    saveSpeed(23, 23);
+    renderWizard();
+    expect((screen.getByLabelText(/keyer speed/i) as HTMLInputElement).value).toBe("23");
+    await settled();
+  });
+
+  it("keeps a Farnsworth speed set on purpose", async () => {
+    const user = userEvent.setup();
+    saveSpeed(25, 12);
+    renderWizard();
+    const speed = screen.getByLabelText(/keyer speed/i);
+    await user.clear(speed);
+    await user.type(speed, "20");
+    await begin(user);
+    expect(loadSpeed()).toEqual({ charWpm: 20, farnsworthWpm: 12 });
     await settled();
   });
 

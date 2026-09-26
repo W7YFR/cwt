@@ -31,7 +31,7 @@ import {
   type Drill,
   type CalibrationRun,
 } from "@/io/calibration";
-import { keepCalibration, linkCalibration, loadPrefs, savePrefs } from "@/io/storage";
+import { keepCalibration, linkCalibration, loadSpeed, saveSpeed } from "@/io/storage";
 import { correctsNothing, normalized } from "@/dsp";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { createPlayer, type Player } from "@/audio/player";
@@ -55,14 +55,23 @@ import { useRecorder } from "./useRecorder";
  *  likely to succeed. */
 const DEFAULT_WPM = 15;
 
-/** The speed is a property of the keyer, not of a calibration.
+/** The saved practice speed, which calibration shares.
  *
  * Retyping it every time is the sort of friction that stops somebody
  * recalibrating after they have moved the microphone — which is the one moment
  * a calibration most needs redoing. */
 function rememberedWpm(): number {
-  const saved = loadPrefs().keyerWpm;
-  return typeof saved === "number" && saved >= 5 && saved <= 40 ? saved : DEFAULT_WPM;
+  const saved = loadSpeed()?.charWpm;
+  return saved !== undefined && saved >= 5 && saved <= 40 ? saved : DEFAULT_WPM;
+}
+
+/** Save the keyer speed as the practice speed. A Farnsworth speed below the
+ *  character speed is a deliberate choice and stays, clamped. Otherwise both
+ *  move, so no Farnsworth gap appears that nobody asked for. */
+function saveKeyerSpeed(wpm: number): void {
+  const prev = loadSpeed();
+  const spaced = prev !== null && prev.farnsworthWpm < prev.charWpm;
+  saveSpeed(wpm, spaced ? prev.farnsworthWpm : wpm);
 }
 
 export interface Step extends Drill {
@@ -281,7 +290,7 @@ function Wizard(props: CalibrateProps): React.ReactElement {
   }, [finish, rec.elapsed, rec.recorder, stage]);
 
   const start = useCallback(async () => {
-    savePrefs({ ...loadPrefs(), keyerWpm: wpmRef.current });
+    saveKeyerSpeed(wpmRef.current);
     stopping.current = false;
     setRun(null);
     setClip(null);

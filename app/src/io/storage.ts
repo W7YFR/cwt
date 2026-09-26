@@ -370,11 +370,12 @@ export interface Prefs {
    * them, not a second copy of them. Which also means a take outlives the
    * session it was recorded in, and a history view can still find it. */
   session?: { ids: string[]; selected: number };
-  /** The speed the keyer is set to, for the calibration wizard. A property of
-   *  the equipment rather than of a session, so it outlives both. */
+  /** Calibration's speed, from saves that hold no `charWpm`. Read by
+   *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
   gainDb?: number;
   tolerance?: number;
+  /** The practice speed, shared by every screen. Read through `loadSpeed`. */
   charWpm?: number;
   farnsworthWpm?: number;
   expected?: string;
@@ -557,6 +558,20 @@ export function savePrefs(prefs: Prefs): void {
   } catch {
     /* private mode, quota, or storage disabled — all survivable */
   }
+}
+
+/** The speed you practice at, or null when none is saved. The practice page
+ *  and calibration both read and write this one pair. */
+export function loadSpeed(): { charWpm: number; farnsworthWpm: number } | null {
+  const p = loadPrefs();
+  const charWpm = p.charWpm ?? p.keyerWpm;
+  if (!charWpm || !(charWpm > 0)) return null;
+  const farnsworthWpm = p.farnsworthWpm && p.farnsworthWpm > 0 ? p.farnsworthWpm : charWpm;
+  return { charWpm, farnsworthWpm: Math.min(farnsworthWpm, charWpm) };
+}
+
+export function saveSpeed(charWpm: number, farnsworthWpm: number): void {
+  savePrefs({ ...loadPrefs(), charWpm, farnsworthWpm: Math.min(farnsworthWpm, charWpm) });
 }
 
 /* ---- the session you were last looking at -------------------------------- */

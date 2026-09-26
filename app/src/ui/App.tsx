@@ -346,7 +346,7 @@ export function App(): React.ReactElement {
             setProfiles(loadProfiles());
             setProfileId(saved.id);
             setCalibrating(false);
-            take.adoptKeyerSpeed();
+            take.adoptSavedSpeed();
           }}
           /* Both ways out, because the speed is stated when the wizard starts
              recording rather than when it saves a profile. Leaving without a
@@ -354,7 +354,7 @@ export function App(): React.ReactElement {
              that follows is at that speed either way. */
           onClose={() => {
             setCalibrating(false);
-            take.adoptKeyerSpeed();
+            take.adoptSavedSpeed();
           }}
         />
       ) : take.loaded && take.review ? (

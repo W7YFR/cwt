@@ -11,10 +11,10 @@
  * behind their back.
  */
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useTake } from "@/ui/useTake";
-import { savePrefs, loadPrefs } from "@/io/storage";
+import { savePrefs, loadPrefs, loadSpeed } from "@/io/storage";
 import { caseNamed, takeFrom, SLOPPY } from "../fixture";
 
 const KEYER = 25;
@@ -58,7 +58,7 @@ describe("the keyer's stated speed", () => {
     const before = result.current.settings.charWpm;
     calibratedAt(before + 7);
 
-    act(() => result.current.adoptKeyerSpeed());
+    act(() => result.current.adoptSavedSpeed());
     expect(result.current.settings.charWpm).toBe(before + 7);
   });
 
@@ -69,7 +69,7 @@ describe("the keyer's stated speed", () => {
 
     const graded = result.current.settings.charWpm;
     calibratedAt(graded + 7);
-    act(() => result.current.adoptKeyerSpeed());
+    act(() => result.current.adoptSavedSpeed());
 
     // The take's own speed is what it is measured against, and it stands.
     expect(result.current.settings.charWpm).toBe(graded);
@@ -83,7 +83,42 @@ describe("the keyer's stated speed", () => {
     const before = result.current.settings.charWpm;
     calibratedAt(before + 7);
 
-    act(() => result.current.adoptKeyerSpeed());
+    act(() => result.current.adoptSavedSpeed());
     expect(result.current.settings.charWpm).toBe(before + 7);
+  });
+});
+
+describe("the practice speed", () => {
+  it("survives a reload", () => {
+    vi.useFakeTimers();
+    try {
+      const first = renderHook(() => useTake());
+      act(() => first.result.current.setSettings({ charWpm: 27, farnsworthWpm: 18 }));
+      act(() => vi.advanceTimersByTime(1000));
+      first.unmount();
+
+      const { result } = renderHook(() => useTake());
+      expect(result.current.settings.charWpm).toBe(27);
+      expect(result.current.settings.farnsworthWpm).toBe(18);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("is not moved by opening a take at its own speed", () => {
+    /* A take opens at the speed it was graded at. Changing some other setting
+       while it is open must not save that speed for every screen. */
+    vi.useFakeTimers();
+    try {
+      savePrefs({ ...loadPrefs(), charWpm: 30, farnsworthWpm: 30 });
+      const { result } = renderHook(() => useTake());
+      act(() => result.current.adopt(takeFrom(caseNamed(SLOPPY)), new ArrayBuffer(0)));
+      expect(result.current.settings.charWpm).not.toBe(30);
+      act(() => result.current.setSettings({ tolerance: 0.4 }));
+      act(() => vi.advanceTimersByTime(1000));
+      expect(loadSpeed()?.charWpm).toBe(30);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
