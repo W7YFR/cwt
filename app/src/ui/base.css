@@ -1271,6 +1271,14 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
    full-width item of the field row, below the label and the button. */
 .drillpicker { display: contents; }
 .drillpicker button { font-size: 12px; padding: 0 10px; }
+.drillpicker.floating { display: block; position: relative; }
+.drillpicker.floating .drilllist {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 30;
+  width: min(560px, calc(100vw - 32px));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
+}
 .drilllist {
   position: relative;
   flex: 1 0 100%;

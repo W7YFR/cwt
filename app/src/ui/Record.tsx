@@ -10,7 +10,9 @@
 import { useRef } from "react";
 import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
+import { DRILLS, type Drill } from "@/drills";
 import { profilesFor, type Profile } from "@/io/profiles";
+import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
 import { IconCog, IconRecord, IconUpload } from "./Icons";
 import { MicDebug } from "./MicDebug";
@@ -177,6 +179,8 @@ export interface RecordBarProps {
   onClear?: (() => void) | undefined;
   /** Start over at a new message and a new speed. */
   onNewSession?: (() => void) | undefined;
+  /** Start a new session at a drill's text, at the current speeds. */
+  onDrill?: ((drill: Drill) => void) | undefined;
   /** Open a recording from disk.
    *
    * Beside dropping one on the page rather than instead of it. The drop target
@@ -221,6 +225,7 @@ export function RecordBar({
   leadLeft,
   onClear,
   onNewSession,
+  onDrill,
   onFile,
   canOpenFile = true,
   onCalibrate,
@@ -352,6 +357,7 @@ export function RecordBar({
             New session
           </button>
         )}
+        {onDrill && <DrillPicker drills={DRILLS} onPick={onDrill} floating />}
         {onClear && (
           <button
             onClick={onClear}

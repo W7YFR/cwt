@@ -661,6 +661,14 @@ export function ReviewScreen({
              but never join one. */
           canOpenFile={blank}
           onNewSession={() => setStarting(true)}
+          onDrill={(d) =>
+            onNewSession({
+              expected: d.text,
+              charWpm: settings.charWpm,
+              farnsworthWpm: Math.min(settings.farnsworthWpm, settings.charWpm),
+              times: settings.times,
+            })
+          }
           /* Drawn by the bar, on the row it shares with the note about how
              the file is being read — see `source` there. A filename earns
              that room; "microphone" does not, and the bar drops it. */

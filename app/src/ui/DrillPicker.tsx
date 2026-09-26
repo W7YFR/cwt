@@ -7,19 +7,22 @@
  * Enter and Escape stop here. The dialog around the picker reads both, as
  * "start the session" and "close the dialog". */
 
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { groupDrills, type Drill } from "@/drills";
 
 export interface DrillPickerProps {
   drills: readonly Drill[];
   onPick(drill: Drill): void;
+  /** Float the list over the page instead of taking room in the layout. */
+  floating?: boolean;
 }
 
 const TYPEAHEAD_MS = 600;
 /** Height of the sticky group header in base.css. */
 const STICKY_PX = 28;
+const VIEWPORT_GUTTER_PX = 16;
 
-export function DrillPicker({ drills, onPick }: DrillPickerProps): React.ReactElement {
+export function DrillPicker({ drills, onPick, floating = false }: DrillPickerProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const root = useRef<HTMLDivElement>(null);
@@ -47,6 +50,15 @@ export function DrillPicker({ drills, onPick }: DrillPickerProps): React.ReactEl
   useEffect(() => {
     if (open) list.current?.focus({ preventScroll: true });
   }, [open]);
+
+  // Shift a floating list left when it would run off the right edge.
+  useLayoutEffect(() => {
+    const l = list.current;
+    if (!open || !floating || !l) return;
+    l.style.left = "0px";
+    const over = l.getBoundingClientRect().right - (window.innerWidth - VIEWPORT_GUTTER_PX);
+    if (over > 0) l.style.left = `${-over}px`;
+  }, [open, floating]);
 
   /* By hand rather than scrollIntoView, which also scrolls the dialog, and
      which cannot allow for the sticky group header. */
@@ -110,7 +122,7 @@ export function DrillPicker({ drills, onPick }: DrillPickerProps): React.ReactEl
   };
 
   return (
-    <div className="drillpicker" ref={root}>
+    <div className={floating ? "drillpicker floating" : "drillpicker"} ref={root}>
       <button
         ref={button}
         type="button"
