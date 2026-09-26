@@ -396,23 +396,39 @@ export interface Prefs {
   wordPreview?: boolean;
   runSort?: string;
   /** Who is sending, for drills that key your own details. */
-  user?: UserInfo;
+  user?: Partial<UserInfo>;
 }
 
 export interface UserInfo {
   name: string;
   callsign: string;
-  qth: string;
+  age: string;
+  qthCity: string;
+  /** State, province or country, abbreviated: "OR". */
+  qthRegionShort: string;
+  /** The same, spelled out: "OREGON". */
+  qthRegionLong: string;
   antenna: string;
-  rig: string;
+  rigManufacturer: string;
+  rigModel: string;
 }
 
-export const EMPTY_USER: UserInfo = { name: "", callsign: "", qth: "", antenna: "", rig: "" };
+export const EMPTY_USER: UserInfo = {
+  name: "",
+  callsign: "",
+  age: "",
+  qthCity: "",
+  qthRegionShort: "",
+  qthRegionLong: "",
+  antenna: "",
+  rigManufacturer: "",
+  rigModel: "",
+};
 
 export function loadUser(): UserInfo {
   const saved = loadPrefs().user;
   const out = { ...EMPTY_USER };
-  if (saved) for (const k of Object.keys(EMPTY_USER) as (keyof UserInfo)[]) out[k] = saved[k];
+  if (saved) for (const k of Object.keys(EMPTY_USER) as (keyof UserInfo)[]) out[k] = (saved[k] ?? "").toUpperCase();
   return out;
 }
 
@@ -459,11 +475,14 @@ const isSession: Check = (v) => {
   );
 };
 
-/** Every field present and a string. */
+/** Each known field absent or a string. Absent, so a field added later does
+ *  not throw away the ones already saved. */
 const isUser: Check = (v) => {
   if (typeof v !== "object" || v === null) return false;
   const u = v as Record<string, unknown>;
-  return (Object.keys(EMPTY_USER) as (keyof UserInfo)[]).every((k) => isStr(u[k]));
+  return (Object.keys(EMPTY_USER) as (keyof UserInfo)[]).every(
+    (k) => u[k] === undefined || isStr(u[k]),
+  );
 };
 
 const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {

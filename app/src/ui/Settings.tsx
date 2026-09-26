@@ -190,7 +190,8 @@ export function Settings(props: SettingsProps): React.ReactElement {
   );
 }
 
-/** Saved on every change, so Done has nothing left to do. */
+/** Upper case, like everything else that gets keyed. Saved on every change,
+ *  so Done has nothing left to do. */
 function UserSection(): React.ReactElement {
   const [user, setUser] = useState<UserInfo>(loadUser);
   const set = useCallback((patch: Partial<UserInfo>) => {
@@ -200,33 +201,67 @@ function UserSection(): React.ReactElement {
       return next;
     });
   }, []);
-  const callsign = useUpperField((callsign) => set({ callsign }));
 
   return (
     <section>
       <h3>User</h3>
       <div className="userfields" data-testid="user-fields">
         <UserField id="user-name" label="Name" value={user.name} onChange={(name) => set({ name })} />
-        <div className="userfield">
-          <label htmlFor="user-callsign">Callsign</label>
-          <input
-            id="user-callsign"
-            type="text"
-            ref={callsign.ref}
-            value={user.callsign}
-            onChange={callsign.onChange}
-            spellCheck={false}
-            autoComplete="off"
+        <UserField
+          id="user-callsign"
+          label="Callsign"
+          value={user.callsign}
+          onChange={(callsign) => set({ callsign })}
+        />
+        <UserField
+          id="user-age"
+          label="Age"
+          value={user.age}
+          numeric
+          onChange={(age) => set({ age })}
+        />
+        <fieldset className="usergroup">
+          <legend>QTH</legend>
+          <UserField
+            id="user-qth-city"
+            label="City"
+            value={user.qthCity}
+            onChange={(qthCity) => set({ qthCity })}
           />
-        </div>
-        <UserField id="user-qth" label="QTH" value={user.qth} onChange={(qth) => set({ qth })} />
+          <UserField
+            id="user-qth-short"
+            label="Region, short"
+            value={user.qthRegionShort}
+            onChange={(qthRegionShort) => set({ qthRegionShort })}
+          />
+          <UserField
+            id="user-qth-long"
+            label="Region, long"
+            value={user.qthRegionLong}
+            onChange={(qthRegionLong) => set({ qthRegionLong })}
+          />
+        </fieldset>
+        <fieldset className="usergroup">
+          <legend>Rig</legend>
+          <UserField
+            id="user-rig-manufacturer"
+            label="Manufacturer"
+            value={user.rigManufacturer}
+            onChange={(rigManufacturer) => set({ rigManufacturer })}
+          />
+          <UserField
+            id="user-rig-model"
+            label="Model"
+            value={user.rigModel}
+            onChange={(rigModel) => set({ rigModel })}
+          />
+        </fieldset>
         <UserField
           id="user-antenna"
           label="Antenna"
           value={user.antenna}
           onChange={(antenna) => set({ antenna })}
         />
-        <UserField id="user-rig" label="Rig" value={user.rig} onChange={(rig) => set({ rig })} />
       </div>
     </section>
   );
@@ -236,16 +271,23 @@ function UserField(props: {
   id: string;
   label: string;
   value: string;
+  /** Digits only. */
+  numeric?: boolean;
   onChange(v: string): void;
 }): React.ReactElement {
+  const { numeric, onChange } = props;
+  const field = useUpperField(numeric ? (v) => onChange(v.replace(/\D/g, "")) : onChange);
   return (
     <div className="userfield">
       <label htmlFor={props.id}>{props.label}</label>
       <input
         id={props.id}
         type="text"
+        ref={field.ref}
         value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
+        onChange={field.onChange}
+        inputMode={numeric ? "numeric" : undefined}
+        maxLength={numeric ? 3 : undefined}
         spellCheck={false}
         autoComplete="off"
       />

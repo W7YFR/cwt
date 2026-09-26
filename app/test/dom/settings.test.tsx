@@ -126,21 +126,30 @@ describe("the user section", () => {
     await settle();
     await user.type(screen.getByLabelText("Name"), "Rob");
     await user.type(screen.getByLabelText("Callsign"), "w7yfr");
-    await user.type(screen.getByLabelText("QTH"), "Portland, OR");
-    await user.type(screen.getByLabelText("Antenna"), "EFHW");
-    await user.type(screen.getByLabelText("Rig"), "FT-710");
+    await user.type(screen.getByLabelText("Age"), "4x2");
+    await user.type(screen.getByLabelText("City"), "Portland");
+    await user.type(screen.getByLabelText("Region, short"), "or");
+    await user.type(screen.getByLabelText("Region, long"), "Oregon");
+    await user.type(screen.getByLabelText("Antenna"), "efhw");
+    await user.type(screen.getByLabelText("Manufacturer"), "yaesu");
+    await user.type(screen.getByLabelText("Model"), "ft-710");
     expect(loadUser()).toEqual({
-      name: "Rob",
+      name: "ROB",
       callsign: "W7YFR",
-      qth: "Portland, OR",
+      age: "42",
+      qthCity: "PORTLAND",
+      qthRegionShort: "OR",
+      qthRegionLong: "OREGON",
       antenna: "EFHW",
-      rig: "FT-710",
+      rigManufacturer: "YAESU",
+      rigModel: "FT-710",
     });
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("ROB");
     unmount();
     open();
     await settle();
     expect((screen.getByLabelText("Callsign") as HTMLInputElement).value).toBe("W7YFR");
-    expect((screen.getByLabelText("Rig") as HTMLInputElement).value).toBe("FT-710");
+    expect((screen.getByLabelText("Model") as HTMLInputElement).value).toBe("FT-710");
   });
 
   it("keeps the other preferences when it saves", async () => {
@@ -155,5 +164,13 @@ describe("the user section", () => {
   it("drops a stored user that is not the right shape", () => {
     localStorage.setItem("cwt:prefs", JSON.stringify({ user: { name: 5 } }));
     expect(loadUser().name).toBe("");
+  });
+
+  it("reads back a value saved in lower case as upper case", () => {
+    localStorage.setItem(
+      "cwt:prefs",
+      JSON.stringify({ user: { name: "rob", callsign: "w7yfr" } }),
+    );
+    expect(loadUser()).toMatchObject({ name: "ROB", callsign: "W7YFR", qthCity: "" });
   });
 });
