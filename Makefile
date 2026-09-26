@@ -116,17 +116,34 @@ tag: ## Tag the current version at HEAD (on main, after merging)
 
 # Pushes the one new tag, not every local tag the way `git push --tags` does.
 # A merge that changed no build input kept the version, so it gets no tag.
+# Run from main, it offers the branch that main's last merge names.
+# `git branch -d` refuses a branch that main does not contain, so the delete
+# cannot lose unmerged work.
 .PHONY: release
-release: ## After merging: update main, tag its version, push the tag
-	@git diff --quiet HEAD || { echo "Uncommitted changes — commit or stash first"; exit 1; }
-	git switch main
-	git pull --ff-only
-	@v=$$(node -p "require('./package.json').version"); \
-		if git rev-parse -q --verify "refs/tags/v$$v" >/dev/null; then \
-			echo "v$$v is already tagged; this merge released nothing"; \
-		else \
-			git tag -a "v$$v" -m "v$$v" && git push origin "v$$v"; \
-		fi
+release: ## After merging: update main, tag and push its version, delete the branch
+	@set -e; \
+	git diff --quiet HEAD || { echo "Uncommitted changes — commit or stash first"; exit 1; }; \
+	branch=$$(git rev-parse --abbrev-ref HEAD); \
+	git switch main; \
+	git pull --ff-only; \
+	v=$$(node -p "require('./package.json').version"); \
+	if git rev-parse -q --verify "refs/tags/v$$v" >/dev/null; then \
+		echo "v$$v is already tagged; this merge released nothing"; \
+	else \
+		git tag -a "v$$v" -m "v$$v"; \
+		git push origin "v$$v"; \
+	fi; \
+	if [ "$$branch" = main ]; then \
+		branch=$$(node --input-type=module -e 'import { branchFromMerge } from "./scripts/version.mjs"; console.log(branchFromMerge(process.argv[1]) ?? "")' "$$(git log -1 --format=%s)"); \
+	fi; \
+	if [ -n "$$branch" ] && [ "$$branch" != main ] && git show-ref -q --verify "refs/heads/$$branch"; then \
+		printf "Delete local branch %s? [Y/n] " "$$branch"; \
+		read -r answer; \
+		case "$$answer" in \
+			[nN]*) echo "kept $$branch" ;; \
+			*) git branch -d "$$branch" ;; \
+		esac; \
+	fi
 
 # ---- housekeeping --------------------------------------------------------- #
 
