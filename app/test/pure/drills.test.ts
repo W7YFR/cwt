@@ -83,6 +83,12 @@ describe("filling a drill", () => {
     );
   });
 
+  it("inserts a value literally, with no replacement patterns or second pass", () => {
+    // `$&` and `$1` are String.replace patterns; a slot inside a value is text.
+    const got = fillDrill(drill, { ...USER, name: "$&$1", qthRegionShort: "{name}" });
+    expect(got.text).toBe("NAME IS $&$1 $&$1 <BT> QTH HR {name}");
+  });
+
   it("hands back a drill with no slots unchanged", () => {
     const plain = DRILLS[0]!;
     expect(fillDrill(plain, EMPTY_USER)).toBe(plain);

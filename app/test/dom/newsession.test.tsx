@@ -287,6 +287,20 @@ describe("starting a new session", () => {
       expect(text().value).toBe("NAME IS ROB ROB <BT> QTH HR OR OR");
     });
 
+    it("shows markup in a saved detail as text, never as elements", async () => {
+      const markup = '<IMG SRC=X ONERROR="ALERT(1)">';
+      saveUser({ ...EMPTY_USER, name: markup, qthRegionShort: "OR" });
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      const row = screen.getByTestId("drill-option-qso/name-qth/1");
+      expect(row.textContent).toContain(markup);
+      expect(document.querySelector("img")).toBeNull();
+      await user.click(row);
+      expect(text().value).toContain(markup);
+      expect(document.querySelector("img")).toBeNull();
+    });
+
     it("will not pick a QSO drill whose details are missing, and says which", async () => {
       saveUser({ ...EMPTY_USER, name: "ROB" });
       const user = userEvent.setup();

@@ -177,4 +177,13 @@ describe("the user section", () => {
     );
     expect(loadUser()).toMatchObject({ name: "ROB", callsign: "W7YFR", qthCity: "" });
   });
+
+  it("shows markup in a saved detail as text, never as elements", async () => {
+    const markup = '<IMG SRC=X ONERROR="ALERT(1)">';
+    localStorage.setItem("cwt:prefs", JSON.stringify({ user: { name: markup } }));
+    open();
+    await settle();
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe(markup);
+    expect(document.querySelector("img")).toBeNull();
+  });
 });
