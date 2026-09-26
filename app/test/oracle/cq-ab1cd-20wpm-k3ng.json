@@ -341,11 +341,11 @@
  ],
  "grading": {
   "measured": {
-   "unitSec": 0.0599665071770335,
-   "charWpm": 20.011170509853983,
-   "farnsworthWpm": 19.95424897009793,
-   "ditDahSplit": 0.1196824162679426,
-   "elementCharSplit": 0.119933014354067,
+   "unitSec": 0.05946531100478468,
+   "charWpm": 20.179832237040614,
+   "farnsworthWpm": 20.057891703379926,
+   "ditDahSplit": 0.11968241626794258,
+   "elementCharSplit": 0.11893062200956936,
    "charWordSplit": 0.3020833333333333,
    "charGapSec": 0.18125,
    "wordGapSec": 0.42291666666666666

@@ -182,14 +182,18 @@ export function estimateTiming(
   const markCenters = kmeans1d(marks, 2);
   let unit: number;
   let ditDahSplit: number;
-  if (markCenters.length === 2) {
+  /* Centers under 2:1 apart are one kind of mark split in two, as in a drill
+     of dits alone, so there is no dah to measure against. */
+  if (markCenters.length === 2 && markCenters[1]! >= 2 * markCenters[0]!) {
     const ditC = markCenters[0]!;
     const dahC = markCenters[1]!;
-    // Combine both estimates of the unit; a dah is three of them.
-    unit = (ditC + dahC / 3) / 2;
+    /* A dah is two units longer than a dit. The detector adds or removes a
+       fixed amount on every mark, and the difference cancels it: on a clean
+       synthesized signal, (dit + dah/3) / 2 read 21.3 wpm for 20. */
+    unit = (dahC - ditC) / 2;
     ditDahSplit = (ditC + dahC) / 2;
   } else {
-    unit = markCenters[0]!;
+    unit = median(marks);
     ditDahSplit = unit * 2;
   }
 
