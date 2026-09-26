@@ -167,6 +167,10 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   min-width: 0;
 }
 .recordbar .hint { white-space: nowrap; }
+/* A select is as wide as its longest option, and a microphone's name has no
+   limit. Capped at the row, so a long one is cut short instead of running
+   past the edge of the page. */
+.recordbar > select { max-width: 100%; min-width: 0; }
 /* Never narrower than what is written on them, and never re-flowed inside
    their own borders. Left to shrink, "New session" broke across two lines and
    made the whole band taller to fit one button's second word. */
