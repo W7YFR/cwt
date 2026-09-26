@@ -112,7 +112,21 @@ bump: ## Bump the version for this branch and commit it (run before the PR)
 .PHONY: tag
 tag: ## Tag the current version at HEAD (on main, after merging)
 	@v=$$(node -p "require('./package.json').version"); \
-		git tag -a "v$$v" -m "v$$v" && echo "tagged v$$v — \`git push --tags\` when you mean it"
+		git tag -a "v$$v" -m "v$$v" && echo "tagged v$$v — \`git push origin v$$v\` when you mean it"
+
+# Pushes the one new tag, not every local tag the way `git push --tags` does.
+# A merge that changed no build input kept the version, so it gets no tag.
+.PHONY: release
+release: ## After merging: update main, tag its version, push the tag
+	@git diff --quiet HEAD || { echo "Uncommitted changes — commit or stash first"; exit 1; }
+	git switch main
+	git pull --ff-only
+	@v=$$(node -p "require('./package.json').version"); \
+		if git rev-parse -q --verify "refs/tags/v$$v" >/dev/null; then \
+			echo "v$$v is already tagged; this merge released nothing"; \
+		else \
+			git tag -a "v$$v" -m "v$$v" && git push origin "v$$v"; \
+		fi
 
 # ---- housekeeping --------------------------------------------------------- #
 

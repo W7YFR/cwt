@@ -275,6 +275,40 @@ export function verifyBump(base, actual, required) {
   return { ok: false, expected, why: `the version is ${actual}` };
 }
 
+/** The files a build reads. A change that touches none of them builds the same
+ *  site, so it needs no version and no deploy. `app/test/` is absent on
+ *  purpose: tests never reach `dist/`.
+ *  @type {readonly RegExp[]} */
+const BUILD_INPUTS = [
+  /^app\/(src|public)\//,
+  /^app\/index\.html$/,
+  /^vite\.config\.ts$/,
+  /^tsconfig\.json$/,
+  /^package(-lock)?\.json$/,
+];
+
+/** Whether any of these paths is a build input.
+ *  @param {readonly string[]} paths
+ *  @returns {boolean} */
+export function ships(paths) {
+  return paths.some((p) => BUILD_INPUTS.some((re) => re.test(p)));
+}
+
+/** The paths that non-release commits touched, out of `git log --name-only
+ *  --format=%x00%s`. Release commits are dropped because their package.json
+ *  edit is the bump, not a change that asks for one.
+ *  @param {string} log
+ *  @returns {string[]} */
+export function touchedPaths(log) {
+  return log
+    .split("\0")
+    .filter(Boolean)
+    .flatMap((entry) => {
+      const [subject = "", ...paths] = entry.split("\n");
+      return isReleaseSubject(subject) ? [] : paths.filter(Boolean);
+    });
+}
+
 // ---- writing it down ------------------------------------------------------- //
 
 /** package.json with its version field changed and nothing else touched.
@@ -336,6 +370,7 @@ it with --check and writes nothing.
       --commit        make the release commit (needs an otherwise clean tree)
       --tag           annotate a tag vX.Y.Z at the release commit
       --check         verify the bump is already here; make no changes
+      --ships         print whether the change touches a build input
       --base <rev>    what --check compares against (the branch being merged into)
       --ref <rev>     read this commit instead of HEAD
       --branch <name> take the prefix from this branch name, not the subject
@@ -347,8 +382,8 @@ The version goes to stdout; the reasoning goes to stderr.`;
 
 function main() {
   const argv = process.argv.slice(2);
-  /** @type {{ dry: boolean, commit: boolean, tag: boolean, check: boolean, ref: string, base: string | null, branch: string | null, since: string | null, force: Level | null }} */
-  const opts = { dry: false, commit: false, tag: false, check: false, ref: "HEAD", base: null, branch: null, since: null, force: null };
+  /** @type {{ dry: boolean, commit: boolean, tag: boolean, check: boolean, ships: boolean, ref: string, base: string | null, branch: string | null, since: string | null, force: Level | null }} */
+  const opts = { dry: false, commit: false, tag: false, check: false, ships: false, ref: "HEAD", base: null, branch: null, since: null, force: null };
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -356,6 +391,7 @@ function main() {
     else if (a === "--commit") opts.commit = true;
     else if (a === "--tag") opts.tag = true;
     else if (a === "--check") opts.check = true;
+    else if (a === "--ships") opts.ships = true;
     else if (a === "--base") opts.base = argv[++i] ?? null;
     else if (a === "--ref") opts.ref = argv[++i] ?? "HEAD";
     else if (a === "--branch") opts.branch = argv[++i] ?? null;
@@ -375,6 +411,18 @@ function main() {
      0.1.0 — a tag that disagrees with what it tags. */
   if (opts.tag && !opts.commit) die("--tag needs --commit: a tag marks the release commit");
 
+  /* In --check the range is the pull request: base..HEAD is exactly what would
+     land, so --base doubles as --since and nobody has to pass both. */
+  const since = opts.since ?? (opts.check ? opts.base : null);
+  const shipping = shipsIn(opts.ref, since);
+
+  if (opts.ships) {
+    process.stdout.write(`${shipping}\n`);
+    const file = process.env["GITHUB_OUTPUT"];
+    if (file) writeFileSync(file, `ships=${shipping}\n`, { flag: "a" });
+    return;
+  }
+
   const pkgText = readFileSync(PKG, "utf8");
   /** @type {{ version: string }} */
   const pkg = JSON.parse(pkgText);
@@ -384,9 +432,7 @@ function main() {
   const subject = git("log", "-1", "--format=%s", opts.ref);
   const body = git("log", "-1", "--format=%b", opts.ref);
 
-  /* In --check the range is the pull request: base..HEAD is exactly what would
-     land, so --base doubles as --since and nobody has to pass both. */
-  const landed = landedCommits(opts.ref, opts.since ?? (opts.check ? opts.base : null));
+  const landed = landedCommits(opts.ref, since);
 
   const merged = landed.filter((c) => !isReleaseSubject(c));
 
@@ -406,6 +452,13 @@ function main() {
     : landed.some(isReleaseSubject)
       ? `this change already carries ${landed.find(isReleaseSubject)}`
       : null;
+
+  if (!shipping && !opts.force) {
+    process.stderr.write("no build input changed; nothing to release\n");
+    process.stdout.write(`${current}\n`);
+    report({ version: current, level: "none", previous: current });
+    return;
+  }
 
   if (already && !opts.force && !opts.check) {
     /* The second line is the way out of a dead end that is otherwise
@@ -578,6 +631,24 @@ function landedCommits(ref, since) {
     if (isMerge(ref)) subjects = git("log", "--format=%s", `${ref}^1..${ref}^2`).split("\n");
   }
   return subjects.filter(Boolean);
+}
+
+/** Whether the change up to `ref` touches a build input. The range follows
+ *  landedCommits, plus `main..ref` for a branch before its merge. With no
+ *  range to read, the answer is yes, so a release is never skipped by
+ *  accident.
+ *
+ *  @param {string} ref
+ *  @param {string | null} since
+ *  @returns {boolean} */
+function shipsIn(ref, since) {
+  const range =
+    since && revExists(since) ? `${since}..${ref}`
+    : isMerge(ref) ? `${ref}^1..${ref}`
+    : revExists("main") ? `main..${ref}`
+    : null;
+  if (!range) return true;
+  return ships(touchedPaths(git("log", "--no-merges", "--name-only", "--format=%x00%s", range)));
 }
 
 /** @param {string} rev @returns {boolean} */

@@ -1,4 +1,5 @@
-# Test every pull request; build and publish every push to main.
+# Test every pull request; build and publish every push to main that changes
+# a build input.
 #
 # One workflow rather than two, so the deploy genuinely depends on the tests:
 # `deploy` needs `build` needs `test`, and a red test stops the site from
@@ -94,7 +95,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
       - name: Say what it will release
-        run: echo "Merging this releases **v${{ steps.version.outputs.version }}** (${{ steps.version.outputs.level }} bump from ${{ steps.version.outputs.previous }})." >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ "$LEVEL" = none ]; then
+            echo "Merging this changes no build input, so it deploys nothing." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Merging this releases **v$VERSION** ($LEVEL bump from $PREVIOUS)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          LEVEL: ${{ steps.version.outputs.level }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
 
   # The gate. Required in the ruleset on main, along with `version`.
   test:
@@ -127,9 +137,35 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
 
-  build:
-    needs: test
+  # Does this push change a build input? A push that touches only CI, docs,
+  # tests or the Makefile builds the same site, so it skips build and deploy.
+  # A manual run always deploys.
+  changes:
     if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      ships: ${{ steps.ships.outputs.ships }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+      - id: ships
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then
+            echo "ships=true" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/version.mjs --ships --since "$BEFORE"
+          fi
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+
+  build:
+    needs: [test, changes]
+    if: needs.changes.outputs.ships == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
