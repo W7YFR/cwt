@@ -39,7 +39,7 @@ import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { reviewTake } from "@/timing";
 import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
-import { baseName } from "./format";
+import { downloadStem } from "./format";
 import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
 
@@ -581,7 +581,7 @@ export function ReviewScreen({
     if (ppu !== settings.ppu) onChange({ ppu });
   }, [handle, stackId, onChange, settings.ppu, review]);
 
-  const stem = baseName(loaded.take.source);
+  const stem = downloadStem(loaded.take.source, selected + 1, settings);
 
   const downloadYou = useCallback(async () => {
     const bytes = await audioBytes;
@@ -595,12 +595,12 @@ export function ReviewScreen({
         ...targetOptions,
         rate: loaded.take.rate,
       });
-      saveBlob(blob, `${stem}-target-${Math.round(settings.charWpm)}wpm.wav`);
+      saveBlob(blob, `${stem}-target.wav`);
       setStatus("");
     } catch (e) {
       setStatus(`target render failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, [loaded.take.rate, player, review.ideal, settings.charWpm, stem, targetOptions]);
+  }, [loaded.take.rate, player, review.ideal, stem, targetOptions]);
 
   const downloadPng = useCallback(() => {
     if (!handle.chart) return;
@@ -618,11 +618,7 @@ export function ReviewScreen({
 
   const downloadJson = useCallback(() => {
     const text = `${JSON.stringify(buildJsonReport(review, settings), null, 2)}\n`;
-    saveBlob(new Blob([text], { type: "application/json" }),
-      // The speed is in the name because this is a dump of the *current*
-      // grading, and re-grading at another speed is a click away — two
-      // downloads of one session should not land on the same filename.
-      `${stem}-${Math.round(settings.charWpm)}wpm-report.json`);
+    saveBlob(new Blob([text], { type: "application/json" }), `${stem}-report.json`);
     setStatus("");
   }, [review, settings, stem]);
 

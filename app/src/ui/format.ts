@@ -60,6 +60,19 @@ export function baseName(source: string): string {
   );
 }
 
+/** A download's filename stem: the source, the run, and the target speeds it
+ *  was graded at. A session holds several runs, and re-grading at another
+ *  speed is a click away, so no two downloads of a session share a name. */
+export function downloadStem(
+  source: string,
+  run: number,
+  target: { readonly charWpm: number; readonly farnsworthWpm: number },
+): string {
+  const c = Math.round(target.charWpm);
+  const f = Math.round(target.farnsworthWpm);
+  return `${baseName(source)}-run${run}-${c}wpm-${f}farns`;
+}
+
 export function escapeHtml(s: string): string {
   return String(s)
     .replace(/&/g, "&amp;")
