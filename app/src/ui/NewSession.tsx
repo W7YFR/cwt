@@ -19,8 +19,10 @@
  */
 
 import { useEffect, useState } from "react";
+import { DRILLS } from "@/drills";
 import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
+import { DrillPicker } from "./DrillPicker";
 import { RecDot } from "./Record";
 import { useUpperField } from "./useUpperField";
 
@@ -108,7 +110,16 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
           lets them be read against each other.
         </p>
 
-        <label htmlFor="ns-text">Target message</label>
+        <div className="fieldrow">
+          <label htmlFor="ns-text">Target message</label>
+          <DrillPicker
+            drills={DRILLS}
+            onPick={(d) => {
+              setText(d.text);
+              box.current?.focus();
+            }}
+          />
+        </div>
         <textarea
           id="ns-text"
           ref={box}

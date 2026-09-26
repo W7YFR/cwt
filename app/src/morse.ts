@@ -44,6 +44,7 @@ export const PROSIGNS: Readonly<Record<string, string>> = {
   "<BT>": "-...-",       // new paragraph / separator (pattern also "=")
   "<CL>": "-.-..-..",    // closing / going off the air
   "<CT>": "-.-.-",       // start of message (a.k.a. <KA>)
+  "<DN>": "-..-.",       // slash                     (pattern also "/")
   "<KN>": "-.--.",       // go ahead, named station only (pattern also "(")
   "<SK>": "...-.-",      // end of contact (a.k.a. <VA>)
   "<SN>": "...-.",       // understood (a.k.a. <VE>)
@@ -58,7 +59,8 @@ export const CHAR_TO_MORSE: Readonly<Record<string, string>> = {
 
 /* Which prosigns win over a colliding punctuation mark when decoding — which
    is a question about spelling and nothing more. Every one of these is an
-   operational signal that on the air almost always means the prosign. */
+   operational signal that on the air almost always means the prosign.
+   <DN> is absent: on the air -..-. is almost always "/", as in W7YFR/P. */
 const PROSIGN_OVERRIDES = [
   "<AA>", "<AR>", "<AS>", "<BK>", "<BT>", "<CL>", "<CT>",
   "<KN>", "<SK>", "<SN>", "<SOS>", "<HH>",

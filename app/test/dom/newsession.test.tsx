@@ -13,6 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { DRILLS } from "@/drills";
 import { NewSession, oneLine } from "@/ui/NewSession";
 
 function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
@@ -183,5 +184,65 @@ describe("starting a new session", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(dialog).toHaveAccessibleName(/new session/i);
+  });
+
+  describe("picking a drill", () => {
+    const drill = DRILLS[1]!;
+
+    it("fills the message and hands it over on Save", async () => {
+      const user = userEvent.setup();
+      const { onStart } = open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.click(screen.getByTestId(`drill-option-${drill.id}`));
+      expect(text().value).toBe(drill.text);
+      expect(document.activeElement).toBe(text());
+      expect(screen.queryByRole("listbox")).toBeNull();
+      await user.click(screen.getByTestId("start-session"));
+      expect(onStart.mock.calls[0]![0].expected).toBe(drill.text);
+    });
+
+    it("takes Enter in the list as a pick, not a start", async () => {
+      const user = userEvent.setup();
+      const { onStart } = open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.keyboard("{ArrowDown}{Enter}");
+      expect(text().value).toBe(drill.text);
+      expect(onStart).not.toHaveBeenCalled();
+    });
+
+    it("takes Enter on the button as opening the list, not a start", async () => {
+      const user = userEvent.setup();
+      const { onStart } = open();
+      screen.getByTestId("drill-picker").focus();
+      await user.keyboard("{Enter}");
+      expect(screen.getByRole("listbox")).toBeTruthy();
+      expect(onStart).not.toHaveBeenCalled();
+    });
+
+    it("takes Escape in the list as closing the list only", async () => {
+      const user = userEvent.setup();
+      const { onCancel } = open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("listbox")).toBeNull();
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(text().value).toBe("CQ DE W7YFR");
+    });
+
+    it("jumps to a drill by its first letters", async () => {
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.keyboard("be{Enter}");
+      expect(text().value).toBe("BENS BEST BENT WIRE/5");
+    });
+
+    it("groups the options under their section", async () => {
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      const warm = screen.getByRole("group", { name: "Daily Sending › Warm Up" });
+      expect(warm.querySelectorAll('[role="option"]').length).toBe(4);
+    });
   });
 });

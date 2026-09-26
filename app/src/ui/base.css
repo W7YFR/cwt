@@ -1221,6 +1221,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   color: var(--ink-dim);
 }
 .dialog textarea {
+  flex-shrink: 0;
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
@@ -1249,6 +1250,71 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 .dialog .numbers .group { flex: 1 1 120px; }
 .dialog .numbers input { width: 100%; }
 .dialog .confirm { margin-top: 6px; }
+.dialog .fieldrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dialog .fieldrow > label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+
+/* ---- drill picker --------------------------------------------------------- */
+
+/* In the dialog's flow rather than floating over it: the dialog scrolls, and
+   a floating list would overflow it. `display: contents` makes the list a
+   full-width item of the field row, below the label and the button. */
+.drillpicker { display: contents; }
+.drillpicker button { font-size: 12px; padding: 0 10px; }
+.drilllist {
+  position: relative;
+  flex: 1 0 100%;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  padding-bottom: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.drilllist:focus { outline: 2px solid var(--you); outline-offset: -1px; }
+.drillgroup {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 28px;
+  padding: 10px 10px 0;
+  background: var(--bg);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.drillsection {
+  padding: 6px 10px 2px 18px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.drilllist [role="option"] {
+  padding: 4px 10px 4px 26px;
+  border-left: 3px solid transparent;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.drilllist [role="option"][aria-selected="true"] {
+  background: var(--panel-2);
+  border-left-color: var(--you);
+}
 
 /* A page to read rather than a form to fill in, so it is set as prose: a
    measure narrow enough to track along, headings that break it into the three
