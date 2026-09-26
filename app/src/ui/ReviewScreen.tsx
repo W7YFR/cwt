@@ -656,7 +656,6 @@ export function ReviewScreen({
              Both are answered once and then left alone, and both sat in the
              header being rare. */
           configuring={chartSettings}
-          onAdvanced={onConfigure}
           appliesToTake={loaded.take.source === MIC_SOURCE}
           rereading={rereading}
           leadLeft={leadLeft}
@@ -682,18 +681,22 @@ export function ReviewScreen({
         />
 
         {/* The corner of the header, and last in it — which is where the eye
-            finds it and so where the tab order has to reach it. Lifted out of
-            the flow rather than laid out in the row: the corner is the one
-            place that does not move as the page fills and empties, and that is
-            the whole point of putting the way into settings there.
-
-            Configuration used to live here too. That is about one thing — the
-            microphone — and now sits beside Calibrate where it is decided;
-            this is about the page in front of you. */}
-        <ChartSettingsButton
-          open={chartSettings}
-          onToggle={() => setChartSettings((v) => !v)}
-        />
+            finds it and so where the tab order has to reach it. Advanced and
+            the cog are one group in the flow, pushed to the right end of the
+            first line: they never split, and the rest of the row takes the
+            width left of them. Advanced shows only while the settings are
+            open, before the cog so the cog stays the last stop. */}
+        <div className="cornergroup">
+          {chartSettings && (
+            <button data-testid="advanced" onClick={onConfigure}>
+              Advanced
+            </button>
+          )}
+          <ChartSettingsButton
+            open={chartSettings}
+            onToggle={() => setChartSettings((v) => !v)}
+          />
+        </div>
       </header>
 
       {/* Always in the tree, open or not: a band that is only rendered while

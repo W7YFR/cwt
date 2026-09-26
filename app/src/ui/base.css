@@ -470,11 +470,27 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   background: var(--panel);
 }
 
-/* Room for the corner button, which sits out of the flow. The same on every
-   screen that has one and whether its panel is open or not, so nothing in the
-   header moves. */
-header:has(.cornerbtn) {
-  padding-right: calc(20px + var(--control-h) + 8px);
+/* Advanced and the chart-settings cog, together at the right end of the
+   header's first line. In the flow, so the row beside it takes the width left
+   of it rather than running underneath. Ordered before the filename row, which
+   comes after it in the markup but belongs on a line below. */
+.cornergroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  align-self: flex-start;
+  order: 1;
+}
+.cornergroup .cornerbtn { position: static; }
+.cornergroup button:not(.iconbtn) { font-size: 12px; padding: 0 10px; }
+.srcrow { order: 2; }
+/* On a narrow screen the row takes a whole line, so the group goes beside the
+   brand on the first line and the row below it. After the rules above, which
+   it overrides. */
+@media (max-width: 700px) {
+  .cornergroup { order: 0; }
+  .recordbar { order: 1; }
 }
 
 /* The band the corner button opens, under the header and above everything the

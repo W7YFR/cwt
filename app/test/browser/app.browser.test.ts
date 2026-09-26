@@ -6,6 +6,7 @@
  * is the one that would catch them being wired together wrong.
  */
 
+import { page } from "vitest/browser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -759,36 +760,48 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
-  it("puts Advanced at the end of the row while settings are open", async () => {
-    /* In the flow, so it takes room rather than covering a control, and last,
-       so opening the settings moves nothing before it. */
-    await served();
-    await mount();
-    const advanced = () => container.querySelector<HTMLElement>("[data-testid='advanced']");
-    const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
-    const row = container.querySelector<HTMLElement>("header .recordbar")!;
-    const first = () => row.querySelector("button")!.getBoundingClientRect();
-    expect(advanced(), "hidden while settings are closed").toBeNull();
-    const before = first();
+  it("puts Advanced beside the cog while settings are open", async () => {
+    /* Grouped with the cog in the flow: the two never split, and the row
+       takes the width left of them rather than running underneath. */
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    await page.viewport(1600, 900);
+    try {
+      await served();
+      await mount();
+      const advanced = () => container.querySelector<HTMLElement>("[data-testid='advanced']");
+      const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+      const row = container.querySelector<HTMLElement>("header .recordbar")!;
+      const first = () => row.querySelector("button")!.getBoundingClientRect();
+      expect(advanced(), "hidden while settings are closed").toBeNull();
+      const before = first();
 
-    await act(async () => cog.click());
-    const controls = [...row.querySelectorAll<HTMLElement>("button, select")];
-    expect(controls.at(-1), "last in the row").toBe(advanced());
-    expect(first().top, "the row stays where it was").toBeCloseTo(before.top, 0);
-    expect(first().left).toBeCloseTo(before.left, 0);
+      await act(async () => cog.click());
+      const controls = [...container.querySelectorAll<HTMLElement>("header button, header select")];
+      const a = advanced()!.getBoundingClientRect();
+      const c = cog.getBoundingClientRect();
+      expect(c.left - a.right, "just left of the cog").toBeCloseTo(8, 0);
+      expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
+      expect(first().top, "the row stays where it was").toBeCloseTo(before.top, 0);
+      expect(first().left).toBeCloseTo(before.left, 0);
 
-    const boxes = [...controls, cog].map((el) => el.getBoundingClientRect());
-    for (let i = 0; i < boxes.length; i++) {
-      for (let j = i + 1; j < boxes.length; j++) {
-        const [x, y] = [boxes[i]!, boxes[j]!];
-        const overlap = x.left < y.right - 0.5 && y.left < x.right - 0.5 &&
-          x.top < y.bottom - 0.5 && y.top < x.bottom - 0.5;
-        expect(overlap, `controls ${i} and ${j} overlap`).toBe(false);
+      const boxes = controls.map((el) => el.getBoundingClientRect());
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const [x, y] = [boxes[i]!, boxes[j]!];
+          const overlap = x.left < y.right - 0.5 && y.left < x.right - 0.5 &&
+            x.top < y.bottom - 0.5 && y.top < x.bottom - 0.5;
+          expect(overlap, `controls ${i} and ${j} overlap`).toBe(false);
+        }
       }
-    }
 
-    await act(async () => advanced()!.click());
-    expect(container.querySelector(".settings h2")?.textContent).toBe("Configuration");
+      await act(async () => advanced()!.click());
+      expect(container.querySelector(".settings h2")?.textContent).toBe("Configuration");
+    } finally {
+      // The screen on show re-lays itself out, so the resize is an update too.
+      await act(async () => {
+        await page.viewport(w, h);
+      });
+    }
   });
 
   it("keeps the way out of the help in sight however long the help is", async () => {

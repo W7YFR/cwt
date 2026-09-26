@@ -211,10 +211,6 @@ export interface RecordBarProps {
    * thing — so on the row you are actually working in, a microphone picker is
    * a control you will use once and read past every time after. */
   configuring?: boolean;
-  /** Into the configuration screen. Last in the row, and only while the
-   *  panel is open: in the flow, so it takes room instead of covering a
-   *  control, and at the end, so nothing before it moves. */
-  onAdvanced?: (() => void) | undefined;
 }
 
 /** Record another, without leaving the review. */
@@ -236,7 +232,6 @@ export function RecordBar({
   onCalibrate,
   source,
   configuring = false,
-  onAdvanced,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   // Read on mount: the configuration page, where the details change, replaces
@@ -439,11 +434,6 @@ export function RecordBar({
               {rereading ? "re-reading the session…" : ""}
             </span>
           </span>
-        )}
-        {configuring && onAdvanced && (
-          <button data-testid="advanced" onClick={onAdvanced}>
-            Advanced
-          </button>
         )}
       </div>
 
