@@ -2075,7 +2075,7 @@ button.danger { border-color: var(--bad); color: var(--bad); }
    thing of the same weight. The same size wherever it appears: beside the
    calibration picker on a microphone take, and beside the device picker on one
    opened from a file. */
-.cal { font-size: 11px; padding: 3px 8px; }
+button.cal { font-size: 11px; padding: 3px 8px; }
 
 /* ---- the microphone readout --------------------------------------------- */
 
