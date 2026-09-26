@@ -57,6 +57,24 @@ describe("the drill catalog", () => {
   });
 });
 
+describe("the alphabet and numbers warm-up", () => {
+  const drill = DRILLS.find((d) => d.id === "daily-sending/warm-up/5")!;
+
+  it("sits in the daily warm-up", () => {
+    expect(drill.path).toEqual(["Daily Sending", "Warm Up"]);
+  });
+
+  it("sends each letter, then each number, three times as its own group", () => {
+    const groups = drill.text.split(" ");
+    expect(groups).toHaveLength(36);
+    expect(groups[0]).toBe("AAA");
+    expect(groups[25]).toBe("ZZZ");
+    expect(groups.slice(26)).toEqual(
+      ["111", "222", "333", "444", "555", "666", "777", "888", "999", "000"],
+    );
+  });
+});
+
 describe("filling a drill", () => {
   const drill = { id: "t", path: ["G", "S"] as const, text: "NAME IS {name} {name} <BT> QTH HR {region_short}" };
 

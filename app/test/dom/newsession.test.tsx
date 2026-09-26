@@ -320,7 +320,8 @@ describe("starting a new session", () => {
       open();
       await user.click(screen.getByTestId("drill-picker"));
       const warm = screen.getByRole("group", { name: "Daily Sending › Warm Up" });
-      expect(warm.querySelectorAll('[role="treeitem"]').length).toBe(4);
+      const inSection = DRILLS.filter((d) => d.path[0] === "Daily Sending" && d.path[1] === "Warm Up");
+      expect(warm.querySelectorAll('[role="treeitem"]').length).toBe(inSection.length);
     });
   });
 });

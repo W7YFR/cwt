@@ -93,6 +93,7 @@ export const DRILLS: readonly Drill[] = [
     "AAAAA NNNNN UUUUU DDDDD VVVVV BBBBB 44444 66666",
     "ABCDEF GHIJK LMNOP QRSTU VWXYZ 12345 67890 <DN> , . ?",
     "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 70364 51289",
+    [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"].map((c) => c.repeat(3)).join(" "),
   ]),
   ...section("daily-sending/exercise", [DAILY, "Exercise"], [
     "AAAAA BBBBB CCCCC DDDDD EEEEE FFFFF GGGGG HHHHH IIIII JJJJJ",
