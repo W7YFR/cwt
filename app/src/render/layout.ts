@@ -13,7 +13,8 @@
  */
 
 import type { Block, Char, Review, Slot, ViewMode } from "@/types";
-import { MARKER_W, PAD_X, REST_W } from "./geometry";
+import { subLabel } from "@/timing";
+import { CAPTION_GLYPH_W, MARKER_W, PAD_X, REST_W } from "./geometry";
 import { planColumns, type ColumnPlan } from "./columns";
 
 /** Breakpoints of a piecewise time->x map, as [seconds, contentX] pairs. */
@@ -87,6 +88,36 @@ export function charWidth(ch: Char | null | undefined, ppu: number): number {
   let u = 0;
   for (const b of ch.blocks) u += b.units;
   return u * ppu;
+}
+
+/** What to write under your row for one slot.
+ *
+ * One function, used by all three views. It was per-view once and only the
+ * per-character view ever gained the annotations, so a substitution was
+ * spelled out on one axis and shown as a bare red character on another —
+ * which looks like the chart having lost track of what you meant rather than
+ * like two views disagreeing about how much to say. */
+export function sentCaption(slot: Slot, blank: boolean): { text: string; bad: boolean } {
+  /* With nothing recorded, every slot is a "deletion" — the target has a
+     character and your side does not — and marking them all as missed would
+     be an accusation about sending that has not happened yet. The row is
+     ghosts, and ghosts need no caption. */
+  if (blank) return { text: "", bad: false };
+  if (slot.op === "sub" && slot.actual && slot.ideal) {
+    // Intended first, then what came out — the same order the accuracy panel
+    // uses, and the same order the two rows are stacked in.
+    return { text: subLabel(slot.ideal.char, slot.actual.char), bad: true };
+  }
+  if (slot.op === "del" && slot.ideal) return { text: `–${slot.ideal.char}`, bad: true };
+  if (slot.op === "ins" && slot.actual) return { text: `+${slot.actual.char}`, bad: true };
+  return { text: slot.actual ? slot.actual.char : "·", bad: false };
+}
+
+/** Right edge of a caption that starts at `from`. A caption starts where its
+ *  character does and can run past it, a prosign most of all, so the last
+ *  caption can reach further than the last mark. */
+function captionEnd(text: string, from: number): number {
+  return from + text.length * CAPTION_GLYPH_W;
 }
 
 /** The per-character column axis, measured at one zoom.
@@ -189,7 +220,21 @@ export function measureColumns(
        view has never had any, and this is the same picture rearranged. */
     cur += gapW[c]! + bodyW[c]!;
   }
-  return { plan, x, gapW, bodyW, ideal, ragged, width: cur + PAD_X, markers };
+
+  let reach = cur;
+  runs.forEach((slots, r) => {
+    const at = plan.at[r]!;
+    slots.forEach((slot, i) => {
+      const c = at[i]!;
+      const bx = x[c]! + gapW[c]!;
+      reach = Math.max(
+        reach,
+        captionEnd(sentCaption(slot, false).text, bx),
+        captionEnd(slot.ideal?.char ?? "·", bx),
+      );
+    });
+  });
+  return { plan, x, gapW, bodyW, ideal, ragged, width: reach + PAD_X, markers };
 }
 
 export interface LayoutOptions {
@@ -362,6 +407,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
   const breaks: number[] = [];
   let endYou = PAD_X;
   let endTgt = PAD_X;
+  let reach = PAD_X;
 
   slots.forEach((slot, i) => {
     const lead = slot.actual?.leadGap ?? null;
@@ -373,8 +419,14 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
     }
     const x = slot.actual ? toX(slot.actual.t0, origin) - offYou : null;
     const ix = slot.ideal ? toX(slot.ideal.t0, 0) - offTgt : null;
-    if (x !== null) endYou = x + charWidth(slot.actual, ppu);
-    if (ix !== null) endTgt = ix + charWidth(slot.ideal, ppu);
+    if (x !== null) {
+      endYou = x + charWidth(slot.actual, ppu);
+      reach = Math.max(reach, captionEnd(sentCaption(slot, false).text, x));
+    }
+    if (ix !== null && slot.ideal) {
+      endTgt = ix + charWidth(slot.ideal, ppu);
+      reach = Math.max(reach, captionEnd(slot.ideal.char, ix));
+    }
 
     items.push({ slot, x, ix, gapW: 0, youGapW: 0, tgtGapW: 0, bodyW: 0, w: 0 });
 
@@ -402,6 +454,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
     Math.max(
       toX(durationSec, origin) - offYou,
       toX(review.ideal.duration, 0) - offTgt,
+      reach,
     ) + PAD_X;
 
   return withRunway(
