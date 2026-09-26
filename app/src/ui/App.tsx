@@ -388,6 +388,10 @@ export function App(): React.ReactElement {
             setError(null);
             setCalibrating(true);
           }}
+          onConfigure={() => {
+            setError(null);
+            setConfiguring(true);
+          }}
           onFile={(file) => void openFile(file)}
           onClear={() => {
             setError(null);

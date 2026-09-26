@@ -395,6 +395,29 @@ export interface Prefs {
   flashCard?: boolean;
   wordPreview?: boolean;
   runSort?: string;
+  /** Who is sending, for drills that key your own details. */
+  user?: UserInfo;
+}
+
+export interface UserInfo {
+  name: string;
+  callsign: string;
+  qth: string;
+  antenna: string;
+  rig: string;
+}
+
+export const EMPTY_USER: UserInfo = { name: "", callsign: "", qth: "", antenna: "", rig: "" };
+
+export function loadUser(): UserInfo {
+  const saved = loadPrefs().user;
+  const out = { ...EMPTY_USER };
+  if (saved) for (const k of Object.keys(EMPTY_USER) as (keyof UserInfo)[]) out[k] = saved[k];
+  return out;
+}
+
+export function saveUser(user: UserInfo): void {
+  savePrefs({ ...loadPrefs(), user });
 }
 
 /* What each preference has to look like coming back off the wire.
@@ -436,6 +459,13 @@ const isSession: Check = (v) => {
   );
 };
 
+/** Every field present and a string. */
+const isUser: Check = (v) => {
+  if (typeof v !== "object" || v === null) return false;
+  const u = v as Record<string, unknown>;
+  return (Object.keys(EMPTY_USER) as (keyof UserInfo)[]).every((k) => isStr(u[k]));
+};
+
 const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   deviceId: isStr,
   profileId: isStr,
@@ -464,6 +494,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   flashCard: isBool,
   wordPreview: isBool,
   runSort: isStr,
+  user: isUser,
 };
 
 export function loadPrefs(): Prefs {

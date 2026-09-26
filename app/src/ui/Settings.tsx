@@ -1,4 +1,5 @@
-/* Configuration: the things that are set once and then left alone.
+/* Configuration: the things that are set once and then left alone — who you
+ * are, and the calibrations.
  *
  * Everything the app does to a recording is decided on the screen you are
  * recording from, and that is right — whether a calibration is applied changes
@@ -27,8 +28,12 @@ import {
   forgetCalibrationsFor,
   getCalibrationAudio,
   listCalibrations,
+  loadUser,
+  saveUser,
   type CalibrationSummary,
+  type UserInfo,
 } from "@/io/storage";
+import { useUpperField } from "./useUpperField";
 
 export interface SettingsProps {
   /** Which calibration is in use, so the one being deleted can be flagged. */
@@ -82,100 +87,168 @@ export function Settings(props: SettingsProps): React.ReactElement {
         <button onClick={props.onClose}>Done</button>
       </header>
 
-      <section>
-        <h3>Saved calibrations</h3>
-        {profiles.length === 0 ? (
-          <p className="lede">None yet. Calibrating from the record screen makes one.</p>
-        ) : (
-          <ul className="callist" data-testid="callist">
-            {profiles.map((p) => (
-              <li key={p.id} data-testid="calrow" data-id={p.id}>
-                <div className="calmeta">
-                  <strong>{p.nickname}</strong>
-                  <span className="hint">
-                    {ms(p.releaseOffsetSec)} · {p.verdict} · {p.wpm} wpm ·{" "}
-                    {day(p.recordedAt)}
-                    {isAdjusted(p) && " · adjusted by hand"}
-                    {p.id === props.profileId && " · in use"}
-                  </span>
-                  {p.deviceLabel && <span className="hint">{p.deviceLabel}</span>}
-                </div>
-                {confirming === p.id ? (
-                  <span className="confirm">
-                    {/* Deleting the one in use is allowed and clears the
-                        selection — see deleteProfile. It is worth saying so
-                        first, because every later recording then reads raw. */}
+      <UserSection />
+
+      <section className="calsection">
+        <h3>Calibration</h3>
+        <section>
+          <h4>Saved calibrations</h4>
+          {profiles.length === 0 ? (
+            <p className="lede">None yet. Calibrating from the record screen makes one.</p>
+          ) : (
+            <ul className="callist" data-testid="callist">
+              {profiles.map((p) => (
+                <li key={p.id} data-testid="calrow" data-id={p.id}>
+                  <div className="calmeta">
+                    <strong>{p.nickname}</strong>
                     <span className="hint">
-                      {p.id === props.profileId
-                        ? "This one is in use. Deleting it leaves recordings uncorrected."
-                        : "Delete it?"}
+                      {ms(p.releaseOffsetSec)} · {p.verdict} · {p.wpm} wpm ·{" "}
+                      {day(p.recordedAt)}
+                      {isAdjusted(p) && " · adjusted by hand"}
+                      {p.id === props.profileId && " · in use"}
                     </span>
-                    <button className="danger" onClick={() => remove(p.id)}>
+                    {p.deviceLabel && <span className="hint">{p.deviceLabel}</span>}
+                  </div>
+                  {confirming === p.id ? (
+                    <span className="confirm">
+                      {/* Deleting the one in use is allowed and clears the
+                          selection — see deleteProfile. It is worth saying so
+                          first, because every later recording then reads raw. */}
+                      <span className="hint">
+                        {p.id === props.profileId
+                          ? "This one is in use. Deleting it leaves recordings uncorrected."
+                          : "Delete it?"}
+                      </span>
+                      <button className="danger" onClick={() => remove(p.id)}>
+                        Delete
+                      </button>
+                      <button onClick={() => setConfirming(null)}>Keep</button>
+                    </span>
+                  ) : (
+                    <button
+                      data-testid="delete-profile"
+                      onClick={() => setConfirming(p.id)}
+                    >
                       Delete
                     </button>
-                    <button onClick={() => setConfirming(null)}>Keep</button>
-                  </span>
-                ) : (
-                  <button
-                    data-testid="delete-profile"
-                    onClick={() => setConfirming(p.id)}
-                  >
-                    Delete
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <section>
-        <h3>Calibration recordings</h3>
-        <p className="lede">
-          The last {KEEP_CALIBRATIONS} attempts, whether or not they produced a
-          calibration. The ones that did not are the useful ones to keep: they
-          are what shows why.
-        </p>
-        {recordings.length === 0 ? (
-          <p className="lede">Nothing recorded yet.</p>
-        ) : (
-          <ul className="callist" data-testid="reclist">
-            {recordings.map((r) => (
-              <li key={r.id} data-testid="recrow" data-id={r.id} data-reason={r.reason ?? ""}>
-                <div className="calmeta">
-                  <strong>
-                    {r.reason ? "No calibration" : "Calibrated"}
-                    {r.offsetSec !== null && ` — ${ms(r.offsetSec)}`}
-                  </strong>
-                  <span className="hint">
-                    {day(r.recordedAt)} · {r.wpm} wpm · {r.durationSec.toFixed(0)}s
-                    {r.reason && ` · ${r.reason}`}
-                    {r.deviceLabel && ` · ${r.deviceLabel}`}
+        <section>
+          <h4>Calibration recordings</h4>
+          <p className="lede">
+            The last {KEEP_CALIBRATIONS} attempts, whether or not they produced a
+            calibration. The ones that did not are the useful ones to keep: they
+            are what shows why.
+          </p>
+          {recordings.length === 0 ? (
+            <p className="lede">Nothing recorded yet.</p>
+          ) : (
+            <ul className="callist" data-testid="reclist">
+              {recordings.map((r) => (
+                <li key={r.id} data-testid="recrow" data-id={r.id} data-reason={r.reason ?? ""}>
+                  <div className="calmeta">
+                    <strong>
+                      {r.reason ? "No calibration" : "Calibrated"}
+                      {r.offsetSec !== null && ` — ${ms(r.offsetSec)}`}
+                    </strong>
+                    <span className="hint">
+                      {day(r.recordedAt)} · {r.wpm} wpm · {r.durationSec.toFixed(0)}s
+                      {r.reason && ` · ${r.reason}`}
+                      {r.deviceLabel && ` · ${r.deviceLabel}`}
+                    </span>
+                  </div>
+                  <span className="rowbuttons">
+                    <button
+                      data-testid="save-recording"
+                      onClick={() => {
+                        void getCalibrationAudio(r.id).then((blob) => {
+                          if (blob) saveBlob(blob, `${r.id}-${r.wpm}wpm.wav`);
+                        });
+                      }}
+                    >
+                      <IconDownload /> Save
+                    </button>
+                    <button
+                      data-testid="delete-recording"
+                      onClick={() => void forgetCalibration(r.id).then(refresh)}
+                    >
+                      Delete
+                    </button>
                   </span>
-                </div>
-                <span className="rowbuttons">
-                  <button
-                    data-testid="save-recording"
-                    onClick={() => {
-                      void getCalibrationAudio(r.id).then((blob) => {
-                        if (blob) saveBlob(blob, `${r.id}-${r.wpm}wpm.wav`);
-                      });
-                    }}
-                  >
-                    <IconDownload /> Save
-                  </button>
-                  <button
-                    data-testid="delete-recording"
-                    onClick={() => void forgetCalibration(r.id).then(refresh)}
-                  >
-                    Delete
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </section>
+    </div>
+  );
+}
+
+/** Saved on every change, so Done has nothing left to do. */
+function UserSection(): React.ReactElement {
+  const [user, setUser] = useState<UserInfo>(loadUser);
+  const set = useCallback((patch: Partial<UserInfo>) => {
+    setUser((u) => {
+      const next = { ...u, ...patch };
+      saveUser(next);
+      return next;
+    });
+  }, []);
+  const callsign = useUpperField((callsign) => set({ callsign }));
+
+  return (
+    <section>
+      <h3>User</h3>
+      <div className="userfields" data-testid="user-fields">
+        <UserField id="user-name" label="Name" value={user.name} onChange={(name) => set({ name })} />
+        <div className="userfield">
+          <label htmlFor="user-callsign">Callsign</label>
+          <input
+            id="user-callsign"
+            type="text"
+            ref={callsign.ref}
+            value={user.callsign}
+            onChange={callsign.onChange}
+            spellCheck={false}
+            autoComplete="off"
+          />
+        </div>
+        <UserField id="user-qth" label="QTH" value={user.qth} onChange={(qth) => set({ qth })} />
+        <UserField
+          id="user-antenna"
+          label="Antenna"
+          value={user.antenna}
+          onChange={(antenna) => set({ antenna })}
+        />
+        <UserField id="user-rig" label="Rig" value={user.rig} onChange={(rig) => set({ rig })} />
+      </div>
+    </section>
+  );
+}
+
+function UserField(props: {
+  id: string;
+  label: string;
+  value: string;
+  onChange(v: string): void;
+}): React.ReactElement {
+  return (
+    <div className="userfield">
+      <label htmlFor={props.id}>{props.label}</label>
+      <input
+        id={props.id}
+        type="text"
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        spellCheck={false}
+        autoComplete="off"
+      />
     </div>
   );
 }

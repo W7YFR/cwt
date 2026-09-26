@@ -759,6 +759,23 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
+  it("puts Advanced beside the corner button while settings are open", async () => {
+    await served();
+    await mount();
+    const advanced = () => container.querySelector<HTMLElement>("[data-testid='advanced']");
+    const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+    expect(advanced(), "hidden while settings are closed").toBeNull();
+
+    await act(async () => cog.click());
+    const a = advanced()!.getBoundingClientRect();
+    const c = cog.getBoundingClientRect();
+    expect(c.left - a.right, "just left of the cog").toBeCloseTo(8, 0);
+    expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
+
+    await act(async () => advanced()!.click());
+    expect(container.querySelector(".settings h2")?.textContent).toBe("Configuration");
+  });
+
   it("keeps the way out of the help in sight however long the help is", async () => {
     /* The first version let the whole sheet scroll, which put Close below the
        fold — reachable only by reading to the end of something you opened
