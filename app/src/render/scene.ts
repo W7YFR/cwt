@@ -580,6 +580,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
     const u = lane.layout.unitSec;
     const ppu = lane.layout.ppu;
     const blank = lane.blank === true;
+    const packed = { right: -Infinity };
 
     for (const it of lane.layout.items) {
       const slot = it.slot;
@@ -591,6 +592,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
 
       if (g) drawGap(ctx, scene, g, it.x - gw, gw, row.row, false);
       drawMarks(ctx, scene, slot.actual, it.x, row.row, false);
+      drawGradeStrip(ctx, scene, slot, it.x, w, it.x - gw, gw, row.grade, packed);
 
       // Only the attempt being read carries text; the others have no band to
       // put it in, and writing it anyway would land it on somebody else's row.
@@ -995,12 +997,19 @@ function drawGhost(
   ctx.setLineDash([]);
 }
 
+/** Least space between two verdicts in a packed strip, in pixels. */
+const STRIP_SPACE = 4;
+
 /** The grade strip for one slot: each verdict over the thing it grades.
  *
  * The gap before the character gets its own verdict, over the gap, from
  * `gapX` for `gapW`. The character gets one for its elements and inner gaps,
  * over the character, unless construction is ignored. A character with no
- * graded gap before it, such as the first, has no gap verdict. */
+ * graded gap before it, such as the first, has no gap verdict.
+ *
+ * With `packed`, a verdict that would overlap the last one drawn in the row is
+ * left out. On a time axis a fast character is narrow, and at a zoom that fits
+ * a long recording its neighbors' verdicts would run into each other. */
 function drawGradeStrip(
   ctx: Ctx2D,
   scene: Scene,
@@ -1010,6 +1019,7 @@ function drawGradeStrip(
   gapX: number,
   gapW: number,
   y: number,
+  packed?: { right: number },
 ): void {
   if (!slot.actual || !slot.ideal) return; // nothing to compare
   ctx.font = `600 9px ${scene.palette.mono}`;
@@ -1022,8 +1032,14 @@ function drawGradeStrip(
       if (g === "bad") worst = "bad";
       else if (g === "warn" && worst !== "bad") worst = "warn";
     }
+    const text = GRADE_MARK[worst];
+    if (packed) {
+      const half = ctx.measureText(text).width / 2;
+      if (cx - half < packed.right + STRIP_SPACE) return;
+      packed.right = cx + half;
+    }
     ctx.fillStyle = scene.palette[worst];
-    ctx.fillText(GRADE_MARK[worst], cx, y + GRADE_H / 2);
+    ctx.fillText(text, cx, y + GRADE_H / 2);
   };
 
   const lead = slot.actual.leadGap;

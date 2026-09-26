@@ -1281,6 +1281,60 @@ describe("drawing", () => {
     },
   );
 
+  it.each([false, true])(
+    "puts each verdict over what it grades on a time axis (construction ignored: %s)",
+    (ignoreConstruction) => {
+      const { take, settings } = longElements();
+      const review = reviewTake(take, { ...settings, ignoreConstruction });
+      const scene = { ...sceneFor(review, "absolute", 40, 40000), ignoreConstruction };
+      const ctx = recordingCtx();
+      draw(ctx, scene);
+      const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
+      const drawn = ctx
+        .ofType("fillText")
+        .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
+        .map((c) => c.args[0]);
+      // On this axis a gap is drawn just left of the character it leads into.
+      const u = scene.layout.unitSec;
+      const want = scene.layout.items
+        .filter((it) => it.slot.actual && it.slot.ideal && it.x !== null)
+        .flatMap((it) => {
+          const ch = it.slot.actual!;
+          const gap = ch.leadGap;
+          const gw = gapWidth(gap, 40);
+          const w = ((ch.t1 - ch.t0) / u) * 40;
+          return [
+            ...((gap?.targetUnits ?? 0) > 0 ? [it.x! - gw / 2] : []),
+            ...(ignoreConstruction ? [] : [it.x! + w / 2]),
+          ];
+        });
+      expect(want.length).toBeGreaterThan(0);
+      expect(drawn).toHaveLength(want.length);
+      drawn.forEach((x, i) => expect(x).toBeCloseTo(want[i]!, 6));
+    },
+  );
+
+  it("leaves out verdicts that would overlap on a crowded time axis", () => {
+    const { take, settings } = longElements();
+    const review = reviewTake(take, settings);
+    const verdicts = (ppu: number) => {
+      const scene = sceneFor(review, "absolute", ppu, 40000);
+      const ctx = recordingCtx();
+      draw(ctx, scene);
+      const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
+      return ctx
+        .ofType("fillText")
+        .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
+        .map((c) => ({ x: c.args[0] as number, half: ctx.measureText(c.text!).width / 2 }));
+    };
+    const wide = verdicts(40);
+    const tight = verdicts(2);
+    expect(tight.length).toBeLessThan(wide.length);
+    for (let i = 1; i < tight.length; i++) {
+      expect(tight[i]!.x - tight[i]!.half).toBeGreaterThanOrEqual(tight[i - 1]!.x + tight[i - 1]!.half);
+    }
+  });
+
   it("stops coloring elements when character construction is ignored", () => {
     const { take, settings } = longElements();
     const flagged = (ignoreConstruction: boolean) => {
