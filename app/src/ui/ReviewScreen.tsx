@@ -20,7 +20,13 @@ import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
-import { ChartSettingsButton, ChartSettingsPanel, Controls, ViewControls } from "./Controls";
+import {
+  ChartSettingsButton,
+  ChartSettingsPanel,
+  Controls,
+  ViewControls,
+  fitSpeed,
+} from "./Controls";
 import { FlashCard } from "./FlashCard";
 import { ZenMode } from "./ZenMode";
 import { beatsFor, pacedEnd, pacedStart, wordsFor, type Word } from "./pacing";
@@ -737,6 +743,10 @@ export function ReviewScreen({
           settings={settings}
           take={loaded.take}
           onDrop={() => onDropRun(selected)}
+          onFit={() => {
+            const speed = fitSpeed(loaded.take.measured);
+            if (speed) onChange(speed);
+          }}
           runOf={{ at: selected, of: stack.length }}
         />
       </section>

@@ -12,6 +12,7 @@ import type { Review, ReviewSettings, Take } from "@/types";
 import { ACCURATE_BANDS, CONSISTENT_BANDS, scoreBand } from "@/timing";
 import { fmtSeconds } from "./format";
 import { isBlankTake } from "@/io/take";
+import { fitSpeed } from "./Controls";
 
 export interface ScoresProps {
   review: Review;
@@ -24,6 +25,8 @@ export interface ScoresProps {
    * at. Deciding to drop a run is something you do while looking at its
    * numbers, so the control belongs where the numbers are. */
   onDrop?: (() => void) | undefined;
+  /** Set the target speeds to the ones this run was sent at. */
+  onFit?: (() => void) | undefined;
   /** Which attempt these figures are, counted the way the chart counts. */
   runOf?: { at: number; of: number } | undefined;
 }
@@ -33,6 +36,7 @@ export function Scores({
   settings,
   take,
   onDrop,
+  onFit,
   runOf,
 }: ScoresProps): React.ReactElement {
   const g = review.analysis;
@@ -50,6 +54,18 @@ export function Scores({
     <div className="score runname" data-testid="run-name">
       <b>Run {runOf.at + 1}</b>
     </div>
+  );
+
+  const fit = onFit && (
+    <button
+      className="fitwpm"
+      onClick={onFit}
+      disabled={fitSpeed(m) === null}
+      data-testid="fit-wpm"
+      title="Set the target speeds to the ones this run was sent at"
+    >
+      Fit WPM
+    </button>
   );
 
   const drop = onDrop && runOf && (
@@ -145,7 +161,12 @@ export function Scores({
           </div>
         )}
 
-        {drop}
+        {(fit || drop) && (
+          <div className="runactions">
+            {fit}
+            {drop}
+          </div>
+        )}
       </div>
 
       <div className="scoredetail">

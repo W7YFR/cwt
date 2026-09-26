@@ -1,4 +1,4 @@
-/* The headline band, and the one action in it.
+/* The headline band, and the actions in it.
  *
  * Dropping a run belongs here rather than up with the record controls: this
  * band IS the attempt being read — its consistency, its accuracy, the speed it
@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Scores } from "@/ui/Scores";
+import { fitSpeed, SPEED_MAX, SPEED_MIN } from "@/ui/Controls";
 import { defaultSettings } from "@/timing";
 import { blankTake } from "@/io/take";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
@@ -16,17 +17,19 @@ import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
 function band(over: Partial<React.ComponentProps<typeof Scores>> = {}) {
   const { take, settings, review } = reviewFrom(caseNamed(SLOPPY));
   const onDrop = vi.fn();
+  const onFit = vi.fn();
   render(
     <Scores
       review={review}
       settings={settings}
       take={take}
       onDrop={onDrop}
+      onFit={onFit}
       runOf={{ at: 0, of: 1 }}
       {...over}
     />,
   );
-  return { onDrop };
+  return { onDrop, onFit, take };
 }
 
 describe("which attempt the band is about", () => {
@@ -111,5 +114,49 @@ describe("dropping a run from the scores", () => {
       />,
     );
     expect(screen.queryByTestId("drop-run")).toBeNull();
+  });
+});
+
+describe("fitting the target to a run", () => {
+  it("sits beside the drop button and asks for the fit", () => {
+    const { onFit } = band();
+    screen.getByTestId("fit-wpm").click();
+    expect(onFit).toHaveBeenCalled();
+  });
+
+  it("stays out of a band with no recording behind it", () => {
+    const take = blankTake({ expected: "CQ", charWpm: 20, farnsworthWpm: 20 });
+    render(
+      <Scores
+        review={reviewFrom(caseNamed(SLOPPY)).review}
+        settings={defaultSettings(take)}
+        take={take}
+        onFit={() => {}}
+        runOf={{ at: 0, of: 1 }}
+      />,
+    );
+    expect(screen.queryByTestId("fit-wpm")).toBeNull();
+  });
+
+  it("rounds the measured speeds to what the sliders hold", () => {
+    const { take } = reviewFrom(caseNamed(SLOPPY));
+    const fit = fitSpeed(take.measured)!;
+    expect(fit.charWpm).toBe(Math.round(take.measured.charWpm));
+    expect(fit.farnsworthWpm).toBe(
+      Math.min(Math.round(take.measured.farnsworthWpm), fit.charWpm),
+    );
+  });
+
+  it("keeps the fit inside the slider range, overall never above character", () => {
+    const m = reviewFrom(caseNamed(SLOPPY)).take.measured;
+    expect(fitSpeed({ ...m, charWpm: 80, farnsworthWpm: 90 })).toEqual({
+      charWpm: SPEED_MAX,
+      farnsworthWpm: SPEED_MAX,
+    });
+    expect(fitSpeed({ ...m, charWpm: 2, farnsworthWpm: 1 })).toEqual({
+      charWpm: SPEED_MIN,
+      farnsworthWpm: SPEED_MIN,
+    });
+    expect(fitSpeed({ ...m, charWpm: 0, farnsworthWpm: 0 })).toBeNull();
   });
 });

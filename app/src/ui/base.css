@@ -304,10 +304,14 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    with them. Quiet until it is under the pointer: it throws a recording away,
    and a red button standing permanently beside your scores reads as a warning
    about the scores. */
-.droprun {
+/* The run's actions, together at the end of the head row. */
+.runactions {
   margin-left: auto;
-  color: var(--ink-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.droprun { color: var(--ink-dim); }
 /* The border is what every other button changes on hover, and it is enough.
    The glyph staying put is also what keeps this one from flashing red at you
    for passing over it. */
