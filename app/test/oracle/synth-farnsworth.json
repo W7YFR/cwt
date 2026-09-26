@@ -303,12 +303,12 @@
   "measured": {
    "unitSec": 0.0545625,
    "charWpm": 21.993127147766323,
-   "farnsworthWpm": 12.907910128675729,
+   "farnsworthWpm": 12.999792364427515,
    "ditDahSplit": 0.1039375,
    "elementCharSplit": 0.109125,
-   "charWordSplit": 0.778125,
-   "charGapSec": 0.466875,
-   "wordGapSec": 1.089375
+   "charWordSplit": 0.7746666666666666,
+   "charGapSec": 0.4616875,
+   "wordGapSec": 1.0772708333333334
   },
   "ref": {
    "unitSec": 0.05454545454545454,
