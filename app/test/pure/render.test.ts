@@ -22,11 +22,12 @@ import {
   measureColumns,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
-import { defaultSettings, reviewTake, subLabel } from "@/timing";
+import { defaultSettings, idealTimeline, pair, reviewTake, subLabel, targetTiming } from "@/timing";
 import { blankTake } from "@/io/take";
 import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/scene";
 import { FALLBACK_PALETTE } from "@/render/theme";
 import {
+  CAPTION_GLYPH_W,
   GUTTER,
   MARK_H,
   CLOCK_MARKER_MIN_W,
@@ -49,6 +50,27 @@ import {
 import type { Review, ViewMode } from "@/types";
 
 const VIEWS: ViewMode[] = ["per-char", "absolute", "overlay"];
+
+/* A caption starts where its character starts. At a low zoom a prosign's
+ * caption is wider than its marks, so the content has to reach past them. */
+describe("the last character's caption", () => {
+  const ref = targetTiming(20, 20);
+  const tl = idealTimeline("E <SK>", ref);
+  const review = { slots: pair(tl, tl), actual: tl, ideal: tl, ref, take: { durationSec: tl.duration } } as unknown as Review;
+  const need = 4 * CAPTION_GLYPH_W;
+
+  for (const view of VIEWS) {
+    for (const markers of view === "per-char" ? [false, true] : [false]) {
+      it(`fits inside the content in the ${view} view${markers ? " with markers" : ""}`, () => {
+        const layout = layoutFor(review, view, 1, markers);
+        const last = layout.items[layout.items.length - 1]!;
+        const start = view === "per-char" ? last.x! + last.gapW : last.x!;
+        expect(charWidth(last.slot.actual, 1)).toBeLessThan(need);
+        expect(layout.width).toBeGreaterThanOrEqual(start + need + PAD_X);
+      });
+    }
+  }
+});
 
 /** How the renderer writes a gap's length on its bracket. */
 const fmtUnits = (u: number) => `${u.toFixed(1)}u`;

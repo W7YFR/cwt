@@ -26,10 +26,12 @@ import { profileForSource, type Profile } from "@/io/profiles";
 import {
   forgetCurrentTake,
   loadPrefs,
+  loadSpeed,
   rememberSettings,
   rememberSession,
   rememberTake,
   savePrefs,
+  saveSpeed,
 } from "@/io/storage";
 import { defaultSettings, reviewTake } from "@/timing";
 import type { AudioClip, Review, ReviewSettings, Take } from "@/types";
@@ -100,14 +102,14 @@ export interface TakeState {
    * the operator's fist free to vary; switching the profile under a recording
    * holds all three fixed by construction. */
   recalibrate(profile: Profile | null): Promise<void>;
-  /** Practice at whatever speed the keyer was last said to be set to.
+  /** Practice at the saved speed.
    *
-   * Called on the way back from the calibration wizard, which is where that
-   * speed gets stated. A recording already on screen keeps its own — the speed
-   * there is what the take is graded against and changing it would re-grade
-   * somebody's work behind their back — so this only moves a session that has
-   * nothing recorded in it yet. */
-  adoptKeyerSpeed(): void;
+   * Called on the way back from the calibration wizard, which can change it.
+   * A recording already on screen keeps its own — the speed there is what the
+   * take is graded against and changing it would re-grade somebody's work
+   * behind their back — so this only moves a session that has nothing
+   * recorded in it yet. */
+  adoptSavedSpeed(): void;
   /** Throw the recording away and stay here, ready to make another.
    *
    * Not the same as `clear`, which leaves the review entirely. This keeps the
@@ -126,16 +128,9 @@ export interface TakeState {
  * app. */
 function restorePrefs(base: ReviewSettings): ReviewSettings {
   const p = loadPrefs();
-  /* The keyer's own speed, when it has been stated. Calibration asks for it
-     because the measurement needs it, but it is a fact about the equipment
-     rather than about that one wizard — so having told the app the paddle is
-     set to 25, being handed a review that assumes 20 is the app forgetting
-     something it was told. Both speeds, or naming the character speed alone
-     would introduce a Farnsworth gap nobody asked for. */
-  const keyer = p.keyerWpm && p.keyerWpm > 0 ? p.keyerWpm : null;
   return {
     ...base,
-    ...(keyer ? { charWpm: keyer, farnsworthWpm: keyer } : {}),
+    ...(loadSpeed() ?? {}),
     tolerance: p.tolerance ?? base.tolerance,
     gainDb: p.gainDb ?? base.gainDb,
     times: p.times ?? base.times,
@@ -158,25 +153,10 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
   };
 }
 
-/** The settings a freshly loaded take should open at: its own defaults, but
- *  keeping the preferences that belong to the person rather than the take. */
-function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
-  const own = defaultSettings(take);
+/** The settings that belong to the person rather than to a take. Every take
+ *  opens with these as they are, whatever was saved with it. */
+function personal(prev: ReviewSettings) {
   return {
-    ...own,
-    /* The message being practiced is one of those, and it outlives every
-       attempt at it. A take falls back to its own decode when nothing was
-       declared — which is the right answer for the first thing you open, and
-       the wrong one for everything after: record against a message already in
-       the box and the box would be rewritten with whatever came out, so the
-       attempt would be graded against itself and score a meaningless hundred
-       percent.
-
-       Only ever filled in, never replaced. Whatever put it there — typed on
-       the landing screen, set in the New session dialog, or decoded off the
-       first recording when the box was empty — is what the session is about
-       until somebody says otherwise. */
-    expected: prev.expected || own.expected,
     tolerance: prev.tolerance,
     gainDb: prev.gainDb,
     times: prev.times,
@@ -197,6 +177,29 @@ function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
     wordPreview: prev.wordPreview,
     runSort: prev.runSort,
     view: prev.view,
+  } satisfies Partial<ReviewSettings>;
+}
+
+/** The settings a freshly loaded take should open at: its own defaults, but
+ *  keeping the preferences that belong to the person rather than the take. */
+function openingSettings(take: Take, prev: ReviewSettings): ReviewSettings {
+  const own = defaultSettings(take);
+  return {
+    ...own,
+    /* The message being practiced is one of those, and it outlives every
+       attempt at it. A take falls back to its own decode when nothing was
+       declared — which is the right answer for the first thing you open, and
+       the wrong one for everything after: record against a message already in
+       the box and the box would be rewritten with whatever came out, so the
+       attempt would be graded against itself and score a meaningless hundred
+       percent.
+
+       Only ever filled in, never replaced. Whatever put it there — typed on
+       the landing screen, set in the New session dialog, or decoded off the
+       first recording when the box was empty — is what the session is about
+       until somebody says otherwise. */
+    expected: prev.expected || own.expected,
+    ...personal(prev),
   };
 }
 
@@ -283,9 +286,18 @@ export function useTake(): TakeState {
   // Persisting on every slider frame would write to localStorage sixty times a
   // second; the trailing edge is the only one that matters.
   const persistTimer = useRef<number | null>(null);
-  const persist = useCallback((next: ReviewSettings) => {
+  /* Set by any change to a speed since the last save. A take opens at its own
+     speed without saving it, so a speed reaches the shared pair only when
+     somebody sets it. */
+  const speedDirty = useRef(false);
+  const persist = useCallback((next: ReviewSettings, speed: boolean) => {
     if (persistTimer.current !== null) window.clearTimeout(persistTimer.current);
+    speedDirty.current ||= speed;
     persistTimer.current = window.setTimeout(() => {
+      if (speedDirty.current) {
+        saveSpeed(next.charWpm, next.farnsworthWpm);
+        speedDirty.current = false;
+      }
       savePrefs({
         ...loadPrefs(),
         tolerance: next.tolerance,
@@ -322,7 +334,7 @@ export function useTake(): TakeState {
         // Overall speed can never exceed character speed; dragging one drags
         // the other rather than letting the pair go invalid.
         if (next.farnsworthWpm > next.charWpm) next.farnsworthWpm = next.charWpm;
-        persist(next);
+        persist(next, "charWpm" in patch || "farnsworthWpm" in patch);
         return next;
       });
     },
@@ -493,10 +505,11 @@ export function useTake(): TakeState {
       loadedRef.current = lanes[pick]!;
       takeIdRef.current = lanes[pick]!.take.id;
 
-      /* Settings belong to the session rather than to any one attempt, so the
-         one being read carries them — and failing that, the last recorded.
-         Rebuilding them from a take would drop the intended message, which is
-         the one thing every attempt in the session shares. */
+      /* The session's own settings come from the attempt being read, and
+         failing that the last recorded: the intended message, and the speed
+         its attempts are graded at. The person's settings come from the
+         preferences. A snapshot saved with a take can be older than they are,
+         and lacks any setting added since. */
       const kept = entries[pick]?.settings ?? entries[entries.length - 1]?.settings;
       /* Zen mode is the exception, and coming back is exactly when it matters:
          it takes the whole page away on the next record, and a session restored
@@ -505,6 +518,7 @@ export function useTake(): TakeState {
          waking up in; this one is chosen for the sitting. */
       const next = {
         ...(kept ?? openingSettings(lanes[pick]!.take, settingsRef.current)),
+        ...personal(settingsRef.current),
         zenMode: false,
       };
       settingsRef.current = next;
@@ -513,12 +527,12 @@ export function useTake(): TakeState {
     [],
   );
 
-  const adoptKeyerSpeed = useCallback(() => {
-    const keyer = loadPrefs().keyerWpm;
-    if (!keyer || !(keyer > 0)) return;
+  const adoptSavedSpeed = useCallback(() => {
+    const speed = loadSpeed();
+    if (!speed) return;
     const take = loadedRef.current?.take;
     if (take && !isBlankTake(take)) return;
-    setSettings({ charWpm: keyer, farnsworthWpm: keyer });
+    setSettings(speed);
   }, [setSettings]);
 
   const reset = useCallback((overrides: Partial<ReviewSettings> = {}) => {
@@ -601,7 +615,7 @@ export function useTake(): TakeState {
     load,
     adopt,
     recalibrate,
-    adoptKeyerSpeed,
+    adoptSavedSpeed,
     reset,
     clear,
   };

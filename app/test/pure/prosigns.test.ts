@@ -1,6 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { CHAR_TO_MORSE, canonicalChar, decodePattern } from "@/morse";
+import { CHAR_TO_MORSE, MORSE_TO_CHAR, UNKNOWN, canonicalChar, decodePattern } from "@/morse";
 import { compareText, idealTimeline, pair, targetTiming } from "@/timing";
+import type { Timeline } from "@/types";
+
+/* An unknown pattern must not read as a question mark: the chart would show
+ * a substitution of "?" for "?", which looks like a correct send. */
+describe("a pattern that decodes to nothing", () => {
+  const ref = targetTiming(20, 20);
+  const ideal = idealTimeline("?", ref);
+  const bad = ".-.-.-.-.-";
+  const actual: Timeline = {
+    ...ideal,
+    text: decodePattern(bad),
+    chars: [{ ...ideal.chars[0]!, char: decodePattern(bad), pattern: bad }],
+  };
+
+  it("decodes to its own symbol, not a question mark", () => {
+    expect(MORSE_TO_CHAR[bad]).toBeUndefined();
+    expect(decodePattern(bad)).toBe(UNKNOWN);
+    expect(UNKNOWN in CHAR_TO_MORSE).toBe(false);
+  });
+
+  it("does not match an intended question mark", () => {
+    expect(pair(actual, ideal).map((s) => s.op)).toEqual(["sub"]);
+    const got = compareText("?", actual.text);
+    expect(got.accuracy).toBe(0);
+    expect(got.diff).toBe(`[?\u2192${UNKNOWN}]`);
+  });
+});
 
 /* Two names for one pattern.
  *

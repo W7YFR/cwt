@@ -10,7 +10,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useTake } from "@/ui/useTake";
 import { MIC_SOURCE } from "@/io/take";
-import { loadPrefs } from "@/io/storage";
+import { loadPrefs, savePrefs } from "@/io/storage";
 import { caseNamed, CLEAN, SLOPPY } from "../fixture";
 import { oracleSegments } from "../oracle";
 import type { AudioClip } from "@/types";
@@ -265,6 +265,28 @@ describe("coming back to a session", () => {
 
     act(() => result.current.adoptSession([{ take, audio: new ArrayBuffer(0), settings }], 0));
     expect(result.current.settings.expected).toBe("PARIS PARIS");
+  });
+
+  it("keeps the person's settings over the snapshot saved with a take", () => {
+    /* The snapshot is as old as the last change made with that take open,
+       and a reload restores it. Preferences set since then must stand. */
+    savePrefs({ ...loadPrefs(), tolerance: 0.45, view: "absolute", showHints: false });
+    const { result } = renderHook(() => useTake());
+    record(result, SLOPPY, "r1");
+    const take = result.current.runs[0]!.take;
+    const settings = {
+      ...result.current.settings,
+      expected: "PARIS",
+      tolerance: 0.1,
+      view: "per-char" as const,
+      showHints: true,
+    };
+
+    act(() => result.current.adoptSession([{ take, audio: new ArrayBuffer(0), settings }], 0));
+    expect(result.current.settings.expected).toBe("PARIS");
+    expect(result.current.settings.tolerance).toBe(0.45);
+    expect(result.current.settings.view).toBe("absolute");
+    expect(result.current.settings.showHints).toBe(false);
   });
 });
 

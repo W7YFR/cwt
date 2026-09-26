@@ -38,13 +38,13 @@ import {
   ACCURATE_BANDS,
   CONSISTENT_BANDS,
   scoreBand,
-  subLabel,
 } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
 import {
   charWidth,
   gapWidth,
   isRest,
+  sentCaption,
   timeToX,
   type ColumnMetrics,
   type Layout,
@@ -415,29 +415,6 @@ function caption(ctx: Ctx2D, text: string, start: number, y: number): void {
  *  measured up from the marks rather than down onto them. */
 function tgtCapY(scene: Scene): number {
   return scene.rows.tgtLabel + LABEL_H - CAP_CHAR;
-}
-
-/** What to write under your row for one slot.
- *
- * One function, used by all three views. It was per-view once and only the
- * per-character view ever gained the annotations, so a substitution was
- * spelled out on one axis and shown as a bare red character on another —
- * which looks like the chart having lost track of what you meant rather than
- * like two views disagreeing about how much to say. */
-function sentCaption(slot: Slot, blank: boolean): { text: string; bad: boolean } {
-  /* With nothing recorded, every slot is a "deletion" — the target has a
-     character and your side does not — and marking them all as missed would
-     be an accusation about sending that has not happened yet. The row is
-     ghosts, and ghosts need no caption. */
-  if (blank) return { text: "", bad: false };
-  if (slot.op === "sub" && slot.actual && slot.ideal) {
-    // Intended first, then what came out — the same order the accuracy panel
-    // uses, and the same order the two rows are stacked in.
-    return { text: subLabel(slot.ideal.char, slot.actual.char), bad: true };
-  }
-  if (slot.op === "del" && slot.ideal) return { text: `–${slot.ideal.char}`, bad: true };
-  if (slot.op === "ins" && slot.actual) return { text: `+${slot.actual.char}`, bad: true };
-  return { text: slot.actual ? slot.actual.char : "·", bad: false };
 }
 
 /** The per-character view: the target once, then every attempt at it.

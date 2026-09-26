@@ -94,9 +94,14 @@ export function canonicalChar(ch: string): string {
   return pat ? (MORSE_TO_CHAR[pat] ?? ch) : ch;
 }
 
-/** Map a dit/dah string (e.g. ".-") to a character or prosign, or "?". */
+/** What a pattern with no character decodes to. It has no Morse pattern of
+ *  its own, so it never matches an intended character — a "?" would match a
+ *  keyed question mark. */
+export const UNKNOWN = "\u25AF";
+
+/** Map a dit/dah string (e.g. ".-") to a character or prosign, or UNKNOWN. */
 export function decodePattern(pattern: string): string {
-  return MORSE_TO_CHAR[pattern] ?? "?";
+  return MORSE_TO_CHAR[pattern] ?? UNKNOWN;
 }
 
 /** Matches one comparable symbol: a prosign in brackets, or a single char. */

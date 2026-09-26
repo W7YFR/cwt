@@ -23,6 +23,10 @@ export const PAD_X = 8;
  * was written across the character it was about. */
 export const LABEL_H = 30;
 
+/** Advance of one character-caption glyph at 12px, rounded up from the 0.6em
+ *  that monospace faces use. The layout has no canvas to measure text with. */
+export const CAPTION_GLYPH_W = 7.5;
+
 /** Where the text sits inside a caption band, from the edge nearest the row it
  *  belongs to. The target's band is above its row and yours is below, so both
  *  are measured toward their own marks and the two face each other across the
