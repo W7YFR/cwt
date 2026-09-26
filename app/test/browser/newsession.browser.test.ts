@@ -89,6 +89,7 @@ function mount() {
       onProfileChange: () => {},
       onDeviceChange: () => {},
       onCalibrate: () => {},
+      onConfigure: () => {},
       onFile: () => {},
       onClear: () => {},
       onNewSession: (next) => setSettings((prev) => ({ ...prev, ...next })),

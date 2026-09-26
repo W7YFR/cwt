@@ -80,6 +80,7 @@ function mount(over: Partial<ReviewSettings> = {}) {
       onProfileChange: () => {},
       onDeviceChange: () => {},
       onCalibrate: () => {},
+      onConfigure: () => {},
       onFile: () => {},
       onClear: () => {},
       onNewSession: () => {},

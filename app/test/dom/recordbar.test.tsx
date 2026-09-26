@@ -9,6 +9,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { DRILLS } from "@/drills";
 import { RecordBar } from "@/ui/Record";
 import type { RecorderHandle } from "@/ui/useRecorder";
 import type { Profile } from "@/io/profiles";
@@ -118,6 +120,29 @@ describe("the record bar in a session", () => {
     bar({ onNewSession });
     screen.getByTestId("new-session-open").click();
     expect(onNewSession).toHaveBeenCalled();
+  });
+
+  it("starts a session at a picked drill", async () => {
+    const user = userEvent.setup();
+    const onDrill = vi.fn();
+    bar({ onDrill });
+    await user.click(screen.getByTestId("drill-picker"));
+    await user.click(screen.getByTestId(`drill-option-${DRILLS[2]!.id}`));
+    expect(onDrill).toHaveBeenCalledWith(DRILLS[2]);
+    expect(screen.queryByRole("tree")).toBeNull();
+  });
+
+  it("keeps the list's keys from reaching the page's shortcuts", async () => {
+    /* R records and T plays the target from anywhere on the page. Typed into
+       the list, they are a search. */
+    const user = userEvent.setup();
+    const onKey = vi.fn();
+    document.addEventListener("keydown", onKey);
+    bar({ onDrill: () => {} });
+    await user.click(screen.getByTestId("drill-picker"));
+    await user.keyboard("rt ");
+    document.removeEventListener("keydown", onKey);
+    expect(onKey).not.toHaveBeenCalled();
   });
 
   it("keeps clearing the whole session on its own button", () => {

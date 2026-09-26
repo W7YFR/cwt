@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAR_TO_MORSE } from "@/morse";
+import { CHAR_TO_MORSE, canonicalChar, decodePattern } from "@/morse";
 import { compareText, idealTimeline, pair, targetTiming } from "@/timing";
 
 /* Two names for one pattern.
@@ -15,6 +15,7 @@ describe("characters that share a pattern", () => {
     ["<BT>", "="],
     ["+", "<AR>"],
     ["&", "<AS>"],
+    ["/", "<DN>"],
   ];
 
   it("really are the same keying", () => {
@@ -57,5 +58,13 @@ describe("characters that share a pattern", () => {
     const actual = idealTimeline("=", ref);
     const slots = pair(actual, ideal);
     expect(slots.map((s) => s.op)).toEqual(["equal"]);
+  });
+});
+
+describe("<DN>", () => {
+  it("keys as a slash and decodes as one", () => {
+    expect(CHAR_TO_MORSE["<DN>"]).toBe("-..-.");
+    expect(decodePattern("-..-.")).toBe("/");
+    expect(canonicalChar("<DN>")).toBe("/");
   });
 });

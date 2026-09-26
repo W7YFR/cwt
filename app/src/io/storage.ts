@@ -395,6 +395,50 @@ export interface Prefs {
   flashCard?: boolean;
   wordPreview?: boolean;
   runSort?: string;
+  /** Who is sending, for drills that key your own details. */
+  user?: Partial<UserInfo>;
+}
+
+export interface UserInfo {
+  name: string;
+  callsign: string;
+  age: string;
+  yearLicensed: string;
+  qthCity: string;
+  /** State, province or country, abbreviated: "OR". */
+  qthRegionShort: string;
+  /** The same, spelled out: "OREGON". */
+  qthRegionLong: string;
+  antenna: string;
+  rigManufacturer: string;
+  rigModel: string;
+  /** Transmit power, in watts. */
+  rigPower: string;
+}
+
+export const EMPTY_USER: UserInfo = {
+  name: "",
+  callsign: "",
+  age: "",
+  yearLicensed: "",
+  qthCity: "",
+  qthRegionShort: "",
+  qthRegionLong: "",
+  antenna: "",
+  rigManufacturer: "",
+  rigModel: "",
+  rigPower: "",
+};
+
+export function loadUser(): UserInfo {
+  const saved = loadPrefs().user;
+  const out = { ...EMPTY_USER };
+  if (saved) for (const k of Object.keys(EMPTY_USER) as (keyof UserInfo)[]) out[k] = (saved[k] ?? "").toUpperCase();
+  return out;
+}
+
+export function saveUser(user: UserInfo): void {
+  savePrefs({ ...loadPrefs(), user });
 }
 
 /* What each preference has to look like coming back off the wire.
@@ -436,6 +480,16 @@ const isSession: Check = (v) => {
   );
 };
 
+/** Each known field absent or a string. Absent, so a field added later does
+ *  not throw away the ones already saved. */
+const isUser: Check = (v) => {
+  if (typeof v !== "object" || v === null) return false;
+  const u = v as Record<string, unknown>;
+  return (Object.keys(EMPTY_USER) as (keyof UserInfo)[]).every(
+    (k) => u[k] === undefined || isStr(u[k]),
+  );
+};
+
 const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   deviceId: isStr,
   profileId: isStr,
@@ -464,6 +518,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   flashCard: isBool,
   wordPreview: isBool,
   runSort: isStr,
+  user: isUser,
 };
 
 export function loadPrefs(): Prefs {

@@ -7,10 +7,13 @@
  * screen's larger arrangement live here too, so the two cannot drift.
  */
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
+import { DRILLS, fillDrills, type Drill } from "@/drills";
+import { loadUser } from "@/io/storage";
 import { profilesFor, type Profile } from "@/io/profiles";
+import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
 import { IconCog, IconRecord, IconUpload } from "./Icons";
 import { MicDebug } from "./MicDebug";
@@ -177,6 +180,8 @@ export interface RecordBarProps {
   onClear?: (() => void) | undefined;
   /** Start over at a new message and a new speed. */
   onNewSession?: (() => void) | undefined;
+  /** Start a new session at a drill's text, at the current speeds. */
+  onDrill?: ((drill: Drill) => void) | undefined;
   /** Open a recording from disk.
    *
    * Beside dropping one on the page rather than instead of it. The drop target
@@ -221,6 +226,7 @@ export function RecordBar({
   leadLeft,
   onClear,
   onNewSession,
+  onDrill,
   onFile,
   canOpenFile = true,
   onCalibrate,
@@ -228,6 +234,9 @@ export function RecordBar({
   configuring = false,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
+  // Read on mount: the configuration page, where the details change, replaces
+  // this screen while it is open.
+  const drills = useMemo(() => fillDrills(DRILLS, loadUser()), []);
 
   if (rec.recorder) {
     return (
@@ -352,6 +361,7 @@ export function RecordBar({
             New session
           </button>
         )}
+        {onDrill && <DrillPicker drills={drills} onPick={onDrill} floating />}
         {onClear && (
           <button
             onClick={onClear}
@@ -377,7 +387,54 @@ export function RecordBar({
             )}
           </>
         )}
+        {appliesToTake && (
+          /* A picker rather than a label, because the audio is right here and
+             reading it again under a different calibration is the same
+             computation that ran when it was recorded. Holding the recordings
+             fixed and changing only the correction is the cleanest comparison
+             available anywhere in the app — the room, the placement and the fist
+             cannot vary, because it is the same audio either way.
 
+             No status dot beside it: what that reported is already in the select
+             itself, in words, and a warning color on "No calibration" calls an
+             ordinary state a problem — it is the state every session starts in,
+             and the right one for a path with nothing in it. */
+          <span className={`calpick ${active ? "ok" : "none"}`} data-testid="calpick">
+            {/* Only where there is a choice to make. One option is not a
+                decision, and a select offering "No calibration" and nothing else
+                is a control whose every state is the state it is already in. */}
+            {choices.length > 0 && (
+              <select
+                aria-label="Calibration"
+                value={profileId ?? ""}
+                disabled={rereading}
+                onChange={(e) => onProfileChange(e.target.value || undefined)}
+              >
+                <option value="">No calibration</option>
+                {choices.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* The way out of an empty list. Calibrating is reached from the
+                landing screen and from the configuration screen, neither of
+                which is where you are standing when the picker in front of you
+                says there is nothing to apply. */}
+            {configuring && onCalibrate && (
+              <CalibrateButton active={active} applied onClick={onCalibrate} />
+            )}
+            {/* Only while it is happening. Changing the calibration re-reads the
+                recording on screen, which takes long enough to need saying —
+                but a line that is on show the whole time to explain a control
+                nobody has touched yet is a caption, and this row already has as
+                many as it can carry. */}
+            <span className="hint" aria-live="polite">
+              {rereading ? "re-reading the session…" : ""}
+            </span>
+          </span>
+        )}
       </div>
 
       {/* Nothing at all without `?micdebug` in the URL. */}
@@ -387,58 +444,8 @@ export function RecordBar({
 
           This is an annotation on the recording rather than another control
           in the row — and on a narrow screen that difference is what lets it
-          drop to a line of its own instead of squeezing four buttons. A
-          sibling can be ordered against the filename below; a child of the
-          bar can only ever land above it, and the filename is what this
-          sentence is about. */}
-      {appliesToTake ? (
-        /* A picker rather than a label, because the audio is right here and
-           reading it again under a different calibration is the same
-           computation that ran when it was recorded. Holding the recordings
-           fixed and changing only the correction is the cleanest comparison
-           available anywhere in the app — the room, the placement and the fist
-           cannot vary, because it is the same audio either way.
-
-           No status dot beside it: what that reported is already in the select
-           itself, in words, and a warning color on "No calibration" calls an
-           ordinary state a problem — it is the state every session starts in,
-           and the right one for a path with nothing in it. */
-        <span className={`calpick ${active ? "ok" : "none"}`} data-testid="calpick">
-          {/* Only where there is a choice to make. One option is not a
-              decision, and a select offering "No calibration" and nothing else
-              is a control whose every state is the state it is already in. */}
-          {choices.length > 0 && (
-            <select
-              aria-label="Calibration"
-              value={profileId ?? ""}
-              disabled={rereading}
-              onChange={(e) => onProfileChange(e.target.value || undefined)}
-            >
-              <option value="">No calibration</option>
-              {choices.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
-                </option>
-              ))}
-            </select>
-          )}
-          {/* The way out of an empty list. Calibrating is reached from the
-              landing screen and from the configuration screen, neither of
-              which is where you are standing when the picker in front of you
-              says there is nothing to apply. */}
-          {configuring && onCalibrate && (
-            <CalibrateButton active={active} applied onClick={onCalibrate} />
-          )}
-          {/* Only while it is happening. Changing the calibration re-reads the
-              recording on screen, which takes long enough to need saying —
-              but a line that is on show the whole time to explain a control
-              nobody has touched yet is a caption, and this row already has as
-              many as it can carry. */}
-          <span className="hint" aria-live="polite">
-            {rereading ? "re-reading the session…" : ""}
-          </span>
-        </span>
-      ) : (
+          drop to a line of its own instead of squeezing four buttons. */}
+      {!appliesToTake && (
         /* The name, and what is being done to it, on one line.
            A filename is the one thing in this header whose width nobody
            controls, so it gets a row rather than a place in the button row —

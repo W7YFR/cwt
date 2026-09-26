@@ -70,6 +70,8 @@ export interface ReviewScreenProps {
   onDeviceChange(id: string | undefined): void;
   /** Into the calibration wizard, and back here afterwards. */
   onCalibrate(): void;
+  /** Into the configuration screen, and back here afterwards. */
+  onConfigure(): void;
   /** Drop the recording and stay here — see useTake.reset. */
   onClear(): void;
   /** Open a recording from disk — the same path a dropped file takes. */
@@ -116,6 +118,7 @@ export function ReviewScreen({
   onProfileChange,
   onDeviceChange,
   onCalibrate,
+  onConfigure,
   onClear,
   onFile,
   onNewSession,
@@ -661,6 +664,14 @@ export function ReviewScreen({
              but never join one. */
           canOpenFile={blank}
           onNewSession={() => setStarting(true)}
+          onDrill={(d) =>
+            onNewSession({
+              expected: d.text,
+              charWpm: settings.charWpm,
+              farnsworthWpm: Math.min(settings.farnsworthWpm, settings.charWpm),
+              times: settings.times,
+            })
+          }
           /* Drawn by the bar, on the row it shares with the note about how
              the file is being read — see `source` there. A filename earns
              that room; "microphone" does not, and the bar drops it. */
@@ -676,6 +687,13 @@ export function ReviewScreen({
             Configuration used to live here too. That is about one thing — the
             microphone — and now sits beside Calibrate where it is decided;
             this is about the page in front of you. */}
+        {/* Beside the cog, and only while it is open. Before it in the DOM,
+            so the cog stays the last stop in the header. */}
+        {chartSettings && (
+          <button className="cornerside" data-testid="advanced" onClick={onConfigure}>
+            Advanced
+          </button>
+        )}
         <ChartSettingsButton
           open={chartSettings}
           onToggle={() => setChartSettings((v) => !v)}

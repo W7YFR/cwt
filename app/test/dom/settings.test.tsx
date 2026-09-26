@@ -8,10 +8,11 @@
  */
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Settings } from "@/ui/Settings";
 import { loadProfiles, saveProfile, selectProfile, activeProfile } from "@/io/profiles";
+import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
 import type { Profile } from "@/io/profiles";
 
 const PROFILE = (over: Partial<Profile> = {}): Profile => ({
@@ -105,5 +106,84 @@ describe("the configuration screen", () => {
     // moment it applies.
     expect(screen.getByRole("button", { name: /^delete$/i })).toBeTruthy();
     expect(screen.getByTestId("calrow").textContent).toMatch(/in use/i);
+  });
+});
+
+describe("the user section", () => {
+  /** Lets the calibration list finish loading inside act. */
+  const settle = () => act(async () => {});
+
+  it("comes first, with calibration second", async () => {
+    open();
+    await settle();
+    const titles = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(titles).toEqual(["User", "Calibration"]);
+  });
+
+  it("saves each field as it is typed, and reads it back", async () => {
+    const user = userEvent.setup();
+    const { unmount } = open();
+    await settle();
+    await user.type(screen.getByLabelText("Name"), "Rob");
+    await user.type(screen.getByLabelText("Callsign"), "w7yfr");
+    await user.type(screen.getByLabelText("Age"), "4x2");
+    await user.type(screen.getByLabelText("Year licensed"), "20245");
+    await user.type(screen.getByLabelText("City"), "Portland");
+    await user.type(screen.getByLabelText("Region, short"), "or");
+    await user.type(screen.getByLabelText("Region, long"), "Oregon");
+    await user.type(screen.getByLabelText("Antenna"), "efhw");
+    await user.type(screen.getByLabelText("Manufacturer"), "yaesu");
+    await user.type(screen.getByLabelText("Model"), "ft-710");
+    await user.type(screen.getByLabelText("Power (W)"), "100w");
+    expect(loadUser()).toEqual({
+      name: "ROB",
+      callsign: "W7YFR",
+      age: "42",
+      yearLicensed: "2024",
+      qthCity: "PORTLAND",
+      qthRegionShort: "OR",
+      qthRegionLong: "OREGON",
+      antenna: "EFHW",
+      rigManufacturer: "YAESU",
+      rigModel: "FT-710",
+      rigPower: "100",
+    });
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("ROB");
+    unmount();
+    open();
+    await settle();
+    expect((screen.getByLabelText("Callsign") as HTMLInputElement).value).toBe("W7YFR");
+    expect((screen.getByLabelText("Model") as HTMLInputElement).value).toBe("FT-710");
+  });
+
+  it("keeps the other preferences when it saves", async () => {
+    const user = userEvent.setup();
+    savePrefs({ charWpm: 18 });
+    open();
+    await settle();
+    await user.type(screen.getByLabelText("Name"), "R");
+    expect(loadPrefs().charWpm).toBe(18);
+  });
+
+  it("drops a stored user that is not the right shape", () => {
+    localStorage.setItem("cwt:prefs", JSON.stringify({ user: { name: 5 } }));
+    expect(loadUser().name).toBe("");
+  });
+
+  it("reads back a value saved in lower case as upper case", () => {
+    localStorage.setItem(
+      "cwt:prefs",
+      JSON.stringify({ user: { name: "rob", callsign: "w7yfr" } }),
+    );
+    expect(loadUser()).toMatchObject({ name: "ROB", callsign: "W7YFR", qthCity: "" });
+  });
+
+  it("shows markup in a saved detail as text, never as elements", async () => {
+    const markup = '<IMG SRC=X ONERROR="ALERT(1)">';
+    localStorage.setItem("cwt:prefs", JSON.stringify({ user: { name: markup } }));
+    open();
+    await settle();
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe(markup);
+    expect(document.querySelector("img")).toBeNull();
   });
 });
