@@ -103,7 +103,13 @@ export function reviewTake(take: Take, settings: ReviewSettings): Review {
   const slots = pair(actual, ideal);
   const retargeted = expected ? retarget(slots) : 0;
 
-  const analysis = grade(actual, ref, take.measured, settings.tolerance);
+  const analysis = grade(
+    actual,
+    ref,
+    take.measured,
+    settings.tolerance,
+    settings.ignoreConstruction,
+  );
   const comparison = expected ? compareText(expected, actual.text) : null;
 
   return { take, ref, actual, ideal, slots, analysis, comparison, retargeted };
@@ -164,6 +170,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     runScores: true,
     captionAll: false,
     advancedGrading: true,
+    ignoreConstruction: false,
     showDownloads: false,
     showHints: true,
     showChartControls: true,

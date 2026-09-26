@@ -6,7 +6,7 @@
  * be thrown away without taking the session with it.
  */
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useTake } from "@/ui/useTake";
 import { MIC_SOURCE, isBlankTake } from "@/io/take";
@@ -339,3 +339,19 @@ describe("the speed a session declares", () => {
   });
 });
 
+describe("ignoring character construction", () => {
+  it("survives a reload", () => {
+    vi.useFakeTimers();
+    try {
+      const first = renderHook(() => useTake());
+      act(() => first.result.current.setSettings({ ignoreConstruction: true }));
+      act(() => vi.advanceTimersByTime(1000));
+      first.unmount();
+
+      const { result } = renderHook(() => useTake());
+      expect(result.current.settings.ignoreConstruction).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

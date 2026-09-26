@@ -37,6 +37,7 @@ import {
 import {
   ACCURATE_BANDS,
   CONSISTENT_BANDS,
+  isGraded,
   scoreBand,
 } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
@@ -87,6 +88,13 @@ export const GRADE_MARK: Record<Grade, string> = {
   bad: "**",
   none: "",
 };
+
+/** A block's grade on the chart, or "none" when the setting leaves its class
+ *  ungraded. The same rule `grade` applies to the score. */
+function blockGrade(scene: Scene, b: Block): Grade {
+  if (!isGraded(b.targetKind, scene.ignoreConstruction === true)) return "none";
+  return gradeOf(b.units, b.targetUnits, scene.tolerance);
+}
 
 /** Grade a measured/target unit pair. Shared with the report table so the
  *  chart and the numbers below it never disagree about what counts as clean. */
@@ -173,6 +181,8 @@ export interface Scene {
   palette: Palette;
   view: ViewMode;
   tolerance: number;
+  /** Leave a character's elements and inner gaps ungraded. */
+  ignoreConstruction?: boolean;
   scrollX: number;
   viewport: Viewport;
   durationSec: number;
@@ -686,7 +696,7 @@ function drawGap(
   if (!gap || w <= 0) return;
   const C = scene.palette;
   const y = yTop + (ROW_H - MARK_H) / 2;
-  const grade = isTarget ? "none" : gradeOf(gap.units, gap.targetUnits, scene.tolerance);
+  const grade = isTarget ? "none" : blockGrade(scene, gap);
   const rest = isRest(gap);
   const color = rest
     ? C.rest
@@ -862,7 +872,7 @@ function drawCharMarker(
     const blocks = ch.leadGap ? [...ch.blocks, ch.leadGap] : ch.blocks;
     for (const b of blocks) {
       if (b.targetUnits <= 0) continue;
-      const g = gradeOf(b.units, b.targetUnits, scene.tolerance);
+      const g = blockGrade(scene, b);
       if (g === "bad" || (g === "warn" && worst === "ok")) worst = g;
     }
   }
@@ -940,7 +950,7 @@ function drawMarks(
     } else {
       const grade = isTarget
         ? "none"
-        : gradeOf(b.units, b.targetUnits, scene.tolerance);
+        : blockGrade(scene, b);
       ctx.fillStyle = isTarget
         ? C.tgt
         : grade === "warn"
@@ -1001,7 +1011,7 @@ function drawGradeStrip(
   const blocks = [...slot.actual.blocks];
   if (slot.actual.leadGap) blocks.push(slot.actual.leadGap);
   for (const b of blocks) {
-    const g = gradeOf(b.units, b.targetUnits, scene.tolerance);
+    const g = blockGrade(scene, b);
     if (g === "bad") worst = "bad";
     else if (g === "warn" && worst !== "bad") worst = "warn";
   }

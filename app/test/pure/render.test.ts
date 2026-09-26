@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { recordingCtx } from "../recording-ctx";
-import { caseNamed, reviewFrom, CLEAN, FARNSWORTH, SLOPPY } from "../fixture";
+import { caseNamed, longElements, reviewFrom, CLEAN, FARNSWORTH, SLOPPY } from "../fixture";
 import {
   buildLayout,
   charWidth,
@@ -1251,6 +1251,21 @@ describe("drawing", () => {
       .ofType("fillRect")
       .find((c) => c.args[1] === lane.grade && c.args[3] === lane.bottom - lane.grade);
     expect(wash).toBeUndefined();
+  });
+
+  it("stops coloring elements when character construction is ignored", () => {
+    const { take, settings } = longElements();
+    const flagged = (ignoreConstruction: boolean) => {
+      const review = reviewTake(take, { ...settings, ignoreConstruction });
+      const ctx = recordingCtx();
+      draw(ctx, { ...sceneFor(review, "per-char", 12, 20000), ignoreConstruction });
+      const colors = new Set([FALLBACK_PALETTE.bad, FALLBACK_PALETTE.warn]);
+      return ctx.ofType("fill").filter((c) => colors.has(c.fill)).length;
+    };
+    const before = flagged(false);
+    const after = flagged(true);
+    expect(before).toBeGreaterThan(0);
+    expect(after).toBeLessThan(before);
   });
 
   it("leaves a clean recording's chart free of bad-colored marks", () => {

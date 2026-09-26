@@ -62,3 +62,11 @@ export const SLOPPY = "cq-de-w7yfr.wav";
 export const CLEAN = "cq-ab1cd-20wpm-k3ng.wav";
 /** Heavy Farnsworth, where the gap classes are far apart. */
 export const FARNSWORTH = "synth-farnsworth";
+
+/** The sloppy case with every mark 60% long: each dit and dah is out of
+ *  tolerance, and the gaps are as they were sent. */
+export function longElements(): { take: Take; settings: ReviewSettings } {
+  const { take, settings } = reviewFrom(caseNamed(SLOPPY));
+  const segments = take.segments.map(([s, d]) => [s, s === 1 ? d * 1.6 : d] as const);
+  return { take: { ...take, segments }, settings };
+}

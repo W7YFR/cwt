@@ -257,6 +257,7 @@ export function createChart(
       palette,
       view: input.settings.view,
       tolerance: input.settings.tolerance,
+      ignoreConstruction: input.settings.ignoreConstruction,
       scrollX,
       viewport: v,
       durationSec: input.review.take.durationSec,
@@ -920,6 +921,7 @@ export function createChart(
         palette,
         view: input.settings.view,
         tolerance: input.settings.tolerance,
+        ignoreConstruction: input.settings.ignoreConstruction,
         scrollX: 0,
         viewport: {
           viewW: w,

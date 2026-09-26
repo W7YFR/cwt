@@ -410,6 +410,17 @@ describe("controls", () => {
     expect(chart.querySelectorAll("input[type='checkbox']")).toHaveLength(4);
   });
 
+  it("offers ignoring character construction under grading, off to start", async () => {
+    const user = userEvent.setup();
+    const seen: Partial<ReviewSettings>[] = [];
+    const { container } = renderView({ open: true, onChange: (p) => seen.push(p) });
+    const box = screen.getByLabelText(/ignore character construction/i) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(container.querySelector("[data-panel='grading']")).toContainElement(box);
+    await user.click(box);
+    expect(seen.at(-1)).toEqual({ ignoreConstruction: true });
+  });
+
   it("disables stop when nothing is playing and enables it when something is", () => {
     const take = takeFrom(caseNamed(SLOPPY));
     const base = defaultSettings(take);

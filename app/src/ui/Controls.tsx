@@ -18,6 +18,7 @@ import type { ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import {
   ADVANCED_GRADING_HELP,
+  IGNORE_CONSTRUCTION_HELP,
   CAPTION_ALL_HELP,
   CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
@@ -566,6 +567,23 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                   </div>
                 </>
               )}
+            </div>
+          </div>
+
+          <div className="panelrow" data-panel="grading">
+            <span className="uplabel">Grading</span>
+            <div className="panelgroups">
+              <div className="group">
+                <label className="check" title={IGNORE_CONSTRUCTION_HELP}>
+                  <input
+                    type="checkbox"
+                    id="ignore-construction"
+                    checked={s.ignoreConstruction}
+                    onChange={(e) => onChange({ ignoreConstruction: e.target.checked })}
+                  />{" "}
+                  Ignore character construction
+                </label>
+              </div>
             </div>
           </div>
 
