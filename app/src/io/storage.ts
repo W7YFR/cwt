@@ -403,6 +403,7 @@ export interface UserInfo {
   name: string;
   callsign: string;
   age: string;
+  yearLicensed: string;
   qthCity: string;
   /** State, province or country, abbreviated: "OR". */
   qthRegionShort: string;
@@ -411,18 +412,22 @@ export interface UserInfo {
   antenna: string;
   rigManufacturer: string;
   rigModel: string;
+  /** Transmit power, in watts. */
+  rigPower: string;
 }
 
 export const EMPTY_USER: UserInfo = {
   name: "",
   callsign: "",
   age: "",
+  yearLicensed: "",
   qthCity: "",
   qthRegionShort: "",
   qthRegionLong: "",
   antenna: "",
   rigManufacturer: "",
   rigModel: "",
+  rigPower: "",
 };
 
 export function loadUser(): UserInfo {

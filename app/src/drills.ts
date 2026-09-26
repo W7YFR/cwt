@@ -25,12 +25,14 @@ export const SLOTS = {
   name: "name",
   callsign: "callsign",
   age: "age",
+  year_licensed: "yearLicensed",
   city: "qthCity",
   region_short: "qthRegionShort",
   region_long: "qthRegionLong",
   antenna: "antenna",
   rig_manufacturer: "rigManufacturer",
   rig_model: "rigModel",
+  power: "rigPower",
 } as const satisfies Record<string, keyof UserInfo>;
 
 export type Slot = keyof typeof SLOTS;
@@ -40,12 +42,14 @@ export const SLOT_LABELS: Readonly<Record<Slot, string>> = {
   name: "Name",
   callsign: "Callsign",
   age: "Age",
+  year_licensed: "Year licensed",
   city: "City",
   region_short: "Region, short",
   region_long: "Region, long",
   antenna: "Antenna",
   rig_manufacturer: "Manufacturer",
   rig_model: "Model",
+  power: "Power (W)",
 };
 
 const SLOT_RE = /\{([a-z_]+)\}/g;
@@ -114,6 +118,10 @@ export const DRILLS: readonly Drill[] = [
   ]),
   ...section("qso/exchange", [QSO, "Exchange"], [
     "NAME IS {name} UR RST 5NN <BK>",
+    "NAME IS {name} UR RST 5NN QTH IS {city} {region_short} " +
+      "RIG IS {rig_manufacturer} {rig_model} ANT IS {antenna} HAM SINCE {year_licensed}",
+    "UR SIG 5NN NAME IS {name} {name} QTH IS {city} {region_short} {city} {region_short} " +
+      "RIG IS {rig_manufacturer} {rig_model} RUNNING {power}W CUL 73 73",
     "GD MATE UR SIG 5NN DE {callsign} " +
       "TU NAME HR IS {name} {name} DE {callsign} " +
       "QTH IS {city} {region_short} {city} {region_short} DE {callsign}",

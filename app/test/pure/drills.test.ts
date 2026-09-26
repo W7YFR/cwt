@@ -8,12 +8,14 @@ const USER: UserInfo = {
   name: "ROB",
   callsign: "W7YFR",
   age: "42",
+  yearLicensed: "2024",
   qthCity: "PORTLAND",
   qthRegionShort: "OR",
   qthRegionLong: "OREGON",
   antenna: "EFHW",
   rigManufacturer: "YAESU",
   rigModel: "FT-710",
+  rigPower: "100",
 };
 
 describe("the drill catalog", () => {

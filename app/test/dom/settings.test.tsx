@@ -127,22 +127,26 @@ describe("the user section", () => {
     await user.type(screen.getByLabelText("Name"), "Rob");
     await user.type(screen.getByLabelText("Callsign"), "w7yfr");
     await user.type(screen.getByLabelText("Age"), "4x2");
+    await user.type(screen.getByLabelText("Year licensed"), "20245");
     await user.type(screen.getByLabelText("City"), "Portland");
     await user.type(screen.getByLabelText("Region, short"), "or");
     await user.type(screen.getByLabelText("Region, long"), "Oregon");
     await user.type(screen.getByLabelText("Antenna"), "efhw");
     await user.type(screen.getByLabelText("Manufacturer"), "yaesu");
     await user.type(screen.getByLabelText("Model"), "ft-710");
+    await user.type(screen.getByLabelText("Power (W)"), "100w");
     expect(loadUser()).toEqual({
       name: "ROB",
       callsign: "W7YFR",
       age: "42",
+      yearLicensed: "2024",
       qthCity: "PORTLAND",
       qthRegionShort: "OR",
       qthRegionLong: "OREGON",
       antenna: "EFHW",
       rigManufacturer: "YAESU",
       rigModel: "FT-710",
+      rigPower: "100",
     });
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("ROB");
     unmount();

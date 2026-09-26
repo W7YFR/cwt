@@ -217,8 +217,15 @@ function UserSection(): React.ReactElement {
           id="user-age"
           label="Age"
           value={user.age}
-          numeric
+          digits={3}
           onChange={(age) => set({ age })}
+        />
+        <UserField
+          id="user-licensed"
+          label="Year licensed"
+          value={user.yearLicensed}
+          digits={4}
+          onChange={(yearLicensed) => set({ yearLicensed })}
         />
         <fieldset className="usergroup">
           <legend>QTH</legend>
@@ -255,6 +262,13 @@ function UserSection(): React.ReactElement {
             value={user.rigModel}
             onChange={(rigModel) => set({ rigModel })}
           />
+          <UserField
+            id="user-rig-power"
+            label="Power (W)"
+            value={user.rigPower}
+            digits={4}
+            onChange={(rigPower) => set({ rigPower })}
+          />
         </fieldset>
         <UserField
           id="user-antenna"
@@ -271,12 +285,12 @@ function UserField(props: {
   id: string;
   label: string;
   value: string;
-  /** Digits only. */
-  numeric?: boolean;
+  /** Digits only, at most this many. */
+  digits?: number;
   onChange(v: string): void;
 }): React.ReactElement {
-  const { numeric, onChange } = props;
-  const field = useUpperField(numeric ? (v) => onChange(v.replace(/\D/g, "")) : onChange);
+  const { digits, onChange } = props;
+  const field = useUpperField(digits ? (v) => onChange(v.replace(/\D/g, "")) : onChange);
   return (
     <div className="userfield">
       <label htmlFor={props.id}>{props.label}</label>
@@ -286,8 +300,8 @@ function UserField(props: {
         ref={field.ref}
         value={props.value}
         onChange={field.onChange}
-        inputMode={numeric ? "numeric" : undefined}
-        maxLength={numeric ? 3 : undefined}
+        inputMode={digits ? "numeric" : undefined}
+        maxLength={digits}
         spellCheck={false}
         autoComplete="off"
       />
