@@ -853,8 +853,8 @@ function drawCountIn(ctx: Ctx2D, scene: Scene): void {
  * into counting elements instead of keeping time.
  *
  * What the markers say is in the space between them. What the color says is
- * whether that character landed where it should have: the same verdict the
- * grade strip carries, its own elements and the gap that led into it, because
+ * whether that character landed where it should have: the worst of the grade
+ * strip's two verdicts, its own elements and the gap that led into it, because
  * arriving late is exactly the fault this view exists to show. */
 function drawCharMarker(
   ctx: Ctx2D,
@@ -995,12 +995,12 @@ function drawGhost(
   ctx.setLineDash([]);
 }
 
-/** The per-character verdict: the worst grade among its own blocks, over the
- *  character.
+/** The grade strip for one slot: each verdict over the thing it grades.
  *
- * With construction ignored the lead gap is the only block graded, so the
- * verdict is the gap's and sits over the gap, from `gapX` for `gapW`. A
- * character with no graded gap before it, such as the first, gets none. */
+ * The gap before the character gets its own verdict, over the gap, from
+ * `gapX` for `gapW`. The character gets one for its elements and inner gaps,
+ * over the character, unless construction is ignored. A character with no
+ * graded gap before it, such as the first, has no gap verdict. */
 function drawGradeStrip(
   ctx: Ctx2D,
   scene: Scene,
@@ -1012,24 +1012,23 @@ function drawGradeStrip(
   y: number,
 ): void {
   if (!slot.actual || !slot.ideal) return; // nothing to compare
-  const lead = slot.actual.leadGap;
-  const gapOnly = scene.ignoreConstruction === true;
-  if (gapOnly && !(lead && lead.targetUnits > 0)) return;
-
-  let worst: "ok" | "warn" | "bad" = "ok";
-  const blocks = gapOnly ? [lead!] : [...slot.actual.blocks];
-  if (!gapOnly && lead) blocks.push(lead);
-  for (const b of blocks) {
-    const g = blockGrade(scene, b);
-    if (g === "bad") worst = "bad";
-    else if (g === "warn" && worst !== "bad") worst = "warn";
-  }
-  const cx = gapOnly ? gapX + gapW / 2 : x + w / 2;
-  ctx.fillStyle = scene.palette[worst];
   ctx.font = `600 9px ${scene.palette.mono}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(GRADE_MARK[worst], cx, y + GRADE_H / 2);
+  const mark = (blocks: readonly Block[], cx: number) => {
+    let worst: "ok" | "warn" | "bad" = "ok";
+    for (const b of blocks) {
+      const g = blockGrade(scene, b);
+      if (g === "bad") worst = "bad";
+      else if (g === "warn" && worst !== "bad") worst = "warn";
+    }
+    ctx.fillStyle = scene.palette[worst];
+    ctx.fillText(GRADE_MARK[worst], cx, y + GRADE_H / 2);
+  };
+
+  const lead = slot.actual.leadGap;
+  if (lead && lead.targetUnits > 0) mark([lead], gapX + gapW / 2);
+  if (scene.ignoreConstruction !== true) mark(slot.actual.blocks, x + w / 2);
 }
 
 /** Cumulative timing drift: how far behind or ahead of the ideal clock you have

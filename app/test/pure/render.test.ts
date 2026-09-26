@@ -1254,25 +1254,32 @@ describe("drawing", () => {
     expect(wash).toBeUndefined();
   });
 
-  it("puts each verdict over the gap it grades when construction is ignored", () => {
-    const { take, settings } = longElements();
-    const review = reviewTake(take, { ...settings, ignoreConstruction: true });
-    const scene = { ...sceneFor(review, "per-char", 12, 20000), ignoreConstruction: true };
-    const ctx = recordingCtx();
-    draw(ctx, scene);
-    const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
-    const drawn = ctx
-      .ofType("fillText")
-      .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
-      .map((c) => c.args[0]);
-    // Only characters with a graded gap before them get a verdict: the first
-    // character has none.
-    const want = scene.layout.items
-      .filter((it) => it.slot.actual && it.slot.ideal && (it.slot.actual.leadGap?.targetUnits ?? 0) > 0)
-      .map((it) => it.x! + it.youGapW / 2);
-    expect(want.length).toBeGreaterThan(0);
-    expect(drawn).toEqual(want);
-  });
+  it.each([false, true])(
+    "puts each verdict over what it grades (construction ignored: %s)",
+    (ignoreConstruction) => {
+      const { take, settings } = longElements();
+      const review = reviewTake(take, { ...settings, ignoreConstruction });
+      const scene = { ...sceneFor(review, "per-char", 12, 20000), ignoreConstruction };
+      const ctx = recordingCtx();
+      draw(ctx, scene);
+      const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
+      const drawn = ctx
+        .ofType("fillText")
+        .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
+        .map((c) => c.args[0]);
+      /* A gap verdict over each graded gap, so none before the first
+         character, and a character verdict over each character unless its
+         construction is ignored. */
+      const want = scene.layout.items
+        .filter((it) => it.slot.actual && it.slot.ideal)
+        .flatMap((it) => [
+          ...((it.slot.actual!.leadGap?.targetUnits ?? 0) > 0 ? [it.x! + it.youGapW / 2] : []),
+          ...(ignoreConstruction ? [] : [it.x! + it.gapW + it.bodyW / 2]),
+        ]);
+      expect(want.length).toBeGreaterThan(0);
+      expect(drawn).toEqual(want);
+    },
+  );
 
   it("stops coloring elements when character construction is ignored", () => {
     const { take, settings } = longElements();
