@@ -527,7 +527,7 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
     if (slot.actual) drawMarks(ctx, scene, slot.actual, bx, row.row, false);
     else drawGhost(ctx, scene, bx, it.bodyW, row.row);
 
-    drawGradeStrip(ctx, scene, slot, bx, it.bodyW, row.grade);
+    drawGradeStrip(ctx, scene, slot, bx, it.bodyW, it.x, it.youGapW, row.grade);
   }
 }
 
@@ -995,31 +995,41 @@ function drawGhost(
   ctx.setLineDash([]);
 }
 
-/** The per-character verdict: the worst grade among its own blocks. */
+/** The per-character verdict: the worst grade among its own blocks, over the
+ *  character.
+ *
+ * With construction ignored the lead gap is the only block graded, so the
+ * verdict is the gap's and sits over the gap, from `gapX` for `gapW`. A
+ * character with no graded gap before it, such as the first, gets none. */
 function drawGradeStrip(
   ctx: Ctx2D,
   scene: Scene,
   slot: Slot,
   x: number,
   w: number,
+  gapX: number,
+  gapW: number,
   y: number,
 ): void {
   if (!slot.actual || !slot.ideal) return; // nothing to compare
-  // Never "none": this only runs when both sides have a character, and every
-  // block of a real character carries a target.
+  const lead = slot.actual.leadGap;
+  const gapOnly = scene.ignoreConstruction === true;
+  if (gapOnly && !(lead && lead.targetUnits > 0)) return;
+
   let worst: "ok" | "warn" | "bad" = "ok";
-  const blocks = [...slot.actual.blocks];
-  if (slot.actual.leadGap) blocks.push(slot.actual.leadGap);
+  const blocks = gapOnly ? [lead!] : [...slot.actual.blocks];
+  if (!gapOnly && lead) blocks.push(lead);
   for (const b of blocks) {
     const g = blockGrade(scene, b);
     if (g === "bad") worst = "bad";
     else if (g === "warn" && worst !== "bad") worst = "warn";
   }
+  const cx = gapOnly ? gapX + gapW / 2 : x + w / 2;
   ctx.fillStyle = scene.palette[worst];
   ctx.font = `600 9px ${scene.palette.mono}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(GRADE_MARK[worst], x + w / 2, y + GRADE_H / 2);
+  ctx.fillText(GRADE_MARK[worst], cx, y + GRADE_H / 2);
 }
 
 /** Cumulative timing drift: how far behind or ahead of the ideal clock you have

@@ -28,6 +28,7 @@ import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/
 import { FALLBACK_PALETTE } from "@/render/theme";
 import {
   CAPTION_GLYPH_W,
+  GRADE_H,
   GUTTER,
   MARK_H,
   CLOCK_MARKER_MIN_W,
@@ -1251,6 +1252,26 @@ describe("drawing", () => {
       .ofType("fillRect")
       .find((c) => c.args[1] === lane.grade && c.args[3] === lane.bottom - lane.grade);
     expect(wash).toBeUndefined();
+  });
+
+  it("puts each verdict over the gap it grades when construction is ignored", () => {
+    const { take, settings } = longElements();
+    const review = reviewTake(take, { ...settings, ignoreConstruction: true });
+    const scene = { ...sceneFor(review, "per-char", 12, 20000), ignoreConstruction: true };
+    const ctx = recordingCtx();
+    draw(ctx, scene);
+    const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
+    const drawn = ctx
+      .ofType("fillText")
+      .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
+      .map((c) => c.args[0]);
+    // Only characters with a graded gap before them get a verdict: the first
+    // character has none.
+    const want = scene.layout.items
+      .filter((it) => it.slot.actual && it.slot.ideal && (it.slot.actual.leadGap?.targetUnits ?? 0) > 0)
+      .map((it) => it.x! + it.youGapW / 2);
+    expect(want.length).toBeGreaterThan(0);
+    expect(drawn).toEqual(want);
   });
 
   it("stops coloring elements when character construction is ignored", () => {
