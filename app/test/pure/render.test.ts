@@ -1084,7 +1084,8 @@ describe("drawing", () => {
     expect(ctx.ofType("clearRect").length).toBe(1);
     // The gutter is drawn last and outside the content clip, so nothing can
     // slide underneath the track labels.
-    expect(ctx.texts()).toContain("YOU");
+    // A recorded run is named by number. Overlay keeps YOU as its color key.
+    expect(ctx.texts()).toContain(view === "overlay" ? "YOU" : "RUN 1");
     expect(ctx.texts()).toContain("TGT");
     expect(ctx.texts()).toContain("DRIFT");
   });

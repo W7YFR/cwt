@@ -1157,11 +1157,9 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
             // brightness rather than a second hue.
             scene.heard === "tgt" || scene.picking === "tgt" ? C.ink : C.tgt,
           ],
-          /* One name per attempt. "YOU" only while there is one of them —
-             with a stack, which attempt a row is is the thing you need from
-             this band, and four rows all called YOU would not say it. Numbered
-             from one, in the order they were recorded, because that is what
-             the Drop button calls them too. */
+          /* One name per attempt, numbered from one in the order they were
+             recorded, because that is what the Drop button calls them too.
+             "YOU" only on a lone row with nothing recorded in it. */
           ...scene.runs.map(
             (lane, r) =>
               [
@@ -1170,7 +1168,7 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
                    attempt keeps the first case, which is what leaves a single
                    run drawing exactly as it always has. */
                 scene.rows.runs[r]!.row + (graded ? 9 : ROW_H / 2),
-                scene.runs.length === 1 ? "YOU" : `RUN ${lane.ordinal + 1}`,
+                scene.runs.length === 1 && lane.blank ? "YOU" : `RUN ${lane.ordinal + 1}`,
                 r === scene.selected
                   ? C.you
                   : r === scene.picking

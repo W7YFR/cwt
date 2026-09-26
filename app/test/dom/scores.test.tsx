@@ -39,9 +39,21 @@ describe("which attempt the band is about", () => {
     expect(screen.getByTestId("run-name").textContent).toContain("3");
   });
 
-  it("says nothing when there is only one of them", () => {
-    // Nothing for it to be distinguished from.
+  it("names a lone run once it is recorded", () => {
     band({ runOf: { at: 0, of: 1 } });
+    expect(screen.getByTestId("run-name").textContent).toContain("1");
+  });
+
+  it("says nothing for a lone run with nothing recorded", () => {
+    const take = blankTake({ expected: "CQ", charWpm: 20, farnsworthWpm: 20 });
+    render(
+      <Scores
+        review={reviewFrom(caseNamed(SLOPPY)).review}
+        settings={defaultSettings(take)}
+        take={take}
+        runOf={{ at: 0, of: 1 }}
+      />,
+    );
     expect(screen.queryByTestId("run-name")).toBeNull();
   });
 
