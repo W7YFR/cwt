@@ -30,8 +30,8 @@ export const DRILLS: readonly Drill[] = [
   ...section("daily-sending/drill", [DAILY, "Drill"], [
     "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 70364 51289",
     "BENS BEST BENT WIRE/5",
-    "<DN> <DN> <DN> <DN> <DN> , , , , , . . . . . ? ? ? ? ? " +
-      "<SK> <SK> <SK> <SK> <SK> <AR> <AR> <AR> <AR> <AR> <BT> <BT> <BT> <BT> <BT>",
+    "<DN><DN><DN><DN><DN> ,,,,, ..... ????? " +
+      "<SK><SK><SK><SK><SK> <AR><AR><AR><AR><AR> <BT><BT><BT><BT><BT>",
   ]),
 ];
 
