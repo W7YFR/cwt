@@ -1304,21 +1304,39 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   position: sticky;
   top: 0;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   height: 28px;
-  padding: 10px 10px 0;
+  padding: 0 10px 0 7px;
+  border-left: 3px solid transparent;
   background: var(--bg);
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--ink-dim);
+  cursor: pointer;
+  user-select: none;
 }
+.drillgroup .caret {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform .12s;
+}
+[aria-expanded="false"] > .drillgroup .caret { transform: rotate(-90deg); }
 .drillsection {
   padding: 6px 10px 2px 18px;
   font-size: 11px;
   color: var(--ink-faint);
 }
-.drilllist [role="option"] {
+.drilllist [aria-level="2"] {
   padding: 4px 10px 4px 26px;
   border-left: 3px solid transparent;
   font-family: var(--mono);
@@ -1329,7 +1347,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   text-overflow: ellipsis;
   cursor: pointer;
 }
-.drilllist [role="option"][aria-selected="true"] {
+.drilllist [data-active="true"] {
   background: var(--panel-2);
   border-left-color: var(--you);
 }

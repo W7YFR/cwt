@@ -196,7 +196,7 @@ describe("starting a new session", () => {
       await user.click(screen.getByTestId(`drill-option-${drill.id}`));
       expect(text().value).toBe(drill.text);
       expect(document.activeElement).toBe(text());
-      expect(screen.queryByRole("listbox")).toBeNull();
+      expect(screen.queryByRole("tree")).toBeNull();
       await user.click(screen.getByTestId("start-session"));
       expect(onStart.mock.calls[0]![0].expected).toBe(drill.text);
     });
@@ -215,7 +215,7 @@ describe("starting a new session", () => {
       const { onStart } = open();
       screen.getByTestId("drill-picker").focus();
       await user.keyboard("{Enter}");
-      expect(screen.getByRole("listbox")).toBeTruthy();
+      expect(screen.getByRole("tree")).toBeTruthy();
       expect(onStart).not.toHaveBeenCalled();
     });
 
@@ -224,7 +224,7 @@ describe("starting a new session", () => {
       const { onCancel } = open();
       await user.click(screen.getByTestId("drill-picker"));
       await user.keyboard("{Escape}");
-      expect(screen.queryByRole("listbox")).toBeNull();
+      expect(screen.queryByRole("tree")).toBeNull();
       expect(onCancel).not.toHaveBeenCalled();
       expect(text().value).toBe("CQ DE W7YFR");
     });
@@ -237,12 +237,51 @@ describe("starting a new session", () => {
       expect(text().value).toBe("BENS BEST BENT WIRE/5");
     });
 
+    it("collapses and expands a group from its header", async () => {
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      const header = screen.getByTestId("drill-group-daily-sending");
+      await user.click(header);
+      expect(screen.queryByTestId(`drill-option-${drill.id}`)).toBeNull();
+      expect(screen.getByRole("treeitem", { name: "Daily Sending" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await user.click(header);
+      expect(screen.getByTestId(`drill-option-${drill.id}`)).toBeTruthy();
+    });
+
+    it("collapses with Left and expands with Right", async () => {
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      // Left from a drill goes to its group; Left again collapses it.
+      await user.keyboard("{ArrowLeft}{ArrowLeft}");
+      expect(screen.queryByTestId(`drill-option-${drill.id}`)).toBeNull();
+      // Enter on a group toggles it rather than starting anything.
+      await user.keyboard("{Enter}");
+      expect(screen.getByTestId(`drill-option-${drill.id}`)).toBeTruthy();
+      await user.keyboard("{ArrowLeft}{ArrowRight}{ArrowRight}{ArrowDown}{Enter}");
+      expect(text().value).toBe(drill.text);
+    });
+
+    it("moves the focus to the group when the group it is in collapses", async () => {
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.click(screen.getByTestId("drill-group-daily-sending"));
+      const tree = screen.getByRole("tree");
+      const group = screen.getByRole("treeitem", { name: "Daily Sending" });
+      expect(tree.getAttribute("aria-activedescendant")).toBe(group.id);
+    });
+
     it("groups the options under their section", async () => {
       const user = userEvent.setup();
       open();
       await user.click(screen.getByTestId("drill-picker"));
       const warm = screen.getByRole("group", { name: "Daily Sending › Warm Up" });
-      expect(warm.querySelectorAll('[role="option"]').length).toBe(4);
+      expect(warm.querySelectorAll('[role="treeitem"]').length).toBe(4);
     });
   });
 });

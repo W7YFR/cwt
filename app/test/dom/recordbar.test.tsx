@@ -129,7 +129,7 @@ describe("the record bar in a session", () => {
     await user.click(screen.getByTestId("drill-picker"));
     await user.click(screen.getByTestId(`drill-option-${DRILLS[2]!.id}`));
     expect(onDrill).toHaveBeenCalledWith(DRILLS[2]);
-    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.queryByRole("tree")).toBeNull();
   });
 
   it("keeps the list's keys from reaching the page's shortcuts", async () => {
