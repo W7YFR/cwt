@@ -130,7 +130,7 @@ export interface Block {
 
 /** One decoded character and the blocks that produced it. */
 export interface Char {
-  /** "L", "<SK>", or "?" when the pattern matched nothing. */
+  /** "L", "<SK>", or UNKNOWN when the pattern matched nothing. */
   char: string;
   pattern: string;
   t0: number;
