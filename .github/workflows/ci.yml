@@ -139,7 +139,8 @@ jobs:
 
   # Does this push change a build input? A push that touches only CI, docs,
   # tests or the Makefile builds the same site, so it skips build and deploy.
-  # A manual run always deploys.
+  # A manual run always deploys. When the commit the push started from is not
+  # in the clone, as after a force push, the job fails rather than guess.
   changes:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
