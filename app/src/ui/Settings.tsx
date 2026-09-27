@@ -47,7 +47,6 @@ import {
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
 import { breakLines } from "@/morse";
-import { BREAK_SEC } from "@/timing/timeline";
 
 export interface SettingsProps {
   /** Which calibration is in use, so the one being deleted can be flagged. */
@@ -409,9 +408,10 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
             <code>&lt;SK&gt;</code>.
           </p>
           <p>
-            A new line is a long break. Use it to write both sides of a QSO. The target waits {BREAK_SEC} seconds at each break,
-            and a break is never graded. In the
-            message box a break shows as <code>|</code>.
+            A new line is a long break. Use it to write both sides of a QSO.
+            The target waits at each break for the Break length configured in the
+            settings, and a break is never graded. In the message box a break shows
+            as <code>|</code>.
           </p>
           <p>
             A slot in braces takes a value from User when you pick the drill.

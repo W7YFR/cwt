@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { BREAK, tokenize } from "@/morse";
 import { defaultSettings, reviewTake, targetText } from "@/timing";
 import { targetTiming } from "@/timing/model";
-import { BREAK_SEC, idealTimeline } from "@/timing/timeline";
+import { BREAK_DEFAULT_SEC, idealTimeline } from "@/timing/timeline";
 import { compareText } from "@/timing/align";
 import { MIC_SOURCE, type Segment, type Take, type Timeline } from "@/types";
 import { caseNamed, takeFrom, SLOPPY } from "../fixture";
@@ -19,13 +19,18 @@ const gaps = (tl: Timeline) =>
   tl.blocks.filter((b) => b.kind === "word-gap" || b.kind === "pause").map((b) => b.kind);
 
 describe("the ideal timeline", () => {
-  it("holds a pause of BREAK_SEC at a break, and a word gap elsewhere", () => {
+  it("holds a pause at a break, and a word gap elsewhere", () => {
     const tl = idealTimeline("CQ K | DE K", REF);
     expect(gaps(tl)).toEqual(["word-gap", "pause", "word-gap"]);
     const pause = tl.blocks.find((b) => b.kind === "pause")!;
-    expect(pause.t1 - pause.t0).toBeCloseTo(BREAK_SEC);
+    expect(pause.t1 - pause.t0).toBeCloseTo(BREAK_DEFAULT_SEC);
     expect(pause.targetKind).toBe("pause");
     expect(tl.chars.map((c) => c.char).join("")).toBe("CQKDEK");
+  });
+
+  it("holds the pause for the length it is given", () => {
+    const pause = idealTimeline("K | K", REF, 7.5).blocks.find((b) => b.kind === "pause")!;
+    expect(pause.t1 - pause.t0).toBeCloseTo(7.5);
   });
 
   it("reads a break with no spaces round it", () => {

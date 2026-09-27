@@ -49,7 +49,9 @@ export const REST_OUTLIER = 3.0;
 /** Length of the pause the ideal timeline holds at each BREAK. It sets the
  *  pace cursor and the target audio only: a rest is never graded, so the
  *  sender can take as long as they like. */
-export const BREAK_SEC = 3;
+export const BREAK_DEFAULT_SEC = 3;
+export const BREAK_MIN_SEC = 1;
+export const BREAK_MAX_SEC = 30;
 
 function block(
   t0: number,
@@ -186,7 +188,11 @@ export function decodeSegments(
  * builds its on/off list — so "perfect" here is precisely what you hear when
  * you play the target track, and every block's `units` equals its
  * `targetUnits` by construction. */
-export function idealTimeline(text: string, timing: Timing): Timeline {
+export function idealTimeline(
+  text: string,
+  timing: Timing,
+  breakSec: number = BREAK_DEFAULT_SEC,
+): Timeline {
   const u = timing.unitSec;
   const charGap = timing.charGapSec || 3 * u;
   const wordGap = timing.wordGapSec || 7 * u;
@@ -214,7 +220,7 @@ export function idealTimeline(text: string, timing: Timing): Timeline {
   words.forEach(({ word, afterBreak }, wi) => {
     let lead: Block | null = null;
     if (wi > 0) {
-      const [kind, dur] = afterBreak ? (["pause", BREAK_SEC] as const) : (["word-gap", wordGap] as const);
+      const [kind, dur] = afterBreak ? (["pause", breakSec] as const) : (["word-gap", wordGap] as const);
       lead = block(t, t + dur, kind, dur / u, dur / u);
       blocks.push(lead);
       t += dur;

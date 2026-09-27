@@ -305,6 +305,8 @@ export interface ReviewSettings {
   paceCursor: boolean;
   /** Seconds of count-in before that cursor sets off. */
   paceLeadSec: number;
+  /** Seconds the target holds at each break in the message. */
+  breakSec: number;
   /** Show the clock axis while a paced recording runs, and put the view back
    *  afterward.
    *

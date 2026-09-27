@@ -16,6 +16,7 @@ import { IconCog, IconPlay, IconStop } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
+import { BREAK_MAX_SEC, BREAK_MIN_SEC } from "@/timing/timeline";
 import {
   ADVANCED_GRADING_HELP,
   IGNORE_CONSTRUCTION_HELP,
@@ -38,6 +39,7 @@ import {
   ZEN_MODE_HELP,
   ZEN_PACING_HELP,
   PACE_LEAD_HELP,
+  BREAK_HELP,
   ZOOM_HELP,
 } from "./copy";
 
@@ -626,9 +628,8 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                 </label>
               </div>
 
-              {/* Both only with the cursor on. A count-in for a cursor that
-                  is not running, and an axis swapped for its benefit, are
-                  settings for nothing. */}
+              {/* Only with the cursor on. An axis swapped for a cursor that
+                  is not running is a setting for nothing. */}
               {s.paceCursor && (
                 <div className="group">
                   <label className="check" title={PACE_ABSOLUTE_HELP}>
@@ -640,23 +641,6 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                     />{" "}
                     Clock axis while pacing
                   </label>
-                </div>
-              )}
-
-              {s.paceCursor && (
-                <div className="group">
-                  <NumberField
-                    id="pace-lead"
-                    name="Delay start"
-                    unit="s"
-                    spoken="seconds"
-                    help={PACE_LEAD_HELP}
-                    value={s.paceLeadSec}
-                    min={PACE_LEAD_MIN_SEC}
-                    max={PACE_LEAD_MAX_SEC}
-                    step={1}
-                    onChange={(v) => onChange({ paceLeadSec: v })}
-                  />
                 </div>
               )}
 
@@ -691,6 +675,45 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                   </label>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="panelrow" data-panel="timing">
+            <span className="uplabel">Timing</span>
+            <div className="panelgroups">
+              {/* Only with the cursor on. A count-in for a cursor that is not
+                  running is a setting for nothing. */}
+              {s.paceCursor && (
+                <div className="group">
+                  <NumberField
+                    id="pace-lead"
+                    name="Delay start"
+                    unit="s"
+                    spoken="seconds"
+                    help={PACE_LEAD_HELP}
+                    value={s.paceLeadSec}
+                    min={PACE_LEAD_MIN_SEC}
+                    max={PACE_LEAD_MAX_SEC}
+                    step={1}
+                    onChange={(v) => onChange({ paceLeadSec: v })}
+                  />
+                </div>
+              )}
+
+              <div className="group">
+                <NumberField
+                  id="break-sec"
+                  name="Break length"
+                  unit="s"
+                  spoken="seconds"
+                  help={BREAK_HELP}
+                  value={s.breakSec}
+                  min={BREAK_MIN_SEC}
+                  max={BREAK_MAX_SEC}
+                  step={1}
+                  onChange={(v) => onChange({ breakSec: v })}
+                />
+              </div>
             </div>
           </div>
 

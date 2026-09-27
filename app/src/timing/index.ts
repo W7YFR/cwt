@@ -20,7 +20,7 @@ import { BREAK } from "@/morse";
 import { compareText } from "./align";
 import { grade } from "./grade";
 import { pair, retarget } from "./pair";
-import { buildTimeline, idealTimeline, PAUSE_FACTOR } from "./timeline";
+import { BREAK_DEFAULT_SEC, buildTimeline, idealTimeline, PAUSE_FACTOR } from "./timeline";
 import { estimateTiming } from "./estimate";
 import { targetTiming } from "./model";
 
@@ -102,7 +102,7 @@ export function reviewTake(take: Take, settings: ReviewSettings): Review {
     ref,
     settings.collapseRests ? PAUSE_FACTOR : Infinity,
   );
-  const ideal = idealTimeline(expected || actual.text, ref);
+  const ideal = idealTimeline(expected || actual.text, ref, settings.breakSec);
 
   const slots = pair(actual, ideal);
   const retargeted = expected ? retarget(slots) : 0;
@@ -169,6 +169,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     collapseRests: true,
     paceCursor: false,
     paceLeadSec: PACE_LEAD_DEFAULT_SEC,
+    breakSec: BREAK_DEFAULT_SEC,
     paceAbsolute: true,
     charMarkers: false,
     runScores: true,
