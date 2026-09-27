@@ -15,6 +15,7 @@ import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
 import type { HitResult, Focus } from "@/render/focus";
 import { HEIGHT } from "@/render/geometry";
 import { CLASS_LONG } from "./copy";
+import { isGraded } from "@/timing";
 import type { Review, ReviewSettings } from "@/types";
 
 export interface ChartHandle {
@@ -95,13 +96,13 @@ function tipForChar(hit: HitResult, unitSec: number): TipContent {
   return { char: hit.char.char, lines };
 }
 
-function tipFor(hit: HitResult, unitSec: number): TipContent {
+function tipFor(hit: HitResult, unitSec: number, ignoreConstruction: boolean): TipContent {
   const b = hit.block;
   const ms = b.units * unitSec * 1000;
   // Name the class it is *graded* as, so the target figure below makes sense,
   // and say what the decoder actually read when the two disagree.
   const lines = [`${ms.toFixed(0)} ms / ${b.units.toFixed(2)}u`];
-  if (b.targetUnits > 0 && hit.row === "you") {
+  if (b.targetUnits > 0 && hit.row === "you" && isGraded(b.targetKind, ignoreConstruction)) {
     const pct = (b.units / b.targetUnits - 1) * 100;
     lines.push(
       `target ${b.targetUnits.toFixed(2)}u (${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%)`,
@@ -161,6 +162,8 @@ export function ChartView({
   unitRef.current = review.ref.unitSec;
   const blocksRef = useRef(settings.charMarkers);
   blocksRef.current = settings.charMarkers;
+  const ignoreRef = useRef(settings.ignoreConstruction);
+  ignoreRef.current = settings.ignoreConstruction;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -179,7 +182,7 @@ export function ChartView({
         const content = hit
           ? blocksRef.current
             ? tipForChar(hit, unitRef.current)
-            : tipFor(hit, unitRef.current)
+            : tipFor(hit, unitRef.current, ignoreRef.current)
           : null;
         setTip(content ? { ...content, x, y } : null);
       },

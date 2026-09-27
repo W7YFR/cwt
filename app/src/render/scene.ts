@@ -37,6 +37,7 @@ import {
 import {
   ACCURATE_BANDS,
   CONSISTENT_BANDS,
+  isGraded,
   scoreBand,
 } from "@/timing";
 import { focusSpan, type Focus } from "./focus";
@@ -87,6 +88,13 @@ export const GRADE_MARK: Record<Grade, string> = {
   bad: "**",
   none: "",
 };
+
+/** A block's grade on the chart, or "none" when the setting leaves its class
+ *  ungraded. The same rule `grade` applies to the score. */
+function blockGrade(scene: Scene, b: Block): Grade {
+  if (!isGraded(b.targetKind, scene.ignoreConstruction === true)) return "none";
+  return gradeOf(b.units, b.targetUnits, scene.tolerance);
+}
 
 /** Grade a measured/target unit pair. Shared with the report table so the
  *  chart and the numbers below it never disagree about what counts as clean. */
@@ -173,6 +181,8 @@ export interface Scene {
   palette: Palette;
   view: ViewMode;
   tolerance: number;
+  /** Leave a character's elements and inner gaps ungraded. */
+  ignoreConstruction?: boolean;
   scrollX: number;
   viewport: Viewport;
   durationSec: number;
@@ -517,7 +527,7 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
     if (slot.actual) drawMarks(ctx, scene, slot.actual, bx, row.row, false);
     else drawGhost(ctx, scene, bx, it.bodyW, row.row);
 
-    drawGradeStrip(ctx, scene, slot, bx, it.bodyW, row.grade);
+    drawGradeStrip(ctx, scene, slot, bx, it.bodyW, it.x, it.youGapW, row.grade);
   }
 }
 
@@ -570,6 +580,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
     const u = lane.layout.unitSec;
     const ppu = lane.layout.ppu;
     const blank = lane.blank === true;
+    const packed = { right: -Infinity };
 
     for (const it of lane.layout.items) {
       const slot = it.slot;
@@ -581,6 +592,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
 
       if (g) drawGap(ctx, scene, g, it.x - gw, gw, row.row, false);
       drawMarks(ctx, scene, slot.actual, it.x, row.row, false);
+      drawGradeStrip(ctx, scene, slot, it.x, w, it.x - gw, gw, row.grade, packed);
 
       // Only the attempt being read carries text; the others have no band to
       // put it in, and writing it anyway would land it on somebody else's row.
@@ -686,7 +698,7 @@ function drawGap(
   if (!gap || w <= 0) return;
   const C = scene.palette;
   const y = yTop + (ROW_H - MARK_H) / 2;
-  const grade = isTarget ? "none" : gradeOf(gap.units, gap.targetUnits, scene.tolerance);
+  const grade = isTarget ? "none" : blockGrade(scene, gap);
   const rest = isRest(gap);
   const color = rest
     ? C.rest
@@ -843,8 +855,8 @@ function drawCountIn(ctx: Ctx2D, scene: Scene): void {
  * into counting elements instead of keeping time.
  *
  * What the markers say is in the space between them. What the color says is
- * whether that character landed where it should have: the same verdict the
- * grade strip carries, its own elements and the gap that led into it, because
+ * whether that character landed where it should have: the worst of the grade
+ * strip's two verdicts, its own elements and the gap that led into it, because
  * arriving late is exactly the fault this view exists to show. */
 function drawCharMarker(
   ctx: Ctx2D,
@@ -862,7 +874,7 @@ function drawCharMarker(
     const blocks = ch.leadGap ? [...ch.blocks, ch.leadGap] : ch.blocks;
     for (const b of blocks) {
       if (b.targetUnits <= 0) continue;
-      const g = gradeOf(b.units, b.targetUnits, scene.tolerance);
+      const g = blockGrade(scene, b);
       if (g === "bad" || (g === "warn" && worst === "ok")) worst = g;
     }
   }
@@ -940,7 +952,7 @@ function drawMarks(
     } else {
       const grade = isTarget
         ? "none"
-        : gradeOf(b.units, b.targetUnits, scene.tolerance);
+        : blockGrade(scene, b);
       ctx.fillStyle = isTarget
         ? C.tgt
         : grade === "warn"
@@ -985,31 +997,54 @@ function drawGhost(
   ctx.setLineDash([]);
 }
 
-/** The per-character verdict: the worst grade among its own blocks. */
+/** Least space between two verdicts in a packed strip, in pixels. */
+const STRIP_SPACE = 4;
+
+/** The grade strip for one slot: each verdict over the thing it grades.
+ *
+ * The gap before the character gets its own verdict, over the gap, from
+ * `gapX` for `gapW`. The character gets one for its elements and inner gaps,
+ * over the character, unless construction is ignored. A character with no
+ * graded gap before it, such as the first, has no gap verdict.
+ *
+ * With `packed`, a verdict that would overlap the last one drawn in the row is
+ * left out. On a time axis a fast character is narrow, and at a zoom that fits
+ * a long recording its neighbors' verdicts would run into each other. */
 function drawGradeStrip(
   ctx: Ctx2D,
   scene: Scene,
   slot: Slot,
   x: number,
   w: number,
+  gapX: number,
+  gapW: number,
   y: number,
+  packed?: { right: number },
 ): void {
   if (!slot.actual || !slot.ideal) return; // nothing to compare
-  // Never "none": this only runs when both sides have a character, and every
-  // block of a real character carries a target.
-  let worst: "ok" | "warn" | "bad" = "ok";
-  const blocks = [...slot.actual.blocks];
-  if (slot.actual.leadGap) blocks.push(slot.actual.leadGap);
-  for (const b of blocks) {
-    const g = gradeOf(b.units, b.targetUnits, scene.tolerance);
-    if (g === "bad") worst = "bad";
-    else if (g === "warn" && worst !== "bad") worst = "warn";
-  }
-  ctx.fillStyle = scene.palette[worst];
   ctx.font = `600 9px ${scene.palette.mono}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(GRADE_MARK[worst], x + w / 2, y + GRADE_H / 2);
+  const mark = (blocks: readonly Block[], cx: number) => {
+    let worst: "ok" | "warn" | "bad" = "ok";
+    for (const b of blocks) {
+      const g = blockGrade(scene, b);
+      if (g === "bad") worst = "bad";
+      else if (g === "warn" && worst !== "bad") worst = "warn";
+    }
+    const text = GRADE_MARK[worst];
+    if (packed) {
+      const half = ctx.measureText(text).width / 2;
+      if (cx - half < packed.right + STRIP_SPACE) return;
+      packed.right = cx + half;
+    }
+    ctx.fillStyle = scene.palette[worst];
+    ctx.fillText(text, cx, y + GRADE_H / 2);
+  };
+
+  const lead = slot.actual.leadGap;
+  if (lead && lead.targetUnits > 0) mark([lead], gapX + gapW / 2);
+  if (scene.ignoreConstruction !== true) mark(slot.actual.blocks, x + w / 2);
 }
 
 /** Cumulative timing drift: how far behind or ahead of the ideal clock you have
@@ -1157,11 +1192,9 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
             // brightness rather than a second hue.
             scene.heard === "tgt" || scene.picking === "tgt" ? C.ink : C.tgt,
           ],
-          /* One name per attempt. "YOU" only while there is one of them —
-             with a stack, which attempt a row is is the thing you need from
-             this band, and four rows all called YOU would not say it. Numbered
-             from one, in the order they were recorded, because that is what
-             the Drop button calls them too. */
+          /* One name per attempt, numbered from one in the order they were
+             recorded, because that is what the Drop button calls them too.
+             "YOU" only on a lone row with nothing recorded in it. */
           ...scene.runs.map(
             (lane, r) =>
               [
@@ -1170,7 +1203,7 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
                    attempt keeps the first case, which is what leaves a single
                    run drawing exactly as it always has. */
                 scene.rows.runs[r]!.row + (graded ? 9 : ROW_H / 2),
-                scene.runs.length === 1 ? "YOU" : `RUN ${lane.ordinal + 1}`,
+                scene.runs.length === 1 && lane.blank ? "YOU" : `RUN ${lane.ordinal + 1}`,
                 r === scene.selected
                   ? C.you
                   : r === scene.picking

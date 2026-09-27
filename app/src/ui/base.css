@@ -78,6 +78,12 @@ header {
   padding: 14px 20px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
+  /* Pinned to the top as the page scrolls, so the way to record, start a
+     session or open the settings is always in reach. Under the chart's
+     tooltip (10) and the sheets (40 and up), over everything else. */
+  position: sticky;
+  top: 0;
+  z-index: 8;
 }
 h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* The foot of the header: what the recording is called, and how it is being
@@ -110,7 +116,16 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    a word rather than as a button so it reads as the title it is, but it is a
    real <button> underneath — a clickable <h1> that is not focusable is a
    control only a mouse can reach. */
-.brand { display: flex; align-items: center; gap: 10px; }
+/* On the first line at a control's height, not centered in the header: a
+   control that wraps to a second line makes the header taller, and the brand
+   stays where it was. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  min-height: var(--control-h);
+}
 .brandmark {
   display: block;
   background: none;
@@ -151,8 +166,17 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
      — so on a narrow screen the choice is between a second line and a line
      that runs off the edge of the page. */
   flex-wrap: wrap;
+  /* Takes the width left beside the brand and wraps inside it, so a control
+     that appears at the end of the row moves only itself to a second line. A
+     basis of its full width would drop the whole row below the brand. */
+  flex: 1 1 0;
+  min-width: 0;
 }
 .recordbar .hint { white-space: nowrap; }
+/* A select is as wide as its longest option, and a microphone's name has no
+   limit. Capped at the row, so a long one is cut short instead of running
+   past the edge of the page. */
+.recordbar > select { max-width: 100%; min-width: 0; }
 /* Never narrower than what is written on them, and never re-flowed inside
    their own borders. Left to shrink, "New session" broke across two lines and
    made the whole band taller to fit one button's second word. */
@@ -304,10 +328,14 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    with them. Quiet until it is under the pointer: it throws a recording away,
    and a red button standing permanently beside your scores reads as a warning
    about the scores. */
-.droprun {
+/* The run's actions, together at the end of the head row. */
+.runactions {
   margin-left: auto;
-  color: var(--ink-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.droprun { color: var(--ink-dim); }
 /* The border is what every other button changes on hover, and it is enough.
    The glyph staying put is also what keeps this one from flashing red at you
    for passing over it. */
@@ -448,14 +476,27 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   background: var(--panel);
 }
 
-/* A word button just left of the corner button, on its center line. */
-.cornerside {
-  position: absolute;
-  top: 14px;
-  right: calc(20px + var(--control-h) + 8px);
-  z-index: 5;
-  font-size: 12px;
-  padding: 0 10px;
+/* Advanced and the chart-settings cog, together at the right end of the
+   header's first line. In the flow, so the row beside it takes the width left
+   of it rather than running underneath. Ordered before the filename row, which
+   comes after it in the markup but belongs on a line below. */
+.cornergroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  align-self: flex-start;
+  order: 1;
+}
+.cornergroup .cornerbtn { position: static; }
+.cornergroup button:not(.iconbtn) { font-size: 12px; padding: 0 10px; }
+.srcrow { order: 2; }
+/* On a narrow screen the row takes a whole line, so the group goes beside the
+   brand on the first line and the row below it. After the rules above, which
+   it overrides. */
+@media (max-width: 700px) {
+  .cornergroup { order: 0; }
+  .recordbar { order: 1; }
 }
 
 /* The band the corner button opens, under the header and above everything the
@@ -2110,6 +2151,10 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 }
 .calpick select { font-size: 12px; padding: 4px 28px 4px 8px; max-width: 22ch; }
 .calpick .hint { font-size: 11px; }
+/* Out of the flow while empty, so it adds no gap before the next control.
+   Not hidden: a live region that is not rendered does not announce what is
+   written into it. */
+.calpick .hint:empty { position: absolute; }
 /* Smaller than the buttons in the bar it sits in, because it belongs to the
    setup rather than to the row of actions — Record and New session are what
    this header is for, and a third button their size would read as a third

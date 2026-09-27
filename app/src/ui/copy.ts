@@ -168,6 +168,11 @@ export const CAPTION_ALL_HELP =
   "being read. The band is reserved either way, so nothing moves — what you " +
   "get is every decode at once.";
 
+export const IGNORE_CONSTRUCTION_HELP =
+  "Grade only the spacing between characters and between words. An " +
+  "automatic keyer forms each character, so its dits, dahs and inner gaps " +
+  "are left out of the score, the tables and the chart.";
+
 export const ADVANCED_GRADING_HELP =
   "The three tables under the chart: every class with its jitter, the " +
   "deviations worth working on, and what came out against what you meant. " +

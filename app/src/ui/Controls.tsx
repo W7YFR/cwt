@@ -14,10 +14,11 @@
 import { useCallback, useState } from "react";
 import { IconCog, IconPlay, IconStop } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
-import type { ReviewSettings, ViewMode } from "@/types";
+import type { ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import {
   ADVANCED_GRADING_HELP,
+  IGNORE_CONSTRUCTION_HELP,
   CAPTION_ALL_HELP,
   CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
@@ -39,6 +40,22 @@ import {
   PACE_LEAD_HELP,
   ZOOM_HELP,
 } from "./copy";
+
+/** The range of both speed sliders. */
+export const SPEED_MIN = 5;
+export const SPEED_MAX = 45;
+
+/** Target speeds that match a run's measured ones, as the sliders can hold
+ *  them: whole words per minute, in range, overall never above character.
+ *  Null when the run gives no speed to fit. */
+export function fitSpeed(
+  measured: Timing,
+): { charWpm: number; farnsworthWpm: number } | null {
+  if (!(measured.charWpm > 0) || !(measured.farnsworthWpm > 0)) return null;
+  const clamp = (v: number, hi: number) => Math.min(Math.max(Math.round(v), SPEED_MIN), hi);
+  const charWpm = clamp(measured.charWpm, SPEED_MAX);
+  return { charWpm, farnsworthWpm: clamp(measured.farnsworthWpm, charWpm) };
+}
 import {
   PACE_LEAD_MAX_SEC,
   PACE_LEAD_MIN_SEC,
@@ -114,8 +131,8 @@ export function Controls(props: ControlsProps): React.ReactElement {
         <input
           type="range"
           id="wpm"
-          min={5}
-          max={45}
+          min={SPEED_MIN}
+          max={SPEED_MAX}
           step={1}
           value={s.charWpm}
           onChange={(e) => onChange({ charWpm: Number(e.target.value) })}
@@ -129,7 +146,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
         <input
           type="range"
           id="farns"
-          min={5}
+          min={SPEED_MIN}
           /* Overall speed cannot exceed character speed, so the slider's
              ceiling follows the other one rather than letting the pair go
              invalid and silently clamping behind your back. */
@@ -550,6 +567,23 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                   </div>
                 </>
               )}
+            </div>
+          </div>
+
+          <div className="panelrow" data-panel="grading">
+            <span className="uplabel">Grading</span>
+            <div className="panelgroups">
+              <div className="group">
+                <label className="check" title={IGNORE_CONSTRUCTION_HELP}>
+                  <input
+                    type="checkbox"
+                    id="ignore-construction"
+                    checked={s.ignoreConstruction}
+                    onChange={(e) => onChange({ ignoreConstruction: e.target.checked })}
+                  />{" "}
+                  Ignore character construction
+                </label>
+              </div>
             </div>
           </div>
 

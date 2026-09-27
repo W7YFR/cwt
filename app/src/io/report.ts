@@ -68,6 +68,8 @@ export interface JsonReport {
        the duration and element counts would look like a different message. */
     times: number;
     collapse_rests: boolean;
+    /** Only the spacing between characters and words was graded. */
+    ignore_character_construction: boolean;
     /* Which microphone profile the timings came from, and what it corrected
        by. Null is a real and common answer — no calibration — and is written
        out rather than omitted, so a reader can tell "not calibrated" from "a
@@ -148,6 +150,7 @@ export function buildJsonReport(
       // consistency figure and the deviation list. Recording it is what keeps
       // two dumps of the same session comparable.
       collapse_rests: settings.collapseRests,
+      ignore_character_construction: settings.ignoreConstruction,
       calibration: take.profile
         ? {
             profile: take.profile.nickname,

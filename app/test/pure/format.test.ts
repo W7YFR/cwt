@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { fmtElapsed, fmtGain, fmtPpu, fmtTolerance, fmtWpm } from "@/ui/format";
+import { fmtElapsed, fmtGain, fmtPpu, fmtTolerance, fmtWpm, downloadStem } from "@/ui/format";
 
 describe("the recording clock", () => {
   it("is the same width from the first tenth to the last", () => {
@@ -41,3 +41,24 @@ describe("the control readouts", () => {
     expect(constant(fmtPpu, [4, 9.5, 12, 18.9])).toBe(1);
   });
 });
+
+describe("a download's filename", () => {
+  it("names the source, the run, and both target speeds", () => {
+    expect(downloadStem("microphone", 2, { charWpm: 25, farnsworthWpm: 10 })).toBe(
+      "microphone-run2-25wpm-10farns",
+    );
+  });
+
+  it("rounds the speeds, as the sliders show them", () => {
+    expect(downloadStem("cq.wav", 1, { charWpm: 24.79, farnsworthWpm: 10.31 })).toBe(
+      "cq-run1-25wpm-10farns",
+    );
+  });
+
+  it("differs between runs and between speeds", () => {
+    const at = (run: number, c: number, f: number) =>
+      downloadStem("microphone", run, { charWpm: c, farnsworthWpm: f });
+    expect(new Set([at(1, 25, 10), at(2, 25, 10), at(1, 25, 12), at(1, 20, 10)]).size).toBe(4);
+  });
+});
+

@@ -182,14 +182,22 @@ export function estimateTiming(
   const markCenters = kmeans1d(marks, 2);
   let unit: number;
   let ditDahSplit: number;
-  if (markCenters.length === 2) {
+  /* How much the detector cuts from each mark. The silence after a mark gains
+     the same amount, so a gap is read `offset` longer than it was keyed. */
+  let offset = 0;
+  /* Centers under 2:1 apart are one kind of mark split in two, as in a drill
+     of dits alone, so there is no dah to measure against. */
+  if (markCenters.length === 2 && markCenters[1]! >= 2 * markCenters[0]!) {
     const ditC = markCenters[0]!;
     const dahC = markCenters[1]!;
-    // Combine both estimates of the unit; a dah is three of them.
-    unit = (ditC + dahC / 3) / 2;
+    /* A dah is two units longer than a dit. The detector adds or removes a
+       fixed amount on every mark, and the difference cancels it: on a clean
+       synthesized signal, (dit + dah/3) / 2 read 21.3 wpm for 20. */
+    unit = (dahC - ditC) / 2;
     ditDahSplit = (ditC + dahC) / 2;
+    offset = unit - ditC;
   } else {
-    unit = markCenters[0]!;
+    unit = median(marks);
     ditDahSplit = unit * 2;
   }
 
@@ -204,8 +212,11 @@ export function estimateTiming(
   const inter = gaps.filter((g) => g >= elementCharSplit);
 
   let charGap = unit * 3;
+  // Where the character-vs-word threshold sits on the measured silences.
+  let gapOffset = 0;
   if (inter.length > 0) {
-    charGap = dominantGap(inter);
+    charGap = dominantGap(inter) - offset;
+    gapOffset = offset;
     /* dominantGap returns the most populous inter-character silence and calls
        it the character gap, which holds for ordinary text. It does not hold
        for a single-letter drill: "A B C D E F" has no character gaps at all,
@@ -225,7 +236,7 @@ export function estimateTiming(
     }
   }
   const wordGap = charGap * (7 / 3);
-  const charWordSplit = charGap * (5 / 3);
+  const charWordSplit = charGap * (5 / 3) + gapOffset;
 
   const farns = farnsworthFromCharGap(charWpm, charGap);
 

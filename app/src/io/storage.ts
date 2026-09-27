@@ -388,6 +388,7 @@ export interface Prefs {
   charMarkers?: boolean;
   runScores?: boolean;
   advancedGrading?: boolean;
+  ignoreConstruction?: boolean;
   showDownloads?: boolean;
   showHints?: boolean;
   showChartControls?: boolean;
@@ -511,6 +512,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   charMarkers: isBool,
   runScores: isBool,
   advancedGrading: isBool,
+  ignoreConstruction: isBool,
   showDownloads: isBool,
   showHints: isBool,
   showChartControls: isBool,

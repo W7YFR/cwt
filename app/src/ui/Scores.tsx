@@ -12,6 +12,7 @@ import type { Review, ReviewSettings, Take } from "@/types";
 import { ACCURATE_BANDS, CONSISTENT_BANDS, scoreBand } from "@/timing";
 import { fmtSeconds } from "./format";
 import { isBlankTake } from "@/io/take";
+import { fitSpeed } from "./Controls";
 
 export interface ScoresProps {
   review: Review;
@@ -24,6 +25,8 @@ export interface ScoresProps {
    * at. Deciding to drop a run is something you do while looking at its
    * numbers, so the control belongs where the numbers are. */
   onDrop?: (() => void) | undefined;
+  /** Set the target speeds to the ones this run was sent at. */
+  onFit?: (() => void) | undefined;
   /** Which attempt these figures are, counted the way the chart counts. */
   runOf?: { at: number; of: number } | undefined;
 }
@@ -33,30 +36,41 @@ export function Scores({
   settings,
   take,
   onDrop,
+  onFit,
   runOf,
 }: ScoresProps): React.ReactElement {
   const g = review.analysis;
   const c = review.comparison;
   const m = take.measured;
 
-  const runName = runOf && runOf.of > 1 && (
+  const blank = isBlankTake(take);
+  const runName = runOf && (runOf.of > 1 || !blank) && (
     /* Which attempt these figures are about.
        Everything in this band, and every table under it, is one run — and with
        a stack on the chart which one was only findable by noticing where the
        caption band had moved to. Named the way the chart names it, and in the
        color the chart lights it, so the row and its numbers are one thing.
-       Absent with a single attempt, where there is nothing for it to be
-       distinguished from. */
+       Absent only from a lone attempt with nothing recorded in it. */
     <div className="score runname" data-testid="run-name">
       <b>Run {runOf.at + 1}</b>
     </div>
   );
 
-  const drop = onDrop && runOf && runOf.of > 1 && (
+  const fit = onFit && (
+    <button
+      className="fitwpm"
+      onClick={onFit}
+      disabled={fitSpeed(m) === null}
+      data-testid="fit-wpm"
+      title="Set the target speeds to the ones this run was sent at"
+    >
+      Fit WPM
+    </button>
+  );
+
+  const drop = onDrop && runOf && (
     /* At the end of the head row: it is an action rather than a reading, and
-       it throws a recording away. Only where there is a rest of the session to
-       keep — with one attempt on screen, dropping it and clearing are the same
-       act. */
+       it throws a recording away. */
     <button
       className="iconbtn droprun"
       onClick={onDrop}
@@ -91,7 +105,7 @@ export function Scores({
    * always the same three things and the way out of the run, and everything
    * that supports them is under it. Each row still wraps within itself, which
    * is the only wrapping left that tells you nothing. */
-  if (isBlankTake(take)) {
+  if (blank) {
     return (
       <div className="scores" data-testid="scores" data-blank="true">
         <div className="scorehead">
@@ -147,7 +161,12 @@ export function Scores({
           </div>
         )}
 
-        {drop}
+        {(fit || drop) && (
+          <div className="runactions">
+            {fit}
+            {drop}
+          </div>
+        )}
       </div>
 
       <div className="scoredetail">

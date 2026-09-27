@@ -6,10 +6,10 @@
  * be thrown away without taking the session with it.
  */
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useTake } from "@/ui/useTake";
-import { MIC_SOURCE } from "@/io/take";
+import { MIC_SOURCE, isBlankTake } from "@/io/take";
 import { loadPrefs, savePrefs } from "@/io/storage";
 import { caseNamed, CLEAN, SLOPPY } from "../fixture";
 import { oracleSegments } from "../oracle";
@@ -182,6 +182,17 @@ describe("a practice session", () => {
     expect(result.current.loaded!.take.id).toBe(last);
   });
 
+  it("leaves an empty session at the same settings when the only attempt is dropped", () => {
+    const { result } = renderHook(() => useTake());
+    record(result, SLOPPY, "r1");
+    act(() => result.current.setSettings({ expected: "PARIS" }));
+
+    act(() => result.current.dropRun(0));
+    expect(result.current.runs).toHaveLength(1);
+    expect(isBlankTake(result.current.loaded!.take)).toBe(true);
+    expect(result.current.settings.expected).toBe("PARIS");
+  });
+
   it("starts over when the whole session is cleared", () => {
     const { result } = renderHook(() => useTake());
     record(result, SLOPPY, "r1");
@@ -328,3 +339,19 @@ describe("the speed a session declares", () => {
   });
 });
 
+describe("ignoring character construction", () => {
+  it("survives a reload", () => {
+    vi.useFakeTimers();
+    try {
+      const first = renderHook(() => useTake());
+      act(() => first.result.current.setSettings({ ignoreConstruction: true }));
+      act(() => vi.advanceTimersByTime(1000));
+      first.unmount();
+
+      const { result } = renderHook(() => useTake());
+      expect(result.current.settings.ignoreConstruction).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

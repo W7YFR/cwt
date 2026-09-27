@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { recordingCtx } from "../recording-ctx";
-import { caseNamed, reviewFrom, CLEAN, FARNSWORTH, SLOPPY } from "../fixture";
+import { caseNamed, longElements, reviewFrom, CLEAN, FARNSWORTH, SLOPPY } from "../fixture";
 import {
   buildLayout,
   charWidth,
@@ -28,6 +28,7 @@ import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/
 import { FALLBACK_PALETTE } from "@/render/theme";
 import {
   CAPTION_GLYPH_W,
+  GRADE_H,
   GUTTER,
   MARK_H,
   CLOCK_MARKER_MIN_W,
@@ -1084,7 +1085,8 @@ describe("drawing", () => {
     expect(ctx.ofType("clearRect").length).toBe(1);
     // The gutter is drawn last and outside the content clip, so nothing can
     // slide underneath the track labels.
-    expect(ctx.texts()).toContain("YOU");
+    // A recorded run is named by number. Overlay keeps YOU as its color key.
+    expect(ctx.texts()).toContain(view === "overlay" ? "YOU" : "RUN 1");
     expect(ctx.texts()).toContain("TGT");
     expect(ctx.texts()).toContain("DRIFT");
   });
@@ -1250,6 +1252,102 @@ describe("drawing", () => {
       .ofType("fillRect")
       .find((c) => c.args[1] === lane.grade && c.args[3] === lane.bottom - lane.grade);
     expect(wash).toBeUndefined();
+  });
+
+  it.each([false, true])(
+    "puts each verdict over what it grades (construction ignored: %s)",
+    (ignoreConstruction) => {
+      const { take, settings } = longElements();
+      const review = reviewTake(take, { ...settings, ignoreConstruction });
+      const scene = { ...sceneFor(review, "per-char", 12, 20000), ignoreConstruction };
+      const ctx = recordingCtx();
+      draw(ctx, scene);
+      const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
+      const drawn = ctx
+        .ofType("fillText")
+        .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
+        .map((c) => c.args[0]);
+      /* A gap verdict over each graded gap, so none before the first
+         character, and a character verdict over each character unless its
+         construction is ignored. */
+      const want = scene.layout.items
+        .filter((it) => it.slot.actual && it.slot.ideal)
+        .flatMap((it) => [
+          ...((it.slot.actual!.leadGap?.targetUnits ?? 0) > 0 ? [it.x! + it.youGapW / 2] : []),
+          ...(ignoreConstruction ? [] : [it.x! + it.gapW + it.bodyW / 2]),
+        ]);
+      expect(want.length).toBeGreaterThan(0);
+      expect(drawn).toEqual(want);
+    },
+  );
+
+  it.each([false, true])(
+    "puts each verdict over what it grades on a time axis (construction ignored: %s)",
+    (ignoreConstruction) => {
+      const { take, settings } = longElements();
+      const review = reviewTake(take, { ...settings, ignoreConstruction });
+      const scene = { ...sceneFor(review, "absolute", 40, 40000), ignoreConstruction };
+      const ctx = recordingCtx();
+      draw(ctx, scene);
+      const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
+      const drawn = ctx
+        .ofType("fillText")
+        .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
+        .map((c) => c.args[0]);
+      // On this axis a gap is drawn just left of the character it leads into.
+      const u = scene.layout.unitSec;
+      const want = scene.layout.items
+        .filter((it) => it.slot.actual && it.slot.ideal && it.x !== null)
+        .flatMap((it) => {
+          const ch = it.slot.actual!;
+          const gap = ch.leadGap;
+          const gw = gapWidth(gap, 40);
+          const w = ((ch.t1 - ch.t0) / u) * 40;
+          return [
+            ...((gap?.targetUnits ?? 0) > 0 ? [it.x! - gw / 2] : []),
+            ...(ignoreConstruction ? [] : [it.x! + w / 2]),
+          ];
+        });
+      expect(want.length).toBeGreaterThan(0);
+      expect(drawn).toHaveLength(want.length);
+      drawn.forEach((x, i) => expect(x).toBeCloseTo(want[i]!, 6));
+    },
+  );
+
+  it("leaves out verdicts that would overlap on a crowded time axis", () => {
+    const { take, settings } = longElements();
+    const review = reviewTake(take, settings);
+    const verdicts = (ppu: number) => {
+      const scene = sceneFor(review, "absolute", ppu, 40000);
+      const ctx = recordingCtx();
+      draw(ctx, scene);
+      const y = scene.rows.runs[0]!.grade + GRADE_H / 2;
+      return ctx
+        .ofType("fillText")
+        .filter((c) => c.args[1] === y && ["OK", "~", "**"].includes(c.text ?? ""))
+        .map((c) => ({ x: c.args[0] as number, half: ctx.measureText(c.text!).width / 2 }));
+    };
+    const wide = verdicts(40);
+    const tight = verdicts(2);
+    expect(tight.length).toBeLessThan(wide.length);
+    for (let i = 1; i < tight.length; i++) {
+      expect(tight[i]!.x - tight[i]!.half).toBeGreaterThanOrEqual(tight[i - 1]!.x + tight[i - 1]!.half);
+    }
+  });
+
+  it("stops coloring elements when character construction is ignored", () => {
+    const { take, settings } = longElements();
+    const flagged = (ignoreConstruction: boolean) => {
+      const review = reviewTake(take, { ...settings, ignoreConstruction });
+      const ctx = recordingCtx();
+      draw(ctx, { ...sceneFor(review, "per-char", 12, 20000), ignoreConstruction });
+      const colors = new Set([FALLBACK_PALETTE.bad, FALLBACK_PALETTE.warn]);
+      return ctx.ofType("fill").filter((c) => colors.has(c.fill)).length;
+    };
+    const before = flagged(false);
+    const after = flagged(true);
+    expect(before).toBeGreaterThan(0);
+    expect(after).toBeLessThan(before);
   });
 
   it("leaves a clean recording's chart free of bad-colored marks", () => {

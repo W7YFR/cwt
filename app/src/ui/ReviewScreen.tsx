@@ -20,7 +20,13 @@ import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
-import { ChartSettingsButton, ChartSettingsPanel, Controls, ViewControls } from "./Controls";
+import {
+  ChartSettingsButton,
+  ChartSettingsPanel,
+  Controls,
+  ViewControls,
+  fitSpeed,
+} from "./Controls";
 import { FlashCard } from "./FlashCard";
 import { ZenMode } from "./ZenMode";
 import { beatsFor, pacedEnd, pacedStart, wordsFor, type Word } from "./pacing";
@@ -33,7 +39,7 @@ import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { reviewTake } from "@/timing";
 import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
-import { baseName } from "./format";
+import { downloadStem } from "./format";
 import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
 
@@ -86,6 +92,58 @@ export interface ReviewScreenProps {
   onBack(): void;
 }
 
+/** How long the settings panel takes to roll open or shut; see `.chartsettings`. */
+const ROLL_MS = 200;
+
+function reducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+/** CSS `ease`, the curve the panel rolls on: cubic-bezier(0.25, 0.1, 0.25, 1),
+ *  solved for the curve's y at time `x`. */
+function ease(x: number): number {
+  const [x1, y1, x2, y2] = [0.25, 0.1, 0.25, 1];
+  const at = (t: number, a: number, b: number) =>
+    3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (at(mid, x1, x2) < x) lo = mid;
+    else hi = mid;
+  }
+  return at((lo + hi) / 2, y1, y2);
+}
+
+/** Scroll the page to `top` on the panel's own timing and curve, so the roll
+ *  and the scroll are one movement. At once when motion is reduced.
+ *
+ * Scroll anchoring is off while it runs. The panel changes height above the
+ * part of the page on show, and anchoring would move the page to make up for
+ * it, against the scroll. */
+function scrollPage(scroller: Element, top: number): void {
+  const root = document.documentElement;
+  const from = scroller.scrollTop;
+  const to = Math.max(0, top);
+  if (from === to) return;
+  root.style.overflowAnchor = "none";
+  if (reducedMotion()) {
+    /* Before the panel's change has rendered, so anchoring stays off until
+       two frames later, when it has. */
+    scroller.scrollTop = to;
+    requestAnimationFrame(() => requestAnimationFrame(() => (root.style.overflowAnchor = "")));
+    return;
+  }
+  const t0 = performance.now();
+  const step = (now: number) => {
+    const p = Math.min(1, (now - t0) / ROLL_MS);
+    scroller.scrollTop = from + (to - from) * ease(p);
+    if (p < 1) requestAnimationFrame(step);
+    else root.style.overflowAnchor = "";
+  };
+  requestAnimationFrame(step);
+}
+
 function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -132,6 +190,35 @@ export function ReviewScreen({
      you are looking rather than anything about the chart, and it has no
      business outliving the page or riding along in a saved report. */
   const [chartSettings, setChartSettings] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  /* Where the page was when opening the settings scrolled it, or null when
+     opening them scrolled nothing. Closing them goes back there. */
+  const returnTo = useRef<number | null>(null);
+
+  /* The header is pinned, so from further down the page the panel opens out of
+     sight above it. Opening scrolls up just far enough to show it, and closing
+     goes back to where you were. */
+  const toggleChartSettings = useCallback(() => {
+    const scroller = document.scrollingElement ?? document.documentElement;
+    const header = headerRef.current;
+    const panel = panelRef.current;
+    if (!chartSettings) {
+      const hidden = header && panel
+        ? header.getBoundingClientRect().bottom - panel.getBoundingClientRect().top
+        : 0;
+      if (hidden > 1) {
+        returnTo.current = scroller.scrollTop;
+        scrollPage(scroller, scroller.scrollTop - hidden);
+      }
+      setChartSettings(true);
+      return;
+    }
+    setChartSettings(false);
+    const back = returnTo.current;
+    returnTo.current = null;
+    if (back !== null) scrollPage(scroller, back);
+  }, [chartSettings]);
 
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [clock, setClock] = useState<number | null>(null);
@@ -575,7 +662,7 @@ export function ReviewScreen({
     if (ppu !== settings.ppu) onChange({ ppu });
   }, [handle, stackId, onChange, settings.ppu, review]);
 
-  const stem = baseName(loaded.take.source);
+  const stem = downloadStem(loaded.take.source, selected + 1, settings);
 
   const downloadYou = useCallback(async () => {
     const bytes = await audioBytes;
@@ -589,12 +676,12 @@ export function ReviewScreen({
         ...targetOptions,
         rate: loaded.take.rate,
       });
-      saveBlob(blob, `${stem}-target-${Math.round(settings.charWpm)}wpm.wav`);
+      saveBlob(blob, `${stem}-target.wav`);
       setStatus("");
     } catch (e) {
       setStatus(`target render failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, [loaded.take.rate, player, review.ideal, settings.charWpm, stem, targetOptions]);
+  }, [loaded.take.rate, player, review.ideal, stem, targetOptions]);
 
   const downloadPng = useCallback(() => {
     if (!handle.chart) return;
@@ -612,17 +699,13 @@ export function ReviewScreen({
 
   const downloadJson = useCallback(() => {
     const text = `${JSON.stringify(buildJsonReport(review, settings), null, 2)}\n`;
-    saveBlob(new Blob([text], { type: "application/json" }),
-      // The speed is in the name because this is a dump of the *current*
-      // grading, and re-grading at another speed is a click away — two
-      // downloads of one session should not land on the same filename.
-      `${stem}-${Math.round(settings.charWpm)}wpm-report.json`);
+    saveBlob(new Blob([text], { type: "application/json" }), `${stem}-report.json`);
     setStatus("");
   }, [review, settings, stem]);
 
   return (
     <>
-      <header>
+      <header ref={headerRef}>
         <h1 className="brand">
           {/* The name is the way home. Nothing else on this screen is a
               natural "start over", and a review you cannot leave is a dead
@@ -679,25 +762,22 @@ export function ReviewScreen({
         />
 
         {/* The corner of the header, and last in it — which is where the eye
-            finds it and so where the tab order has to reach it. Lifted out of
-            the flow rather than laid out in the row: the corner is the one
-            place that does not move as the page fills and empties, and that is
-            the whole point of putting the way into settings there.
-
-            Configuration used to live here too. That is about one thing — the
-            microphone — and now sits beside Calibrate where it is decided;
-            this is about the page in front of you. */}
-        {/* Beside the cog, and only while it is open. Before it in the DOM,
-            so the cog stays the last stop in the header. */}
-        {chartSettings && (
-          <button className="cornerside" data-testid="advanced" onClick={onConfigure}>
-            Advanced
-          </button>
-        )}
-        <ChartSettingsButton
-          open={chartSettings}
-          onToggle={() => setChartSettings((v) => !v)}
-        />
+            finds it and so where the tab order has to reach it. Advanced and
+            the cog are one group in the flow, pushed to the right end of the
+            first line: they never split, and the rest of the row takes the
+            width left of them. Advanced shows only while the settings are
+            open, before the cog so the cog stays the last stop. */}
+        <div className="cornergroup">
+          {chartSettings && (
+            <button data-testid="advanced" onClick={onConfigure}>
+              Advanced
+            </button>
+          )}
+          <ChartSettingsButton
+            open={chartSettings}
+            onToggle={toggleChartSettings}
+          />
+        </div>
       </header>
 
       {/* Always in the tree, open or not: a band that is only rendered while
@@ -705,7 +785,7 @@ export function ReviewScreen({
           unreachable rather than merely invisible — `inert` takes it out of
           the tab order and off the accessibility tree together, which two
           attributes doing half each would eventually disagree about. */}
-      <section className="chartsettings" data-open={String(chartSettings)}>
+      <section className="chartsettings" data-open={String(chartSettings)} ref={panelRef}>
         <div inert={!chartSettings}>
           <ChartSettingsPanel
             settings={settings}
@@ -737,6 +817,10 @@ export function ReviewScreen({
           settings={settings}
           take={loaded.take}
           onDrop={() => onDropRun(selected)}
+          onFit={() => {
+            const speed = fitSpeed(loaded.take.measured);
+            if (speed) onChange(speed);
+          }}
           runOf={{ at: selected, of: stack.length }}
         />
       </section>

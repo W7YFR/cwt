@@ -21,6 +21,7 @@ import { buildJsonReport } from "@/io/report";
 import { measureCalibration, PROBE, segmentsFrom } from "@/dsp";
 import { normalizePeak } from "../wav";
 import { defaultSettings, reviewTake } from "@/timing";
+import { kmeans1d } from "@/timing/estimate";
 import type { Profile } from "@/io/profiles";
 
 const WPM = 15;
@@ -74,16 +75,28 @@ function open(profile: Profile | null) {
 }
 
 describe.skipIf(!HAVE)("recording through a calibrated setup", () => {
-  it("reads closer to the speed it was keyed at", () => {
+  it("reads the elements closer to the length they were keyed", () => {
     /* The profile was measured from held-paddle drills and this is an ordinary
        message — a recording it has never seen. If the offset only ever
-       corrected the drills it came from, it would be a description of nothing. */
-    const without = open(null).take.measured.charWpm;
-    const withIt = open(profileFor()).take.measured.charWpm;
-    const err = (v: number) => Math.abs(v - WPM);
-    expect(err(withIt), `${withIt.toFixed(2)} wpm against ${without.toFixed(2)}`)
+       corrected the drills it came from, it would be a description of nothing.
+
+       The dits, not the speed: the speed comes from the difference between a
+       dah and a dit, which a fixed offset does not move. */
+    const ditMs = (profile: Profile | null) => {
+      const marks = open(profile).take.segments.filter((s) => s[0] === 1).map((s) => s[1]);
+      return kmeans1d(marks, 2)[0]! * 1000;
+    };
+    const without = ditMs(null);
+    const withIt = ditMs(profileFor());
+    const err = (ms: number) => Math.abs(ms - 1200 / WPM);
+    expect(err(withIt), `${withIt.toFixed(1)} ms against ${without.toFixed(1)}`)
       .toBeLessThan(err(without));
-    expect(err(withIt)).toBeLessThan(1);
+  });
+
+  it("reads the speed it was keyed at, with or without the profile", () => {
+    for (const profile of [null, profileFor()]) {
+      expect(Math.abs(open(profile).take.measured.charWpm - WPM)).toBeLessThan(0.5);
+    }
   });
 
   it("still reads the message correctly", () => {

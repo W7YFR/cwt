@@ -359,6 +359,12 @@ export interface ReviewSettings {
    * read, and the two figures in the scores band answer "how did that go" on
    * their own. */
   advancedGrading: boolean;
+  /** Grade only the spacing between characters and between words.
+   *
+   * An automatic keyer forms each character, so the dits, the dahs and the
+   * gaps inside a character are the keyer's timing rather than the sender's.
+   * On, those are left out of the score, the tables and the chart's marks. */
+  ignoreConstruction: boolean;
   /** Caption every attempt with what it decoded to, rather than only the one
    *  being read.
    *

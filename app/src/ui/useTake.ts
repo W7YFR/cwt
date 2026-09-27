@@ -141,6 +141,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     charMarkers: p.charMarkers ?? base.charMarkers,
     runScores: p.runScores ?? base.runScores,
     advancedGrading: p.advancedGrading ?? base.advancedGrading,
+    ignoreConstruction: p.ignoreConstruction ?? base.ignoreConstruction,
     showDownloads: p.showDownloads ?? base.showDownloads,
     showHints: p.showHints ?? base.showHints,
     showChartControls: p.showChartControls ?? base.showChartControls,
@@ -167,6 +168,7 @@ function personal(prev: ReviewSettings) {
     charMarkers: prev.charMarkers,
     runScores: prev.runScores,
     advancedGrading: prev.advancedGrading,
+    ignoreConstruction: prev.ignoreConstruction,
     showDownloads: prev.showDownloads,
     showHints: prev.showHints,
     showChartControls: prev.showChartControls,
@@ -229,6 +231,7 @@ export function useTake(): TakeState {
          the tables are the answer to "why" — which is the next question after
          a score you did not like. */
       advancedGrading: true,
+      ignoreConstruction: false,
       showDownloads: false,
       showHints: true,
       showChartControls: true,
@@ -310,6 +313,7 @@ export function useTake(): TakeState {
         charMarkers: next.charMarkers,
         runScores: next.runScores,
         advancedGrading: next.advancedGrading,
+        ignoreConstruction: next.ignoreConstruction,
         showDownloads: next.showDownloads,
         showHints: next.showHints,
         showChartControls: next.showChartControls,
@@ -593,13 +597,19 @@ export function useTake(): TakeState {
     setSelected((prev) => (i >= 0 && i < runsRef.current.length ? i : prev));
   }, []);
 
+  /* Dropping the only run leaves an empty session at the same settings, ready
+     for the next attempt, rather than leaving the review. */
   const dropRun = useCallback((i: number) => {
     const rest = runsRef.current.filter((_, k) => k !== i);
+    if (rest.length === 0) {
+      reset();
+      return;
+    }
     runsRef.current = rest;
     setRuns(rest);
     // Land on the attempt that took its place, or the last one if it was.
     setSelected((prev) => Math.max(0, Math.min(prev > i ? prev - 1 : prev, rest.length - 1)));
-  }, []);
+  }, [reset]);
 
   return {
     loaded,

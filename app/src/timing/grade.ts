@@ -9,6 +9,7 @@
 import type {
   Analysis,
   Block,
+  BlockKind,
   ClassStat,
   Deviation,
   GradedKind,
@@ -29,6 +30,17 @@ export const MAX_DEVIATIONS = 12;
 export const MIN_DEVIATION_UNITS = 0.4;
 
 export const DEFAULT_TOLERANCE = 0.3;
+
+/** The classes a keyer forms: a character's elements and the gaps inside it. */
+const CONSTRUCTION_KINDS: ReadonlySet<BlockKind> = new Set(["dit", "dah", "element-gap"]);
+
+/** The classes graded when character construction is ignored. */
+export const SPACING_KINDS = ["char-gap", "word-gap"] as const satisfies readonly GradedKind[];
+
+/** Whether a block's grade counts, given the construction setting. */
+export function isGraded(kind: BlockKind, ignoreConstruction: boolean): boolean {
+  return !(ignoreConstruction && CONSTRUCTION_KINDS.has(kind));
+}
 
 /** Where a score stops reading as good and starts reading as a problem.
  *
@@ -65,12 +77,13 @@ export function grade(
   ref: Timing,
   measured: Timing,
   tolerance: number = DEFAULT_TOLERANCE,
+  ignoreConstruction = false,
 ): Analysis {
   let nPauses = 0;
   const graded: Block[] = [];
   for (const b of timeline.blocks) {
     if (b.targetKind === "pause") nPauses++;
-    if (b.targetUnits > 0) graded.push(b);
+    if (b.targetUnits > 0 && isGraded(b.targetKind, ignoreConstruction)) graded.push(b);
   }
 
   const groups = new Map<string, { vals: number[]; target: number }>();
