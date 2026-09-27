@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- A recording no longer cuts off at five minutes while the message is still being sent. It finishes itself 30 s after the target's end.
+
 ### Development
 
 - `CHANGELOG.md` holds one entry per release. A branch writes its entry under Unreleased, and `make bump` moves it under the new version. CI fails a release with no entry.

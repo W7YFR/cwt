@@ -12,7 +12,7 @@
  * landing page impossible to test on its own.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   listInputs,
   requestMicAccess,
@@ -45,6 +45,9 @@ export interface UseRecorderOptions {
    * nothing to do with what is on screen. The two screens that offer a record
    * button turn it on, and there the key and the button mean the same thing. */
   startKey?: boolean | undefined;
+  /** The longest a recording may run. At this length it finishes itself.
+   *  Unset, the recorder's own safety cap applies. */
+  maxSeconds?: number | undefined;
 }
 
 export interface RecorderHandle {
@@ -126,7 +129,7 @@ function bareR(ev: KeyboardEvent): boolean {
 }
 
 export function useRecorder(options: UseRecorderOptions): RecorderHandle {
-  const { deviceId, onClip, onError, onStart, startKey = false } = options;
+  const { deviceId, maxSeconds, onClip, onError, onStart, startKey = false } = options;
   const [devices, setDevices] = useState<InputDevice[]>([]);
   /** The device list came back with nothing in it worth picking between. */
   const [unnamed, setUnnamed] = useState(false);
@@ -222,6 +225,10 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
         ? true
         : unnamed;
 
+  // The recorder's limit callback is bound when the take starts, so it reads
+  // the finish of the render it fires in.
+  const finishRef = useRef<() => Promise<void>>(async () => {});
+
   const start = useCallback(async () => {
     /* Cleared before the device is opened, not after.
      *
@@ -239,10 +246,12 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     try {
       const rec = await startRecording({
         deviceId,
+        maxSeconds,
         onLevel: (peak, seconds) => {
           setLevel(peak);
           setElapsed(seconds);
         },
+        onLimit: () => void finishRef.current(),
       });
       setRecorder(rec);
       /* A device opened, which is the browser having said yes — the one
@@ -262,7 +271,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       }
       onError(micError(e));
     }
-  }, [deviceId, onError, onStart, refreshDevices]);
+  }, [deviceId, maxSeconds, onError, onStart, refreshDevices]);
 
   const grantAccess = useCallback(async () => {
     try {
@@ -313,6 +322,8 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       setBusy(false);
     }
   }, [onClip, onError, recorder]);
+
+  finishRef.current = finish;
 
   const discard = useCallback(async () => {
     if (!recorder) return;

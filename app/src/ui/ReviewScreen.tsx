@@ -29,7 +29,7 @@ import {
 } from "./Controls";
 import { FlashCard } from "./FlashCard";
 import { ZenMode } from "./ZenMode";
-import { beatsFor, pacedEnd, pacedStart, wordsFor, type Word } from "./pacing";
+import { beatsFor, pacedEnd, pacedStart, recordLimit, wordsFor, type Word } from "./pacing";
 import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
@@ -247,8 +247,10 @@ export function ReviewScreen({
   useEffect(() => () => player.destroy(), [player]);
   const stop = useCallback(() => player.stop(), [player]);
 
+  const maxSeconds = useMemo(() => recordLimit(settings) ?? undefined, [settings]);
   const rec = useRecorder({
     deviceId,
+    maxSeconds,
     onClip: useCallback(
       (clip: AudioClip) => onAudio(clip, MIC_SOURCE, true, null),
       [onAudio],

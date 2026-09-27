@@ -169,7 +169,9 @@ export interface RecordOptions {
   /** Called with the running length, a few times a second. */
   readonly onLevel?: (peak: number, seconds: number) => void;
   /** Safety cap so a forgotten tab cannot fill memory. */
-  readonly maxSeconds?: number;
+  readonly maxSeconds?: number | undefined;
+  /** Called once when the recording reaches `maxSeconds`. */
+  readonly onLimit?: () => void;
 }
 
 export const DEFAULT_MAX_SECONDS = 300;
@@ -240,6 +242,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     total += frame.length;
     if (total >= maxFrames) {
       stopped = true;
+      options.onLimit?.();
       return;
     }
     if (total - lastReport > ctx.sampleRate / 8) {

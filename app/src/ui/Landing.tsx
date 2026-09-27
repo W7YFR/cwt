@@ -34,6 +34,8 @@ export interface LandingProps {
    *  page-wide rather than by this screen — see ui/useFileDrop.ts. */
   onFile(file: File): void;
   onError(message: string): void;
+  /** The longest a recording may run. */
+  maxSeconds?: number | undefined;
   deviceId: string | undefined;
   onDeviceChange(id: string | undefined): void;
   /** Saved calibrations, and which one is being applied. */
@@ -139,6 +141,7 @@ export function Landing(props: LandingProps): React.ReactElement {
 
   const rec = useRecorder({
     deviceId: props.deviceId,
+    maxSeconds: props.maxSeconds,
     onClip: useCallback(
       (clip: AudioClip) => onAudio(clip, MIC_SOURCE, true, null),
       [onAudio],
