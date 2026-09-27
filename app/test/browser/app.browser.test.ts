@@ -804,6 +804,50 @@ const showDownloads = () => tickSetting("show-downloads");
     }
   });
 
+  it("scrolls up to the settings from down the page, and back when they close", async () => {
+    /* The header is pinned, so from further down the page the panel would open
+       out of sight above it. A short window, so the review has room to scroll. */
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    await page.viewport(1400, 420);
+    const scroller = document.scrollingElement ?? document.documentElement;
+    const wait = (ms: number) => act(async () => {
+      await new Promise((res) => setTimeout(res, ms));
+    });
+    try {
+      await served();
+      await mount();
+      const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+      const header = container.querySelector("header")!;
+      const panel = container.querySelector(".chartsettings")!;
+
+      scroller.scrollTop = scroller.scrollHeight;
+      await wait(50);
+      const down = scroller.scrollTop;
+      expect(down, "the review scrolls").toBeGreaterThan(100);
+
+      await act(async () => cog.click());
+      await wait(900);
+      expect(panel.getBoundingClientRect().top, "just under the header").toBeCloseTo(
+        header.getBoundingClientRect().bottom,
+        0,
+      );
+
+      await act(async () => cog.click());
+      await wait(900);
+      expect(scroller.scrollTop, "back where it was").toBeCloseTo(down, 0);
+
+      // From the top there is nothing to scroll to.
+      scroller.scrollTop = 0;
+      await act(async () => cog.click());
+      await wait(900);
+      expect(scroller.scrollTop).toBe(0);
+    } finally {
+      await act(async () => {
+        await page.viewport(w, h);
+      });
+    }
+  });
+
   it("keeps the way out of the help in sight however long the help is", async () => {
     /* The first version let the whole sheet scroll, which put Close below the
        fold — reachable only by reading to the end of something you opened

@@ -92,6 +92,58 @@ export interface ReviewScreenProps {
   onBack(): void;
 }
 
+/** How long the settings panel takes to roll open or shut; see `.chartsettings`. */
+const ROLL_MS = 200;
+
+function reducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+/** CSS `ease`, the curve the panel rolls on: cubic-bezier(0.25, 0.1, 0.25, 1),
+ *  solved for the curve's y at time `x`. */
+function ease(x: number): number {
+  const [x1, y1, x2, y2] = [0.25, 0.1, 0.25, 1];
+  const at = (t: number, a: number, b: number) =>
+    3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (at(mid, x1, x2) < x) lo = mid;
+    else hi = mid;
+  }
+  return at((lo + hi) / 2, y1, y2);
+}
+
+/** Scroll the page to `top` on the panel's own timing and curve, so the roll
+ *  and the scroll are one movement. At once when motion is reduced.
+ *
+ * Scroll anchoring is off while it runs. The panel changes height above the
+ * part of the page on show, and anchoring would move the page to make up for
+ * it, against the scroll. */
+function scrollPage(scroller: Element, top: number): void {
+  const root = document.documentElement;
+  const from = scroller.scrollTop;
+  const to = Math.max(0, top);
+  if (from === to) return;
+  root.style.overflowAnchor = "none";
+  if (reducedMotion()) {
+    /* Before the panel's change has rendered, so anchoring stays off until
+       two frames later, when it has. */
+    scroller.scrollTop = to;
+    requestAnimationFrame(() => requestAnimationFrame(() => (root.style.overflowAnchor = "")));
+    return;
+  }
+  const t0 = performance.now();
+  const step = (now: number) => {
+    const p = Math.min(1, (now - t0) / ROLL_MS);
+    scroller.scrollTop = from + (to - from) * ease(p);
+    if (p < 1) requestAnimationFrame(step);
+    else root.style.overflowAnchor = "";
+  };
+  requestAnimationFrame(step);
+}
+
 function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -138,6 +190,35 @@ export function ReviewScreen({
      you are looking rather than anything about the chart, and it has no
      business outliving the page or riding along in a saved report. */
   const [chartSettings, setChartSettings] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  /* Where the page was when opening the settings scrolled it, or null when
+     opening them scrolled nothing. Closing them goes back there. */
+  const returnTo = useRef<number | null>(null);
+
+  /* The header is pinned, so from further down the page the panel opens out of
+     sight above it. Opening scrolls up just far enough to show it, and closing
+     goes back to where you were. */
+  const toggleChartSettings = useCallback(() => {
+    const scroller = document.scrollingElement ?? document.documentElement;
+    const header = headerRef.current;
+    const panel = panelRef.current;
+    if (!chartSettings) {
+      const hidden = header && panel
+        ? header.getBoundingClientRect().bottom - panel.getBoundingClientRect().top
+        : 0;
+      if (hidden > 1) {
+        returnTo.current = scroller.scrollTop;
+        scrollPage(scroller, scroller.scrollTop - hidden);
+      }
+      setChartSettings(true);
+      return;
+    }
+    setChartSettings(false);
+    const back = returnTo.current;
+    returnTo.current = null;
+    if (back !== null) scrollPage(scroller, back);
+  }, [chartSettings]);
 
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [clock, setClock] = useState<number | null>(null);
@@ -624,7 +705,7 @@ export function ReviewScreen({
 
   return (
     <>
-      <header>
+      <header ref={headerRef}>
         <h1 className="brand">
           {/* The name is the way home. Nothing else on this screen is a
               natural "start over", and a review you cannot leave is a dead
@@ -694,7 +775,7 @@ export function ReviewScreen({
           )}
           <ChartSettingsButton
             open={chartSettings}
-            onToggle={() => setChartSettings((v) => !v)}
+            onToggle={toggleChartSettings}
           />
         </div>
       </header>
@@ -704,7 +785,7 @@ export function ReviewScreen({
           unreachable rather than merely invisible — `inert` takes it out of
           the tab order and off the accessibility tree together, which two
           attributes doing half each would eventually disagree about. */}
-      <section className="chartsettings" data-open={String(chartSettings)}>
+      <section className="chartsettings" data-open={String(chartSettings)} ref={panelRef}>
         <div inert={!chartSettings}>
           <ChartSettingsPanel
             settings={settings}
