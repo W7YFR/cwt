@@ -423,12 +423,23 @@ pull request:
 ```
 make bump:dry   # what this branch would release, nothing written
 make bump       # write it and make the release commit
+make pr         # bump, push, and open the pull request
 ```
+
+Each release has an entry in `CHANGELOG.md`. The branch writes it under
+`## Unreleased`, and `make bump` moves it under `## vX.Y.Z — date` in the
+release commit. `make bump` refuses without an entry, and CI fails a release
+whose version has no entry. A change that touches no build input writes a
+`### Development` entry, which waits under `## Unreleased` for the next
+release. `make pr` titles the pull request `[TYPE] vX.Y.Z` and uses the lines
+the branch wrote as its body. `make release` uses it as the tag message and
+the GitHub release notes.
 
 `scripts/version.mjs` takes the bump from the branch you are standing on —
 `feat/` is a minor, `fix/` and `chore/` are patches, an unrecognized prefix is
 a patch rather than an error. It writes `package.json`, keeps the lockfile in
-step, and commits the pair as `chore: release vX.Y.Z`. That commit rides in
+step, stamps the changelog entry, and commits the three as
+`chore: release vX.Y.Z`. That commit rides in
 with the change, so merging is what publishes the new version, and `main` is
 never written to by a machine.
 
@@ -452,8 +463,9 @@ check, and rebasing on `main` drops the now-duplicate release commit so
 
 Tags are not automatic. After the merge, `make release` switches to `main`,
 fast-forwards it, tags the version it finds there, and pushes that one tag.
-It then offers to delete the local branch you ran it from. Run from `main`, it
-offers the branch that the last merge names.
+Run from a branch, it first stops unless that branch's pull request is merged.
+It then offers to delete the local branch you ran it from, if `main` contains
+it. Run from `main`, it offers the branch that the last merge names.
 `make tag` only tags `HEAD` and pushes nothing.
 
 #### Why CI cannot write anything

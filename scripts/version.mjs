@@ -24,6 +24,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { CHANGELOG, stamp, today, unreleased, verifyEntry } from "./changelog.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PKG = `${ROOT}package.json`;
@@ -364,7 +365,8 @@ const USAGE = `Move the version, or check that a branch already has.
 
 The bump comes from a branch prefix — feat/ is a minor, fix/ and chore/ are
 patches. Run it on your branch before the pull request (\`make bump\`); CI runs
-it with --check and writes nothing.
+it with --check and writes nothing. A release moves the entry under
+'## Unreleased' in CHANGELOG.md to the new version, and refuses without one.
 
   -n, --dry-run       print the next version; write nothing
       --commit        make the release commit (needs an otherwise clean tree)
@@ -469,6 +471,7 @@ function main() {
     process.stderr.write(
       `${already}; nothing to bump\n` +
         `if ${opts.branch ? "the base branch" : "main"} has moved on since, the bump needs redoing:\n` +
+        `  move this branch's CHANGELOG.md entry back under '## Unreleased', then\n` +
         `  node scripts/version.mjs --commit --release ${decision.level}\n`,
     );
     process.stdout.write(`${current}\n`);
@@ -489,7 +492,12 @@ function main() {
 
   report({ version: next, level: decision.level, previous: current });
 
-  if (opts.dry) return;
+  const logText = readFileSync(CHANGELOG, "utf8");
+  if (opts.dry) {
+    const pending = unreleased(logText);
+    process.stderr.write(pending ? `\nCHANGELOG.md entry:\n${pending}\n` : "CHANGELOG.md has nothing under '## Unreleased'\n");
+    return;
+  }
 
   /* Checked before anything is written, not after. The first cut of this asked
      about the tree between writing the files and making the commit, so a run
@@ -497,13 +505,22 @@ function main() {
      outcome nobody asked for. */
   if (opts.commit) assertNothingElsePending();
 
+  /** @type {string} */
+  let stamped;
+  try {
+    stamped = stamp(logText, next, today());
+  } catch (e) {
+    die(/** @type {Error} */ (e).message);
+  }
+
   writeFileSync(PKG, withVersion(pkgText, next));
   writeFileSync(LOCK, lockWithVersion(readFileSync(LOCK, "utf8"), next));
-  process.stderr.write("wrote package.json, package-lock.json\n");
+  writeFileSync(CHANGELOG, stamped);
+  process.stderr.write("wrote package.json, package-lock.json, CHANGELOG.md\n");
 
   if (opts.commit) {
     const subjectLine = `chore: release v${next}`;
-    git("add", "--", PKG, LOCK);
+    git("add", "--", PKG, LOCK, CHANGELOG);
     git("commit", "-m", subjectLine);
     process.stderr.write(`committed ${subjectLine}\n`);
   }
@@ -543,7 +560,17 @@ function check(baseRev, actual, decision) {
   const verdict = verifyBump(base, actual, decision.level);
 
   if (verdict.ok) {
-    process.stderr.write(`${verdict.why} — ${decision.level}, ${decision.reason}\n`);
+    const logged = verifyEntry(readFileSync(CHANGELOG, "utf8"), actual);
+    if (!logged.ok) {
+      die(
+        [
+          `The version moved to ${actual}, but ${logged.why}.`,
+          "",
+          `The release commit carries the entry. Put it under '## v${actual} — <date>' at the top of CHANGELOG.md, below an empty '## Unreleased'.`,
+        ].join("\n"),
+      );
+    }
+    process.stderr.write(`${verdict.why} — ${decision.level}, ${decision.reason}; ${logged.why}\n`);
     process.stdout.write(`${actual}\n`);
     report({ version: actual, level: decision.level, previous: base });
     return;
@@ -557,7 +584,7 @@ function check(baseRev, actual, decision) {
       `This change needs a ${decision.level} bump — ${decision.reason}.`,
       `${short(baseRev)} is at ${base}, so merging should land ${verdict.expected}, but ${verdict.why}.`,
       "",
-      "Run `make bump` on the branch, then push the release commit it makes.",
+      "Write the entry under '## Unreleased' in CHANGELOG.md, run `make bump` on the branch, then push the release commit it makes.",
     ].join("\n"),
   );
 }
@@ -588,15 +615,16 @@ function short(rev) {
  *
  * A release commit is worth having because it contains exactly the version
  * move and nothing else; a tree with other changes in it is a sign the timing
- * is wrong rather than a thing to work around. package.json and the lockfile
- * are exempt because they are what this script is here to change.
+ * is wrong rather than a thing to work around. package.json, the lockfile and
+ * CHANGELOG.md are exempt because they are what this script is here to change.
+ * The changelog entry may arrive uncommitted and land in the release commit.
  *
  * @returns {void} */
 function assertNothingElsePending() {
   const dirty = git("status", "--porcelain")
     .split("\n")
     .filter(Boolean)
-    .filter((l) => !/package(-lock)?\.json$/.test(l));
+    .filter((l) => !/(package(-lock)?\.json|CHANGELOG\.md)$/.test(l));
   if (dirty.length) die(`the tree has other changes; commit or stash them first:\n${dirty.join("\n")}`);
 }
 
