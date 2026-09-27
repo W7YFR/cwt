@@ -109,12 +109,22 @@ bump\:dry: ## Say what this branch would release, change nothing
 bump: ## Bump the version for this branch and commit it (run before the PR)
 	node scripts/version.mjs --commit --branch "$$(git rev-parse --abbrev-ref HEAD)"
 
+# Write the branch's entry under `## Unreleased` in CHANGELOG.md first. The
+# bump moves it under the new version, and the entry becomes the PR body. A
+# branch that releases nothing takes its title from the branch name, or TITLE.
+.PHONY: pr
+pr: ## Bump, push, and open or update this branch's PR (TITLE="..." for no-release)
+	node scripts/pr.mjs $(if $(TITLE),--title "$(TITLE)")
+
 .PHONY: tag
 tag: ## Tag the current version at HEAD (on main, after merging)
 	@v=$$(node -p "require('./package.json').version"); \
 		git tag -a "v$$v" -m "v$$v" && echo "tagged v$$v — \`git push origin v$$v\` when you mean it"
 
 # Pushes the one new tag, not every local tag the way `git push --tags` does.
+# The tag message and the GitHub release notes are the version's CHANGELOG.md
+# entry. `--cleanup=whitespace` keeps its `###` headings, which git strips as
+# comments by default.
 # A merge that changed no build input kept the version, so it gets no tag.
 # Run from main, it offers the branch that main's last merge names.
 # `git branch -d` refuses a branch that main does not contain, so the delete
@@ -130,8 +140,13 @@ release: ## After merging: update main, tag and push its version, delete the bra
 	if git rev-parse -q --verify "refs/tags/v$$v" >/dev/null; then \
 		echo "v$$v is already tagged; this merge released nothing"; \
 	else \
-		git tag -a "v$$v" -m "v$$v"; \
+		notes=$$(node scripts/changelog.mjs "$$v" 2>/dev/null || true); \
+		printf 'v%s\n\n%s\n' "$$v" "$$notes" | git tag -a "v$$v" --cleanup=whitespace -F -; \
 		git push origin "v$$v"; \
+		if [ -n "$$notes" ]; then \
+			printf '%s\n' "$$notes" | gh release create "v$$v" --verify-tag --title "v$$v" --notes-file - \
+				|| echo "tagged v$$v, but the GitHub release failed; retry with gh release create"; \
+		fi; \
 	fi; \
 	if [ "$$branch" = main ]; then \
 		branch=$$(node --input-type=module -e 'import { branchFromMerge } from "./scripts/version.mjs"; console.log(branchFromMerge(process.argv[1]) ?? "")' "$$(git log -1 --format=%s)"); \

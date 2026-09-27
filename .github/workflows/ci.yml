@@ -87,7 +87,7 @@ jobs:
       # The branch name is the signal rather than the commit, since GitHub
       # checks out a throwaway merge commit here whose subject says nothing
       # about anybody's intent.
-      - name: Check the version bump
+      - name: Check the version bump and its changelog entry
         id: version
         run: node scripts/version.mjs --check --branch "$HEAD_REF" --base "$BASE_SHA"
         env:

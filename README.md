@@ -423,12 +423,21 @@ pull request:
 ```
 make bump:dry   # what this branch would release, nothing written
 make bump       # write it and make the release commit
+make pr         # bump, push, and open the pull request
 ```
+
+Each release has an entry in `CHANGELOG.md`. The branch writes it under
+`## Unreleased`, and `make bump` moves it under `## vX.Y.Z — date` in the
+release commit. `make bump` refuses without an entry, and CI fails a release
+whose version has no entry. `make pr` titles the pull request `[TYPE] vX.Y.Z`
+and uses the entry as its body. `make release` uses it as the tag message and
+the GitHub release notes.
 
 `scripts/version.mjs` takes the bump from the branch you are standing on —
 `feat/` is a minor, `fix/` and `chore/` are patches, an unrecognized prefix is
 a patch rather than an error. It writes `package.json`, keeps the lockfile in
-step, and commits the pair as `chore: release vX.Y.Z`. That commit rides in
+step, stamps the changelog entry, and commits the three as
+`chore: release vX.Y.Z`. That commit rides in
 with the change, so merging is what publishes the new version, and `main` is
 never written to by a machine.
 
