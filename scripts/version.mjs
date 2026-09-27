@@ -638,12 +638,27 @@ function landedCommits(ref, since) {
  *  range to read, the answer is yes, so a release is never skipped by
  *  accident.
  *
+ * A `since` that is not in the clone is an error, not a fallback. It is the
+ * commit a push started from, and it goes missing when history was rewritten,
+ * as by a force push to main. The fallbacks below cannot tell what that push
+ * changed, and on main `main..ref` is empty, which reads as "nothing ships"
+ * and skips the deploy without a word.
+ *
  *  @param {string} ref
  *  @param {string | null} since
  *  @returns {boolean} */
 function shipsIn(ref, since) {
+  if (since && !revExists(since)) {
+    die(
+      [
+        `${since} is not a commit here, so what this change touched cannot be read.`,
+        "History was rewritten, or the clone is too shallow to hold it.",
+        "Nothing was decided. To deploy, run the workflow by hand; a manual run always deploys.",
+      ].join("\n"),
+    );
+  }
   const range =
-    since && revExists(since) ? `${since}..${ref}`
+    since ? `${since}..${ref}`
     : isMerge(ref) ? `${ref}^1..${ref}`
     : revExists("main") ? `main..${ref}`
     : null;

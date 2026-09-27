@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   branchFromMerge,
@@ -271,6 +272,31 @@ describe("whether a change ships", () => {
   it("drops the paths of release commits, whose package.json edit is the bump", () => {
     const log = "\0chore: release v1.0.2\n\npackage-lock.json\npackage.json\n\0ci: gate deploy\n\n.github/workflows/ci.yml\n";
     expect(touchedPaths(log)).toEqual([".github/workflows/ci.yml"]);
+  });
+});
+
+describe("asking what a push changed", () => {
+  /* The script itself, the way CI runs it. The range starts at the commit the
+     push started from, and a missing one must stop the job, not skip the
+     deploy. */
+  const SCRIPT = fileURLToPath(new URL("../../../scripts/version.mjs", import.meta.url));
+  const run = (since: string) =>
+    spawnSync(process.execPath, [SCRIPT, "--ships", "--since", since], {
+      encoding: "utf8",
+      env: { ...process.env, GITHUB_OUTPUT: "" },
+    });
+
+  it("fails when the commit it starts from is not in the clone", () => {
+    const got = run("0123456789abcdef0123456789abcdef01234567");
+    expect(got.status).toBe(1);
+    expect(got.stdout).toBe("");
+    expect(got.stderr).toMatch(/cannot be read/);
+  });
+
+  it("answers when that commit is here", () => {
+    const got = run("HEAD");
+    expect(got.status).toBe(0);
+    expect(got.stdout.trim()).toMatch(/^(true|false)$/);
   });
 });
 
