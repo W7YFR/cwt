@@ -10,7 +10,7 @@ so they wait under Unreleased until the next release.
 
 - `CHANGELOG.md` holds one entry per release. A branch writes its entry under Unreleased, and `make bump` moves it under the new version. CI fails a release with no entry.
 - `make pr` bumps the version, pushes the branch, and opens or updates its pull request. The body is the branch's changelog entry.
-- `make release` uses the entry as the tag message and the GitHub release notes.
+- `make release` uses the entry as the tag message and the GitHub release notes. It stops unless the branch's pull request is merged.
 - `CLAUDE.md` describes the contributor workflow and the changelog rules. `/changelog-check` checks a branch's entry against its diff.
 
 ## v1.3.0 — 2026-09-27

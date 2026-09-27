@@ -463,8 +463,9 @@ check, and rebasing on `main` drops the now-duplicate release commit so
 
 Tags are not automatic. After the merge, `make release` switches to `main`,
 fast-forwards it, tags the version it finds there, and pushes that one tag.
-It then offers to delete the local branch you ran it from. Run from `main`, it
-offers the branch that the last merge names.
+Run from a branch, it first stops unless that branch's pull request is merged.
+It then offers to delete the local branch you ran it from, if `main` contains
+it. Run from `main`, it offers the branch that the last merge names.
 `make tag` only tags `HEAD` and pushes nothing.
 
 #### Why CI cannot write anything

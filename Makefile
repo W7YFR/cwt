@@ -127,19 +127,26 @@ tag: ## Tag the current version at HEAD (on main, after merging)
 # entry. `--cleanup=whitespace` keeps its `###` headings, which git strips as
 # comments by default.
 # A merge that changed no build input kept the version, so it gets no tag.
+# Run from a branch, it stops unless that branch's pull request is merged.
 # Run from main, it offers the branch that main's last merge names.
-# `git branch -d` refuses a branch that main does not contain, so the delete
-# cannot lose unmerged work.
+# It offers the delete only when main contains the branch. `git branch -d`
+# alone is not enough: it also deletes a branch that its upstream contains,
+# and `make pr` sets an upstream.
 .PHONY: release
 release: ## After merging: update main, tag and push its version, delete the branch
 	@set -e; \
 	git diff --quiet HEAD || { echo "Uncommitted changes — commit or stash first"; exit 1; }; \
 	branch=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$branch" != main ]; then \
+		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null) \
+			|| { echo "No pull request found for $$branch — open one with 'make pr', or run this from main"; exit 1; }; \
+		[ "$$state" = MERGED ] || { echo "The pull request for $$branch is $$state, not merged — merge it first"; exit 1; }; \
+	fi; \
 	git switch main; \
 	git pull --ff-only; \
 	v=$$(node -p "require('./package.json').version"); \
 	if git rev-parse -q --verify "refs/tags/v$$v" >/dev/null; then \
-		echo "v$$v is already tagged; this merge released nothing"; \
+		echo "v$$v is already tagged; main has no new version to release"; \
 	else \
 		notes=$$(node scripts/changelog.mjs "$$v" 2>/dev/null || true); \
 		printf 'v%s\n\n%s\n' "$$v" "$$notes" | git tag -a "v$$v" --cleanup=whitespace -F -; \
@@ -153,6 +160,10 @@ release: ## After merging: update main, tag and push its version, delete the bra
 		branch=$$(node --input-type=module -e 'import { branchFromMerge } from "./scripts/version.mjs"; console.log(branchFromMerge(process.argv[1]) ?? "")' "$$(git log -1 --format=%s)"); \
 	fi; \
 	if [ -n "$$branch" ] && [ "$$branch" != main ] && git show-ref -q --verify "refs/heads/$$branch"; then \
+		if ! git merge-base --is-ancestor "$$branch" main; then \
+			echo "$$branch is not merged into main; kept"; \
+			exit 0; \
+		fi; \
 		printf "Delete local branch %s? [Y/n] " "$$branch"; \
 		read -r answer; \
 		case "$$answer" in \
