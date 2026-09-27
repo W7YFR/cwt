@@ -110,8 +110,9 @@ bump: ## Bump the version for this branch and commit it (run before the PR)
 	node scripts/version.mjs --commit --branch "$$(git rev-parse --abbrev-ref HEAD)"
 
 # Write the branch's entry under `## Unreleased` in CHANGELOG.md first. The
-# bump moves it under the new version, and the entry becomes the PR body. A
-# branch that releases nothing takes its title from the branch name, or TITLE.
+# bump moves it under the new version, and the lines this branch wrote become
+# the PR body. A branch that releases nothing keeps its entry under
+# Unreleased, and takes its title from the branch name, or TITLE.
 .PHONY: pr
 pr: ## Bump, push, and open or update this branch's PR (TITLE="..." for no-release)
 	node scripts/pr.mjs $(if $(TITLE),--title "$(TITLE)")

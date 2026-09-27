@@ -2,9 +2,11 @@
  *
  * Bumps the version (`make bump`, which does nothing when the bump is already
  * there), pushes the branch, and opens the pull request, or updates the one
- * already open. The title is `[TYPE] vX.Y.Z` and the body is the CHANGELOG.md
- * entry for that version. A branch that touches no build input releases no
- * version, so its title comes from the branch name.
+ * already open. The title is `[TYPE] vX.Y.Z`. The body is the part of the
+ * CHANGELOG.md entry that this branch wrote, without the pending lines other
+ * branches merged before it. A branch that touches no build input releases no
+ * version, so its title comes from the branch name and its entry stays under
+ * `## Unreleased` for the next release.
  *
  *   make pr
  *   make pr TITLE="Deploy Gap"   # title for a branch that releases nothing
@@ -13,7 +15,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { CHANGELOG, entry, unreleased } from "./changelog.mjs";
+import { CHANGELOG, added, entry, unreleased } from "./changelog.mjs";
 import { isReleaseSubject } from "./version.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -63,6 +65,15 @@ function main() {
 
   const ships = run(process.execPath, [VERSION, "--ships"]) === "true";
 
+  // The pending entry on main when this branch started; "" before CHANGELOG.md existed.
+  let base = "";
+  try {
+    const at = run("git", ["merge-base", "HEAD", "main"]);
+    base = unreleased(execFileSync("git", ["show", `${at}:CHANGELOG.md`], { cwd: ROOT, encoding: "utf8", stdio: "pipe" }));
+  } catch {
+    // No CHANGELOG.md at the merge base.
+  }
+
   /** @type {string | null} */
   let version = null;
   let body;
@@ -74,13 +85,12 @@ function main() {
     version = pkg.version;
     const logged = entry(readFileSync(CHANGELOG, "utf8"), version);
     if (!logged) die(`CHANGELOG.md has no v${version} entry; write it under '## Unreleased' and run make pr again`);
-    body = `${logged}\n`;
+    body = added(base, logged);
   } else {
-    if (unreleased(readFileSync(CHANGELOG, "utf8"))) {
-      process.stderr.write("warning: this branch releases nothing, so its '## Unreleased' entry waits for the next release\n");
-    }
-    body = "This change touches no build input, so it releases no version and deploys nothing.\n";
+    body = added(base, unreleased(readFileSync(CHANGELOG, "utf8")));
   }
+  if (!body) die("this branch adds nothing to CHANGELOG.md; write its entry under '## Unreleased', commit it, and run make pr again");
+  body = `${body}\n`;
 
   const dirty = run("git", ["status", "--porcelain"]);
   if (dirty) die(`the tree has uncommitted changes; commit or stash them first:\n${dirty}`);

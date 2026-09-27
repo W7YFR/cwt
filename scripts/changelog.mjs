@@ -48,6 +48,27 @@ export function entry(text, version) {
   return sections(text).find((s) => s.version === version)?.body ?? null;
 }
 
+/** The lines of `head` that `base` does not have, under the `###` group
+ *  headings they sit in. `base` is the pending entry on main, so the result is
+ *  the part of an entry that one branch wrote.
+ *
+ * @param {string} base
+ * @param {string} head
+ * @returns {string} */
+export function added(base, head) {
+  const seen = new Set(base.split("\n").map((l) => l.trim()).filter(Boolean));
+  /** @type {{ heading: string | null, lines: string[] }[]} */
+  const groups = [{ heading: null, lines: [] }];
+  for (const line of head.split("\n")) {
+    if (line.startsWith("### ")) groups.push({ heading: line, lines: [] });
+    else if (line.trim() && !seen.has(line.trim())) groups.at(-1)?.lines.push(line);
+  }
+  return groups
+    .filter((g) => g.lines.length)
+    .map((g) => (g.heading ? `${g.heading}\n\n${g.lines.join("\n")}` : g.lines.join("\n")))
+    .join("\n\n");
+}
+
 /** The file with the pending entry moved under a version heading. The
  *  `## Unreleased` heading stays, empty, for the next branch.
  *

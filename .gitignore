@@ -21,7 +21,12 @@ app/.vitest/
 *.swp
 .DS_Store
 
-.claude/
+# Claude Code. Only the skills named here are shared; everything else in
+# .claude/ is personal.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/changelog-check/
 CLAUDE.local.md
 
 # Local audio scratch (recordings live elsewhere; don't commit samples)

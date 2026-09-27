@@ -1,9 +1,16 @@
 # Changelog
 
-What each release of cwt changes for the people who use it, newest first. A
-change that ships nothing to the site has no entry.
+What each release of cwt changes, newest first. The Development group lists
+changes to the build, CI and tooling. Those changes ship nothing to the site,
+so they wait under Unreleased until the next release.
 
 ## Unreleased
+
+### Development
+
+- `CHANGELOG.md` holds one entry per release. A branch writes its entry under Unreleased, and `make bump` moves it under the new version. CI fails a release with no entry.
+- `make pr` bumps the version, pushes the branch, and opens or updates its pull request. The body is the branch's changelog entry.
+- `make release` uses the entry as the tag message and the GitHub release notes.
 
 ## v1.3.0 — 2026-09-27
 
@@ -16,6 +23,10 @@ change that ships nothing to the site has no entry.
 ### Changed
 
 - Delay start moved from Practice aids to the Timing row.
+
+### Development
+
+- CI fails, in place of skipping the deploy, when the commit a push to main started from is missing from the clone.
 
 ## v1.2.0 — 2026-09-27
 
@@ -45,6 +56,11 @@ change that ships nothing to the site has no entry.
 - A prosign caption at the end of a message, such as `<SK>`, is no longer cut off.
 - An unknown pattern decodes as `▯`, not `?`, so it never grades as a correct question mark.
 - Speeds are saved, and the practice page and calibration share them. A deploy no longer resets your settings.
+
+### Development
+
+- `make release` updates main, tags and pushes the version, and offers to delete the merged branch.
+- A change that touches no build input needs no version bump and deploys nothing.
 
 ## v1.1.0 — 2026-09-26
 
@@ -76,6 +92,11 @@ change that ships nothing to the site has no entry.
 - Each screen opens at the top.
 - The landing callsign no longer overlaps the wordmark on narrow screens.
 
+### Development
+
+- `make dev-device` serves the dev server over HTTPS on the LAN, so a phone can use the microphone. `make uninstall:cert` removes the certificate.
+- The dev server serves only `app/`, `node_modules/` and `package.json`. Before, any device on the LAN could fetch any file in the repository.
+
 ## v1.0.1 — 2026-09-20
 
 ### Added
@@ -89,6 +110,11 @@ change that ships nothing to the site has no entry.
 - Below 700px the review header wraps instead of squeezing.
 - A take opened from a file shows Calibrate beside the device picker.
 - The record button no longer flashes live before the device list loads.
+
+### Development
+
+- `make icons` builds the `.ico` and PNG icons from `app/public/favicon.svg`.
+- Node 24.
 
 ## v1.0.0 — 2026-09-19
 
@@ -105,3 +131,8 @@ The first release. Key into a microphone or a loopback device, and cwt measures 
 - Calibration, which removes the delay a room adds to every key release.
 - Open WAV, MP3, M4A, FLAC or OGG files, or drop them on the page.
 - The session and the last ten recordings survive a reload.
+
+### Development
+
+- CI tests every pull request and deploys every merge to main that changes a build input.
+- `make bump` sets the version from the branch prefix: `feat/` is a minor, `fix/` and `chore/` are patches.

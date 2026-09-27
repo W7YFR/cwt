@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { entry, sections, stamp, unreleased, verifyEntry } from "../../../scripts/changelog.mjs";
+import { added, entry, sections, stamp, unreleased, verifyEntry } from "../../../scripts/changelog.mjs";
 import { title } from "../../../scripts/pr.mjs";
 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
@@ -84,6 +84,25 @@ describe("what CI checks", () => {
     const text = readFileSync(`${ROOT}CHANGELOG.md`, "utf8");
     const version = JSON.parse(readFileSync(`${ROOT}package.json`, "utf8")).version;
     expect(entry(text, version)).toBeTruthy();
+  });
+});
+
+describe("the lines one branch wrote", () => {
+  it("drops the pending lines other branches merged, and keeps their groups", () => {
+    const base = "### Development\n\n- CI thing.";
+    const head = "### Added\n\n- New control.\n\n### Development\n\n- CI thing.\n- Make thing.";
+    expect(added(base, head)).toBe("### Added\n\n- New control.\n\n### Development\n\n- Make thing.");
+  });
+
+  it("drops a group this branch added nothing to", () => {
+    expect(added("### Development\n\n- CI thing.", "### Development\n\n- CI thing.\n\n### Fixed\n\n- Bug.")).toBe(
+      "### Fixed\n\n- Bug.",
+    );
+    expect(added("- Same.", "- Same.")).toBe("");
+  });
+
+  it("keeps everything when main has nothing pending", () => {
+    expect(added("", "Intro.\n\n### Added\n\n- A.")).toBe("Intro.\n\n### Added\n\n- A.");
   });
 });
 

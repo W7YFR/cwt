@@ -429,8 +429,10 @@ make pr         # bump, push, and open the pull request
 Each release has an entry in `CHANGELOG.md`. The branch writes it under
 `## Unreleased`, and `make bump` moves it under `## vX.Y.Z — date` in the
 release commit. `make bump` refuses without an entry, and CI fails a release
-whose version has no entry. `make pr` titles the pull request `[TYPE] vX.Y.Z`
-and uses the entry as its body. `make release` uses it as the tag message and
+whose version has no entry. A change that touches no build input writes a
+`### Development` entry, which waits under `## Unreleased` for the next
+release. `make pr` titles the pull request `[TYPE] vX.Y.Z` and uses the lines
+the branch wrote as its body. `make release` uses it as the tag message and
 the GitHub release notes.
 
 `scripts/version.mjs` takes the bump from the branch you are standing on —
