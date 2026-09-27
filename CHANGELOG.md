@@ -1,8 +1,9 @@
 # Changelog
 
 What each release of cwt changes, newest first. The Development group lists
-changes to the build, CI and tooling. Those changes ship nothing to the site,
-so they wait under Unreleased until the next release.
+changes to the build, CI and tooling. Unreleased lists changes merged to main
+that no tagged version holds yet. These are Development changes, which ship
+nothing to the site. The next release carries them.
 
 ## Unreleased
 
