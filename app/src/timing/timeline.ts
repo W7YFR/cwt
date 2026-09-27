@@ -9,7 +9,7 @@
 
 import type { Block, BlockKind, Char, Segment, Timeline, Timing } from "@/types";
 import { median } from "@/dsp/segments";
-import { CHAR_TO_MORSE, decodePattern, keyableSymbols } from "@/morse";
+import { BREAK, CHAR_TO_MORSE, decodePattern, keyableSymbols } from "@/morse";
 
 /** Does this character open a word?
  *
@@ -45,6 +45,11 @@ export const PAUSE_FACTOR = 2.0;
  *  word gap cannot tell those apart at any setting: measured that way,
  *  wide-but-even spacing and a genuine stop overlap. */
 export const REST_OUTLIER = 3.0;
+
+/** Length of the pause the ideal timeline holds at each BREAK. It sets the
+ *  pace cursor and the target audio only: a rest is never graded, so the
+ *  sender can take as long as they like. */
+export const BREAK_SEC = 3;
 
 function block(
   t0: number,
@@ -190,17 +195,29 @@ export function idealTimeline(text: string, timing: Timing): Timeline {
   const blocks: Block[] = [];
   let t = 0;
 
-  const words = text
+  // Each word, and whether a BREAK comes before it. Breaks at either end or
+  // in a row count as one break, or as none.
+  const words: { word: string; afterBreak: boolean }[] = [];
+  let afterBreak = false;
+  text
     .toUpperCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 0);
+    .split(BREAK)
+    .forEach((part, pi) => {
+      if (pi > 0) afterBreak = true;
+      for (const word of part.split(/\s+/)) {
+        if (!word) continue;
+        words.push({ word, afterBreak });
+        afterBreak = false;
+      }
+    });
 
-  words.forEach((word, wi) => {
+  words.forEach(({ word, afterBreak }, wi) => {
     let lead: Block | null = null;
     if (wi > 0) {
-      lead = block(t, t + wordGap, "word-gap", wordGap / u, wordGap / u);
+      const [kind, dur] = afterBreak ? (["pause", BREAK_SEC] as const) : (["word-gap", wordGap] as const);
+      lead = block(t, t + dur, kind, dur / u, dur / u);
       blocks.push(lead);
-      t += wordGap;
+      t += dur;
     }
     keyableSymbols(word).forEach((ch, li) => {
       if (li > 0) {
@@ -236,5 +253,5 @@ export function idealTimeline(text: string, timing: Timing): Timeline {
     });
   });
 
-  return { text: words.join(" "), chars, blocks, duration: t };
+  return { text: words.map((w) => w.word).join(" "), chars, blocks, duration: t };
 }

@@ -2065,7 +2065,7 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .slotvalue.unset { font-family: inherit; color: var(--ink-faint); font-style: italic; }
 .drillproblems { margin: 0; padding-left: 18px; font-size: 12px; color: var(--bad); }
 .drillsave { display: flex; justify-content: flex-end; }
-.drillrowtext { font-size: 13px; overflow-wrap: anywhere; }
+.drillrowtext { font-size: 13px; overflow-wrap: anywhere; white-space: pre-line; }
 
 /* Overriding the measurement. Below the preview, because a slider whose
    effect you cannot see is guesswork with extra steps. */

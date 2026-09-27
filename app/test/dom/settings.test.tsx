@@ -206,16 +206,18 @@ describe("the drills section", () => {
     return user;
   }
 
-  it("saves the whole box as one drill, in upper case with slot names kept", async () => {
+  it("saves the box as one drill, with each line break as a break", async () => {
     open();
     await settle();
-    const user = await write("cq cq de {CALLSIGN} k\n\n  vvv   vvv ");
-    expect(box().value).toBe("CQ CQ DE {callsign} K\n\n  VVV   VVV ");
+    const user = await write("cq cq de {CALLSIGN} k\n\n  {callsign}   de k7abc ");
+    expect(box().value).toBe("CQ CQ DE {callsign} K\n\n  {callsign}   DE K7ABC ");
     await user.click(screen.getByTestId("save-drill"));
-    expect(loadCustomDrills().map((d) => d.text)).toEqual(["CQ CQ DE {callsign} K VVV VVV"]);
+    expect(loadCustomDrills().map((d) => d.text)).toEqual([
+      "CQ CQ DE {callsign} K | {callsign} DE K7ABC",
+    ]);
     expect(box().value).toBe("");
-    expect(screen.getAllByTestId("drillrow").map((r) => r.querySelector("code")!.textContent)).toEqual(
-      ["CQ CQ DE {callsign} K VVV VVV"],
+    expect(screen.getByTestId("drillrow").querySelector("code")!.textContent).toBe(
+      "CQ CQ DE {callsign} K\n{callsign} DE K7ABC",
     );
   });
 

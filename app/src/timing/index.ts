@@ -16,6 +16,7 @@ import {
   type Timeline,
   type Timing,
 } from "@/types";
+import { BREAK } from "@/morse";
 import { compareText } from "./align";
 import { grade } from "./grade";
 import { pair, retarget } from "./pair";
@@ -56,6 +57,8 @@ export const TIMES_MAX = 20;
  * repeat sounds like. There is nothing else it could be: a gap longer than a
  * word gap is a rest, which is not graded, and a shorter one would say the
  * last character of one pass and the first of the next belong to one word.
+ * A message that holds a BREAK is the exception: it is a dialog, so the passes
+ * are joined by a BREAK too.
  *
  * Only ever applied to a message you supplied. With the box empty the target
  * falls back to your own decode, and repeating THAT would claim you meant to
@@ -73,7 +76,8 @@ export function passCount(times: number): number {
 export function targetText(expected: string, times: number): string {
   const one = expected.trim();
   const n = passCount(times);
-  return one && n > 1 ? Array.from({ length: n }, () => one).join(" ") : one;
+  const join = one.includes(BREAK) ? ` ${BREAK} ` : " ";
+  return one && n > 1 ? Array.from({ length: n }, () => one).join(join) : one;
 }
 
 export function reviewTake(take: Take, settings: ReviewSettings): Review {

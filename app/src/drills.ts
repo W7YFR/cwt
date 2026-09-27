@@ -7,7 +7,7 @@
  * the user's details. */
 
 import { loadCustomDrills, loadUser, type CustomDrill, type UserInfo } from "@/io/storage";
-import { CHAR_TO_MORSE, tokenize } from "@/morse";
+import { CHAR_TO_MORSE, normalizeMessage, tokenize } from "@/morse";
 
 export interface Drill {
   /** Stable across releases: keys and test ids are built from it. */
@@ -147,15 +147,10 @@ export function loadDrills(): Drill[] {
   return fillDrills([...DRILLS, ...customDrills(loadCustomDrills())], loadUser());
 }
 
-/** Upper case with single spaces, like the catalog, with slot names kept in
- *  lower case so that `{NAME}` typed in an upper-case field is still a slot. */
+/** A message as `normalizeMessage` leaves it, with slot names kept in lower
+ *  case so that `{NAME}` typed in an upper-case field is still a slot. */
 export function normalizeDrill(text: string): string {
-  return text
-    .toUpperCase()
-    .trim()
-    .split(/\s+/)
-    .join(" ")
-    .replace(/\{[A-Z_]+\}/g, (slot) => slot.toLowerCase());
+  return normalizeMessage(text).replace(/\{[A-Z_]+\}/g, (slot) => slot.toLowerCase());
 }
 
 /** What stops a normalized text from being a drill: slots that read no user

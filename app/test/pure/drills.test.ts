@@ -12,8 +12,7 @@ import {
   slotsOf,
 } from "@/drills";
 import { EMPTY_USER, type UserInfo } from "@/io/storage";
-import { CHAR_TO_MORSE, tokenize } from "@/morse";
-import { oneLine } from "@/ui/NewSession";
+import { CHAR_TO_MORSE, normalizeMessage, tokenize } from "@/morse";
 
 const USER: UserInfo = {
   name: "ROB",
@@ -49,7 +48,7 @@ describe("the drill catalog", () => {
   });
 
   it("stores each text the way the dialog hands it over", () => {
-    for (const d of fillDrills(DRILLS, USER)) expect(d.text).toBe(oneLine(d.text));
+    for (const d of fillDrills(DRILLS, USER)) expect(d.text).toBe(normalizeMessage(d.text));
   });
 
   it("holds only symbols that have a keying", () => {
@@ -127,6 +126,16 @@ describe("filling a drill", () => {
 describe("custom drills", () => {
   it("normalize like the catalog, with slot names in lower case", () => {
     expect(normalizeDrill("  name is {NAME}\t{name}  <bt> ")).toBe("NAME IS {name} {name} <BT>");
+  });
+
+  it("turn each line break, or a typed break, into one break between words", () => {
+    expect(normalizeDrill("\ncq de k7abc k\r\n\n\nk7abc de {callsign}|tu \n")).toBe(
+      "CQ DE K7ABC K | K7ABC DE {callsign} | TU",
+    );
+  });
+
+  it("accept a break as a symbol", () => {
+    expect(drillProblems("CQ K | DE K")).toEqual([]);
   });
 
   it("have no problems when every slot and symbol is known", () => {

@@ -46,6 +46,8 @@ import {
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
+import { breakLines } from "@/morse";
+import { BREAK_SEC } from "@/timing/timeline";
 
 export interface SettingsProps {
   /** Which calibration is in use, so the one being deleted can be flagged. */
@@ -383,7 +385,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
         rows={3}
         spellCheck={false}
         value={text}
-        placeholder="CQ CQ DE {callsign} K"
+        placeholder={"CQ CQ DE {callsign} K\n{callsign} DE K7ABC K"}
         onChange={field.onChange}
       />
       {problems.length > 0 && (
@@ -405,6 +407,11 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
             Type anything that has Morse: letters, numbers, punctuation, and
             prosigns in angle brackets, such as <code>&lt;BT&gt;</code> or{" "}
             <code>&lt;SK&gt;</code>.
+          </p>
+          <p>
+            A new line is a long break. Use it to write both sides of a QSO. The target waits {BREAK_SEC} seconds at each break,
+            and a break is never graded. In the
+            message box a break shows as <code>|</code>.
           </p>
           <p>
             A slot in braces takes a value from User when you pick the drill.
@@ -459,7 +466,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
             return (
               <li key={d.id} data-testid="drillrow" data-id={d.id}>
                 <div className="calmeta">
-                  <code className="drillrowtext">{d.text}</code>
+                  <code className="drillrowtext">{breakLines(d.text)}</code>
                   {missing.length > 0 && (
                     <span className="hint">
                       Needs {missing.map((s) => SLOT_LABELS[s]).join(", ")}.
