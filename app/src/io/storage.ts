@@ -385,6 +385,7 @@ export interface Prefs {
   paceCursor?: boolean;
   paceLeadSec?: number;
   breakSec?: number;
+  repeatPauseSec?: number;
   paceAbsolute?: boolean;
   charMarkers?: boolean;
   runScores?: boolean;
@@ -535,6 +536,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   paceCursor: isBool,
   paceLeadSec: isNum,
   breakSec: isNum,
+  repeatPauseSec: isNum,
   paceAbsolute: isBool,
   charMarkers: isBool,
   runScores: isBool,

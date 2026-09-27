@@ -665,6 +665,18 @@ describe("controls", () => {
     expect(onChange).toHaveBeenLastCalledWith({ breakSec: BREAK_MAX_SEC });
   });
 
+  it("asks for a repeat pause, whatever the number of passes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderView({ onChange, open: true });
+    const box = screen.getByLabelText("Repeat pause in seconds") as HTMLInputElement;
+    expect(document.querySelector("[data-panel='timing']")).toContainElement(box);
+    expect(box.value).toBe("0");
+    await user.clear(box);
+    await user.type(box, "4");
+    expect(onChange).toHaveBeenLastCalledWith({ repeatPauseSec: 4 });
+  });
+
   it("calls fit when the Fit button is pressed", async () => {
     const user = userEvent.setup();
     const onFit = vi.fn();

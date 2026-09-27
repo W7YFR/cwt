@@ -1,12 +1,13 @@
-/* Long breaks inside a message.
+/* Long breaks inside a message, and pauses between its passes.
  *
- * A BREAK splits a message into turns, such as both sides of a QSO. The ideal
- * timeline holds a pause there, and the sender's own silence there is a rest
- * whatever its length and whatever the collapse-rests setting says.
+ * A BREAK splits a message into turns, such as both sides of a QSO. A REPEAT
+ * joins two passes when the repeat pause is above zero. The ideal timeline
+ * holds a pause at each, and the sender's own silence there is a rest whatever
+ * its length and whatever the collapse-rests setting says.
  */
 
 import { describe, expect, it } from "vitest";
-import { BREAK, tokenize } from "@/morse";
+import { BREAK, REPEAT, tokenize } from "@/morse";
 import { defaultSettings, reviewTake, targetText } from "@/timing";
 import { targetTiming } from "@/timing/model";
 import { BREAK_DEFAULT_SEC, idealTimeline } from "@/timing/timeline";
@@ -29,8 +30,21 @@ describe("the ideal timeline", () => {
   });
 
   it("holds the pause for the length it is given", () => {
-    const pause = idealTimeline("K | K", REF, 7.5).blocks.find((b) => b.kind === "pause")!;
+    const pause = idealTimeline("K | K", REF, { breakSec: 7.5 }).blocks.find((b) => b.kind === "pause")!;
     expect(pause.t1 - pause.t0).toBeCloseTo(7.5);
+  });
+
+  it("holds the repeat pause at a repeat, and a word gap when it is zero", () => {
+    const text = `K ${REPEAT} K`;
+    const pause = idealTimeline(text, REF, { repeatSec: 4 }).blocks.find((b) => b.kind === "pause")!;
+    expect(pause.t1 - pause.t0).toBeCloseTo(4);
+    expect(gaps(idealTimeline(text, REF, { repeatSec: 0 }))).toEqual(["word-gap"]);
+  });
+
+  it("takes the longer pause where a break meets a repeat", () => {
+    const tl = idealTimeline(`K | ${REPEAT} K`, REF, { breakSec: 3, repeatSec: 6 });
+    const pause = tl.blocks.find((b) => b.kind === "pause")!;
+    expect(pause.t1 - pause.t0).toBeCloseTo(6);
   });
 
   it("reads a break with no spaces round it", () => {
@@ -43,15 +57,20 @@ describe("the ideal timeline", () => {
 });
 
 describe("comparing text", () => {
-  it("reads a break as a word space", () => {
+  it("reads a break or a repeat as a word space", () => {
     expect(tokenize(`CQ ${BREAK} K`)).toEqual(tokenize("CQ K"));
+    expect(tokenize(`CQ ${REPEAT} K`)).toEqual(tokenize("CQ K"));
     expect(compareText("CQ | K", "CQ K").accuracy).toBe(1);
   });
 });
 
 describe("targetText", () => {
-  it("joins the passes of a dialog with a break", () => {
-    expect(targetText("CQ | K", 2)).toBe("CQ | K | CQ | K");
+  it("joins the passes with a repeat when there is a repeat pause", () => {
+    expect(targetText("CQ | K", 2, 5)).toBe(`CQ | K ${REPEAT} CQ | K`);
+  });
+
+  it("joins the passes with a space when the repeat pause is zero", () => {
+    expect(targetText("CQ | K", 2, 0)).toBe("CQ | K CQ | K");
   });
 });
 
@@ -91,4 +110,50 @@ describe("a take with a break in it", () => {
       });
     }
   }
+});
+
+describe("a take sent twice", () => {
+  /* One pass, a gap of `gapSec`, then the other. The gap is past the target's
+     word gap, and short enough that it is not a rest on its own. */
+  const one = "CQ DE K7ABC";
+  const gapSec = 0.7;
+  const segments = (): Segment[] => {
+    const segs: Segment[] = [[0, 0.5]];
+    for (const b of idealTimeline(`${one} ${REPEAT} ${one}`, REF, { repeatSec: 1 }).blocks) {
+      const mark = b.kind === "dit" || b.kind === "dah";
+      segs.push([mark ? 1 : 0, b.kind === "pause" ? gapSec : b.t1 - b.t0]);
+    }
+    segs.push([0, 0.5]);
+    return segs;
+  };
+  const base = takeFrom(caseNamed(SLOPPY));
+  const t: Take = {
+    ...base,
+    source: MIC_SOURCE,
+    segments: segments(),
+    measured: { ...base.measured, unitSec: REF.unitSec },
+    target: { charWpm: 20, farnsworthWpm: 20, explicit: true },
+  };
+  const review = (repeatPauseSec: number) =>
+    reviewTake(t, {
+      ...defaultSettings(t),
+      expected: one,
+      charWpm: 20,
+      farnsworthWpm: 20,
+      times: 2,
+      collapseRests: true,
+      repeatPauseSec,
+    });
+  const wordGapErrors = (repeatPauseSec: number) =>
+    review(repeatPauseSec).analysis.deviations.filter((d) => d.kind === "word-gap");
+
+  it("does not grade the gap between passes with a repeat pause", () => {
+    expect(review(5).comparison?.accuracy).toBe(1);
+    expect(wordGapErrors(5)).toEqual([]);
+  });
+
+  it("grades the gap between passes as a word gap with no repeat pause", () => {
+    expect(review(0).comparison?.accuracy).toBe(1);
+    expect(wordGapErrors(0)).toHaveLength(1);
+  });
 });

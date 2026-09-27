@@ -113,6 +113,11 @@ export const BREAK_HELP =
   "cursor and the target audio. A break is never graded, so you can rest " +
   "longer or shorter.";
 
+export const REPEAT_PAUSE_HELP =
+  "Extra time between passes when the message is sent more than once. Above " +
+  "0 it is a rest and is not graded. At 0 the passes are one word gap apart, " +
+  "and that gap is graded.";
+
 export const TIMES_HELP =
   "How many times you send the message in one take. The box still holds one " +
   "copy; the target you hear, the row the chart draws and what you are " +

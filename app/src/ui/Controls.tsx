@@ -16,7 +16,12 @@ import { IconCog, IconPlay, IconStop } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
-import { BREAK_MAX_SEC, BREAK_MIN_SEC } from "@/timing/timeline";
+import {
+  BREAK_MAX_SEC,
+  BREAK_MIN_SEC,
+  REPEAT_PAUSE_MAX_SEC,
+  REPEAT_PAUSE_MIN_SEC,
+} from "@/timing/timeline";
 import {
   ADVANCED_GRADING_HELP,
   IGNORE_CONSTRUCTION_HELP,
@@ -40,6 +45,7 @@ import {
   ZEN_PACING_HELP,
   PACE_LEAD_HELP,
   BREAK_HELP,
+  REPEAT_PAUSE_HELP,
   ZOOM_HELP,
 } from "./copy";
 
@@ -712,6 +718,21 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                   max={BREAK_MAX_SEC}
                   step={1}
                   onChange={(v) => onChange({ breakSec: v })}
+                />
+              </div>
+
+              <div className="group">
+                <NumberField
+                  id="repeat-pause"
+                  name="Repeat pause"
+                  unit="s"
+                  spoken="seconds"
+                  help={REPEAT_PAUSE_HELP}
+                  value={s.repeatPauseSec}
+                  min={REPEAT_PAUSE_MIN_SEC}
+                  max={REPEAT_PAUSE_MAX_SEC}
+                  step={1}
+                  onChange={(v) => onChange({ repeatPauseSec: v })}
                 />
               </div>
             </div>

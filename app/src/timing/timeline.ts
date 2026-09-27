@@ -9,7 +9,7 @@
 
 import type { Block, BlockKind, Char, Segment, Timeline, Timing } from "@/types";
 import { median } from "@/dsp/segments";
-import { BREAK, CHAR_TO_MORSE, decodePattern, keyableSymbols } from "@/morse";
+import { BREAK, CHAR_TO_MORSE, REPEAT, decodePattern, keyableSymbols } from "@/morse";
 
 /** Does this character open a word?
  *
@@ -52,6 +52,25 @@ export const REST_OUTLIER = 3.0;
 export const BREAK_DEFAULT_SEC = 3;
 export const BREAK_MIN_SEC = 1;
 export const BREAK_MAX_SEC = 30;
+
+/** Extra time the ideal timeline holds between passes, at each REPEAT. At
+ *  zero a REPEAT is a word gap, and the sender's gap there is graded. */
+export const REPEAT_PAUSE_DEFAULT_SEC = 0;
+export const REPEAT_PAUSE_MIN_SEC = 0;
+export const REPEAT_PAUSE_MAX_SEC = 30;
+
+export interface Pauses {
+  breakSec: number;
+  repeatSec: number;
+}
+
+const DEFAULT_PAUSES: Pauses = {
+  breakSec: BREAK_DEFAULT_SEC,
+  repeatSec: REPEAT_PAUSE_DEFAULT_SEC,
+};
+
+/** Splits text on BREAK and REPEAT, and keeps each marker as its own part. */
+const MARKS = new RegExp(`([${BREAK}${REPEAT}])`);
 
 function block(
   t0: number,
@@ -191,8 +210,9 @@ export function decodeSegments(
 export function idealTimeline(
   text: string,
   timing: Timing,
-  breakSec: number = BREAK_DEFAULT_SEC,
+  pauses: Partial<Pauses> = {},
 ): Timeline {
+  const { breakSec, repeatSec } = { ...DEFAULT_PAUSES, ...pauses };
   const u = timing.unitSec;
   const charGap = timing.charGapSec || 3 * u;
   const wordGap = timing.wordGapSec || 7 * u;
@@ -201,26 +221,26 @@ export function idealTimeline(
   const blocks: Block[] = [];
   let t = 0;
 
-  // Each word, and whether a BREAK comes before it. Breaks at either end or
-  // in a row count as one break, or as none.
-  const words: { word: string; afterBreak: boolean }[] = [];
-  let afterBreak = false;
-  text
-    .toUpperCase()
-    .split(BREAK)
-    .forEach((part, pi) => {
-      if (pi > 0) afterBreak = true;
+  // Each word, and the pause before it: zero for a word gap. Markers at
+  // either end count for nothing, and markers in a row take the longest.
+  const words: { word: string; pauseSec: number }[] = [];
+  let pauseSec = 0;
+  for (const part of text.toUpperCase().split(MARKS)) {
+    if (part === BREAK) pauseSec = Math.max(pauseSec, breakSec);
+    else if (part === REPEAT) pauseSec = Math.max(pauseSec, repeatSec);
+    else {
       for (const word of part.split(/\s+/)) {
         if (!word) continue;
-        words.push({ word, afterBreak });
-        afterBreak = false;
+        words.push({ word, pauseSec });
+        pauseSec = 0;
       }
-    });
+    }
+  }
 
-  words.forEach(({ word, afterBreak }, wi) => {
+  words.forEach(({ word, pauseSec }, wi) => {
     let lead: Block | null = null;
     if (wi > 0) {
-      const [kind, dur] = afterBreak ? (["pause", breakSec] as const) : (["word-gap", wordGap] as const);
+      const [kind, dur] = pauseSec > 0 ? (["pause", pauseSec] as const) : (["word-gap", wordGap] as const);
       lead = block(t, t + dur, kind, dur / u, dur / u);
       blocks.push(lead);
       t += dur;

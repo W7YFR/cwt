@@ -109,6 +109,11 @@ export function decodePattern(pattern: string): string {
  *  here, and text comparison reads it as a word space. */
 export const BREAK = "|";
 
+/** The join between two passes of a repeated message. Never typed:
+ *  `targetText` puts it there when the repeat pause is above zero. Read like
+ *  BREAK, with the repeat pause as its length. */
+export const REPEAT = "\u2016";
+
 /** One message out of however it was typed or pasted: upper case with single
  *  spaces, and each line break or typed BREAK as one BREAK between words. */
 export function normalizeMessage(text: string): string {
@@ -138,7 +143,13 @@ export const SYMBOL_RE = /<[A-Z]+>|./g;
  * shows up in the alignment as its own edit rather than vanishing into a
  * substitution. Case is normalized and runs of whitespace collapse to one. */
 export function tokenize(text: string): string[] {
-  const collapsed = String(text ?? "").toUpperCase().split(BREAK).join(" ").trim().split(/\s+/).join(" ");
+  const collapsed = String(text ?? "")
+    .toUpperCase()
+    .replaceAll(BREAK, " ")
+    .replaceAll(REPEAT, " ")
+    .trim()
+    .split(/\s+/)
+    .join(" ");
   return collapsed ? (collapsed.match(SYMBOL_RE) ?? []) : [];
 }
 
