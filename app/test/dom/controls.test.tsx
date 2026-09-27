@@ -16,6 +16,7 @@ import {
 } from "@/ui/Controls";
 import { defaultSettings, TIMES_MAX, TIMES_MIN } from "@/timing";
 import { PACE_LEAD_MAX_SEC } from "@/render/geometry";
+import { BREAK_MAX_SEC } from "@/timing/timeline";
 import type { ReviewSettings } from "@/types";
 import { caseNamed, SLOPPY } from "../fixture";
 import { takeFrom } from "../fixture";
@@ -330,11 +331,13 @@ describe("controls", () => {
 
     const display = container.querySelector("[data-panel='display']")!;
     const practice = container.querySelector("[data-panel='practice']")!;
+    const timing = container.querySelector("[data-panel='timing']")!;
+    expect(timing).toContainElement(screen.getByLabelText("Break length in seconds"));
     expect(display).toContainElement(screen.getByLabelText(/collapse rests/i));
     expect(display).toContainElement(screen.getByLabelText(/^scores$/i));
     expect(practice).toContainElement(screen.getByLabelText(/pacing cursor/i));
     expect(practice).toContainElement(screen.getByLabelText(/flash card/i));
-    for (const row of [display, practice]) {
+    for (const row of [display, practice, timing]) {
       expect(row.querySelector(".uplabel")!.textContent).not.toBe("");
     }
   });
@@ -612,6 +615,7 @@ describe("controls", () => {
 
     rerender(view({ paceCursor: true }, onChange));
     const box = screen.getByLabelText(/delay start/i) as HTMLInputElement;
+    expect(document.querySelector("[data-panel='timing']")).toContainElement(box);
     expect(box.value).toBe(String(defaults().paceLeadSec));
 
     await user.clear(box);
@@ -643,6 +647,34 @@ describe("controls", () => {
     // and leaving the field shows what was actually kept.
     await user.tab();
     expect(Number(box().value)).toBe(PACE_LEAD_MAX_SEC);
+  });
+
+  it("asks how long a break is, with or without the pacing aids", async () => {
+    /* A break sets the target audio as well as the cursor, so the field is
+       there whatever else is on. */
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderView({ onChange, open: true });
+    const box = screen.getByLabelText("Break length in seconds") as HTMLInputElement;
+    expect(box.value).toBe(String(defaults().breakSec));
+    await user.clear(box);
+    await user.type(box, "12");
+    expect(onChange).toHaveBeenLastCalledWith({ breakSec: 12 });
+    await user.clear(box);
+    await user.type(box, "99");
+    expect(onChange).toHaveBeenLastCalledWith({ breakSec: BREAK_MAX_SEC });
+  });
+
+  it("asks for a repeat pause, whatever the number of passes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderView({ onChange, open: true });
+    const box = screen.getByLabelText("Repeat pause in seconds") as HTMLInputElement;
+    expect(document.querySelector("[data-panel='timing']")).toContainElement(box);
+    expect(box.value).toBe("0");
+    await user.clear(box);
+    await user.type(box, "4");
+    expect(onChange).toHaveBeenLastCalledWith({ repeatPauseSec: 4 });
   });
 
   it("calls fit when the Fit button is pressed", async () => {

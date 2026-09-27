@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { DRILLS, SLOTS, fillDrill, fillDrills, groupDrills, slotsOf } from "@/drills";
+import {
+  CUSTOM,
+  DRILLS,
+  SLOTS,
+  customDrills,
+  drillProblems,
+  fillDrill,
+  fillDrills,
+  groupDrills,
+  normalizeDrill,
+  slotsOf,
+} from "@/drills";
 import { EMPTY_USER, type UserInfo } from "@/io/storage";
-import { CHAR_TO_MORSE, tokenize } from "@/morse";
-import { oneLine } from "@/ui/NewSession";
+import { CHAR_TO_MORSE, normalizeMessage, tokenize } from "@/morse";
 
 const USER: UserInfo = {
   name: "ROB",
@@ -38,7 +48,7 @@ describe("the drill catalog", () => {
   });
 
   it("stores each text the way the dialog hands it over", () => {
-    for (const d of fillDrills(DRILLS, USER)) expect(d.text).toBe(oneLine(d.text));
+    for (const d of fillDrills(DRILLS, USER)) expect(d.text).toBe(normalizeMessage(d.text));
   });
 
   it("holds only symbols that have a keying", () => {
@@ -110,5 +120,39 @@ describe("filling a drill", () => {
   it("hands back a drill with no slots unchanged", () => {
     const plain = DRILLS[0]!;
     expect(fillDrill(plain, EMPTY_USER)).toBe(plain);
+  });
+});
+
+describe("custom drills", () => {
+  it("normalize like the catalog, with slot names in lower case", () => {
+    expect(normalizeDrill("  name is {NAME}\t{name}  <bt> ")).toBe("NAME IS {name} {name} <BT>");
+  });
+
+  it("turn each line break, or a typed break, into one break between words", () => {
+    expect(normalizeDrill("\ncq de k7abc k\r\n\n\nk7abc de {callsign}|tu \n")).toBe(
+      "CQ DE K7ABC K | K7ABC DE {callsign} | TU",
+    );
+  });
+
+  it("accept a break as a symbol", () => {
+    expect(drillProblems("CQ K | DE K")).toEqual([]);
+  });
+
+  it("have no problems when every slot and symbol is known", () => {
+    expect(drillProblems("CQ DE {callsign} <SK> 73?")).toEqual([]);
+  });
+
+  it("name each unknown slot and each symbol with no Morse, once", () => {
+    expect(drillProblems("HI {nmae} # # {")).toEqual([
+      "{nmae} is not a slot.",
+      "# has no Morse.",
+      "{ has no Morse.",
+    ]);
+  });
+
+  it("group after the catalog under Custom, with one unnamed section", () => {
+    const custom = customDrills([{ id: "custom/a", text: "AAA" }]);
+    const groups = groupDrills([...DRILLS, ...custom]);
+    expect(groups.at(-1)).toEqual({ name: CUSTOM, sections: [{ name: "", drills: custom }] });
   });
 });

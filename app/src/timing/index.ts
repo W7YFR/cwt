@@ -16,10 +16,17 @@ import {
   type Timeline,
   type Timing,
 } from "@/types";
+import { REPEAT } from "@/morse";
 import { compareText } from "./align";
 import { grade } from "./grade";
 import { pair, retarget } from "./pair";
-import { buildTimeline, idealTimeline, PAUSE_FACTOR } from "./timeline";
+import {
+  BREAK_DEFAULT_SEC,
+  REPEAT_PAUSE_DEFAULT_SEC,
+  buildTimeline,
+  idealTimeline,
+  PAUSE_FACTOR,
+} from "./timeline";
 import { estimateTiming } from "./estimate";
 import { targetTiming } from "./model";
 
@@ -51,11 +58,10 @@ export const TIMES_MAX = 20;
 
 /** The message as it will actually be sent: one instance, or several.
  *
- * Joined by a single space, which the ideal timeline reads as a word gap —
- * the same silence that separates the words inside it, because that is what a
- * repeat sounds like. There is nothing else it could be: a gap longer than a
- * word gap is a rest, which is not graded, and a shorter one would say the
- * last character of one pass and the first of the next belong to one word.
+ * With no repeat pause, joined by a single space, which the ideal timeline
+ * reads as a word gap — the same silence that separates the words inside it,
+ * and graded like one. With a repeat pause, joined by a REPEAT, which the ideal
+ * timeline holds as a rest of that length, and which is not graded.
  *
  * Only ever applied to a message you supplied. With the box empty the target
  * falls back to your own decode, and repeating THAT would claim you meant to
@@ -70,10 +76,11 @@ export function passCount(times: number): number {
   return Number.isFinite(times) ? Math.min(Math.max(Math.floor(times), TIMES_MIN), TIMES_MAX) : TIMES_MIN;
 }
 
-export function targetText(expected: string, times: number): string {
+export function targetText(expected: string, times: number, repeatPauseSec = 0): string {
   const one = expected.trim();
   const n = passCount(times);
-  return one && n > 1 ? Array.from({ length: n }, () => one).join(" ") : one;
+  const join = repeatPauseSec > 0 ? ` ${REPEAT} ` : " ";
+  return one && n > 1 ? Array.from({ length: n }, () => one).join(join) : one;
 }
 
 export function reviewTake(take: Take, settings: ReviewSettings): Review {
@@ -91,14 +98,17 @@ export function reviewTake(take: Take, settings: ReviewSettings): Review {
      too, but decided here, so it cannot come back by the setting being changed
      while the file is on screen. */
   const passes = take.source === MIC_SOURCE ? settings.times : 1;
-  const expected = targetText(settings.expected, passes);
+  const expected = targetText(settings.expected, passes, settings.repeatPauseSec);
 
   const actual = buildTimeline(
     take.segments,
     ref,
     settings.collapseRests ? PAUSE_FACTOR : Infinity,
   );
-  const ideal = idealTimeline(expected || actual.text, ref);
+  const ideal = idealTimeline(expected || actual.text, ref, {
+    breakSec: settings.breakSec,
+    repeatSec: settings.repeatPauseSec,
+  });
 
   const slots = pair(actual, ideal);
   const retargeted = expected ? retarget(slots) : 0;
@@ -165,6 +175,8 @@ export function defaultSettings(take: Take): ReviewSettings {
     collapseRests: true,
     paceCursor: false,
     paceLeadSec: PACE_LEAD_DEFAULT_SEC,
+    breakSec: BREAK_DEFAULT_SEC,
+    repeatPauseSec: REPEAT_PAUSE_DEFAULT_SEC,
     paceAbsolute: true,
     charMarkers: false,
     runScores: true,

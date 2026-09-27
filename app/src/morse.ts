@@ -104,6 +104,36 @@ export function decodePattern(pattern: string): string {
   return MORSE_TO_CHAR[pattern] ?? UNKNOWN;
 }
 
+/** A long break inside a message: the other side of a dialog, or time to
+ *  read the next part. It has no Morse. The ideal timeline holds a pause
+ *  here, and text comparison reads it as a word space. */
+export const BREAK = "|";
+
+/** The join between two passes of a repeated message. Never typed:
+ *  `targetText` puts it there when the repeat pause is above zero. Read like
+ *  BREAK, with the repeat pause as its length. */
+export const REPEAT = "\u2016";
+
+/** One message out of however it was typed or pasted: upper case with single
+ *  spaces, and each line break or typed BREAK as one BREAK between words. */
+export function normalizeMessage(text: string): string {
+  return text
+    .toUpperCase()
+    .replaceAll("\n", BREAK)
+    .split(BREAK)
+    .map((part) => part.trim().split(/\s+/).join(" "))
+    .filter(Boolean)
+    .join(` ${BREAK} `);
+}
+
+/** A message with each BREAK shown as a line break, for a text box. */
+export function breakLines(text: string): string {
+  return text
+    .split(BREAK)
+    .map((part) => part.trim())
+    .join("\n");
+}
+
 /** Matches one comparable symbol: a prosign in brackets, or a single char. */
 export const SYMBOL_RE = /<[A-Z]+>|./g;
 
@@ -113,7 +143,13 @@ export const SYMBOL_RE = /<[A-Z]+>|./g;
  * shows up in the alignment as its own edit rather than vanishing into a
  * substitution. Case is normalized and runs of whitespace collapse to one. */
 export function tokenize(text: string): string[] {
-  const collapsed = String(text ?? "").toUpperCase().trim().split(/\s+/).join(" ");
+  const collapsed = String(text ?? "")
+    .toUpperCase()
+    .replaceAll(BREAK, " ")
+    .replaceAll(REPEAT, " ")
+    .trim()
+    .split(/\s+/)
+    .join(" ");
   return collapsed ? (collapsed.match(SYMBOL_RE) ?? []) : [];
 }
 

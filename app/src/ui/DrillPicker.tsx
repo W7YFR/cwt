@@ -252,10 +252,16 @@ export function DrillPicker({ drills, onPick, floating = false }: DrillPickerPro
                 {expanded && (
                   <div role="group">
                     {g.sections.map((s) => (
-                      <div key={s.name} role="group" aria-label={`${g.name} › ${s.name}`}>
-                        <div role="presentation" className="drillsection">
-                          {s.name}
-                        </div>
+                      <div
+                        key={s.name}
+                        role="group"
+                        aria-label={s.name ? `${g.name} › ${s.name}` : g.name}
+                      >
+                        {s.name && (
+                          <div role="presentation" className="drillsection">
+                            {s.name}
+                          </div>
+                        )}
                         {s.drills.map((d) => (
                           <div
                             key={d.id}

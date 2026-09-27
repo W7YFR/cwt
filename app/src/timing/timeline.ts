@@ -9,7 +9,7 @@
 
 import type { Block, BlockKind, Char, Segment, Timeline, Timing } from "@/types";
 import { median } from "@/dsp/segments";
-import { CHAR_TO_MORSE, decodePattern, keyableSymbols } from "@/morse";
+import { BREAK, CHAR_TO_MORSE, REPEAT, decodePattern, keyableSymbols } from "@/morse";
 
 /** Does this character open a word?
  *
@@ -45,6 +45,32 @@ export const PAUSE_FACTOR = 2.0;
  *  word gap cannot tell those apart at any setting: measured that way,
  *  wide-but-even spacing and a genuine stop overlap. */
 export const REST_OUTLIER = 3.0;
+
+/** Length of the pause the ideal timeline holds at each BREAK. It sets the
+ *  pace cursor and the target audio only: a rest is never graded, so the
+ *  sender can take as long as they like. */
+export const BREAK_DEFAULT_SEC = 3;
+export const BREAK_MIN_SEC = 1;
+export const BREAK_MAX_SEC = 30;
+
+/** Extra time the ideal timeline holds between passes, at each REPEAT. At
+ *  zero a REPEAT is a word gap, and the sender's gap there is graded. */
+export const REPEAT_PAUSE_DEFAULT_SEC = 0;
+export const REPEAT_PAUSE_MIN_SEC = 0;
+export const REPEAT_PAUSE_MAX_SEC = 30;
+
+export interface Pauses {
+  breakSec: number;
+  repeatSec: number;
+}
+
+const DEFAULT_PAUSES: Pauses = {
+  breakSec: BREAK_DEFAULT_SEC,
+  repeatSec: REPEAT_PAUSE_DEFAULT_SEC,
+};
+
+/** Splits text on BREAK and REPEAT, and keeps each marker as its own part. */
+const MARKS = new RegExp(`([${BREAK}${REPEAT}])`);
 
 function block(
   t0: number,
@@ -181,7 +207,12 @@ export function decodeSegments(
  * builds its on/off list — so "perfect" here is precisely what you hear when
  * you play the target track, and every block's `units` equals its
  * `targetUnits` by construction. */
-export function idealTimeline(text: string, timing: Timing): Timeline {
+export function idealTimeline(
+  text: string,
+  timing: Timing,
+  pauses: Partial<Pauses> = {},
+): Timeline {
+  const { breakSec, repeatSec } = { ...DEFAULT_PAUSES, ...pauses };
   const u = timing.unitSec;
   const charGap = timing.charGapSec || 3 * u;
   const wordGap = timing.wordGapSec || 7 * u;
@@ -190,17 +221,29 @@ export function idealTimeline(text: string, timing: Timing): Timeline {
   const blocks: Block[] = [];
   let t = 0;
 
-  const words = text
-    .toUpperCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 0);
+  // Each word, and the pause before it: zero for a word gap. Markers at
+  // either end count for nothing, and markers in a row take the longest.
+  const words: { word: string; pauseSec: number }[] = [];
+  let pauseSec = 0;
+  for (const part of text.toUpperCase().split(MARKS)) {
+    if (part === BREAK) pauseSec = Math.max(pauseSec, breakSec);
+    else if (part === REPEAT) pauseSec = Math.max(pauseSec, repeatSec);
+    else {
+      for (const word of part.split(/\s+/)) {
+        if (!word) continue;
+        words.push({ word, pauseSec });
+        pauseSec = 0;
+      }
+    }
+  }
 
-  words.forEach((word, wi) => {
+  words.forEach(({ word, pauseSec }, wi) => {
     let lead: Block | null = null;
     if (wi > 0) {
-      lead = block(t, t + wordGap, "word-gap", wordGap / u, wordGap / u);
+      const [kind, dur] = pauseSec > 0 ? (["pause", pauseSec] as const) : (["word-gap", wordGap] as const);
+      lead = block(t, t + dur, kind, dur / u, dur / u);
       blocks.push(lead);
-      t += wordGap;
+      t += dur;
     }
     keyableSymbols(word).forEach((ch, li) => {
       if (li > 0) {
@@ -236,5 +279,5 @@ export function idealTimeline(text: string, timing: Timing): Timeline {
     });
   });
 
-  return { text: words.join(" "), chars, blocks, duration: t };
+  return { text: words.map((w) => w.word).join(" "), chars, blocks, duration: t };
 }

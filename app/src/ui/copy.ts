@@ -108,6 +108,16 @@ export const PACE_LEAD_HELP =
   "character. Recording starts the moment you click either way, and the dead " +
   "air at the front is trimmed off.";
 
+export const BREAK_HELP =
+  "How long the target waits at each break in the message. It sets the pace " +
+  "cursor and the target audio. A break is never graded, so you can rest " +
+  "longer or shorter.";
+
+export const REPEAT_PAUSE_HELP =
+  "Extra time between passes when the message is sent more than once. Above " +
+  "0 it is a rest and is not graded. At 0 the passes are one word gap apart, " +
+  "and that gap is graded.";
+
 export const TIMES_HELP =
   "How many times you send the message in one take. The box still holds one " +
   "copy; the target you hear, the row the chart draws and what you are " +

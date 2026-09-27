@@ -14,8 +14,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
-import { saveUser, EMPTY_USER } from "@/io/storage";
-import { NewSession, oneLine } from "@/ui/NewSession";
+import { saveCustomDrills, saveUser, EMPTY_USER } from "@/io/storage";
+import { normalizeMessage } from "@/morse";
+import { NewSession } from "@/ui/NewSession";
 
 function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
   const onStart = vi.fn();
@@ -141,10 +142,19 @@ describe("starting a new session", () => {
     expect(text().value).toBe("CQ DE W7YFR");
   });
 
-  it("makes one message out of however it was pasted", () => {
-    /* Practice text arrives from somewhere else, with newlines in it. */
-    expect(oneLine("  cq  cq\n de   w7yfr \n")).toBe("CQ CQ DE W7YFR");
-    expect(oneLine("")).toBe("");
+  it("makes one message, with each line break as a break", () => {
+    expect(normalizeMessage("  cq  cq\n de   w7yfr \n")).toBe("CQ CQ | DE W7YFR");
+    expect(normalizeMessage("cq\r\n\n|de")).toBe("CQ | DE");
+    expect(normalizeMessage("")).toBe("");
+  });
+
+  it("shows each break in the message as a line, and sends it back as a break", async () => {
+    const user = userEvent.setup();
+    const { onStart } = open({ expected: "CQ DE K7ABC K | K7ABC DE W7YFR K" });
+    expect(text().value).toBe("CQ DE K7ABC K\nK7ABC DE W7YFR K");
+    await user.type(text(), "{Enter}tu", { initialSelectionStart: 99, initialSelectionEnd: 99 });
+    await user.click(screen.getByTestId("start-session"));
+    expect(onStart.mock.calls[0]![0].expected).toBe("CQ DE K7ABC K | K7ABC DE W7YFR K | TU");
   });
 
   it("keeps the overall speed from exceeding the character speed", async () => {
@@ -276,6 +286,17 @@ describe("starting a new session", () => {
       const tree = screen.getByRole("tree");
       const group = screen.getByRole("treeitem", { name: "Daily Sending" });
       expect(tree.getAttribute("aria-activedescendant")).toBe(group.id);
+    });
+
+    it("offers the user's own drills under Custom, filled like the rest", async () => {
+      saveUser({ ...EMPTY_USER, callsign: "W7YFR" });
+      saveCustomDrills([{ id: "custom/a", text: "CQ DE {callsign} K | {callsign} DE K7ABC" }]);
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      expect(screen.getByTestId("drill-group-custom").textContent).toBe("Custom");
+      await user.click(screen.getByTestId("drill-option-custom/a"));
+      expect(text().value).toBe("CQ DE W7YFR K\nW7YFR DE K7ABC");
     });
 
     it("fills a QSO drill from the saved details", async () => {

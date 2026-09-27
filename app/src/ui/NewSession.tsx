@@ -13,14 +13,14 @@
  * box stays editable for what it is good at: fixing a typo in your own
  * callsign, where re-grading is exactly what you want.
  *
- * A textarea rather than a line, because practice text is usually pasted from
- * somewhere and arrives with newlines in it. Whitespace collapses on the way
- * out, so a pasted paragraph is one message.
+ * A textarea rather than a line, so a message can hold long breaks: each line
+ * is one turn, and each line break goes out as a BREAK. Other whitespace
+ * collapses on the way out.
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { DRILLS, fillDrills } from "@/drills";
-import { loadUser } from "@/io/storage";
+import { loadDrills } from "@/drills";
+import { breakLines, normalizeMessage } from "@/morse";
 import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
 import { DrillPicker } from "./DrillPicker";
@@ -48,20 +48,15 @@ export interface NewSessionProps {
   onCancel(): void;
 }
 
-/** One message out of however it was pasted in. */
-export function oneLine(text: string): string {
-  return text.toUpperCase().trim().split(/\s+/).join(" ");
-}
-
 export function NewSession(props: NewSessionProps): React.ReactElement {
-  const [text, setText] = useState(props.expected.toUpperCase());
+  const [text, setText] = useState(() => breakLines(props.expected.toUpperCase()));
   const [charWpm, setCharWpm] = useState(props.charWpm);
   const [farnsworthWpm, setFarnsworthWpm] = useState(props.farnsworthWpm);
   const [times, setTimes] = useState(props.times);
   /* Upper case as it is typed, not only once Start is pressed. The message is
      upper-cased on the way out either way, and a box that shows one thing
      while promising another is the sort of small lie that makes you check. */
-  const drills = useMemo(() => fillDrills(DRILLS, loadUser()), []);
+  const drills = useMemo(loadDrills, []);
   const sent = useUpperField<HTMLTextAreaElement>(setText);
   const box = sent.ref;
 
@@ -75,7 +70,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   const start = (record: boolean) =>
     props.onStart(
       {
-        expected: oneLine(text),
+        expected: normalizeMessage(text),
         charWpm,
         // Overall speed can never exceed character speed. Clamped here rather
         // than refused, so a leftover Farnsworth setting cannot block a start.
@@ -100,8 +95,8 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
         data-testid="new-session"
         onKeyDown={(e) => {
           if (e.key === "Escape") props.onCancel();
-          // Enter sends from the speed boxes; in the textarea it is a newline,
-          // which collapses away anyway and is not worth stealing.
+          // Enter sends from the speed boxes; in the textarea it is a line
+          // break, which goes out as a BREAK.
           if (e.key === "Enter" && e.target !== box.current) start(false);
         }}
       >
@@ -117,7 +112,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
           <DrillPicker
             drills={drills}
             onPick={(d) => {
-              setText(d.text);
+              setText(breakLines(d.text));
               box.current?.focus();
             }}
           />

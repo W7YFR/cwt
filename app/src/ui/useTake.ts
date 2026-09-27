@@ -34,6 +34,7 @@ import {
   saveSpeed,
 } from "@/io/storage";
 import { defaultSettings, reviewTake } from "@/timing";
+import { BREAK_DEFAULT_SEC, REPEAT_PAUSE_DEFAULT_SEC } from "@/timing/timeline";
 import type { AudioClip, Review, ReviewSettings, Take } from "@/types";
 
 export interface LoadedTake {
@@ -137,6 +138,8 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     collapseRests: p.collapseRests ?? base.collapseRests,
     paceCursor: p.paceCursor ?? base.paceCursor,
     paceLeadSec: p.paceLeadSec ?? base.paceLeadSec,
+    breakSec: p.breakSec ?? base.breakSec,
+    repeatPauseSec: p.repeatPauseSec ?? base.repeatPauseSec,
     paceAbsolute: p.paceAbsolute ?? base.paceAbsolute,
     charMarkers: p.charMarkers ?? base.charMarkers,
     runScores: p.runScores ?? base.runScores,
@@ -164,6 +167,8 @@ function personal(prev: ReviewSettings) {
     collapseRests: prev.collapseRests,
     paceCursor: prev.paceCursor,
     paceLeadSec: prev.paceLeadSec,
+    breakSec: prev.breakSec,
+    repeatPauseSec: prev.repeatPauseSec,
     paceAbsolute: prev.paceAbsolute,
     charMarkers: prev.charMarkers,
     runScores: prev.runScores,
@@ -222,6 +227,8 @@ export function useTake(): TakeState {
       collapseRests: true,
       paceCursor: false,
       paceLeadSec: PACE_LEAD_DEFAULT_SEC,
+      breakSec: BREAK_DEFAULT_SEC,
+      repeatPauseSec: REPEAT_PAUSE_DEFAULT_SEC,
       paceAbsolute: true,
       charMarkers: false,
       /* On, because it is what a stack is for: several attempts side by side
@@ -309,6 +316,8 @@ export function useTake(): TakeState {
         collapseRests: next.collapseRests,
         paceCursor: next.paceCursor,
         paceLeadSec: next.paceLeadSec,
+        breakSec: next.breakSec,
+        repeatPauseSec: next.repeatPauseSec,
         paceAbsolute: next.paceAbsolute,
         charMarkers: next.charMarkers,
         runScores: next.runScores,
