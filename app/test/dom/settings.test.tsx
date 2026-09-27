@@ -12,7 +12,14 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Settings } from "@/ui/Settings";
 import { loadProfiles, saveProfile, selectProfile, activeProfile } from "@/io/profiles";
-import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
+import {
+  loadCustomDrills,
+  loadPrefs,
+  loadUser,
+  saveCustomDrills,
+  savePrefs,
+  saveUser,
+} from "@/io/storage";
 import type { Profile } from "@/io/profiles";
 
 const PROFILE = (over: Partial<Profile> = {}): Profile => ({
@@ -113,11 +120,11 @@ describe("the user section", () => {
   /** Lets the calibration list finish loading inside act. */
   const settle = () => act(async () => {});
 
-  it("comes first, with calibration second", async () => {
+  it("comes first, then drills, then calibration", async () => {
     open();
     await settle();
     const titles = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(titles).toEqual(["User", "Calibration"]);
+    expect(titles).toEqual(["User", "Drills", "Calibration"]);
   });
 
   it("saves each field as it is typed, and reads it back", async () => {
@@ -185,5 +192,82 @@ describe("the user section", () => {
     await settle();
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe(markup);
     expect(document.querySelector("img")).toBeNull();
+  });
+});
+
+describe("the drills section", () => {
+  const settle = () => act(async () => {});
+  const box = () => screen.getByTestId("custom-drill-text") as HTMLTextAreaElement;
+
+  async function write(text: string) {
+    const user = userEvent.setup();
+    await user.click(box());
+    await user.paste(text);
+    return user;
+  }
+
+  it("saves the whole box as one drill, in upper case with slot names kept", async () => {
+    open();
+    await settle();
+    const user = await write("cq cq de {CALLSIGN} k\n\n  vvv   vvv ");
+    expect(box().value).toBe("CQ CQ DE {callsign} K\n\n  VVV   VVV ");
+    await user.click(screen.getByTestId("save-drill"));
+    expect(loadCustomDrills().map((d) => d.text)).toEqual(["CQ CQ DE {callsign} K VVV VVV"]);
+    expect(box().value).toBe("");
+    expect(screen.getAllByTestId("drillrow").map((r) => r.querySelector("code")!.textContent)).toEqual(
+      ["CQ CQ DE {callsign} K VVV VVV"],
+    );
+  });
+
+  it("refuses a slot it does not know and a symbol with no Morse", async () => {
+    open();
+    await settle();
+    await write("HI {nmae}\nHI #");
+    expect(screen.getByTestId("drill-problems").textContent).toMatch(/\{nmae\} is not a slot/);
+    expect(screen.getByTestId("drill-problems").textContent).toMatch(/# has no Morse/);
+    expect((screen.getByTestId("save-drill") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("deletes a saved drill", async () => {
+    const user = userEvent.setup();
+    saveCustomDrills([
+      { id: "custom/a", text: "AAA" },
+      { id: "custom/b", text: "BBB" },
+    ]);
+    open();
+    await settle();
+    await user.click(screen.getAllByTestId("delete-drill")[0]!);
+    expect(loadCustomDrills()).toEqual([{ id: "custom/b", text: "BBB" }]);
+    expect(screen.getAllByTestId("drillrow")).toHaveLength(1);
+  });
+
+  it("says which details a saved drill still needs", async () => {
+    saveCustomDrills([{ id: "custom/a", text: "DE {callsign}" }]);
+    open();
+    await settle();
+    expect(screen.getByTestId("drillrow").textContent).toMatch(/Needs Callsign/);
+  });
+
+  it("lists the slots with the user's values, and adds one at the cursor", async () => {
+    const user = userEvent.setup();
+    saveUser({ ...loadUser(), callsign: "W7YFR" });
+    open();
+    await settle();
+    expect(screen.queryByTestId("drill-help")).toBeNull();
+    await user.click(screen.getByTestId("drill-help-toggle"));
+    const help = screen.getByTestId("drill-help");
+    expect(help.textContent).toMatch(/W7YFR/);
+    expect(help.textContent).toMatch(/not set/);
+
+    await write("CQ  K");
+    box().setSelectionRange(3, 3);
+    await user.click(screen.getByTestId("insert-slot-callsign"));
+    expect(box().value).toBe("CQ {callsign} K");
+    expect(box().selectionStart).toBe(13);
+  });
+
+  it("drops stored drills that are not the right shape", () => {
+    localStorage.setItem("cwt:prefs", JSON.stringify({ customDrills: [{ id: 1, text: "A" }] }));
+    expect(loadCustomDrills()).toEqual([]);
   });
 });

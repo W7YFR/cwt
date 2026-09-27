@@ -6,7 +6,8 @@
  * A drill's text can hold slots, such as `{name}`, that `fillDrill` fills from
  * the user's details. */
 
-import type { UserInfo } from "@/io/storage";
+import { loadCustomDrills, loadUser, type CustomDrill, type UserInfo } from "@/io/storage";
+import { CHAR_TO_MORSE, tokenize } from "@/morse";
 
 export interface Drill {
   /** Stable across releases: keys and test ids are built from it. */
@@ -131,6 +132,43 @@ export const DRILLS: readonly Drill[] = [
 
 function section(prefix: string, path: readonly [string, string], lines: string[]): Drill[] {
   return lines.map((text, i) => ({ id: `${prefix}/${i + 1}`, path, text }));
+}
+
+/** The group that holds the drills the user wrote. It has one section, with
+ *  no name. */
+export const CUSTOM = "Custom";
+
+export function customDrills(saved: readonly CustomDrill[]): Drill[] {
+  return saved.map((d) => ({ id: d.id, path: [CUSTOM, ""], text: d.text }));
+}
+
+/** The catalog and the user's own drills, filled from the saved details. */
+export function loadDrills(): Drill[] {
+  return fillDrills([...DRILLS, ...customDrills(loadCustomDrills())], loadUser());
+}
+
+/** Upper case with single spaces, like the catalog, with slot names kept in
+ *  lower case so that `{NAME}` typed in an upper-case field is still a slot. */
+export function normalizeDrill(text: string): string {
+  return text
+    .toUpperCase()
+    .trim()
+    .split(/\s+/)
+    .join(" ")
+    .replace(/\{[A-Z_]+\}/g, (slot) => slot.toLowerCase());
+}
+
+/** What stops a normalized text from being a drill: slots that read no user
+ *  detail, and symbols with no Morse. Empty when it can be saved. */
+export function drillProblems(text: string): string[] {
+  const unknown = slotsOf(text).filter((s) => !isSlot(s));
+  const unkeyable = new Set(
+    tokenize(text.replace(SLOT_RE, " ")).filter((t) => t !== " " && !(t in CHAR_TO_MORSE)),
+  );
+  return [
+    ...unknown.map((s) => `{${s}} is not a slot.`),
+    ...[...unkeyable].map((t) => `${t} has no Morse.`),
+  ];
 }
 
 export interface DrillGroup {

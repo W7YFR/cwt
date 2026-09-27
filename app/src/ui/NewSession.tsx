@@ -19,8 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { DRILLS, fillDrills } from "@/drills";
-import { loadUser } from "@/io/storage";
+import { loadDrills } from "@/drills";
 import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
 import { DrillPicker } from "./DrillPicker";
@@ -61,7 +60,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   /* Upper case as it is typed, not only once Start is pressed. The message is
      upper-cased on the way out either way, and a box that shows one thing
      while promising another is the sort of small lie that makes you check. */
-  const drills = useMemo(() => fillDrills(DRILLS, loadUser()), []);
+  const drills = useMemo(loadDrills, []);
   const sent = useUpperField<HTMLTextAreaElement>(setText);
   const box = sent.ref;
 

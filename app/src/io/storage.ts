@@ -399,6 +399,15 @@ export interface Prefs {
   runSort?: string;
   /** Who is sending, for drills that key your own details. */
   user?: Partial<UserInfo>;
+  /** Drills the user wrote, in the order they were saved. */
+  customDrills?: CustomDrill[];
+}
+
+/** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
+ *  slots and all. */
+export interface CustomDrill {
+  id: string;
+  text: string;
 }
 
 export interface UserInfo {
@@ -441,6 +450,14 @@ export function loadUser(): UserInfo {
 
 export function saveUser(user: UserInfo): void {
   savePrefs({ ...loadPrefs(), user });
+}
+
+export function loadCustomDrills(): CustomDrill[] {
+  return loadPrefs().customDrills ?? [];
+}
+
+export function saveCustomDrills(customDrills: CustomDrill[]): void {
+  savePrefs({ ...loadPrefs(), customDrills });
 }
 
 /* What each preference has to look like coming back off the wire.
@@ -492,6 +509,14 @@ const isUser: Check = (v) => {
   );
 };
 
+const isCustomDrills: Check = (v) =>
+  Array.isArray(v) &&
+  v.every((d: unknown) => {
+    if (typeof d !== "object" || d === null) return false;
+    const c = d as Record<string, unknown>;
+    return isStr(c.id) && isStr(c.text);
+  });
+
 const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   deviceId: isStr,
   profileId: isStr,
@@ -522,6 +547,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   wordPreview: isBool,
   runSort: isStr,
   user: isUser,
+  customDrills: isCustomDrills,
 };
 
 export function loadPrefs(): Prefs {

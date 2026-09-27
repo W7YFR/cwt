@@ -155,3 +155,14 @@ export function IconChevron({ up = false }: { up?: boolean }): React.ReactElemen
     </Icon>
   );
 }
+
+/** Help: a question mark in a ring. */
+export function IconHelp(): React.ReactElement {
+  return (
+    <Icon name="help" stroke>
+      <circle cx="8" cy="8" r="6.2" />
+      <path d="M6.1 6.3a1.95 1.95 0 1 1 2.6 1.85c-.45.17-.7.55-.7 1.05v.3" />
+      <circle cx="8" cy="11.5" r=".35" />
+    </Icon>
+  );
+}

@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
-import { saveUser, EMPTY_USER } from "@/io/storage";
+import { saveCustomDrills, saveUser, EMPTY_USER } from "@/io/storage";
 import { NewSession, oneLine } from "@/ui/NewSession";
 
 function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
@@ -276,6 +276,17 @@ describe("starting a new session", () => {
       const tree = screen.getByRole("tree");
       const group = screen.getByRole("treeitem", { name: "Daily Sending" });
       expect(tree.getAttribute("aria-activedescendant")).toBe(group.id);
+    });
+
+    it("offers the user's own drills under Custom, filled like the rest", async () => {
+      saveUser({ ...EMPTY_USER, callsign: "W7YFR" });
+      saveCustomDrills([{ id: "custom/a", text: "CQ DE {callsign} K" }]);
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      expect(screen.getByTestId("drill-group-custom").textContent).toBe("Custom");
+      await user.click(screen.getByTestId("drill-option-custom/a"));
+      expect(text().value).toBe("CQ DE W7YFR K");
     });
 
     it("fills a QSO drill from the saved details", async () => {

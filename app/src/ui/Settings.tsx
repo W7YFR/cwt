@@ -14,8 +14,17 @@
  * and cannot be got at again might as well not be.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { IconDownload } from "./Icons";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { IconDownload, IconHelp } from "./Icons";
+import {
+  SLOTS,
+  SLOT_LABELS,
+  customDrills,
+  drillProblems,
+  fillDrill,
+  normalizeDrill,
+  type Slot,
+} from "@/drills";
 import {
   deleteProfile,
   isAdjusted,
@@ -28,9 +37,12 @@ import {
   forgetCalibrationsFor,
   getCalibrationAudio,
   listCalibrations,
+  loadCustomDrills,
   loadUser,
+  saveCustomDrills,
   saveUser,
   type CalibrationSummary,
+  type CustomDrill,
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
@@ -62,6 +74,14 @@ export function Settings(props: SettingsProps): React.ReactElement {
   const [profiles, setProfiles] = useState<Profile[]>(() => loadProfiles());
   const [recordings, setRecordings] = useState<CalibrationSummary[]>([]);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [user, setUser] = useState<UserInfo>(loadUser);
+  const changeUser = useCallback((patch: Partial<UserInfo>) => {
+    setUser((u) => {
+      const next = { ...u, ...patch };
+      saveUser(next);
+      return next;
+    });
+  }, []);
 
   const refresh = useCallback(() => {
     void listCalibrations().then(setRecordings);
@@ -87,7 +107,9 @@ export function Settings(props: SettingsProps): React.ReactElement {
         <button onClick={props.onClose}>Done</button>
       </header>
 
-      <UserSection />
+      <UserSection user={user} set={changeUser} />
+
+      <DrillSection user={user} />
 
       <section className="calsection">
         <h3>Calibration</h3>
@@ -192,16 +214,13 @@ export function Settings(props: SettingsProps): React.ReactElement {
 
 /** Upper case, like everything else that gets keyed. Saved on every change,
  *  so Done has nothing left to do. */
-function UserSection(): React.ReactElement {
-  const [user, setUser] = useState<UserInfo>(loadUser);
-  const set = useCallback((patch: Partial<UserInfo>) => {
-    setUser((u) => {
-      const next = { ...u, ...patch };
-      saveUser(next);
-      return next;
-    });
-  }, []);
-
+function UserSection({
+  user,
+  set,
+}: {
+  user: UserInfo;
+  set(patch: Partial<UserInfo>): void;
+}): React.ReactElement {
   return (
     <section>
       <h3>User</h3>
@@ -277,6 +296,187 @@ function UserSection(): React.ReactElement {
           onChange={(antenna) => set({ antenna })}
         />
       </div>
+    </section>
+  );
+}
+
+const SLOT_NAMES = Object.keys(SLOTS) as Slot[];
+
+const drillId = () =>
+  `custom/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+/** Slot names stay lower case as they are typed, the way they are saved. The
+ *  length does not change, so the caret stays in place. */
+const lowerSlots = (v: string) => v.replace(/\{[^}\s]*\}?/g, (m) => m.toLowerCase());
+
+/** Drills the user writes. The drill picker shows them under
+ *  Custom, filled from the user details like the catalog's own. */
+function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
+  const [saved, setSaved] = useState<CustomDrill[]>(loadCustomDrills);
+  const [text, setText] = useState("");
+  const [help, setHelp] = useState(false);
+  const field = useUpperField<HTMLTextAreaElement>((v) => setText(lowerSlots(v)));
+  const caretAfterInsert = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const el = field.ref.current;
+    const at = caretAfterInsert.current;
+    caretAfterInsert.current = null;
+    if (el && at !== null) {
+      el.focus();
+      el.setSelectionRange(at, at);
+    }
+  });
+
+  const drill = normalizeDrill(text);
+  const problems = drillProblems(drill);
+  const canSave = drill !== "" && problems.length === 0;
+
+  const store = (next: CustomDrill[]) => {
+    saveCustomDrills(next);
+    setSaved(next);
+  };
+
+  const save = () => {
+    if (!canSave) return;
+    store([...saved, { id: drillId(), text: drill }]);
+    setText("");
+  };
+
+  const insert = (slot: Slot) => {
+    const el = field.ref.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    const token = `{${slot}}`;
+    setText(text.slice(0, start) + token + text.slice(end));
+    caretAfterInsert.current = start + token.length;
+  };
+
+  return (
+    <section className="drillsettings">
+      <h3>Drills</h3>
+      <p className="lede">
+        Your own drills. They show in the drill picker under Custom.
+      </p>
+
+      <div className="fieldrow">
+        <label htmlFor="custom-drill">New drill</label>
+        <button
+          type="button"
+          className="iconbtn helpbtn"
+          data-testid="drill-help-toggle"
+          aria-label="How to write a drill"
+          aria-expanded={help}
+          aria-controls="drill-help"
+          title="How to write a drill"
+          onClick={() => setHelp((h) => !h)}
+        >
+          <IconHelp />
+        </button>
+      </div>
+
+      <textarea
+        id="custom-drill"
+        className="drilltext"
+        data-testid="custom-drill-text"
+        ref={field.ref}
+        rows={3}
+        spellCheck={false}
+        value={text}
+        placeholder="CQ CQ DE {callsign} K"
+        onChange={field.onChange}
+      />
+      {problems.length > 0 && (
+        <ul className="drillproblems" data-testid="drill-problems" role="alert">
+          {problems.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      )}
+      <div className="drillsave">
+        <button data-testid="save-drill" disabled={!canSave} onClick={save}>
+          Save drill
+        </button>
+      </div>
+
+      {help && (
+        <div id="drill-help" className="drillhelp" data-testid="drill-help">
+          <p>
+            Type anything that has Morse: letters, numbers, punctuation, and
+            prosigns in angle brackets, such as <code>&lt;BT&gt;</code> or{" "}
+            <code>&lt;SK&gt;</code>.
+          </p>
+          <p>
+            A slot in braces takes a value from User when you pick the drill.
+            Click a slot to add it at the cursor. A drill with an empty slot
+            cannot be picked until you set that value.
+          </p>
+          <table className="slottable">
+            <thead>
+              <tr>
+                <th>Slot</th>
+                <th>Field</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SLOT_NAMES.map((slot) => {
+                const value = user[SLOTS[slot]].trim();
+                return (
+                  <tr key={slot}>
+                    <td>
+                      <button
+                        type="button"
+                        className="slotbtn"
+                        data-testid={`insert-slot-${slot}`}
+                        onClick={() => insert(slot)}
+                      >
+                        {`{${slot}}`}
+                      </button>
+                    </td>
+                    <td>{SLOT_LABELS[slot]}</td>
+                    <td className={value ? "slotvalue" : "slotvalue unset"}>
+                      {value || "not set"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="hint">
+            Example: <code>CQ CQ DE {"{callsign}"} K</code> keys as{" "}
+            <code>{fillDrill({ id: "", path: ["", ""], text: "CQ CQ DE {callsign} K" }, user).text}</code>.
+          </p>
+        </div>
+      )}
+
+      {saved.length === 0 ? (
+        <p className="lede">No custom drills yet.</p>
+      ) : (
+        <ul className="callist" data-testid="drilllist">
+          {customDrills(saved).map((d) => {
+            const missing = fillDrill(d, user).missing ?? [];
+            return (
+              <li key={d.id} data-testid="drillrow" data-id={d.id}>
+                <div className="calmeta">
+                  <code className="drillrowtext">{d.text}</code>
+                  {missing.length > 0 && (
+                    <span className="hint">
+                      Needs {missing.map((s) => SLOT_LABELS[s]).join(", ")}.
+                    </span>
+                  )}
+                </div>
+                <button
+                  data-testid="delete-drill"
+                  onClick={() => store(saved.filter((x) => x.id !== d.id))}
+                >
+                  Delete
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

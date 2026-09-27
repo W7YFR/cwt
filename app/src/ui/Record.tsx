@@ -10,8 +10,7 @@
 import { useMemo, useRef } from "react";
 import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
-import { DRILLS, fillDrills, type Drill } from "@/drills";
-import { loadUser } from "@/io/storage";
+import { loadDrills, type Drill } from "@/drills";
 import { profilesFor, type Profile } from "@/io/profiles";
 import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
@@ -234,9 +233,9 @@ export function RecordBar({
   configuring = false,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
-  // Read on mount: the configuration page, where the details change, replaces
-  // this screen while it is open.
-  const drills = useMemo(() => fillDrills(DRILLS, loadUser()), []);
+  // Read on mount: the configuration page, where the details and the custom
+  // drills change, replaces this screen while it is open.
+  const drills = useMemo(loadDrills, []);
 
   if (rec.recorder) {
     return (
