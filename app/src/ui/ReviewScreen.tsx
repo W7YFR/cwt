@@ -873,7 +873,6 @@ export function ReviewScreen({
           expected={settings.expected}
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
-          times={settings.times}
           onCancel={() => setStarting(false)}
           onStart={(next, record) => {
             setStarting(false);

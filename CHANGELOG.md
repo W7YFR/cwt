@@ -13,6 +13,10 @@ nothing to the site. The next release carries them.
 - **Edit** on a custom drill in Configuration › Drills loads it into the text box. **Save changes** updates the drill in its place in the list.
 - An **Insert slot** menu adds a slot, such as `{rig_model}`, at the cursor in a custom drill. An **Insert** menu in **New session** adds a value from User, such as your callsign.
 
+### Changed
+
+- **New session** opens with **Times** at 1.
+
 ### Fixed
 
 - A recording no longer cuts off at five minutes while the message is still being sent. It finishes itself 30 s after the target's end.

@@ -32,8 +32,6 @@ import { useUpperField } from "./useUpperField";
 export interface NewSessionProps {
   charWpm: number;
   farnsworthWpm: number;
-  /** How many passes of the message make up one attempt — see ReviewSettings. */
-  times: number;
   expected: string;
   /** Begin the session. `record` asks for the microphone to open as the
    *  dialog closes — the same act, without the trip back through the record
@@ -54,7 +52,8 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   const [text, setText] = useState(() => breakLines(props.expected.toUpperCase()));
   const [charWpm, setCharWpm] = useState(props.charWpm);
   const [farnsworthWpm, setFarnsworthWpm] = useState(props.farnsworthWpm);
-  const [times, setTimes] = useState(props.times);
+  // A new session starts at one pass, whatever the last one ran.
+  const [times, setTimes] = useState(1);
   /* Upper case as it is typed, not only once Start is pressed. The message is
      upper-cased on the way out either way, and a box that shows one thing
      while promising another is the sort of small lie that makes you check. */
