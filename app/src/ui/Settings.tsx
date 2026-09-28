@@ -303,6 +303,8 @@ function UserSection({
 
 const SLOT_NAMES = Object.keys(SLOTS) as Slot[];
 
+const isSlotName = (s: string): s is Slot => (SLOT_NAMES as string[]).includes(s);
+
 const drillId = () =>
   `custom/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -386,18 +388,40 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
 
       <div className="fieldrow">
         <label htmlFor="custom-drill">{editing ? "Edit drill" : "New drill"}</label>
-        <button
-          type="button"
-          className="iconbtn helpbtn"
-          data-testid="drill-help-toggle"
-          aria-label="How to write a drill"
-          aria-expanded={help}
-          aria-controls="drill-help"
-          title="How to write a drill"
-          onClick={() => setHelp((h) => !h)}
-        >
-          <IconHelp />
-        </button>
+        <div className="drilltools">
+          {/* Always reads "Insert slot": a pick inserts the slot, then the
+              menu resets. */}
+          <select
+            data-testid="insert-slot"
+            aria-label="Insert slot"
+            value=""
+            onChange={(e) => {
+              const slot = e.target.value;
+              if (isSlotName(slot)) insert(slot);
+            }}
+          >
+            <option value="" disabled>
+              Insert slot
+            </option>
+            {SLOT_NAMES.map((slot) => (
+              <option key={slot} value={slot}>
+                {`{${slot}}`} · {SLOT_LABELS[slot]}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="iconbtn helpbtn"
+            data-testid="drill-help-toggle"
+            aria-label="How to write a drill"
+            aria-expanded={help}
+            aria-controls="drill-help"
+            title="How to write a drill"
+            onClick={() => setHelp((h) => !h)}
+          >
+            <IconHelp />
+          </button>
+        </div>
       </div>
 
       <textarea

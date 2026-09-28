@@ -317,6 +317,18 @@ describe("the drills section", () => {
     expect(box().selectionStart).toBe(13);
   });
 
+  it("adds a slot picked from the menu at the cursor", async () => {
+    const user = userEvent.setup();
+    open();
+    await settle();
+    await write("DE  K");
+    box().setSelectionRange(3, 3);
+    await user.selectOptions(screen.getByTestId("insert-slot"), "rig_model");
+    expect(box().value).toBe("DE {rig_model} K");
+    expect(box().selectionStart).toBe(14);
+    expect((screen.getByTestId("insert-slot") as HTMLSelectElement).value).toBe("");
+  });
+
   it("drops stored drills that are not the right shape", () => {
     localStorage.setItem("cwt:prefs", JSON.stringify({ customDrills: [{ id: 1, text: "A" }] }));
     expect(loadCustomDrills()).toEqual([]);
