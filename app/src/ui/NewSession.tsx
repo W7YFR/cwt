@@ -20,18 +20,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { loadDrills } from "@/drills";
+import { loadUser } from "@/io/storage";
 import { breakLines, normalizeMessage } from "@/morse";
 import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
 import { DrillPicker } from "./DrillPicker";
 import { RecDot } from "./Record";
+import { SlotMenu, slotValue, useInsertAtCursor } from "./SlotMenu";
 import { useUpperField } from "./useUpperField";
 
 export interface NewSessionProps {
   charWpm: number;
   farnsworthWpm: number;
-  /** How many passes of the message make up one attempt — see ReviewSettings. */
-  times: number;
   expected: string;
   /** Begin the session. `record` asks for the microphone to open as the
    *  dialog closes — the same act, without the trip back through the record
@@ -52,13 +52,16 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   const [text, setText] = useState(() => breakLines(props.expected.toUpperCase()));
   const [charWpm, setCharWpm] = useState(props.charWpm);
   const [farnsworthWpm, setFarnsworthWpm] = useState(props.farnsworthWpm);
-  const [times, setTimes] = useState(props.times);
+  // A new session starts at one pass, whatever the last one ran.
+  const [times, setTimes] = useState(1);
   /* Upper case as it is typed, not only once Start is pressed. The message is
      upper-cased on the way out either way, and a box that shows one thing
      while promising another is the sort of small lie that makes you check. */
   const drills = useMemo(loadDrills, []);
+  const user = useMemo(loadUser, []);
   const sent = useUpperField<HTMLTextAreaElement>(setText);
   const box = sent.ref;
+  const insert = useInsertAtCursor(box, text, setText);
 
   /* Straight into the textarea: the message is the reason the dialog opened,
      and the speeds usually carry over from the session before it. */
@@ -109,6 +112,12 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
 
         <div className="fieldrow">
           <label htmlFor="ns-text">Target message</label>
+          {/* The message holds no slots, so a pick inserts the slot's value. */}
+          <SlotMenu
+            label="Insert"
+            user={user}
+            onPick={(slot) => insert(slotValue(slot, user))}
+          />
           <DrillPicker
             drills={drills}
             onPick={(d) => {

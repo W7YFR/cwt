@@ -457,10 +457,13 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
     /* The message you meant to send, and nothing else. It is the reference, so
        it is never marked up — a character cannot be wrong in the text that
        defines what right is. Where some run sent something that was not asked
-       for there is no intended character at all, and the blank says so. */
-    ctx.fillStyle = C.ink;
-    ctx.font = `600 12px ${C.mono}`;
-    caption(ctx, ideal ? ideal.char : "·", bx, tgtCapY(scene));
+       for there is no intended character at all. The caption stays empty,
+       because any glyph there reads as a character. */
+    if (ideal) {
+      ctx.fillStyle = C.ink;
+      ctx.font = `600 12px ${C.mono}`;
+      caption(ctx, ideal.char, bx, tgtCapY(scene));
+    }
 
     // Where the character starts, when the gaps arriving here disagree about
     // it. Drawn once, down the whole stack: it is a fact about the column.

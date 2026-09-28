@@ -110,7 +110,10 @@ export function sentCaption(slot: Slot, blank: boolean): { text: string; bad: bo
   }
   if (slot.op === "del" && slot.ideal) return { text: `–${slot.ideal.char}`, bad: true };
   if (slot.op === "ins" && slot.actual) return { text: `+${slot.actual.char}`, bad: true };
-  return { text: slot.actual ? slot.actual.char : "·", bad: false };
+  // A match can pair two names of one pattern, such as <DN> and /. The
+  // caption uses the intended name.
+  if (slot.op === "equal" && slot.ideal) return { text: slot.ideal.char, bad: false };
+  return { text: slot.actual ? slot.actual.char : "", bad: false };
 }
 
 /** Right edge of a caption that starts at `from`. A caption starts where its
@@ -230,7 +233,7 @@ export function measureColumns(
       reach = Math.max(
         reach,
         captionEnd(sentCaption(slot, false).text, bx),
-        captionEnd(slot.ideal?.char ?? "·", bx),
+        captionEnd(slot.ideal?.char ?? "", bx),
       );
     });
   });

@@ -7,12 +7,31 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.4.0 — 2026-09-28
+
+### Added
+
+- Daily Sending › Warm Up ends with a drill of the first four warm-ups, with a break between each. Daily Sending › Exercise ends with all four exercises the same way.
+- **Edit** on a custom drill in Configuration › Drills loads it into the text box. **Save changes** updates the drill in its place in the list.
+- An **Insert slot** menu adds a slot, such as `{rig_model}`, at the cursor in a custom drill. An **Insert** menu in **New session** adds a value from User, such as your callsign.
+
+### Changed
+
+- **New session** opens with **Times** at 1.
+
+### Fixed
+
+- A recording no longer cuts off at five minutes while the message is still being sent. It finishes itself 30 s after the target's end.
+- A correctly sent character shows as the intended text spells it, in a run's caption and in **Decoded**. For example, a keyed `<DN>` shows as `<DN>`, not `/`. The built-in drills write `/` in place of `<DN>`.
+- The target row shows no caption over an extra character. It no longer shows a dot there.
+
 ### Development
 
 - `CHANGELOG.md` holds one entry per release. A branch writes its entry under Unreleased, and `make bump` moves it under the new version. CI fails a release with no entry.
 - `make pr` bumps the version, pushes the branch, and opens or updates its pull request. The body is the branch's changelog entry.
 - `make release` uses the entry as the tag message and the GitHub release notes. It stops unless the branch's pull request is merged.
 - `CLAUDE.md` describes the contributor workflow and the changelog rules. `/changelog-check` checks a branch's entry against its diff.
+- Claude suggests a one-line commit message for each staged part.
 
 ## v1.3.0 — 2026-09-27
 

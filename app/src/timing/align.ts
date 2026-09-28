@@ -163,10 +163,16 @@ export function compareText(expected: string, decoded: string): Comparison {
   }
 
   const collapse = (s: string) => s.toUpperCase().trim().split(/\s+/).join(" ");
+  // A match takes the intended spelling, so a keyed <DN> reads as <DN>
+  // where the intended text has <DN>, and as / where it has /.
+  const spelled = ops
+    .filter((o) => o.b !== null)
+    .map((o) => (o.op === "equal" ? o.a! : o.b!))
+    .join("");
 
   return {
     expected: collapse(expected),
-    decoded: collapse(decoded),
+    decoded: collapse(spelled),
     accuracy: exp.length ? matches / exp.length : 1,
     nExpected: exp.length,
     substitutions: subs,

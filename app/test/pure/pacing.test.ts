@@ -9,8 +9,17 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { beatsFor, pacedEnd, pacedStart, wordAt, wordsFor } from "@/ui/pacing";
-import { buildTimeline, idealTimeline, targetTiming } from "@/timing";
+import {
+  RECORD_OVERRUN_SEC,
+  beatsFor,
+  pacedEnd,
+  pacedStart,
+  recordLimit,
+  wordAt,
+  wordsFor,
+} from "@/ui/pacing";
+import { buildTimeline, defaultSettings, idealTimeline, reviewTake, targetTiming } from "@/timing";
+import { blankTake } from "@/io/take";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
 
 const TIMING = targetTiming(15, 15);
@@ -122,5 +131,26 @@ describe("the target split into words", () => {
     const got = wordsFor(idealTimeline("CQ DE", TIMING));
     expect(wordAt(got, 4)).toBe(1);
     expect(wordAt(got, 99)).toBe(1);
+  });
+});
+
+describe("the recording limit", () => {
+  const base = defaultSettings(blankTake({ expected: null, charWpm: 20, farnsworthWpm: 20 }));
+  const settings = { ...base, expected: "CQ CQ DE W7YFR K", times: 2 };
+
+  it("runs past the end of the target by the overrun", () => {
+    const take = blankTake({ expected: settings.expected, charWpm: 20, farnsworthWpm: 20 });
+    const { ideal } = reviewTake(take, settings);
+    const end = pacedEnd(ideal, settings.paceLeadSec, 0)!;
+    expect(recordLimit(settings)).toBeCloseTo(end + RECORD_OVERRUN_SEC, 9);
+  });
+
+  it("grows with each pass of the message", () => {
+    const once = recordLimit({ ...settings, times: 1 })!;
+    expect(recordLimit(settings)!).toBeGreaterThan(once);
+  });
+
+  it("has no limit without a message", () => {
+    expect(recordLimit({ ...settings, expected: "" })).toBeNull();
   });
 });

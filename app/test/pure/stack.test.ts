@@ -145,22 +145,21 @@ describe("a stack of attempts", () => {
         .map((c) => c.text);
 
     for (const scene of [stack(reviews().slice(0, 1)), stack(reviews())]) {
-      expect(onTargetRow(scene).filter((t) => t !== "·")).toEqual(target);
+      expect(onTargetRow(scene)).toEqual(target);
     }
   });
 
-  it("says nothing was asked for, where a run keyed something extra", () => {
-    /* An interstice belongs to whichever run put a character there, but the
-       fact that the target wanted nothing is a property of the column — so it
-       has to be said even when the run being read is not that one. */
+  it("leaves the target caption empty, where a run keyed something extra", () => {
+    /* Any glyph over an interstice reads as a character the target asked
+       for, so the target row names only the characters it holds. */
     const scene = stack(reviews(), 0);
-    const interstices = scene.columns!.ideal.filter((c) => c === null).length;
-    expect(interstices).toBeGreaterThan(0);
+    const cols = scene.columns!;
+    expect(cols.ideal.filter((c) => c === null).length).toBeGreaterThan(0);
 
-    const dots = paint(scene)
+    const onTargetRow = paint(scene)
       .ofType("fillText")
-      .filter((c) => c.text === "·" && Math.abs(c.args[1]! - (scene.rows.tgtLabel + LABEL_H - CAP_CHAR)) < 2);
-    expect(dots).toHaveLength(interstices);
+      .filter((c) => Math.abs(c.args[1]! - (scene.rows.tgtLabel + LABEL_H - CAP_CHAR)) < 2);
+    expect(onTargetRow).toHaveLength(cols.ideal.filter((c) => c !== null).length);
   });
 
   it("lines the runs up, so a column means the same thing on every row", () => {

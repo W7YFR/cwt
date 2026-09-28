@@ -1315,6 +1315,9 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   color: var(--ink-dim);
 }
 
+/* Right-aligned beside the drill picker's button. */
+.dialog .fieldrow .slotmenu { margin-left: auto; }
+
 /* ---- drill picker --------------------------------------------------------- */
 
 /* In the dialog's flow rather than floating over it: the dialog scrolls, and
@@ -2018,6 +2021,7 @@ button.danger { border-color: var(--bad); color: var(--bad); }
   letter-spacing: .08em;
   color: var(--ink-dim);
 }
+.drilltools { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .helpbtn { font-size: 16px; }
 .helpbtn[aria-expanded="true"] { border-color: var(--you); color: var(--you); }
 .drilltext {
@@ -2064,7 +2068,9 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .slotvalue { font-family: var(--mono); color: var(--ink); overflow-wrap: anywhere; }
 .slotvalue.unset { font-family: inherit; color: var(--ink-faint); font-style: italic; }
 .drillproblems { margin: 0; padding-left: 18px; font-size: 12px; color: var(--bad); }
-.drillsave { display: flex; justify-content: flex-end; }
+.drillsave { display: flex; justify-content: flex-end; gap: 8px; }
+.drillrowactions { display: flex; gap: 8px; flex-shrink: 0; }
+.callist li[data-editing="true"] { border-color: var(--you); }
 .drillrowtext { font-size: 13px; overflow-wrap: anywhere; white-space: pre-line; }
 
 /* Overriding the measurement. Below the preview, because a slider whose

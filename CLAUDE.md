@@ -12,7 +12,9 @@ When asked, Claude stages work for review. Work on several changes at once
 can then be committed in parts: Claude stages the hunks for one part, and the
 contributor reviews and commits it. Staging changes only the index. Claude
 never resets or moves the branch. Claude may suggest a commit message for the
-staged part, but the contributor commits it.
+staged part, but the contributor commits it. A suggested message is one line:
+a type prefix and a summary, such as `fix: caption a matched prosign`. It has
+no body and no trailer.
 
 1. Claude or the contributor branches from `main` with a type prefix:
    `feat/` (minor), `fix/` or `chore/` (patch). The prefix sets the version

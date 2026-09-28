@@ -26,6 +26,7 @@ import { ReviewScreen } from "./ReviewScreen";
 import { useFileDrop } from "./useFileDrop";
 import { OPEN_FILE_CLOSED } from "./copy";
 import { useMicAccess } from "./useMicAccess";
+import { recordLimit } from "./pacing";
 import { useTake } from "./useTake";
 
 /** How long the boot may take before it says anything.
@@ -232,6 +233,12 @@ export function App(): React.ReactElement {
     [intended, profile, take],
   );
 
+  // The landing screen records against the intended message at the set speeds.
+  const landingLimit = useMemo(
+    () => recordLimit({ ...take.settings, expected: intended }) ?? undefined,
+    [intended, take.settings],
+  );
+
   /* Opening a file lives here rather than on the landing screen, because a
      drop is answered anywhere on the page and the review is a page too: having
      looked at one recording, dragging the next one on is the obvious move. */
@@ -421,6 +428,7 @@ export function App(): React.ReactElement {
           onAudio={onAudio}
           onFile={(file) => void openFile(file)}
           onError={setError}
+          maxSeconds={landingLimit}
           deviceId={deviceId}
           onDeviceChange={chooseDevice}
           profiles={profiles}

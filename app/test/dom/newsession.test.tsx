@@ -26,7 +26,6 @@ function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
       expected="CQ DE W7YFR"
       charWpm={20}
       farnsworthWpm={20}
-      times={1}
       onStart={onStart}
       onCancel={onCancel}
       {...over}
@@ -62,10 +61,10 @@ describe("starting a new session", () => {
        payload, so nothing about what the session IS can differ between the
        two ways out. */
     const user = userEvent.setup();
-    const { onStart } = open({ expected: "CQ TEST", times: 2 });
+    const { onStart } = open({ expected: "CQ TEST" });
     await user.click(screen.getByTestId("start-session-recording"));
     expect(onStart).toHaveBeenCalledWith(
-      { expected: "CQ TEST", charWpm: 20, farnsworthWpm: 20, times: 2 },
+      { expected: "CQ TEST", charWpm: 20, farnsworthWpm: 20, times: 1 },
       true,
     );
   });
@@ -91,13 +90,12 @@ describe("starting a new session", () => {
 
   it("collects how many passes make up an attempt", async () => {
     /* Part of what a session is fixed at, like the speed: a stack whose rows
-       are one pass and five passes is not comparable either. It opens at
-       whatever the session before it ran, so the common case is to leave it
-       alone. */
+       are one pass and five passes is not comparable either. It opens at one
+       pass, whatever the session before it ran. */
     const user = userEvent.setup();
-    const { onStart } = open({ times: 3 });
+    const { onStart } = open();
     const box = screen.getByLabelText(/times/i) as HTMLInputElement;
-    expect(box.value).toBe("3");
+    expect(box.value).toBe("1");
     await user.clear(box);
     await user.type(box, "5");
     await user.click(screen.getByTestId("start-session"));
@@ -108,8 +106,11 @@ describe("starting a new session", () => {
     /* Emptying the box leaves nothing under the caret to parse, and a NaN
        reaching the target builder is an empty sheet rather than a short one. */
     const user = userEvent.setup();
-    const { onStart } = open({ times: 3 });
-    await user.clear(screen.getByLabelText(/times/i));
+    const { onStart } = open();
+    const box = screen.getByLabelText(/times/i);
+    await user.clear(box);
+    await user.type(box, "3");
+    await user.clear(box);
     await user.click(screen.getByTestId("start-session"));
     expect(onStart.mock.calls[0]![0].times).toBe(3);
   });
@@ -195,6 +196,46 @@ describe("starting a new session", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(dialog).toHaveAccessibleName(/new session/i);
+  });
+
+  describe("inserting a slot", () => {
+    const menu = () => screen.getByTestId("insert-slot") as HTMLSelectElement;
+
+    it("adds the slot's value at the cursor", async () => {
+      saveUser({ ...EMPTY_USER, callsign: "W7YFR" });
+      const user = userEvent.setup();
+      open({ expected: "CQ DE  K" });
+      text().setSelectionRange(6, 6);
+      await user.selectOptions(menu(), "callsign");
+      expect(text().value).toBe("CQ DE W7YFR K");
+      expect(text().selectionStart).toBe(11);
+      expect(menu().value).toBe("");
+    });
+
+    it("reads Insert, since the message holds values rather than slots", () => {
+      open();
+      expect(screen.getByLabelText("Insert")).toBe(menu());
+      expect(menu().options[0]!.textContent).toBe("Insert");
+    });
+
+    it("will not pick a slot with no value, and says so", () => {
+      saveUser({ ...EMPTY_USER, callsign: "W7YFR" });
+      open();
+      const option = (slot: string) =>
+        menu().querySelector(`option[value="${slot}"]`) as HTMLOptionElement;
+      expect(option("callsign").disabled).toBe(false);
+      expect(option("callsign").textContent).toBe("Callsign · W7YFR");
+      expect(option("name").disabled).toBe(true);
+      expect(option("name").textContent).toBe("Name · not set");
+    });
+
+    it("takes Enter on the menu as a pick, not a start", async () => {
+      const user = userEvent.setup();
+      const { onStart } = open();
+      menu().focus();
+      await user.keyboard("{Enter}");
+      expect(onStart).not.toHaveBeenCalled();
+    });
   });
 
   describe("picking a drill", () => {

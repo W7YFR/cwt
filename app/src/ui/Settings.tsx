@@ -14,10 +14,9 @@
  * and cannot be got at again might as well not be.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IconDownload, IconHelp } from "./Icons";
 import {
-  SLOTS,
   SLOT_LABELS,
   customDrills,
   drillProblems,
@@ -46,6 +45,7 @@ import {
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
+import { SLOT_NAMES, SlotMenu, slotValue, useInsertAtCursor } from "./SlotMenu";
 import { breakLines } from "@/morse";
 
 export interface SettingsProps {
@@ -301,8 +301,6 @@ function UserSection({
   );
 }
 
-const SLOT_NAMES = Object.keys(SLOTS) as Slot[];
-
 const drillId = () =>
   `custom/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -315,19 +313,11 @@ const lowerSlots = (v: string) => v.replace(/\{[^}\s]*\}?/g, (m) => m.toLowerCas
 function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
   const [saved, setSaved] = useState<CustomDrill[]>(loadCustomDrills);
   const [text, setText] = useState("");
+  /** The saved drill the box holds, or null when it holds a new one. */
+  const [editing, setEditing] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const field = useUpperField<HTMLTextAreaElement>((v) => setText(lowerSlots(v)));
-  const caretAfterInsert = useRef<number | null>(null);
-
-  useLayoutEffect(() => {
-    const el = field.ref.current;
-    const at = caretAfterInsert.current;
-    caretAfterInsert.current = null;
-    if (el && at !== null) {
-      el.focus();
-      el.setSelectionRange(at, at);
-    }
-  });
+  const insertText = useInsertAtCursor(field.ref, text, setText);
 
   const drill = normalizeDrill(text);
   const problems = drillProblems(drill);
@@ -338,20 +328,35 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
     setSaved(next);
   };
 
+  // An edit keeps the drill's id and its place in the list.
   const save = () => {
     if (!canSave) return;
-    store([...saved, { id: drillId(), text: drill }]);
+    store(
+      editing
+        ? saved.map((d) => (d.id === editing ? { ...d, text: drill } : d))
+        : [...saved, { id: drillId(), text: drill }],
+    );
+    setEditing(null);
     setText("");
   };
 
-  const insert = (slot: Slot) => {
-    const el = field.ref.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    const token = `{${slot}}`;
-    setText(text.slice(0, start) + token + text.slice(end));
-    caretAfterInsert.current = start + token.length;
+  const edit = (d: CustomDrill) => {
+    setEditing(d.id);
+    setText(breakLines(d.text));
+    field.ref.current?.focus();
   };
+
+  const cancel = () => {
+    setEditing(null);
+    setText("");
+  };
+
+  const remove = (id: string) => {
+    if (id === editing) cancel();
+    store(saved.filter((x) => x.id !== id));
+  };
+
+  const insert = (slot: Slot) => insertText(`{${slot}}`);
 
   return (
     <section className="drillsettings">
@@ -361,19 +366,22 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
       </p>
 
       <div className="fieldrow">
-        <label htmlFor="custom-drill">New drill</label>
-        <button
-          type="button"
-          className="iconbtn helpbtn"
-          data-testid="drill-help-toggle"
-          aria-label="How to write a drill"
-          aria-expanded={help}
-          aria-controls="drill-help"
-          title="How to write a drill"
-          onClick={() => setHelp((h) => !h)}
-        >
-          <IconHelp />
-        </button>
+        <label htmlFor="custom-drill">{editing ? "Edit drill" : "New drill"}</label>
+        <div className="drilltools">
+          <SlotMenu onPick={insert} />
+          <button
+            type="button"
+            className="iconbtn helpbtn"
+            data-testid="drill-help-toggle"
+            aria-label="How to write a drill"
+            aria-expanded={help}
+            aria-controls="drill-help"
+            title="How to write a drill"
+            onClick={() => setHelp((h) => !h)}
+          >
+            <IconHelp />
+          </button>
+        </div>
       </div>
 
       <textarea
@@ -396,8 +404,13 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
       )}
       <div className="drillsave">
         <button data-testid="save-drill" disabled={!canSave} onClick={save}>
-          Save drill
+          {editing ? "Save changes" : "Save drill"}
         </button>
+        {editing && (
+          <button data-testid="cancel-edit" onClick={cancel}>
+            Cancel
+          </button>
+        )}
       </div>
 
       {help && (
@@ -428,7 +441,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
             </thead>
             <tbody>
               {SLOT_NAMES.map((slot) => {
-                const value = user[SLOTS[slot]].trim();
+                const value = slotValue(slot, user);
                 return (
                   <tr key={slot}>
                     <td>
@@ -464,7 +477,12 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
           {customDrills(saved).map((d) => {
             const missing = fillDrill(d, user).missing ?? [];
             return (
-              <li key={d.id} data-testid="drillrow" data-id={d.id}>
+              <li
+                key={d.id}
+                data-testid="drillrow"
+                data-id={d.id}
+                data-editing={d.id === editing}
+              >
                 <div className="calmeta">
                   <code className="drillrowtext">{breakLines(d.text)}</code>
                   {missing.length > 0 && (
@@ -473,12 +491,14 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
                     </span>
                   )}
                 </div>
-                <button
-                  data-testid="delete-drill"
-                  onClick={() => store(saved.filter((x) => x.id !== d.id))}
-                >
-                  Delete
-                </button>
+                <div className="drillrowactions">
+                  <button data-testid="edit-drill" onClick={() => edit(d)}>
+                    Edit
+                  </button>
+                  <button data-testid="delete-drill" onClick={() => remove(d.id)}>
+                    Delete
+                  </button>
+                </div>
               </li>
             );
           })}

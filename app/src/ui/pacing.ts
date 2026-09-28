@@ -10,7 +10,9 @@
  * timeline directly rather than by running a recording.
  */
 
-import type { Timeline } from "@/types";
+import type { ReviewSettings, Timeline } from "@/types";
+import { blankTake } from "@/io/take";
+import { reviewTake } from "@/timing";
 import { opensWord } from "@/timing/timeline";
 
 /** One character, and the moment on the recorder's clock it should be sent. */
@@ -53,6 +55,26 @@ export function pacedEnd(
   const last = ideal.chars[ideal.chars.length - 1];
   if (!last) return null;
   return leadSec + (last.t1 - pacedStart(ideal)) + afterSec;
+}
+
+/** How far past the target's end a recording may run before it stops. */
+export const RECORD_OVERRUN_SEC = 30;
+
+/** The longest a recording of the intended message may run, or null when
+ *  there is no message to time.
+ *
+ * The target at the set speeds, with its passes, breaks and delay start, plus
+ * `RECORD_OVERRUN_SEC`. */
+export function recordLimit(settings: ReviewSettings): number | null {
+  const { ideal } = reviewTake(
+    blankTake({
+      expected: settings.expected || null,
+      charWpm: settings.charWpm,
+      farnsworthWpm: settings.farnsworthWpm,
+    }),
+    settings,
+  );
+  return pacedEnd(ideal, settings.paceLeadSec, RECORD_OVERRUN_SEC);
 }
 
 /** One word of the target, as a span of beats.
