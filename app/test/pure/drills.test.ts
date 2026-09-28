@@ -156,3 +156,18 @@ describe("custom drills", () => {
     expect(groups.at(-1)).toEqual({ name: CUSTOM, sections: [{ name: "", drills: custom }] });
   });
 });
+
+describe("the combined drills", () => {
+  const texts = (prefix: string, n: number) =>
+    Array.from({ length: n }, (_, i) => DRILLS.find((d) => d.id === `${prefix}/${i + 1}`)!.text);
+
+  it("end the warm-up with the first four warm-ups, a break between each", () => {
+    const combined = DRILLS.find((d) => d.id === "daily-sending/warm-up/6")!;
+    expect(combined.text).toBe(texts("daily-sending/warm-up", 4).join(" | "));
+  });
+
+  it("end the exercises with all four exercises, a break between each", () => {
+    const combined = DRILLS.find((d) => d.id === "daily-sending/exercise/5")!;
+    expect(combined.text).toBe(texts("daily-sending/exercise", 4).join(" | "));
+  });
+});

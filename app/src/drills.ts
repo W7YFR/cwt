@@ -7,7 +7,7 @@
  * the user's details. */
 
 import { loadCustomDrills, loadUser, type CustomDrill, type UserInfo } from "@/io/storage";
-import { CHAR_TO_MORSE, normalizeMessage, tokenize } from "@/morse";
+import { BREAK, CHAR_TO_MORSE, normalizeMessage, tokenize } from "@/morse";
 
 export interface Drill {
   /** Stable across releases: keys and test ids are built from it. */
@@ -88,19 +88,31 @@ export function fillDrills(drills: readonly Drill[], user: UserInfo): Drill[] {
 const DAILY = "Daily Sending";
 const QSO = "QSO";
 
+const WARM_UPS = [
+  "EEEEE TTTTT IIIII MMMMM SSSSS OOOOO HHHHH 00000 55555",
+  "AAAAA NNNNN UUUUU DDDDD VVVVV BBBBB 44444 66666",
+  "ABCDEF GHIJK LMNOP QRSTU VWXYZ 12345 67890 / , . ?",
+  "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 70364 51289",
+];
+
+const EXERCISES = [
+  "AAAAA BBBBB CCCCC DDDDD EEEEE FFFFF GGGGG HHHHH IIIII JJJJJ",
+  "KKKKK LLLLL MMMMM NNNNN OOOOO PPPPP QQQQQ RRRRR",
+  "SSSSS TTTTT UUUUU VVVVV WWWWW XXXXX YYYYY ZZZZZ",
+  "11111 22222 33333 44444 55555 66666 77777 88888 99999 00000",
+];
+
+// Each section ends with all of its lines as one drill, with a break between
+// lines. A drill's id is its position, so new drills go at the end of a section.
 export const DRILLS: readonly Drill[] = [
   ...section("daily-sending/warm-up", [DAILY, "Warm Up"], [
-    "EEEEE TTTTT IIIII MMMMM SSSSS OOOOO HHHHH 00000 55555",
-    "AAAAA NNNNN UUUUU DDDDD VVVVV BBBBB 44444 66666",
-    "ABCDEF GHIJK LMNOP QRSTU VWXYZ 12345 67890 / , . ?",
-    "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 70364 51289",
+    ...WARM_UPS,
     [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"].map((c) => c.repeat(3)).join(" "),
+    WARM_UPS.join(` ${BREAK} `),
   ]),
   ...section("daily-sending/exercise", [DAILY, "Exercise"], [
-    "AAAAA BBBBB CCCCC DDDDD EEEEE FFFFF GGGGG HHHHH IIIII JJJJJ",
-    "KKKKK LLLLL MMMMM NNNNN OOOOO PPPPP QQQQQ RRRRR",
-    "SSSSS TTTTT UUUUU VVVVV WWWWW XXXXX YYYYY ZZZZZ",
-    "11111 22222 33333 44444 55555 66666 77777 88888 99999 00000",
+    ...EXERCISES,
+    EXERCISES.join(` ${BREAK} `),
   ]),
   ...section("daily-sending/drill", [DAILY, "Drill"], [
     "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 70364 51289",

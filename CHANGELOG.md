@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- Daily Sending › Warm Up ends with a drill of the first four warm-ups, with a break between each. Daily Sending › Exercise ends with all four exercises the same way.
+
 ### Fixed
 
 - A recording no longer cuts off at five minutes while the message is still being sent. It finishes itself 30 s after the target's end.
