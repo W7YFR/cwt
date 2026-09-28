@@ -64,6 +64,14 @@ describe("the keying schedule", () => {
     expect(slice.points.length).toBeLessThan(whole.points.length);
     expect(slice.duration).toBeCloseTo(0.7, 6);
   });
+
+  it("plays from a seek point to the end when only a start is given", () => {
+    const whole = keyingEnvelope(IDEAL, { peak: 1, padSec: 0.5 });
+    const tail = keyingEnvelope(IDEAL, { peak: 1, padSec: 0.5, from: 1 });
+    expect(tail.points.length).toBeGreaterThan(0);
+    expect(tail.points.length).toBeLessThan(whole.points.length);
+    expect(tail.duration).toBeCloseTo(IDEAL.duration + 0.5 - 1, 6);
+  });
 });
 
 describe("rendering the target offline", () => {

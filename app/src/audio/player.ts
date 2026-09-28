@@ -245,9 +245,8 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         else gate.gain.linearRampToValueAtTime(value, t0 + at);
       }
 
-      const full = options.to === undefined;
-      const start = full ? -options.padSec : (options.from ?? 0);
-      const endT = full ? timeline.duration + options.padSec : options.to!;
+      const start = options.from ?? -options.padSec;
+      const endT = options.to ?? timeline.duration + options.padSec;
 
       osc.start(t0);
       osc.stop(t0 + env.duration + 0.05);

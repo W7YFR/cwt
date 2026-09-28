@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- A click on the ruler while the target plays now plays the target from that point. It no longer restarts the target.
+
 ## v1.4.0 — 2026-09-28
 
 ### Added
