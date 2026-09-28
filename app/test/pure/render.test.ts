@@ -20,6 +20,7 @@ import {
   xToTime,
   type Layout,
   measureColumns,
+  sentCaption,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
 import { defaultSettings, idealTimeline, pair, reviewTake, subLabel, targetTiming } from "@/timing";
@@ -1359,5 +1360,20 @@ describe("drawing", () => {
     const fills = ctx.ofType("fill").map((c) => c.fill);
     const bad = fills.filter((f) => f === FALLBACK_PALETTE.bad).length;
     expect(bad / fills.length).toBeLessThan(0.1);
+  });
+});
+
+describe("sentCaption", () => {
+  const ref = targetTiming(20, 20);
+
+  it("names a match the way the target does, where one pattern has two names", () => {
+    const [slot] = pair(idealTimeline("/", ref), idealTimeline("<DN>", ref));
+    expect(slot!.op).toBe("equal");
+    expect(sentCaption(slot!, false)).toEqual({ text: "<DN>", bad: false });
+  });
+
+  it("writes an extra character with a plus", () => {
+    const slots = pair(idealTimeline("A7", ref), idealTimeline("A", ref));
+    expect(sentCaption(slots[1]!, false)).toEqual({ text: "+7", bad: true });
   });
 });

@@ -68,13 +68,23 @@ describe("characters that share a pattern", () => {
     expect(got.accuracy).toBeLessThan(1);
   });
 
-  it("keep their own spelling in the report", () => {
+  it("keep the intended spelling in the report", () => {
     /* Comparison is normalized; display is not. Somebody who typed <BT> is
-       shown <BT>, because that is what they meant. */
+       shown <BT>, in the intended text and in the decode that matches it. */
     const got = compareText("CQ <BT> DE", "CQ = DE");
-    expect(got.expected).toContain("<BT>");
-    expect(got.decoded).toContain("=");
+    expect(got.expected).toBe("CQ <BT> DE");
+    expect(got.decoded).toBe("CQ <BT> DE");
     expect(got.accuracy).toBe(1);
+  });
+
+  it("spell each match the way the intended text does", () => {
+    const got = compareText("<DN> IS /", "/ IS /");
+    expect(got.decoded).toBe("<DN> IS /");
+  });
+
+  it("keep the decoder's spelling where nothing matches", () => {
+    expect(compareText("A", "A /").decoded).toBe("A /");
+    expect(compareText("A", "/").decoded).toBe("/");
   });
 
   it("pair without reporting a substitution on the chart", () => {

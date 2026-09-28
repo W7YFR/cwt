@@ -176,6 +176,7 @@ export interface AlignOp {
 /** Text-level scoring of a decode against the intended message. */
 export interface Comparison {
   expected: string;
+  /** The decode, with each match in the intended spelling. */
   decoded: string;
   /** Matched symbols over expected symbols. */
   accuracy: number;

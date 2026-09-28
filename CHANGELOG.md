@@ -10,6 +10,7 @@ nothing to the site. The next release carries them.
 ### Fixed
 
 - A recording no longer cuts off at five minutes while the message is still being sent. It finishes itself 30 s after the target's end.
+- A correctly sent character shows as the intended text spells it, in a run's caption and in **Decoded**. For example, a keyed `<DN>` shows as `<DN>`, not `/`. The built-in drills write `/` in place of `<DN>`.
 
 ### Development
 

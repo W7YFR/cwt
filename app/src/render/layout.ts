@@ -110,6 +110,9 @@ export function sentCaption(slot: Slot, blank: boolean): { text: string; bad: bo
   }
   if (slot.op === "del" && slot.ideal) return { text: `–${slot.ideal.char}`, bad: true };
   if (slot.op === "ins" && slot.actual) return { text: `+${slot.actual.char}`, bad: true };
+  // A match can pair two names of one pattern, such as <DN> and /. The
+  // caption uses the intended name.
+  if (slot.op === "equal" && slot.ideal) return { text: slot.ideal.char, bad: false };
   return { text: slot.actual ? slot.actual.char : "·", bad: false };
 }
 

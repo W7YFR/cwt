@@ -92,7 +92,7 @@ export const DRILLS: readonly Drill[] = [
   ...section("daily-sending/warm-up", [DAILY, "Warm Up"], [
     "EEEEE TTTTT IIIII MMMMM SSSSS OOOOO HHHHH 00000 55555",
     "AAAAA NNNNN UUUUU DDDDD VVVVV BBBBB 44444 66666",
-    "ABCDEF GHIJK LMNOP QRSTU VWXYZ 12345 67890 <DN> , . ?",
+    "ABCDEF GHIJK LMNOP QRSTU VWXYZ 12345 67890 / , . ?",
     "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 70364 51289",
     [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"].map((c) => c.repeat(3)).join(" "),
   ]),
@@ -105,7 +105,7 @@ export const DRILLS: readonly Drill[] = [
   ...section("daily-sending/drill", [DAILY, "Drill"], [
     "THE QUICK BROWN FOX JUMPED OVER THE LAZY DOGS BACK 70364 51289",
     "BENS BEST BENT WIRE/5",
-    "<DN><DN><DN><DN><DN> ,,,,, ..... ????? " +
+    "///// ,,,,, ..... ????? " +
       "<SK><SK><SK><SK><SK> <AR><AR><AR><AR><AR> <BT><BT><BT><BT><BT>",
   ]),
   // From the CW Academy Fundamental curriculum, with "(your ...)" as slots.
