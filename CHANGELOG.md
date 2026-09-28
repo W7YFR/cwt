@@ -10,6 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - Daily Sending › Warm Up ends with a drill of the first four warm-ups, with a break between each. Daily Sending › Exercise ends with all four exercises the same way.
+- **Edit** on a custom drill in Configuration › Drills loads it into the text box. **Save changes** updates the drill in its place in the list.
 
 ### Fixed
 

@@ -315,6 +315,8 @@ const lowerSlots = (v: string) => v.replace(/\{[^}\s]*\}?/g, (m) => m.toLowerCas
 function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
   const [saved, setSaved] = useState<CustomDrill[]>(loadCustomDrills);
   const [text, setText] = useState("");
+  /** The saved drill the box holds, or null when it holds a new one. */
+  const [editing, setEditing] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const field = useUpperField<HTMLTextAreaElement>((v) => setText(lowerSlots(v)));
   const caretAfterInsert = useRef<number | null>(null);
@@ -338,10 +340,32 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
     setSaved(next);
   };
 
+  // An edit keeps the drill's id and its place in the list.
   const save = () => {
     if (!canSave) return;
-    store([...saved, { id: drillId(), text: drill }]);
+    store(
+      editing
+        ? saved.map((d) => (d.id === editing ? { ...d, text: drill } : d))
+        : [...saved, { id: drillId(), text: drill }],
+    );
+    setEditing(null);
     setText("");
+  };
+
+  const edit = (d: CustomDrill) => {
+    setEditing(d.id);
+    setText(breakLines(d.text));
+    field.ref.current?.focus();
+  };
+
+  const cancel = () => {
+    setEditing(null);
+    setText("");
+  };
+
+  const remove = (id: string) => {
+    if (id === editing) cancel();
+    store(saved.filter((x) => x.id !== id));
   };
 
   const insert = (slot: Slot) => {
@@ -361,7 +385,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
       </p>
 
       <div className="fieldrow">
-        <label htmlFor="custom-drill">New drill</label>
+        <label htmlFor="custom-drill">{editing ? "Edit drill" : "New drill"}</label>
         <button
           type="button"
           className="iconbtn helpbtn"
@@ -396,8 +420,13 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
       )}
       <div className="drillsave">
         <button data-testid="save-drill" disabled={!canSave} onClick={save}>
-          Save drill
+          {editing ? "Save changes" : "Save drill"}
         </button>
+        {editing && (
+          <button data-testid="cancel-edit" onClick={cancel}>
+            Cancel
+          </button>
+        )}
       </div>
 
       {help && (
@@ -464,7 +493,12 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
           {customDrills(saved).map((d) => {
             const missing = fillDrill(d, user).missing ?? [];
             return (
-              <li key={d.id} data-testid="drillrow" data-id={d.id}>
+              <li
+                key={d.id}
+                data-testid="drillrow"
+                data-id={d.id}
+                data-editing={d.id === editing}
+              >
                 <div className="calmeta">
                   <code className="drillrowtext">{breakLines(d.text)}</code>
                   {missing.length > 0 && (
@@ -473,12 +507,14 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
                     </span>
                   )}
                 </div>
-                <button
-                  data-testid="delete-drill"
-                  onClick={() => store(saved.filter((x) => x.id !== d.id))}
-                >
-                  Delete
-                </button>
+                <div className="drillrowactions">
+                  <button data-testid="edit-drill" onClick={() => edit(d)}>
+                    Edit
+                  </button>
+                  <button data-testid="delete-drill" onClick={() => remove(d.id)}>
+                    Delete
+                  </button>
+                </div>
               </li>
             );
           })}

@@ -243,6 +243,55 @@ describe("the drills section", () => {
     expect(screen.getAllByTestId("drillrow")).toHaveLength(1);
   });
 
+  it("edits a saved drill in place, keeping its id and position", async () => {
+    const user = userEvent.setup();
+    saveCustomDrills([
+      { id: "custom/a", text: "AAA | BBB" },
+      { id: "custom/b", text: "CCC" },
+    ]);
+    open();
+    await settle();
+    await user.click(screen.getAllByTestId("edit-drill")[0]!);
+    expect(box().value).toBe("AAA\nBBB");
+    expect(screen.getByLabelText("Edit drill")).toBe(box());
+    expect(screen.getByTestId("save-drill").textContent).toBe("Save changes");
+
+    await user.clear(box());
+    await user.type(box(), "ddd");
+    await user.click(screen.getByTestId("save-drill"));
+    expect(loadCustomDrills()).toEqual([
+      { id: "custom/a", text: "DDD" },
+      { id: "custom/b", text: "CCC" },
+    ]);
+    expect(box().value).toBe("");
+    expect(screen.getByTestId("save-drill").textContent).toBe("Save drill");
+  });
+
+  it("cancels an edit without changing the drill", async () => {
+    const user = userEvent.setup();
+    saveCustomDrills([{ id: "custom/a", text: "AAA" }]);
+    open();
+    await settle();
+    await user.click(screen.getByTestId("edit-drill"));
+    await user.type(box(), "B");
+    await user.click(screen.getByTestId("cancel-edit"));
+    expect(loadCustomDrills()).toEqual([{ id: "custom/a", text: "AAA" }]);
+    expect(box().value).toBe("");
+    expect(screen.queryByTestId("cancel-edit")).toBeNull();
+  });
+
+  it("ends the edit when the drill being edited is deleted", async () => {
+    const user = userEvent.setup();
+    saveCustomDrills([{ id: "custom/a", text: "AAA" }]);
+    open();
+    await settle();
+    await user.click(screen.getByTestId("edit-drill"));
+    await user.click(screen.getByTestId("delete-drill"));
+    expect(loadCustomDrills()).toEqual([]);
+    expect(box().value).toBe("");
+    expect(screen.getByTestId("save-drill").textContent).toBe("Save drill");
+  });
+
   it("says which details a saved drill still needs", async () => {
     saveCustomDrills([{ id: "custom/a", text: "DE {callsign}" }]);
     open();
