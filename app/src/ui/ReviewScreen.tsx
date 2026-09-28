@@ -16,6 +16,7 @@ import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
 import { contextWindow, type Focus } from "@/render/focus";
 import { PACED_STOP_AFTER_SEC, PLAY_PAD } from "@/render/geometry";
+import type { PlayRange } from "@/render/layout";
 import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
@@ -539,6 +540,12 @@ export function ReviewScreen({
      you back into your own recording every time. */
   const [heard, setHeard] = useState<PlaySide>("you");
 
+  /* The stretch of the ruler picked out to play. Its seconds belong to one
+     recording and one target, so a different run or a different target
+     speed clears it. */
+  const [range, setRange] = useState<PlayRange | null>(null);
+  useEffect(() => setRange(null), [loaded.take.id, review.ideal.duration]);
+
   const playYou = useCallback(
     async (from?: number, to?: number) => {
       setHeard("you");
@@ -579,6 +586,27 @@ export function ReviewScreen({
     [player, playing, review.ideal, targetOptions],
   );
 
+
+  /** Play a track: its range when there is one, else the whole track. A
+   *  second press stops it. */
+  const playTrack = useCallback(
+    (side: PlaySide) => {
+      if (!range) {
+        if (side === "you") void playYou();
+        else playTarget();
+        return;
+      }
+      if (playing === side) {
+        player.stop();
+        return;
+      }
+      const from = Math.max(range[side][0] - PLAY_PAD, 0);
+      const to = range[side][1] + PLAY_PAD;
+      if (side === "you") void playYou(from, to);
+      else playTarget(from, to);
+    },
+    [playTarget, playYou, player, playing, range],
+  );
 
   /* Picking up another track ends whatever is playing.
      Everything on this screen that names a recording follows the selection,
@@ -625,10 +653,14 @@ export function ReviewScreen({
       if (ev.code === "Space") {
         ev.preventDefault();
         if (playing) stop();
+        else if (range) playTrack(heard);
         else void playYou(0);
       } else if (ev.key === "t") {
         if (playing === "tgt") stop();
+        else if (range) playTrack("tgt");
         else playTarget(0);
+      } else if (ev.key === "Escape" && range) {
+        setRange(null);
       } else if (ev.key === "Home") {
         ev.preventDefault();
         handle.chart?.scrollTo(0);
@@ -639,7 +671,7 @@ export function ReviewScreen({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [handle, playTarget, playYou, playing, rec.recorder, stop]);
+  }, [handle, heard, playTarget, playTrack, playYou, playing, range, rec.recorder, stop]);
 
   /* Open filling the width. Done once the chart exists and after the first
      layout, because the fit is measured off the real content — a short session
@@ -804,8 +836,8 @@ export function ReviewScreen({
         clock={clock}
         canPlayYou={!blank}
         fromFile={loaded.take.source !== MIC_SOURCE}
-        onPlayYou={() => void playYou()}
-        onPlayTarget={() => playTarget()}
+        onPlayYou={() => playTrack("you")}
+        onPlayTarget={() => playTrack("tgt")}
         onStop={stop}
       />
 
@@ -933,14 +965,14 @@ export function ReviewScreen({
           firstRun={recording ? 0 : from}
           onSelectRun={selectRun}
           onSelectTarget={selectTarget}
-          onPlayTrack={(side) => {
-            if (side === "you") void playYou();
-            else playTarget();
-          }}
+          onPlayTrack={playTrack}
           heard={heard}
           settings={settings}
           focus={focus}
           playhead={playhead}
+          range={range}
+          onRange={setRange}
+          onPlayRange={() => playTrack(heard)}
           handle={handle}
           onPlayChar={(side, from, to) => {
             if (side === "you") void playYou(from, to);
@@ -972,8 +1004,8 @@ export function ReviewScreen({
               <p className="legend howto">
                 click a character to hear it, a gap to hear it between what it
                 separates &nbsp;·&nbsp; click a track&rsquo;s name to pick it up,
-                again to play it &nbsp;·&nbsp; click the ruler to seek
-                &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
+                again to play it &nbsp;·&nbsp; click the ruler to seek, drag it to
+                pick a range to play (Esc clears it) &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
               </p>
               {/* The recording transport, which is otherwise only discoverable

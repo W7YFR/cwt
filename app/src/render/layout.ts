@@ -501,6 +501,106 @@ export function xToTime(layout: Layout, x: number, side: "you" | "tgt"): number 
   return m[m.length - 1]![0];
 }
 
+/** A stretch of the ruler to play, in seconds on each track.
+ *
+ * Seconds rather than pixels, so it holds its place through a zoom. Both
+ * tracks, because one ruler runs over two clocks. */
+export interface PlayRange {
+  readonly you: readonly [number, number];
+  readonly tgt: readonly [number, number];
+}
+
+/** Shortest range worth playing, in seconds. */
+const RANGE_MIN_SEC = 0.02;
+
+/** The range a drag from `xa` to `xb` selects, in content pixels.
+ *
+ * Snapped, it takes in every character on `side` that the drag touches, and
+ * each track gets its own characters from those slots. That makes the target
+ * range the same letters as yours even where the two tracks drift apart. A drag
+ * that touches no character, or a `free` one, maps its ends straight to time. */
+export function rangeBetween(
+  layout: Layout,
+  slots: readonly Slot[],
+  xa: number,
+  xb: number,
+  side: "you" | "tgt",
+  free: boolean,
+): PlayRange | null {
+  const lo = Math.min(xa, xb);
+  const hi = Math.max(xa, xb);
+  const raw = (s: "you" | "tgt"): [number, number] => [
+    Math.max(xToTime(layout, lo, s), 0),
+    Math.max(xToTime(layout, hi, s), 0),
+  ];
+
+  let first = -1;
+  let last = -1;
+  if (!free) {
+    slots.forEach((slot, i) => {
+      const ch = side === "you" ? slot.actual : slot.ideal;
+      if (!ch) return;
+      const x0 = timeToX(layout, ch.t0, side);
+      const x1 = timeToX(layout, ch.t1, side);
+      if (x1 > lo && x0 < hi) {
+        if (first < 0) first = i;
+        last = i;
+      }
+    });
+  }
+
+  const snapped = (s: "you" | "tgt"): [number, number] | null => {
+    let a = Infinity;
+    let b = -Infinity;
+    for (let i = first; i <= last; i++) {
+      const ch = s === "you" ? slots[i]!.actual : slots[i]!.ideal;
+      if (!ch) continue;
+      a = Math.min(a, ch.t0);
+      b = Math.max(b, ch.t1);
+    }
+    return a < b ? [a, b] : null;
+  };
+
+  const range: PlayRange =
+    first < 0
+      ? { you: raw("you"), tgt: raw("tgt") }
+      : { you: snapped("you") ?? raw("you"), tgt: snapped("tgt") ?? raw("tgt") };
+  const [a, b] = range[side];
+  return b - a >= RANGE_MIN_SEC ? range : null;
+}
+
+/** Room left between a range's ends and what it holds, in pixels. */
+const RANGE_PAD = 4;
+
+/** Content x of each end of the range as drawn, on the track `side`.
+ *
+ * Each end reaches to the edge of the characters it holds, captions
+ * included, and a little past. Drawn as a marker, a character is one tick
+ * and its caption is most of what shows of it. In the per-character view a
+ * character sits at the start of its column, which is not where its own
+ * clock puts it when it was sent early or late. */
+export function rangeEdges(
+  layout: Layout,
+  range: PlayRange,
+  side: "you" | "tgt",
+): [number, number] {
+  const [t0, t1] = range[side];
+  let x0 = timeToX(layout, t0, side);
+  let x1 = timeToX(layout, t1, side);
+  layout.items.forEach(({ slot }, i) => {
+    const ch = side === "you" ? slot.actual : slot.ideal;
+    if (!ch || ch.t0 < t0 - 1e-9 || ch.t1 > t1 + 1e-9) return;
+    const span = slotSpan(layout, side, i, false);
+    if (!span) return;
+    const sent = sentCaption(slot, false).text;
+    const intended = slot.ideal?.char ?? "";
+    const text = sent.length > intended.length ? sent : intended;
+    x0 = Math.min(x0, span[0]);
+    x1 = Math.max(x1, span[1], captionEnd(text, span[0]));
+  });
+  return [x0 - RANGE_PAD, x1 + RANGE_PAD];
+}
+
 /** The x-range one slot occupies on one track, in content pixels. Null when
  *  that side has no character in the slot (a missed or an extra one).
  *

@@ -847,6 +847,8 @@ canvas { display: block; touch-action: pan-y pinch-zoom; }
 canvas.grabbing { cursor: grabbing; }
 /* Over a run's name in the gutter, which picks that row up. */
 canvas.picking { cursor: pointer; }
+/* Over an end of a range on the ruler, which drags that end. */
+canvas.resizing { cursor: ew-resize; }
 
 .tip {
   position: fixed;

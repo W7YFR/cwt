@@ -20,6 +20,8 @@ import {
   xToTime,
   type Layout,
   measureColumns,
+  rangeBetween,
+  rangeEdges,
   sentCaption,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
@@ -52,6 +54,103 @@ import {
 import type { Review, ViewMode } from "@/types";
 
 const VIEWS: ViewMode[] = ["per-char", "absolute", "overlay"];
+
+describe("a range picked on the ruler", () => {
+  const { review } = reviewFrom(caseNamed(SLOPPY));
+  // The first two neighbouring slots that have a character on both tracks.
+  const both = (k: number) => !!review.slots[k]?.actual && !!review.slots[k]?.ideal;
+  const i = review.slots.findIndex((_, k) => both(k) && both(k + 1));
+  const j = i + 1;
+
+  it.each(VIEWS)("takes in every character a drag touches, in %s", (view) => {
+    const layout = layoutFor(review, view, 12);
+    const a = review.slots[i]!;
+    const b = review.slots[j]!;
+    // From inside the first character to inside the second.
+    const xa = (timeToX(layout, a.actual!.t0, "you") + timeToX(layout, a.actual!.t1, "you")) / 2;
+    const xb = (timeToX(layout, b.actual!.t0, "you") + timeToX(layout, b.actual!.t1, "you")) / 2;
+    const r = rangeBetween(layout, review.slots, xb, xa, "you", false)!;
+    expect(r.you[0]).toBeCloseTo(a.actual!.t0, 6);
+    expect(r.you[1]).toBeCloseTo(b.actual!.t1, 6);
+    // The target gets the same letters, on its own clock.
+    expect(r.tgt[0]).toBeCloseTo(a.ideal!.t0, 6);
+    expect(r.tgt[1]).toBeCloseTo(b.ideal!.t1, 6);
+  });
+
+  it("maps a free drag straight to time", () => {
+    const layout = layoutFor(review, "absolute", 12);
+    const a = review.slots[i]!.actual!;
+    const xa = (timeToX(layout, a.t0, "you") + timeToX(layout, a.t1, "you")) / 2;
+    const r = rangeBetween(layout, review.slots, xa, xa + 40, "you", true)!;
+    expect(r.you[0]).toBeCloseTo(xToTime(layout, xa, "you"), 6);
+    expect(r.you[1]).toBeCloseTo(xToTime(layout, xa + 40, "you"), 6);
+  });
+
+  it("reaches to the end of its last character's caption", () => {
+    // Drawn as markers, a character is one tick and its caption runs past it.
+    const layout = layoutFor(review, "per-char", 12, true);
+    const a = review.slots[i]!;
+    const b = review.slots[j]!;
+    const r = rangeBetween(
+      layout,
+      review.slots,
+      timeToX(layout, a.actual!.t0, "you"),
+      timeToX(layout, b.actual!.t1, "you"),
+      "you",
+      false,
+    )!;
+    const [, x1] = rangeEdges(layout, r, "you");
+    const start = timeToX(layout, b.actual!.t0, "you");
+    expect(x1).toBeGreaterThanOrEqual(start + b.ideal!.char.length * CAPTION_GLYPH_W);
+    expect(x1).toBeGreaterThan(timeToX(layout, b.actual!.t1, "you"));
+  });
+
+  it("holds a character sent early, which sits right of its own clock", () => {
+    // The word gap before <BK> is sent short. In the per-character view the
+    // prosign still sits at the start of its column, so its caption starts
+    // after the moment its marks began.
+    const base = reviewFrom(caseNamed(FARNSWORTH)).take;
+    const tl = idealTimeline("HEY <BK>", targetTiming(12, 12));
+    const segments: Array<readonly [0 | 1, number]> = [[0, 0.5]];
+    for (const bl of tl.blocks) {
+      const d = bl.t1 - bl.t0;
+      segments.push(
+        bl.kind === "dit" || bl.kind === "dah" ? [1, d] : [0, bl.kind === "word-gap" ? d * 0.85 : d],
+      );
+    }
+    segments.push([0, 0.5]);
+    const take = {
+      ...base,
+      segments,
+      expected: "HEY <BK>",
+      durationSec: segments.reduce((sum, seg) => sum + seg[1], 0),
+      target: { charWpm: 12, farnsworthWpm: 12, explicit: true },
+    };
+    const settings = { ...defaultSettings(take), charMarkers: true, view: "per-char" as const };
+    const early = reviewTake(take, settings);
+    const layout = buildLayout(early, {
+      view: "per-char",
+      ppu: 12,
+      durationSec: take.durationSec,
+      charMarkers: true,
+      columns: measureColumns([early.slots], 12, true),
+      run: 0,
+    });
+    const at = early.slots.findIndex((sl) => sl.ideal?.char === "<BK>");
+    const bk = early.slots[at]!.actual!;
+    const r = rangeBetween(layout, early.slots, 0, layout.width, "you", false)!;
+    const [x0, x1] = rangeEdges(layout, r, "you");
+    const start = slotSpan(layout, "you", at, false)![0];
+    expect(start).toBeGreaterThan(timeToX(layout, bk.t0, "you"));
+    expect(x1).toBeGreaterThan(start + "<BK>".length * CAPTION_GLYPH_W);
+    expect(x0).toBeLessThan(slotSpan(layout, "you", 0, false)![0]);
+  });
+
+  it("is nothing when the drag has no length", () => {
+    const layout = layoutFor(review, "absolute", 12);
+    expect(rangeBetween(layout, review.slots, 100, 100, "you", true)).toBeNull();
+  });
+});
 
 /* A caption starts where its character starts. At a low zoom a prosign's
  * caption is wider than its marks, so the content has to reach past them. */

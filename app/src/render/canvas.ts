@@ -5,8 +5,9 @@
  * change at sixty frames a second and have no business going through React.
  * Everything else arrives through `update()` and is treated as read-only.
  *
- * One gesture model for the whole surface: press, then either drag (pan, or
- * move the scrollbar thumb) or release without moving (a click).
+ * One gesture model for the whole surface: press, then either drag (pan, move
+ * the scrollbar thumb, or pick a range on the ruler) or release without moving
+ * (a click).
  */
 
 import type { Block, Review, ReviewSettings } from "@/types";
@@ -15,6 +16,7 @@ import {
   GUTTER,
   HEIGHT,
   PAD_R,
+  RANGE_GRAB,
   RULER_H,
   ROW_H,
   ZOOM_MAX,
@@ -27,10 +29,13 @@ import {
   buildLayout,
   fitZoom,
   measureColumns,
+  rangeBetween,
+  rangeEdges,
   timeToX,
   xToTime,
   type ColumnMetrics,
   type Layout,
+  type PlayRange,
 } from "./layout";
 import {
   draw,
@@ -69,6 +74,11 @@ export interface ChartCallbacks {
    * per-character view the two tracks are stretched to a shared column axis
    * independently, so a point on the ruler is a different second on each. */
   onSeek?: (at: { you: number; tgt: number }) => void;
+  /** A drag on the ruler picked out a range, or a click cleared it (null).
+   *  A chart without this has no ranges. */
+  onRange?: (range: PlayRange | null) => void;
+  /** The ruler was clicked inside the range. */
+  onPlayRange?: () => void;
   /** Pointer moved over (or off) a block, for the tooltip. */
   onHover?: (hit: HitResult | null, clientX: number, clientY: number) => void;
   /** The zoom changed from a wheel gesture, so the slider can follow. */
@@ -110,6 +120,8 @@ export interface ChartInput {
   heard?: "you" | "tgt";
   settings: ReviewSettings;
   focus: Focus | null;
+  /** The stretch of the ruler picked out to play. */
+  range?: PlayRange | null;
 }
 
 export interface Chart {
@@ -265,6 +277,7 @@ export function createChart(
       hover,
       focus: input.focus,
       playhead,
+      range: pending ?? input.range ?? null,
       driftMax,
       leadSec,
       charMarkers: input.settings.charMarkers,
@@ -410,9 +423,14 @@ export function createChart(
   type DragBase = { x0: number; scroll0: number; moved: number; pointerId: number };
   type Drag =
     | ({ kind: "pan" } & DragBase)
-    | ({ kind: "thumb"; thumbW: number; trackW: number } & DragBase);
+    | ({ kind: "thumb"; thumbW: number; trackW: number } & DragBase)
+    /* `anchor` is the content x of the end that stays put: where the press
+       landed, or the far end of the range when the press grabbed one end. */
+    | ({ kind: "range"; anchor: number } & DragBase);
 
   let drag: Drag | null = null;
+  /** The range a drag on the ruler is drawing, until it is released. */
+  let pending: PlayRange | null = null;
   let suppressClick = false;
 
   function localPos(ev: { clientX: number; clientY: number }): {
@@ -424,6 +442,19 @@ export function createChart(
   }
 
   const contentXOf = (sx: number) => sx - GUTTER + scrollX;
+
+  /** The content x of the far end of the range, when screen x `sx` is on one
+   *  of its ends as drawn. The far end is its own moment, not its drawn edge,
+   *  so a drag leaves it where it was. */
+  function grabbedEnd(sx: number): number | null {
+    if (!input?.range || !layout) return null;
+    const side = input.heard ?? "you";
+    const [x0, x1] = rangeEdges(layout, input.range, side);
+    const cx = contentXOf(sx);
+    if (Math.abs(cx - x1) <= RANGE_GRAB) return timeToX(layout, input.range[side][0], side);
+    if (Math.abs(cx - x0) <= RANGE_GRAB) return timeToX(layout, input.range[side][1], side);
+    return null;
+  }
 
   function doScrollTo(x: number, notify = true): void {
     const v = viewport();
@@ -497,7 +528,19 @@ export function createChart(
       ev.preventDefault();
       return;
     }
-    if (p.x < GUTTER || p.y < RULER_H) return; // the gutter and ruler aren't pans
+    if (p.x < GUTTER) return; // the gutter isn't a pan
+    if (p.y < RULER_H) {
+      if (!callbacks.onRange) return;
+      drag = {
+        kind: "range",
+        anchor: grabbedEnd(p.x) ?? contentXOf(p.x),
+        x0: p.x,
+        scroll0: scrollX,
+        moved: 0,
+        pointerId: ev.pointerId,
+      };
+      return;
+    }
     drag = { kind: "pan", x0: p.x, scroll0: scrollX, moved: 0, pointerId: ev.pointerId };
   };
 
@@ -508,7 +551,19 @@ export function createChart(
     drag.moved = Math.max(drag.moved, Math.abs(dx));
     if (drag.moved < DRAG_SLOP) return;
     const v = viewport();
-    if (drag.kind === "thumb") {
+    if (drag.kind === "range") {
+      if (!layout || !input) return;
+      const lane = lanes[selected]!;
+      pending = rangeBetween(
+        layout,
+        lane.slots,
+        drag.anchor,
+        contentXOf(p.x),
+        input.heard ?? "you",
+        ev.altKey,
+      );
+      paint();
+    } else if (drag.kind === "thumb") {
       const span = drag.trackW - drag.thumbW;
       doScrollTo(drag.scroll0 + (span > 0 ? (dx / span) * v.maxScroll : 0));
     } else {
@@ -529,6 +584,11 @@ export function createChart(
     if (!drag || ev.pointerId !== drag.pointerId) return;
     canvas.classList.remove("grabbing");
     suppressClick = drag.moved >= DRAG_SLOP;
+    if (drag.kind === "range" && suppressClick) {
+      callbacks.onRange?.(pending);
+      pending = null;
+      paint();
+    }
     drag = null;
   };
 
@@ -635,6 +695,10 @@ export function createChart(
     const p = localPos(ev);
     const over = gutterNameAt(p);
     canvas.classList.toggle("picking", over !== null);
+    canvas.classList.toggle(
+      "resizing",
+      p.x >= GUTTER && p.y < RULER_H && grabbedEnd(p.x) !== null,
+    );
     const band = rowAt(p);
     const h = hitAt(p);
     const b = h ? h.block : null;
@@ -649,7 +713,7 @@ export function createChart(
   };
 
   const onPointerLeave = (ev: PointerEvent) => {
-    canvas.classList.remove("picking");
+    canvas.classList.remove("picking", "resizing");
     callbacks.onHover?.(null, ev.clientX, ev.clientY);
     if (picking !== null || hoverRow !== null || hover) {
       picking = null;
@@ -685,9 +749,18 @@ export function createChart(
 
     if (p.x < GUTTER || p.y >= rows.scroll) return;
 
-    // The ruler band is a seek strip.
+    /* The ruler band is a seek strip. Inside a range, a click plays the range;
+       outside it, a click clears the range and seeks. */
     if (p.y < RULER_H) {
       const at = contentXOf(p.x);
+      if (input?.range) {
+        const [x0, x1] = rangeEdges(layout, input.range, input.heard ?? "you");
+        if (at >= x0 && at <= x1) {
+          callbacks.onPlayRange?.();
+          return;
+        }
+        callbacks.onRange?.(null);
+      }
       callbacks.onSeek?.({
         you: Math.max(xToTime(layout, at, "you"), 0),
         tgt: Math.max(xToTime(layout, at, "tgt"), 0),

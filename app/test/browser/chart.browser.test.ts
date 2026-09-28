@@ -304,6 +304,79 @@ describe("the chart in a browser", () => {
     expect(onScroll).toHaveBeenCalled();
   });
 
+  describe("a range on the ruler", () => {
+    function ranging() {
+      const cbs = { onRange: vi.fn(), onPlayRange: vi.fn(), onSeek: vi.fn(), onScroll: vi.fn() };
+      chart.destroy();
+      chart = createChart(host, canvas, cbs);
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null });
+      return cbs;
+    }
+    const onRuler = (type: string, x: number, target: EventTarget, alt = false) => {
+      const rect = canvas.getBoundingClientRect();
+      const init = { clientX: rect.left + x, clientY: rect.top + 8, bubbles: true, altKey: alt };
+      target.dispatchEvent(
+        type === "click"
+          ? new MouseEvent(type, init)
+          : new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: "mouse" }),
+      );
+    };
+    const drag = (from: number, to: number, alt = false) => {
+      onRuler("pointerdown", from, canvas);
+      onRuler("pointermove", to, window, alt);
+      onRuler("pointerup", to, window, alt);
+      onRuler("click", to, canvas);
+    };
+
+    it("is picked out by a drag, which neither seeks nor pans", () => {
+      const cbs = ranging();
+      drag(GUTTER + 40, GUTTER + 300);
+      expect(cbs.onRange).toHaveBeenCalledTimes(1);
+      const r = cbs.onRange.mock.calls[0]![0];
+      expect(r.you[1]).toBeGreaterThan(r.you[0]);
+      expect(r.tgt[1]).toBeGreaterThan(r.tgt[0]);
+      expect(cbs.onSeek).not.toHaveBeenCalled();
+      expect(cbs.onScroll).not.toHaveBeenCalled();
+    });
+
+    it("plays from a click inside it, and clears and seeks from one outside", () => {
+      const cbs = ranging();
+      drag(GUTTER + 40, GUTTER + 300, true);
+      const r = cbs.onRange.mock.calls[0]![0];
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null, range: r });
+
+      onRuler("click", GUTTER + 150, canvas);
+      expect(cbs.onPlayRange).toHaveBeenCalledTimes(1);
+      expect(cbs.onSeek).not.toHaveBeenCalled();
+
+      onRuler("click", GUTTER + 500, canvas);
+      expect(cbs.onRange).toHaveBeenLastCalledWith(null);
+      expect(cbs.onSeek).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves one end when that end is dragged", () => {
+      const cbs = ranging();
+      drag(GUTTER + 40, GUTTER + 300, true);
+      const r = cbs.onRange.mock.calls[0]![0];
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null, range: r });
+
+      drag(GUTTER + 300, GUTTER + 400, true);
+      const moved = cbs.onRange.mock.calls[1]![0];
+      expect(moved.you[0]).toBeCloseTo(r.you[0], 6);
+      expect(moved.you[1]).toBeGreaterThan(r.you[1]);
+    });
+
+    it("is not offered by a chart that takes no ranges", () => {
+      const onSeek = vi.fn();
+      chart.destroy();
+      chart = createChart(host, canvas, { onSeek });
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null });
+      drag(GUTTER + 40, GUTTER + 300);
+      // No drag started, so the release is a plain click: a seek.
+      expect(onSeek).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("plays a character when one is clicked without dragging", () => {
     const onPlayChar = vi.fn();
     chart.destroy();

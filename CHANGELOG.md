@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- Drag along the ruler to pick a range to play. The range snaps to whole characters, or hold Alt to place its ends freely.
+- With a range picked, **Your sending**, **Target**, space and a click inside the range play only the range. Esc clears it.
+
 ### Fixed
 
 - A click on the ruler while the target plays now plays the target from that point. It no longer restarts the target.

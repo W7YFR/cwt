@@ -23,6 +23,7 @@ import {
   MARK_H,
   MARKER_W,
   PLAYHEAD_W,
+  RANGE_HANDLE_W,
   OVER_H,
   OVER_MARK_H,
   PAD_R,
@@ -45,10 +46,12 @@ import {
   charWidth,
   gapWidth,
   isRest,
+  rangeEdges,
   sentCaption,
   timeToX,
   type ColumnMetrics,
   type Layout,
+  type PlayRange,
 } from "./layout";
 import type { Palette } from "./theme";
 
@@ -190,6 +193,8 @@ export interface Scene {
   hover: Block | null;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
+  /** The stretch of the ruler picked out to play. */
+  range?: PlayRange | null;
   /** Filled in by draw(), read by the gutter: the drift axis bound. */
   driftMax?: number;
 }
@@ -238,6 +243,7 @@ export function draw(ctx: Ctx2D, scene: Scene): void {
   ctx.font = `500 11px ${C.mono}`;
 
   drawTicks(ctx, scene);
+  drawRange(ctx, scene);
   drawFocus(ctx, scene);
   if (scene.view === "per-char") drawPerChar(ctx, scene);
   else if (scene.view === "overlay") drawOverlay(ctx, scene);
@@ -331,6 +337,34 @@ function drawTicks(ctx: Ctx2D, scene: Scene): void {
     ctx.fillStyle = C["ink-faint"];
     ctx.fillText(`${s}s`, x + 4, Y_RULER + 8);
   }
+}
+
+/** Wash the range across every row, behind the marks, and mark its ends on
+ *  the ruler as handles. In the color of the playhead that will play it. */
+function drawRange(ctx: Ctx2D, scene: Scene): void {
+  if (!scene.range) return;
+  const side = scene.heard ?? "you";
+  const [x0, x1] = rangeEdges(scene.layout, scene.range, side);
+  const w = x1 - x0;
+  if (!visible(x0, w, scene)) return;
+
+  const color = side === "you" ? scene.palette.you : scene.palette.ink;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.08;
+  ctx.fillRect(x0, Y_RULER + RULER_H, w, scene.rows.plotBottom - RULER_H);
+  ctx.globalAlpha = 0.3;
+  ctx.fillRect(x0, Y_RULER, w, RULER_H);
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const x of [x0 + 0.5, x1 - 0.5]) {
+    ctx.moveTo(x, Y_RULER + RULER_H);
+    ctx.lineTo(x, scene.rows.plotBottom);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  for (const x of [x0, x1 - RANGE_HANDLE_W]) ctx.fillRect(x, Y_RULER, RANGE_HANDLE_W, RULER_H);
 }
 
 /** Wash the focused stretch, behind the marks so it reads as a spotlight rather
