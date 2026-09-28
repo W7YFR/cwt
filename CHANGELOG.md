@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.4.0 — 2026-09-28
+
 ### Added
 
 - Daily Sending › Warm Up ends with a drill of the first four warm-ups, with a break between each. Daily Sending › Exercise ends with all four exercises the same way.
