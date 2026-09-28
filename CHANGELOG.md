@@ -19,6 +19,7 @@ nothing to the site. The next release carries them.
 - `make pr` bumps the version, pushes the branch, and opens or updates its pull request. The body is the branch's changelog entry.
 - `make release` uses the entry as the tag message and the GitHub release notes. It stops unless the branch's pull request is merged.
 - `CLAUDE.md` describes the contributor workflow and the changelog rules. `/changelog-check` checks a branch's entry against its diff.
+- Claude suggests a one-line commit message for each staged part.
 
 ## v1.3.0 — 2026-09-27
 
