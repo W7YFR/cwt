@@ -197,6 +197,46 @@ describe("starting a new session", () => {
     expect(dialog).toHaveAccessibleName(/new session/i);
   });
 
+  describe("inserting a slot", () => {
+    const menu = () => screen.getByTestId("insert-slot") as HTMLSelectElement;
+
+    it("adds the slot's value at the cursor", async () => {
+      saveUser({ ...EMPTY_USER, callsign: "W7YFR" });
+      const user = userEvent.setup();
+      open({ expected: "CQ DE  K" });
+      text().setSelectionRange(6, 6);
+      await user.selectOptions(menu(), "callsign");
+      expect(text().value).toBe("CQ DE W7YFR K");
+      expect(text().selectionStart).toBe(11);
+      expect(menu().value).toBe("");
+    });
+
+    it("reads Insert, since the message holds values rather than slots", () => {
+      open();
+      expect(screen.getByLabelText("Insert")).toBe(menu());
+      expect(menu().options[0]!.textContent).toBe("Insert");
+    });
+
+    it("will not pick a slot with no value, and says so", () => {
+      saveUser({ ...EMPTY_USER, callsign: "W7YFR" });
+      open();
+      const option = (slot: string) =>
+        menu().querySelector(`option[value="${slot}"]`) as HTMLOptionElement;
+      expect(option("callsign").disabled).toBe(false);
+      expect(option("callsign").textContent).toBe("Callsign · W7YFR");
+      expect(option("name").disabled).toBe(true);
+      expect(option("name").textContent).toBe("Name · not set");
+    });
+
+    it("takes Enter on the menu as a pick, not a start", async () => {
+      const user = userEvent.setup();
+      const { onStart } = open();
+      menu().focus();
+      await user.keyboard("{Enter}");
+      expect(onStart).not.toHaveBeenCalled();
+    });
+  });
+
   describe("picking a drill", () => {
     const drill = DRILLS[1]!;
     beforeEach(() => localStorage.clear());

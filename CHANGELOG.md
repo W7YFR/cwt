@@ -11,7 +11,7 @@ nothing to the site. The next release carries them.
 
 - Daily Sending › Warm Up ends with a drill of the first four warm-ups, with a break between each. Daily Sending › Exercise ends with all four exercises the same way.
 - **Edit** on a custom drill in Configuration › Drills loads it into the text box. **Save changes** updates the drill in its place in the list.
-- An **Insert slot** menu beside the drill text box adds a slot, such as `{rig_model}`, at the cursor.
+- An **Insert slot** menu adds a slot, such as `{rig_model}`, at the cursor in a custom drill. An **Insert** menu in **New session** adds a value from User, such as your callsign.
 
 ### Fixed
 

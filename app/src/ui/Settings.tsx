@@ -14,10 +14,9 @@
  * and cannot be got at again might as well not be.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IconDownload, IconHelp } from "./Icons";
 import {
-  SLOTS,
   SLOT_LABELS,
   customDrills,
   drillProblems,
@@ -46,6 +45,7 @@ import {
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
+import { SLOT_NAMES, SlotMenu, slotValue, useInsertAtCursor } from "./SlotMenu";
 import { breakLines } from "@/morse";
 
 export interface SettingsProps {
@@ -301,10 +301,6 @@ function UserSection({
   );
 }
 
-const SLOT_NAMES = Object.keys(SLOTS) as Slot[];
-
-const isSlotName = (s: string): s is Slot => (SLOT_NAMES as string[]).includes(s);
-
 const drillId = () =>
   `custom/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -321,17 +317,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
   const [editing, setEditing] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const field = useUpperField<HTMLTextAreaElement>((v) => setText(lowerSlots(v)));
-  const caretAfterInsert = useRef<number | null>(null);
-
-  useLayoutEffect(() => {
-    const el = field.ref.current;
-    const at = caretAfterInsert.current;
-    caretAfterInsert.current = null;
-    if (el && at !== null) {
-      el.focus();
-      el.setSelectionRange(at, at);
-    }
-  });
+  const insertText = useInsertAtCursor(field.ref, text, setText);
 
   const drill = normalizeDrill(text);
   const problems = drillProblems(drill);
@@ -370,14 +356,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
     store(saved.filter((x) => x.id !== id));
   };
 
-  const insert = (slot: Slot) => {
-    const el = field.ref.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    const token = `{${slot}}`;
-    setText(text.slice(0, start) + token + text.slice(end));
-    caretAfterInsert.current = start + token.length;
-  };
+  const insert = (slot: Slot) => insertText(`{${slot}}`);
 
   return (
     <section className="drillsettings">
@@ -389,26 +368,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
       <div className="fieldrow">
         <label htmlFor="custom-drill">{editing ? "Edit drill" : "New drill"}</label>
         <div className="drilltools">
-          {/* Always reads "Insert slot": a pick inserts the slot, then the
-              menu resets. */}
-          <select
-            data-testid="insert-slot"
-            aria-label="Insert slot"
-            value=""
-            onChange={(e) => {
-              const slot = e.target.value;
-              if (isSlotName(slot)) insert(slot);
-            }}
-          >
-            <option value="" disabled>
-              Insert slot
-            </option>
-            {SLOT_NAMES.map((slot) => (
-              <option key={slot} value={slot}>
-                {`{${slot}}`} · {SLOT_LABELS[slot]}
-              </option>
-            ))}
-          </select>
+          <SlotMenu onPick={insert} />
           <button
             type="button"
             className="iconbtn helpbtn"
@@ -481,7 +441,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
             </thead>
             <tbody>
               {SLOT_NAMES.map((slot) => {
-                const value = user[SLOTS[slot]].trim();
+                const value = slotValue(slot, user);
                 return (
                   <tr key={slot}>
                     <td>

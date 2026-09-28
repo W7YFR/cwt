@@ -20,11 +20,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { loadDrills } from "@/drills";
+import { loadUser } from "@/io/storage";
 import { breakLines, normalizeMessage } from "@/morse";
 import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
 import { DrillPicker } from "./DrillPicker";
 import { RecDot } from "./Record";
+import { SlotMenu, slotValue, useInsertAtCursor } from "./SlotMenu";
 import { useUpperField } from "./useUpperField";
 
 export interface NewSessionProps {
@@ -57,8 +59,10 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
      upper-cased on the way out either way, and a box that shows one thing
      while promising another is the sort of small lie that makes you check. */
   const drills = useMemo(loadDrills, []);
+  const user = useMemo(loadUser, []);
   const sent = useUpperField<HTMLTextAreaElement>(setText);
   const box = sent.ref;
+  const insert = useInsertAtCursor(box, text, setText);
 
   /* Straight into the textarea: the message is the reason the dialog opened,
      and the speeds usually carry over from the session before it. */
@@ -109,6 +113,12 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
 
         <div className="fieldrow">
           <label htmlFor="ns-text">Target message</label>
+          {/* The message holds no slots, so a pick inserts the slot's value. */}
+          <SlotMenu
+            label="Insert"
+            user={user}
+            onPick={(slot) => insert(slotValue(slot, user))}
+          />
           <DrillPicker
             drills={drills}
             onPick={(d) => {

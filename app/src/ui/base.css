@@ -1315,6 +1315,9 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   color: var(--ink-dim);
 }
 
+/* Right-aligned beside the drill picker's button. */
+.dialog .fieldrow .slotmenu { margin-left: auto; }
+
 /* ---- drill picker --------------------------------------------------------- */
 
 /* In the dialog's flow rather than floating over it: the dialog scrolls, and
@@ -2019,9 +2022,6 @@ button.danger { border-color: var(--bad); color: var(--bad); }
   color: var(--ink-dim);
 }
 .drilltools { display: flex; align-items: center; gap: 8px; min-width: 0; }
-/* A select is as wide as its widest option. This one fits its own label and
-   the chevron. The open list still shows each option in full. */
-.drilltools select { width: calc(11ch + 40px); }
 .helpbtn { font-size: 16px; }
 .helpbtn[aria-expanded="true"] { border-color: var(--you); color: var(--you); }
 .drilltext {
