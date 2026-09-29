@@ -295,6 +295,75 @@ describe("the loop switch", () => {
   });
 });
 
+describe("N and P", () => {
+  const press = (key: string) =>
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    });
+
+  const heard = () =>
+    [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Target"))!;
+
+  it("pick the next and previous run, and stop at the last", () => {
+    const app = mount();
+    press("n");
+    expect(app.picked()).toBe(1);
+    press("n");
+    expect(app.picked()).toBe(1);
+    press("p");
+    expect(app.picked()).toBe(0);
+  });
+
+  it("follow the order the rows are drawn in", () => {
+    const app = mount({ runSort: "newest" });
+    press("n");
+    expect(app.picked()).toBe(0);
+    press("p");
+    expect(app.picked()).toBe(1);
+  });
+
+  it("step from the first run to the target, and back to the selected run", async () => {
+    const app = mount({ runSort: "newest" });
+    press("n");
+    expect(app.picked()).toBe(0);
+    // A real key press, since a browser holds audio back until a gesture.
+    await act(async () => {
+      await userEvent.keyboard("p");
+      await userEvent.keyboard("p");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(app.picked(), "p on the first run keeps the run selected").toBe(1);
+    expect(heard().getAttribute("aria-pressed"), "and plays the target").toBe("true");
+    await act(async () => {
+      await userEvent.keyboard("p");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(heard().getAttribute("aria-pressed"), "p on the target does nothing").toBe("true");
+    await act(async () => {
+      await userEvent.keyboard("n");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(app.picked(), "n from the target picks the selected run").toBe(1);
+    const you = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Your sending"))!;
+    expect(you.getAttribute("aria-pressed"), "and plays it").toBe("true");
+    await act(async () => {
+      await userEvent.keyboard("{Escape}");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+  });
+
+  it("play the run they pick", async () => {
+    mount();
+    const you = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Your sending"))!;
+    // A real key press, since a browser holds audio back until a gesture.
+    await act(async () => {
+      await userEvent.keyboard("n");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(you.getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
 describe("Esc", () => {
   it("stops what is playing", async () => {
     mount();

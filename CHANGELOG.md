@@ -13,6 +13,7 @@ nothing to the site. The next release carries them.
 - With a range picked, **Your sending**, **Target**, space and a click inside the range play only the range.
 - Esc stops playback. With nothing playing, Esc clears the range.
 - **Loop**, or L, replays the range or the whole track each time it reaches its end.
+- N and P pick and play the next and previous track, in the order the rows are drawn. P on the first run plays the target, and N on the target plays the selected run.
 
 ### Fixed
 

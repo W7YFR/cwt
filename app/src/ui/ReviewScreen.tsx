@@ -650,6 +650,34 @@ export function ReviewScreen({
     setHeard("tgt");
   }, [heard, player]);
 
+  /* The track a step away in the order the rows are drawn, played once it is
+     loaded. The target sits above the first run, and the step down from it is
+     the selected run. The loaded run arrives with the next render, so the
+     playback waits for it in an effect. */
+  const [playQueued, setPlayQueued] = useState(false);
+  const stepRun = useCallback(
+    (step: 1 | -1) => {
+      if (heard === "tgt") {
+        if (step === 1) {
+          selectRun(from + shownAt);
+          setPlayQueued(true);
+        }
+        return;
+      }
+      const at = order.indexOf(shownAt) + step;
+      if (at < 0) {
+        selectTarget();
+        startTrack("tgt");
+        return;
+      }
+      const next = order[at];
+      if (next === undefined) return;
+      selectRun(from + next);
+      setPlayQueued(true);
+    },
+    [from, heard, order, selectRun, selectTarget, shownAt, startTrack],
+  );
+
   const playDeviation = useCallback(
     (side: "you" | "tgt", idx: number, kind: Focus["kind"]) => {
       const w = contextWindow(review.slots, side, idx, kind);
@@ -677,6 +705,8 @@ export function ReviewScreen({
       } else if (ev.key === "t") {
         if (playing === "tgt") stop();
         else startTrack("tgt");
+      } else if (ev.key === "n" || ev.key === "p") {
+        stepRun(ev.key === "n" ? 1 : -1);
       } else if (ev.key === "l") {
         setLoop((on) => !on);
       } else if (ev.key === "Escape") {
@@ -693,7 +723,13 @@ export function ReviewScreen({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [handle, playing, range, rangeTrack, rec.recorder, startTrack, stop]);
+  }, [handle, playing, range, rangeTrack, rec.recorder, startTrack, stepRun, stop]);
+
+  useEffect(() => {
+    if (!playQueued) return;
+    setPlayQueued(false);
+    startTrack(range ? rangeTrack : "you");
+  }, [playQueued, range, rangeTrack, startTrack]);
 
   /* Open filling the width. Done once the chart exists and after the first
      layout, because the fit is measured off the real content — a short session
@@ -1033,7 +1069,7 @@ export function ReviewScreen({
                 separates &nbsp;·&nbsp; click a track&rsquo;s name to pick it up,
                 again to play it &nbsp;·&nbsp; click the ruler to seek, drag it to
                 pick a range to play &nbsp;·&nbsp; Esc stops playback, then clears the
-                range &nbsp;·&nbsp; L loops &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
+                range &nbsp;·&nbsp; L loops &nbsp;·&nbsp; N and P play the next and previous track &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
               </p>
               {/* The recording transport, which is otherwise only discoverable
