@@ -674,8 +674,10 @@ export function ReviewScreen({
         else startTrack("tgt");
       } else if (ev.key === "l") {
         setLoop((on) => !on);
-      } else if (ev.key === "Escape" && range) {
-        setRange(null);
+      } else if (ev.key === "Escape") {
+        // Playback first, so stopping a loop keeps the range it was playing.
+        if (playing) stop();
+        else setRange(null);
       } else if (ev.key === "Home") {
         ev.preventDefault();
         handle.chart?.scrollTo(0);
@@ -1022,7 +1024,8 @@ export function ReviewScreen({
                 click a character to hear it, a gap to hear it between what it
                 separates &nbsp;·&nbsp; click a track&rsquo;s name to pick it up,
                 again to play it &nbsp;·&nbsp; click the ruler to seek, drag it to
-                pick a range to play (Esc clears it) &nbsp;·&nbsp; L loops &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
+                pick a range to play &nbsp;·&nbsp; Esc stops playback, then clears the
+                range &nbsp;·&nbsp; L loops &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
               </p>
               {/* The recording transport, which is otherwise only discoverable

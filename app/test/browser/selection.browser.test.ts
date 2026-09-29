@@ -12,6 +12,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ReviewScreen } from "@/ui/ReviewScreen";
@@ -291,5 +292,25 @@ describe("the loop switch", () => {
     expect(loop().getAttribute("aria-pressed")).toBe("true");
     act(() => loop().click());
     expect(loop().getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
+describe("Esc", () => {
+  it("stops what is playing", async () => {
+    mount();
+    const target = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Target"))!;
+    const frames = () => new Promise((done) => setTimeout(done, 100));
+    // A real click, since a browser holds audio back until a gesture. Inside
+    // act, because playback moves the playhead on every frame.
+    await act(async () => {
+      await userEvent.click(target);
+      await frames();
+    });
+    expect(target.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await frames();
+    });
+    expect(target.getAttribute("aria-pressed")).toBe("false");
   });
 });
