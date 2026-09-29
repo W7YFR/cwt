@@ -14,7 +14,7 @@ import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
 import { buildLayout, rangeEdges, rangeTimes, timeToX } from "@/render/layout";
 import { trackBands } from "@/render/scene";
 import { contextWindow } from "@/render/focus";
-import { HEIGHT, GUTTER, PAD_R, ZOOM_MIN, rowsFor } from "@/render/geometry";
+import { HEIGHT, GUTTER, PAD_R, ROW_H, ZOOM_MIN, rowsFor } from "@/render/geometry";
 import type { BlockKind } from "@/types";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
 import { blankTake } from "@/io/take";
@@ -401,6 +401,60 @@ describe("the chart in a browser", () => {
       drag(GUTTER + 40, GUTTER + 300);
       // No drag started, so the release is a plain click: a seek.
       expect(onSeek).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("the play button in the gutter", () => {
+    /** Blue pixels in a box of the gutter, in CSS pixels. The selected run's
+     *  name and its play button are drawn in your color. */
+    function blueIn(x0: number, x1: number, y0: number, y1: number): number {
+      const dpr = canvas.width / canvas.getBoundingClientRect().width;
+      const { data } = canvas
+        .getContext("2d")!
+        .getImageData(
+          Math.round(x0 * dpr),
+          Math.round(y0 * dpr),
+          Math.round((x1 - x0) * dpr),
+          Math.round((y1 - y0) * dpr),
+        );
+      let blue = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3]! > 0 && data[i + 2]! - data[i]! > 40) blue++;
+      }
+      return blue;
+    }
+
+    it("shows over the name of the track in hand, and a stop button while it plays", () => {
+      chart.destroy();
+      chart = createChart(host, canvas, { onPlayTrack: vi.fn(), onSelectRun: vi.fn() });
+      chart.update({ review, settings, focus: null });
+      const y = rowsFor(1, 0).runs[0]!.row + ROW_H / 2;
+      const cx = GUTTER / 2;
+      /** Whether the pixel at this point, in CSS pixels, is your color. */
+      const blueAt = (dx: number, dy: number) => blueIn(cx + dx - 0.5, cx + dx + 0.5, y + dy - 0.5, y + dy + 0.5) > 0;
+      // Inside the disc, clear of the name's letters and of the icon.
+      const onDisc = () => blueAt(-9, 7) && blueAt(9, -7);
+      expect(onDisc(), "no button before the pointer arrives").toBe(false);
+
+      const box = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(
+        new PointerEvent("pointermove", {
+          clientX: box.left + 8,
+          clientY: box.top + y,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "mouse",
+          bubbles: true,
+        }),
+      );
+      expect(onDisc(), "the disc").toBe(true);
+      expect(blueAt(0, 0), "the triangle, cut out of it").toBe(false);
+      // Right and up of center: outside the triangle, inside a stop square.
+      expect(blueAt(2.5, -2.5), "a play button").toBe(true);
+
+      chart.update({ review, settings, focus: null, playing: "you" });
+      expect(onDisc()).toBe(true);
+      expect(blueAt(2.5, -2.5), "a stop button while it plays").toBe(false);
     });
   });
 

@@ -156,6 +156,11 @@ export interface Scene {
   /** The name in the gutter the pointer is over, if any. Lights it, because a
    *  word you can click has to look different from a word you cannot. */
   picking?: GutterName | null;
+  /** `picking` names the track already in hand, so a click on it plays. A
+   *  play button in place of the name says so. */
+  pickingInHand?: boolean;
+  /** The track playing, if any. Turns the play button into a stop button. */
+  playing?: "you" | "tgt" | null;
   /** The row the pointer is anywhere over, for its tint. */
   hoverRow?: GutterName | null;
   /** Which track playback is about, so its name in the gutter shows as the one
@@ -1214,12 +1219,14 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
 
   // In overlay the tracks share one band, so the two names stack as a color key
   // inside it rather than labeling separate rows.
-  const rows: Array<[number, string, string]> =
+  /* Each name with the row it picks up, or null for a label that picks up
+     nothing. Overlay has no rows to pick. */
+  const rows: Array<[number, string, string, GutterName | null]> =
     scene.view === "overlay"
       ? [
-          [scene.rows.tgt + OVER_H / 2 - 9, "TGT", C.tgt],
-          [scene.rows.tgt + OVER_H / 2 + 9, "YOU", C.you],
-          [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],
+          [scene.rows.tgt + OVER_H / 2 - 9, "TGT", C.tgt, null],
+          [scene.rows.tgt + OVER_H / 2 + 9, "YOU", C.you, null],
+          [scene.rows.drift + 7, "DRIFT", C["ink-dim"], null],
         ]
       : [
           [
@@ -1230,6 +1237,7 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
             // is the reference, not the subject — so "picked up" has to be
             // brightness rather than a second hue.
             scene.heard === "tgt" || scene.picking === "tgt" ? C.ink : C.tgt,
+            "tgt",
           ],
           /* One name per attempt, numbered from one in the order they were
              recorded, because that is what the Drop button calls them too.
@@ -1248,11 +1256,20 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
                   : r === scene.picking
                     ? C.ink
                     : C["ink-dim"],
-              ] as [number, string, string],
+                // Nothing recorded is nothing to play.
+                lane.blank ? null : r,
+              ] as [number, string, string, GutterName | null],
           ),
-          [scene.rows.drift + 7, "DRIFT", C["ink-dim"]],
+          [scene.rows.drift + 7, "DRIFT", C["ink-dim"], null],
         ];
-  for (const [y, label, color] of rows) {
+  /* The play button takes the place of the name and scores of the track in
+     hand. Text around it would peek out past its edges. */
+  let button: { name: GutterName; color: string } | null = null;
+  for (const [y, label, color, name] of rows) {
+    if (name !== null && name === scene.picking && scene.pickingInHand) {
+      button = { name, color };
+      continue;
+    }
     ctx.fillStyle = color;
     ctx.fillText(label, 4, y);
   }
@@ -1262,7 +1279,7 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
     for (const [r, lane] of scene.runs.entries()) {
       // Nothing was keyed into it, so every figure would be a reading off an
       // empty recording — the same reason the band below dashes them.
-      if (lane.blank) continue;
+      if (lane.blank || button?.name === r) continue;
       const top = scene.rows.runs[r]!.row;
       ctx.fillStyle = C[scoreBand(lane.analysis.withinTolFrac, CONSISTENT_BANDS)];
       ctx.fillText(`${Math.round(lane.analysis.withinTolFrac * 100)}%`, 4, top + 20);
@@ -1289,6 +1306,45 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
     4,
     scene.rows.drift + 20,
   );
+
+  if (button) {
+    const top = button.name === "tgt" ? scene.rows.tgt : scene.rows.runs[button.name]!.row;
+    const playing = scene.playing === (button.name === "tgt" ? "tgt" : "you");
+    drawPlayButton(ctx, top + ROW_H / 2, button.color, C.panel, playing);
+  }
+}
+
+/** Radius of the gutter's play button. */
+export const PLAY_BUTTON_R = 13;
+
+/** A play button centered in the gutter at `y`: a disc in `color`, with a
+ *  triangle cut out of it in `ink`, or a square while its track plays. The
+ *  shapes of `IconPlay` and `IconStop`. */
+function drawPlayButton(
+  ctx: Ctx2D,
+  y: number,
+  color: string,
+  ink: string,
+  playing: boolean,
+): void {
+  const cx = GUTTER / 2;
+  const r = PLAY_BUTTON_R;
+  ctx.fillStyle = color;
+  roundRect(ctx, cx - r, y - r, 2 * r, 2 * r, r);
+  ctx.fill();
+  ctx.fillStyle = ink;
+  if (playing) {
+    roundRect(ctx, cx - 4, y - 4, 8, 8, 1.2);
+  } else {
+    // Right of center. A triangle's weight is at its base, so a centered box
+    // looks off to the left.
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5, y - 5);
+    ctx.lineTo(cx + 5.5, y);
+    ctx.lineTo(cx - 3.5, y + 5);
+    ctx.closePath();
+  }
+  ctx.fill();
 }
 
 /** Thumb geometry for the canvas-drawn scrollbar, also used for hit testing. */

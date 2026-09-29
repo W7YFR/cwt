@@ -119,6 +119,8 @@ export interface ChartInput {
   firstRun?: number;
   /** The track playback is about, for the gutter. Defaults to yours. */
   heard?: "you" | "tgt";
+  /** The track playing, if any, for the gutter's play button. */
+  playing?: "you" | "tgt" | null;
   settings: ReviewSettings;
   focus: Focus | null;
   /** The stretch of the ruler picked out to play. */
@@ -260,6 +262,8 @@ export function createChart(
       runs: lanes,
       selected,
       picking,
+      pickingInHand: picking !== null && inHand(picking),
+      playing: input.playing ?? null,
       hoverRow,
       ...(input.heard ? { heard: input.heard } : {}),
       ...(columns ? { columns } : {}),

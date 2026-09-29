@@ -35,6 +35,8 @@ export interface ChartProps {
   firstRun?: number;
   /** The track playback is about, for the gutter's highlight. */
   heard?: "you" | "tgt";
+  /** The track playing, if any. */
+  playing?: "you" | "tgt" | null;
   settings: ReviewSettings;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
@@ -125,6 +127,7 @@ export function ChartView({
   selected,
   firstRun,
   heard,
+  playing,
   settings,
   focus,
   playhead,
@@ -231,9 +234,10 @@ export function ChartView({
       ...(selected === undefined ? {} : { selected }),
       ...(firstRun ? { firstRun } : {}),
       ...(heard ? { heard } : {}),
+      playing: playing ?? null,
       range: range ?? null,
     });
-  }, [review, stack, order, selected, firstRun, heard, settings, focus, range]);
+  }, [review, stack, order, selected, firstRun, heard, playing, settings, focus, range]);
 
   useEffect(() => {
     chartRef.current?.setPlayhead(playhead);

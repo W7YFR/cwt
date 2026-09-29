@@ -1027,6 +1027,7 @@ export function ReviewScreen({
           onSelectTarget={selectTarget}
           onPlayTrack={playTrack}
           heard={heard}
+          playing={playing}
           settings={settings}
           focus={focus}
           playhead={playhead}

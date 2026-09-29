@@ -14,6 +14,7 @@ nothing to the site. The next release carries them.
 - Esc stops playback. With nothing playing, Esc clears the range.
 - **Loop**, or L, replays the range or the whole track each time it reaches its end.
 - N and P pick and play the next and previous track, in the order the rows are drawn. P on the first run plays the target, and N on the target plays the selected run.
+- The name of the track in hand, at the left of the chart, shows a play button while the pointer is over it. It shows a stop button while that track plays.
 
 ### Fixed
 
