@@ -366,28 +366,6 @@ describe("the chart in a browser", () => {
       expect(moved.you[1]).toBeGreaterThan(r.you[1]);
     });
 
-    it("puts an end at the playhead from a key, and does nothing while silent", () => {
-      const cbs = ranging();
-      chart.markRange("start");
-      expect(cbs.onRange).not.toHaveBeenCalled();
-
-      const layout = buildLayout(review, {
-        view: settings.view,
-        ppu: 30,
-        durationSec: review.take.durationSec,
-        charMarkers: settings.charMarkers,
-      });
-      const ch = review.slots.find((sl) => sl.actual)!.actual!;
-      const t = (ch.t0 + ch.t1) / 2;
-      chart.setPlayhead({ t, side: "you" });
-      chart.markRange("start");
-      const r = cbs.onRange.mock.calls[0]![0];
-      // Snapped to the character the playhead is in, and on to the end.
-      expect(r.you[0]).toBeCloseTo(ch.t0, 6);
-      expect(r.you[1]).toBeGreaterThan(t);
-      expect(timeToX(layout, r.you[0], "you")).toBeLessThan(timeToX(layout, t, "you"));
-    });
-
     it("is not offered by a chart that takes no ranges", () => {
       const onSeek = vi.fn();
       chart.destroy();

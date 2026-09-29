@@ -129,10 +129,6 @@ export interface Chart {
   update(input: ChartInput): void;
   /** Move the playhead without rebuilding anything. */
   setPlayhead(playhead: { t: number; side: "you" | "tgt" } | null): void;
-  /** Put one end of the range at the playhead, snapped like a drag. With no
-   *  range, the other end is the far end of the chart. Does nothing while
-   *  nothing plays. */
-  markRange(end: "start" | "end"): void;
   /** The zoom at which the whole session fills the width. */
   fit(): number;
   /** Reserve room at both ends of the axis, in seconds: a count-in to come in
@@ -914,18 +910,6 @@ export function createChart(
         }
       }
       paint();
-    },
-
-    markRange(end) {
-      if (!playhead || !layout || !input || !callbacks.onRange) return;
-      const side = playhead.side;
-      const at = timeToX(layout, playhead.t, side);
-      const keep = input.range
-        ? timeToX(layout, input.range[side][end === "start" ? 1 : 0], side)
-        : end === "start"
-          ? layout.width
-          : 0;
-      callbacks.onRange(rangeBetween(layout, lanes[selected]!.slots, at, keep, side, false));
     },
 
     fit() {
