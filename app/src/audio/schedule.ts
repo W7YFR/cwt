@@ -28,7 +28,8 @@ export interface ScheduleOptions {
    *  so the two tracks are consistent and the target does not stop dead on its
    *  last element. */
   readonly padSec: number;
-  /** Play only this window of the timeline; omit for the whole thing. */
+  /** Play only this window of the timeline. Each bound defaults to the
+   *  padded edge of the whole message. */
   readonly from?: number;
   readonly to?: number;
 }
@@ -42,10 +43,9 @@ export function keyingEnvelope(
   options: ScheduleOptions,
 ): Envelope {
   const { peak, padSec } = options;
-  const full = options.to === undefined;
   // Times here are timeline times, so a negative start is just lead-in.
-  const start = full ? -padSec : (options.from ?? 0);
-  const end = full ? timeline.duration + padSec : options.to!;
+  const start = options.from ?? -padSec;
+  const end = options.to ?? timeline.duration + padSec;
 
   const points: Array<readonly [number, number]> = [];
   for (const b of timeline.blocks) {

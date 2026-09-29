@@ -19,10 +19,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ReviewScreen } from "@/ui/ReviewScreen";
-import { ROW_H, rowsFor } from "@/render/geometry";
+import { GUTTER, ROW_H, RULER_H, rowsFor } from "@/render/geometry";
 import { defaultSettings, reviewTake } from "@/timing";
 import { blankTake } from "@/io/take";
-import type { ReviewSettings } from "@/types";
+import type { ReviewSettings, Take } from "@/types";
+import { caseNamed, takeFrom, SLOPPY } from "../fixture";
 import "@/ui/base.css";
 
 /** A real MediaStream with a real audio track, made without a microphone.
@@ -71,20 +72,22 @@ afterEach(() => {
  * Driving it by calling `root.render` from a callback instead would not do:
  * nested inside `act`, those renders collapse into one, and a loop between two
  * views would be flattened out of existence before the assertion saw it. */
-function mount(over: Partial<ReviewSettings> & { runs?: number }) {
-  const take = blankTake({
-    expected: "CQ DE W7YFR",
-    expectedSource: "the test",
-    charWpm: 20,
-    farnsworthWpm: 20,
-  });
+function mount(over: Partial<ReviewSettings> & { runs?: number; take?: Take }) {
+  const take =
+    over.take ??
+    blankTake({
+      expected: "CQ DE W7YFR",
+      expectedSource: "the test",
+      charWpm: 20,
+      farnsworthWpm: 20,
+    });
   const loaded = {
     take,
     clip: { samples: new Float32Array(0), rate: take.rate, peak: 0 },
     data: null,
   };
   const seen: ReviewSettings["view"][] = [];
-  const { runs: _runs, ...settingsOver } = over;
+  const { runs: _runs, take: _take, ...settingsOver } = over;
   let picked = Math.max((over.runs ?? 1) - 1, 0);
   let latest: ReviewSettings = { ...defaultSettings(take), ...settingsOver };
 
@@ -326,6 +329,54 @@ describe("what the chart shows while recording", () => {
     await stop();
     // And they come straight back once the paddle is down.
     expect(height()).toBe(before);
+  });
+});
+
+describe("a range picked before recording", () => {
+  /** Blue pixels in the ruler band, where the range is the only blue thing
+   *  of any size. */
+  function blueOnRuler(): number {
+    const canvas = host.querySelector("canvas")!;
+    const dpr = canvas.width / canvas.getBoundingClientRect().width;
+    const { data } = canvas
+      .getContext("2d")!
+      .getImageData(0, 0, canvas.width, Math.floor(RULER_H * dpr));
+    let blue = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3]! > 0 && data[i + 2]! - data[i]! > 40) blue++;
+    }
+    return blue;
+  }
+
+  it("is hidden while the take runs, and back when it is discarded", async () => {
+    // A recording to pick a range in. A blank take has no characters of yours.
+    mount({ take: takeFrom(caseNamed(SLOPPY)) });
+    // A pixel or so of blue in the ruler's edge, with no range at all.
+    const none = blueOnRuler();
+    const canvas = host.querySelector("canvas")!;
+    const box = canvas.getBoundingClientRect();
+    const at = (type: string, x: number, target: EventTarget) =>
+      act(() => {
+        const init = { clientX: box.left + x, clientY: box.top + 8, bubbles: true };
+        target.dispatchEvent(
+          type === "click"
+            ? new MouseEvent(type, init)
+            : new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: "mouse" }),
+        );
+      });
+    at("pointerdown", GUTTER + 40, canvas);
+    at("pointermove", GUTTER + 300, window);
+    at("pointerup", GUTTER + 300, window);
+    at("click", GUTTER + 300, canvas);
+    expect(blueOnRuler(), "the range is drawn").toBeGreaterThan(none + 100);
+
+    await record();
+    expect(blueOnRuler(), "hidden while recording").toBeLessThanOrEqual(none);
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(blueOnRuler(), "back once the take is discarded").toBeGreaterThan(none + 100);
   });
 });
 

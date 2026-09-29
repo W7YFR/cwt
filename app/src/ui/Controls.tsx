@@ -86,6 +86,9 @@ export interface ControlsProps {
   onPlayYou(): void;
   onPlayTarget(): void;
   onStop(): void;
+  /** Repeat what a play control starts, each time it reaches its end. */
+  loop?: boolean;
+  onLoop?(): void;
 }
 
 export function Controls(props: ControlsProps): React.ReactElement {
@@ -128,6 +131,11 @@ export function Controls(props: ControlsProps): React.ReactElement {
           <button onClick={props.onStop} disabled={!props.playing} aria-label="Stop">
             <IconStop />
           </button>
+          {props.onLoop && (
+            <button className="loop" onClick={props.onLoop} aria-pressed={props.loop ?? false}>
+              Loop
+            </button>
+          )}
           <span className="clock">{fmtSeconds(props.clock ?? 0)}</span>
         </div>
       </div>

@@ -13,6 +13,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
 import type { HitResult, Focus } from "@/render/focus";
+import type { CharRange } from "@/render/layout";
 import { HEIGHT } from "@/render/geometry";
 import { CLASS_LONG } from "./copy";
 import { isGraded } from "@/timing";
@@ -34,14 +35,20 @@ export interface ChartProps {
   firstRun?: number;
   /** The track playback is about, for the gutter's highlight. */
   heard?: "you" | "tgt";
+  /** The track playing, if any. */
+  playing?: "you" | "tgt" | null;
   settings: ReviewSettings;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
+  range?: CharRange | null;
   /* Optional: a chart can be shown purely to be looked at. The calibration
      preview is one — it has no transport of its own, so a click that seeks
      nothing would be a control that lies. */
   onPlayChar?: ChartCallbacks["onPlayChar"];
   onSeek?: ChartCallbacks["onSeek"];
+  /** Given, a drag on the ruler picks out a range. */
+  onRange?: ChartCallbacks["onRange"];
+  onPlayRange?: ChartCallbacks["onPlayRange"];
   onSelectRun?: ChartCallbacks["onSelectRun"];
   onSelectTarget?: ChartCallbacks["onSelectTarget"];
   onPlayTrack?: ChartCallbacks["onPlayTrack"];
@@ -120,11 +127,15 @@ export function ChartView({
   selected,
   firstRun,
   heard,
+  playing,
   settings,
   focus,
   playhead,
+  range,
   onPlayChar,
   onSeek,
+  onRange,
+  onPlayRange,
   onSelectRun,
   onSelectTarget,
   onPlayTrack,
@@ -144,6 +155,8 @@ export function ChartView({
     onPlayChar,
     onPlayTrack,
     onSeek,
+    onRange,
+    onPlayRange,
     onSelectRun,
     onSelectTarget,
     onZoom,
@@ -153,6 +166,8 @@ export function ChartView({
     onPlayChar,
     onPlayTrack,
     onSeek,
+    onRange,
+    onPlayRange,
     onSelectRun,
     onSelectTarget,
     onZoom,
@@ -173,6 +188,11 @@ export function ChartView({
     const chart = createChart(host, canvas, {
       onPlayChar: (...a) => cb.current.onPlayChar?.(...a),
       onSeek: (...a) => cb.current.onSeek?.(...a),
+      // Read once: the chart takes ranges or it does not.
+      ...(cb.current.onRange
+        ? { onRange: (r: CharRange | null) => cb.current.onRange?.(r) }
+        : {}),
+      onPlayRange: () => cb.current.onPlayRange?.(),
       onSelectRun: (...a) => cb.current.onSelectRun?.(...a),
       onSelectTarget: (...a) => cb.current.onSelectTarget?.(...a),
       onPlayTrack: (...a) => cb.current.onPlayTrack?.(...a),
@@ -214,8 +234,10 @@ export function ChartView({
       ...(selected === undefined ? {} : { selected }),
       ...(firstRun ? { firstRun } : {}),
       ...(heard ? { heard } : {}),
+      playing: playing ?? null,
+      range: range ?? null,
     });
-  }, [review, stack, order, selected, firstRun, heard, settings, focus]);
+  }, [review, stack, order, selected, firstRun, heard, playing, settings, focus, range]);
 
   useEffect(() => {
     chartRef.current?.setPlayhead(playhead);

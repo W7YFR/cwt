@@ -7,6 +7,21 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.5.0 — 2026-09-29
+
+### Added
+
+- Drag along the ruler to pick a range of the target's characters to play. The range stays on those characters when you pick another run or the target.
+- With a range picked, **Your sending**, **Target**, space and a click inside the range play only the range.
+- Esc stops playback. With nothing playing, Esc clears the range.
+- **Loop**, or L, replays the range or the whole track each time it reaches its end.
+- N and P pick and play the next and previous track, in the order the rows are drawn. P on the first run plays the target, and N on the target plays the selected run.
+- The name of the track in hand, at the left of the chart, shows a play button while the pointer is over it. It shows a stop button while that track plays.
+
+### Fixed
+
+- A click on the ruler while the target plays now plays the target from that point. It no longer restarts the target.
+
 ## v1.4.0 — 2026-09-28
 
 ### Added

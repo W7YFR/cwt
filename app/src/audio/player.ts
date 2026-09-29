@@ -21,8 +21,9 @@ export type PlaySide = "you" | "tgt";
 export interface PlayerCallbacks {
   /** Called every animation frame while something is playing. */
   onProgress?: (t: number, side: PlaySide) => void;
-  /** Called when playback ends, for any reason including being stopped. */
-  onEnded?: () => void;
+  /** Called when playback ends: "done" when it reached its end, "stopped"
+   *  when `stop()` ended it. */
+  onEnded?: (reason: "done" | "stopped") => void;
   onError?: (message: string) => void;
 }
 
@@ -143,19 +144,22 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
     stopAt = null;
   }
 
-  function stop(): void {
+  function finish(reason: "done" | "stopped"): void {
     const was = mode;
     teardown();
-    if (was) callbacks.onEnded?.();
+    if (was) callbacks.onEnded?.(reason);
   }
+
+  const stop = () => finish("stopped");
+  const done = () => finish("done");
 
   function tick(): void {
     if (!ctx || !mode) return;
     const t = ctx.currentTime - clockStart + clockOffset;
-    if (stopAt !== null && t >= stopAt) return stop();
+    if (stopAt !== null && t >= stopAt) return done();
     // The buffer knows its own real duration, so this cannot hang waiting for a
     // rounded figure the audio never reaches.
-    if (t >= clockEnd - 0.01) return stop();
+    if (t >= clockEnd - 0.01) return done();
     // Playback is scheduled a beat in the future, so the first few frames sit
     // slightly before zero — which would otherwise read as "-0.0s".
     callbacks.onProgress?.(Math.max(t, 0), mode);
@@ -194,7 +198,7 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         // The node's own end event, so a throttled frame loop cannot leave the
         // transport stuck showing "playing".
         src.onended = () => {
-          if (mode === "you") stop();
+          if (mode === "you") done();
         };
 
         youNodes = { src, level };
@@ -245,14 +249,13 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         else gate.gain.linearRampToValueAtTime(value, t0 + at);
       }
 
-      const full = options.to === undefined;
-      const start = full ? -options.padSec : (options.from ?? 0);
-      const endT = full ? timeline.duration + options.padSec : options.to!;
+      const start = options.from ?? -options.padSec;
+      const endT = options.to ?? timeline.duration + options.padSec;
 
       osc.start(t0);
       osc.stop(t0 + env.duration + 0.05);
       osc.onended = () => {
-        if (mode === "tgt") stop();
+        if (mode === "tgt") done();
       };
 
       tgtNodes = { osc, gate, level, filter };

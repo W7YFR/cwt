@@ -501,6 +501,115 @@ export function xToTime(layout: Layout, x: number, side: "you" | "tgt"): number 
   return m[m.length - 1]![0];
 }
 
+/** A range of the target's characters, `first` to `last` inclusive, by their
+ *  place in the target.
+ *
+ * Characters rather than seconds. Every run is an attempt at the same target,
+ * so the range stays on the same letters when you pick another run, the
+ * target, or another target speed. */
+export interface CharRange {
+  readonly first: number;
+  readonly last: number;
+}
+
+/** Where a range falls on each track of one run, in seconds. `you` is null
+ *  when the run holds none of the range's characters. */
+export interface PlayRange {
+  readonly you: readonly [number, number] | null;
+  readonly tgt: readonly [number, number];
+}
+
+/** Each slot's place in the target, or -1 for an extra character. Slots list
+ *  the target's characters in order, so a place is a count. */
+function targetPlaces(slots: readonly Slot[]): number[] {
+  let n = 0;
+  return slots.map((slot) => (slot.ideal ? n++ : -1));
+}
+
+/** Where `range` falls on one run, from that run's own slots. Extra characters
+ *  sent inside the range belong to it. */
+export function rangeTimes(slots: readonly Slot[], range: CharRange): PlayRange | null {
+  const places = targetPlaces(slots);
+  const a = places.findIndex((p) => p >= range.first);
+  let b = -1;
+  places.forEach((p, i) => {
+    if (p >= 0 && p <= range.last) b = i;
+  });
+  if (a < 0 || b < a) return null;
+
+  const span = (side: "you" | "tgt"): [number, number] | null => {
+    let t0 = Infinity;
+    let t1 = -Infinity;
+    for (let i = a; i <= b; i++) {
+      const ch = side === "you" ? slots[i]!.actual : slots[i]!.ideal;
+      if (!ch) continue;
+      t0 = Math.min(t0, ch.t0);
+      t1 = Math.max(t1, ch.t1);
+    }
+    return t0 < t1 ? [t0, t1] : null;
+  };
+  const tgt = span("tgt");
+  return tgt ? { you: span("you"), tgt } : null;
+}
+
+/** The track a range plays on: the one in hand, unless this run holds none
+ *  of its characters. */
+export function rangeSide(heard: "you" | "tgt" | undefined, range: PlayRange): "you" | "tgt" {
+  return (heard ?? "you") === "you" && range.you ? "you" : "tgt";
+}
+
+/** The target's characters a drag from `xa` to `xb` touches, in content
+ *  pixels on the target track. */
+export function rangeBetween(
+  layout: Layout,
+  slots: readonly Slot[],
+  xa: number,
+  xb: number,
+): CharRange | null {
+  const lo = Math.min(xa, xb);
+  const hi = Math.max(xa, xb);
+  const places = targetPlaces(slots);
+  const held = slots.flatMap((slot, i) => {
+    const ch = slot.ideal;
+    if (!ch) return [];
+    const inside = timeToX(layout, ch.t1, "tgt") > lo && timeToX(layout, ch.t0, "tgt") < hi;
+    return inside ? [places[i]!] : [];
+  });
+  return held.length ? { first: Math.min(...held), last: Math.max(...held) } : null;
+}
+
+/** Room left between a range's ends and what it holds, in pixels. */
+const RANGE_PAD = 4;
+
+/** Content x of each end of a range as drawn, from its `times` on `side`.
+ *
+ * Each end reaches to the edge of the characters it holds, captions
+ * included, and a little past. Drawn as a marker, a character is one tick
+ * and its caption is most of what shows of it. In the per-character view a
+ * character sits at the start of its column, which is not where its own
+ * clock puts it when it was sent early or late. */
+export function rangeEdges(
+  layout: Layout,
+  times: readonly [number, number],
+  side: "you" | "tgt",
+): [number, number] {
+  const [t0, t1] = times;
+  let x0 = timeToX(layout, t0, side);
+  let x1 = timeToX(layout, t1, side);
+  layout.items.forEach(({ slot }, i) => {
+    const ch = side === "you" ? slot.actual : slot.ideal;
+    if (!ch || ch.t0 < t0 - 1e-9 || ch.t1 > t1 + 1e-9) return;
+    const span = slotSpan(layout, side, i, false);
+    if (!span) return;
+    const sent = sentCaption(slot, false).text;
+    const intended = slot.ideal?.char ?? "";
+    const text = sent.length > intended.length ? sent : intended;
+    x0 = Math.min(x0, span[0]);
+    x1 = Math.max(x1, span[1], captionEnd(text, span[0]));
+  });
+  return [x0 - RANGE_PAD, x1 + RANGE_PAD];
+}
+
 /** The x-range one slot occupies on one track, in content pixels. Null when
  *  that side has no character in the slot (a missed or an extra one).
  *

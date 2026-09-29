@@ -20,12 +20,16 @@ import {
   xToTime,
   type Layout,
   measureColumns,
+  rangeBetween,
+  rangeEdges,
+  rangeSide,
+  rangeTimes,
   sentCaption,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
 import { defaultSettings, idealTimeline, pair, reviewTake, subLabel, targetTiming } from "@/timing";
 import { blankTake } from "@/io/take";
-import { draw, gradeOf, scrollbarThumb, trackBands, type Scene } from "@/render/scene";
+import { draw, gradeOf, PLAY_BUTTON_R, scrollbarThumb, trackBands, type Scene } from "@/render/scene";
 import { FALLBACK_PALETTE } from "@/render/theme";
 import {
   CAPTION_GLYPH_W,
@@ -49,9 +53,85 @@ import {
   ZOOM_MIN,
   rowsFor,
 } from "@/render/geometry";
-import type { Review, ViewMode } from "@/types";
+import type { Review, Slot, ViewMode } from "@/types";
 
 const VIEWS: ViewMode[] = ["per-char", "absolute", "overlay"];
+
+describe("a range picked on the ruler", () => {
+  const { review } = reviewFrom(caseNamed(SLOPPY));
+  // The first two neighbouring slots that have a character on both tracks.
+  const both = (k: number) => !!review.slots[k]?.actual && !!review.slots[k]?.ideal;
+  const i = review.slots.findIndex((_, k) => both(k) && both(k + 1));
+  const j = i + 1;
+  /** A slot's place in the target: how many target characters come before it. */
+  const placeOf = (slots: readonly Slot[], k: number) =>
+    slots.slice(0, k).filter((sl) => sl.ideal).length;
+  const middle = (layout: Layout, ch: { t0: number; t1: number }) =>
+    (timeToX(layout, ch.t0, "tgt") + timeToX(layout, ch.t1, "tgt")) / 2;
+
+  it.each(VIEWS)("takes in every target character a drag touches, in %s", (view) => {
+    const layout = layoutFor(review, view, 12);
+    const a = review.slots[i]!;
+    const b = review.slots[j]!;
+    // From inside the second character back to inside the first.
+    const r = rangeBetween(layout, review.slots, middle(layout, b.ideal!), middle(layout, a.ideal!))!;
+    expect(r).toEqual({ first: placeOf(review.slots, i), last: placeOf(review.slots, j) });
+
+    // Each track plays its own characters for those letters.
+    const t = rangeTimes(review.slots, r)!;
+    expect(t.tgt[0]).toBeCloseTo(a.ideal!.t0, 9);
+    expect(t.tgt[1]).toBeCloseTo(b.ideal!.t1, 9);
+    expect(t.you![0]).toBeCloseTo(a.actual!.t0, 9);
+    expect(t.you![1]).toBeCloseTo(b.actual!.t1, 9);
+  });
+
+  it("holds the same letters on another run of the same target", () => {
+    const expected = "CQ DE W7YFR";
+    const one = reviewFrom(caseNamed(SLOPPY), { expected }).review;
+    const two = reviewFrom(caseNamed(CLEAN), { expected }).review;
+    const r = { first: 2, last: 3 }; // "DE": spaces are not characters
+    const onOne = rangeTimes(one.slots, r)!;
+    const onTwo = rangeTimes(two.slots, r)!;
+    // Each run's own "DE", on both tracks. The two were recorded against
+    // different target speeds, so the same letters are at different seconds.
+    const de = (rv: Review) => rv.slots.filter((sl) => sl.ideal).slice(2, 4);
+    for (const [rv, t] of [[one, onOne], [two, onTwo]] as const) {
+      const [d, e] = de(rv);
+      expect(d!.ideal!.char + e!.ideal!.char).toBe("DE");
+      expect(t.tgt).toEqual([d!.ideal!.t0, e!.ideal!.t1]);
+      expect(t.you).toEqual([d!.actual!.t0, e!.actual!.t1]);
+    }
+  });
+
+  it("plays on the target when the run has nothing recorded", () => {
+    const take = blankTake({
+      expected: "CQ DE W7YFR",
+      expectedSource: "the test",
+      charWpm: 20,
+      farnsworthWpm: 20,
+    });
+    const empty = reviewTake(take, defaultSettings(take));
+    const t = rangeTimes(empty.slots, { first: 0, last: 1 })!;
+    expect(t.you).toBeNull();
+    expect(rangeSide("you", t)).toBe("tgt");
+  });
+
+  it("reaches to the end of its last character's caption", () => {
+    // Drawn as markers, a character is one tick and its caption runs past it.
+    const layout = layoutFor(review, "per-char", 12, true);
+    const b = review.slots[j]!;
+    const t = rangeTimes(review.slots, { first: placeOf(review.slots, i), last: placeOf(review.slots, j) })!;
+    const [, x1] = rangeEdges(layout, t.tgt, "tgt");
+    const start = slotSpan(layout, "tgt", j, false)![0];
+    expect(x1).toBeGreaterThanOrEqual(start + b.ideal!.char.length * CAPTION_GLYPH_W);
+    expect(x1).toBeGreaterThan(timeToX(layout, b.ideal!.t1, "tgt"));
+  });
+
+  it("is nothing when the drag touches no character", () => {
+    const layout = layoutFor(review, "absolute", 12);
+    expect(rangeBetween(layout, review.slots, -50, -10)).toBeNull();
+  });
+});
 
 /* A caption starts where its character starts. At a low zoom a prosign's
  * caption is wider than its marks, so the content has to reach past them. */
@@ -1375,5 +1455,80 @@ describe("sentCaption", () => {
   it("writes an extra character with a plus", () => {
     const slots = pair(idealTimeline("A7", ref), idealTimeline("A", ref));
     expect(sentCaption(slots[1]!, false)).toEqual({ text: "+7", bad: true });
+  });
+});
+
+describe("the play button in the gutter", () => {
+  const { review } = reviewFrom(caseNamed(SLOPPY));
+  const base = sceneFor(review, "per-char", 12);
+  const runY = base.rows.runs[0]!.row + ROW_H / 2;
+  const tgtY = base.rows.tgt + ROW_H / 2;
+  const cx = GUTTER / 2;
+  const drawn = (over: Partial<Scene>) => {
+    const ctx = recordingCtx();
+    draw(ctx, { ...base, ...over });
+    return ctx;
+  };
+  /** Whether a path starts at this point. */
+  const startsAt = (ctx: ReturnType<typeof recordingCtx>, x: number, y: number) =>
+    ctx.ofType("moveTo").some((c) => Math.abs(c.args[0]! - x) < 1e-9 && Math.abs(c.args[1]! - y) < 1e-9);
+  // The disc's top, the triangle's top left corner, and the stop square's
+  // first rounded corner.
+  const disc = (ctx: ReturnType<typeof recordingCtx>, y: number) => startsAt(ctx, cx, y - PLAY_BUTTON_R);
+  const play = (ctx: ReturnType<typeof recordingCtx>, y: number) => startsAt(ctx, cx - 3.5, y - 5);
+  const stop = (ctx: ReturnType<typeof recordingCtx>, y: number) => startsAt(ctx, cx - 4 + 1.2, y - 4);
+
+  it("takes the place of the name of the track in hand, centered on its row", () => {
+    const ctx = drawn({ picking: 0, pickingInHand: true });
+    expect(ctx.texts()).not.toContain("RUN 1");
+    expect(disc(ctx, runY)).toBe(true);
+    expect(play(ctx, runY)).toBe(true);
+  });
+
+  it("takes the place of that run's scores in a stack", () => {
+    const stacked: Partial<Scene> = {
+      runs: [base.runs[0]!, { ...base.runs[0]!, ordinal: 1 }],
+      rows: rowsFor(2, 0),
+      picking: 0,
+      pickingInHand: true,
+    };
+    const scores = (ctx: ReturnType<typeof recordingCtx>) =>
+      ctx.texts().filter((t) => t.endsWith("%")).length;
+    const ctx = drawn(stacked);
+    expect(ctx.texts()).toContain("RUN 2");
+    // The other run's scores, and none for the one under the button.
+    const all = scores(drawn({ ...stacked, pickingInHand: false }));
+    expect(all).toBeGreaterThan(0);
+    expect(scores(ctx)).toBe(all / 2);
+  });
+
+  it("is not there when the track is not in hand", () => {
+    const ctx = drawn({ picking: 0, pickingInHand: false });
+    expect(ctx.texts()).toContain("RUN 1");
+    expect(disc(ctx, runY)).toBe(false);
+  });
+
+  it("is a stop button while that track plays", () => {
+    const ctx = drawn({ picking: 0, pickingInHand: true, playing: "you" });
+    expect(play(ctx, runY)).toBe(false);
+    expect(stop(ctx, runY)).toBe(true);
+  });
+
+  it("is on the target's row when the target is in hand", () => {
+    const ctx = drawn({ picking: "tgt", pickingInHand: true, heard: "tgt" });
+    expect(ctx.texts()).not.toContain("TGT");
+    expect(ctx.texts()).toContain("RUN 1");
+    expect(disc(ctx, tgtY)).toBe(true);
+    expect(disc(ctx, runY)).toBe(false);
+  });
+
+  it("is not offered on a row with nothing recorded", () => {
+    const ctx = drawn({
+      picking: 0,
+      pickingInHand: true,
+      runs: base.runs.map((r) => ({ ...r, blank: true })),
+    });
+    expect(ctx.texts()).toContain("YOU");
+    expect(disc(ctx, runY)).toBe(false);
   });
 });

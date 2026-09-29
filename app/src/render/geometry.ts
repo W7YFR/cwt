@@ -215,6 +215,13 @@ export const ZOOM_RATE = 0.0025;
 /** Pixels a press may move before it counts as a pan rather than a click. */
 export const DRAG_SLOP = 4;
 
+/** Width of the handle drawn at each end of a range on the ruler. */
+export const RANGE_HANDLE_W = 3;
+
+/** Pixels either side of a range's end that grab it rather than start a new
+ *  range. */
+export const RANGE_GRAB = 6;
+
 /** Silence either side of a played span, so a clip doesn't start hard on the
  *  first edge. */
 export const PLAY_PAD = 0.08;

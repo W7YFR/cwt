@@ -16,6 +16,7 @@ import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
 import { contextWindow, type Focus } from "@/render/focus";
 import { PACED_STOP_AFTER_SEC, PLAY_PAD } from "@/render/geometry";
+import { rangeSide, rangeTimes, type CharRange } from "@/render/layout";
 import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
@@ -227,6 +228,15 @@ export function ReviewScreen({
   // the whole screen sixty times a second; the chart takes it directly.
   const [playhead, setPlayhead] = useState<{ t: number; side: PlaySide } | null>(null);
 
+  /* Loop repeats what a track's play control started: the range, or the
+     whole track. The player is made once, so it reaches the latest of these
+     through refs. */
+  const [loop, setLoop] = useState(false);
+  const loopRef = useRef(loop);
+  loopRef.current = loop;
+  const looping = useRef<PlaySide | null>(null);
+  const restart = useRef<(side: PlaySide) => void>(() => {});
+
   const playerRef = useRef<Player | null>(null);
   if (!playerRef.current) {
     playerRef.current = createPlayer({
@@ -234,10 +244,12 @@ export function ReviewScreen({
         setPlayhead({ t, side });
         setClock(t);
       },
-      onEnded: () => {
+      onEnded: (reason) => {
         setPlaying(null);
         setPlayhead(null);
         setClock(null);
+        const side = looping.current;
+        if (reason === "done" && loopRef.current && side) restart.current(side);
       },
       onError: setStatus,
     });
@@ -539,9 +551,20 @@ export function ReviewScreen({
      you back into your own recording every time. */
   const [heard, setHeard] = useState<PlaySide>("you");
 
+  /* The target's characters picked out to play. Every run is an attempt at
+     the same target, so only another target clears it. */
+  const [range, setRange] = useState<CharRange | null>(null);
+  useEffect(() => setRange(null), [review.ideal.text]);
+  // Where the range falls on the run being read.
+  const times = useMemo(() => (range ? rangeTimes(review.slots, range) : null), [range, review.slots]);
+  // A run with none of the range's characters, or nothing recorded, has only
+  // the target's to play.
+  const rangeTrack: PlaySide = times ? rangeSide(heard, times) : heard;
+
   const playYou = useCallback(
     async (from?: number, to?: number) => {
       setHeard("you");
+      looping.current = null;
       if (playing === "you" && from === undefined) {
         player.stop();
         return;
@@ -565,6 +588,7 @@ export function ReviewScreen({
   const playTarget = useCallback(
     (from?: number, to?: number) => {
       setHeard("tgt");
+      looping.current = null;
       if (playing === "tgt" && from === undefined) {
         player.stop();
         return;
@@ -579,6 +603,30 @@ export function ReviewScreen({
     [player, playing, review.ideal, targetOptions],
   );
 
+
+  /** Start a track: its range when there is one, else the whole track. */
+  const startTrack = useCallback(
+    (side: PlaySide) => {
+      const span = times?.[side] ?? null;
+      const from = span ? Math.max(span[0] - PLAY_PAD, 0) : undefined;
+      const to = span ? span[1] + PLAY_PAD : undefined;
+      // The whole target starts in its lead-in, before zero.
+      if (side === "you") void playYou(from ?? 0, to);
+      else playTarget(from ?? -targetOptions.padSec, to);
+      looping.current = side;
+    },
+    [playTarget, playYou, times, targetOptions.padSec],
+  );
+  restart.current = startTrack;
+
+  /** A track's play control: start it, or stop it when it is playing. */
+  const playTrack = useCallback(
+    (side: PlaySide) => {
+      if (playing === side) player.stop();
+      else startTrack(side);
+    },
+    [player, playing, startTrack],
+  );
 
   /* Picking up another track ends whatever is playing.
      Everything on this screen that names a recording follows the selection,
@@ -601,6 +649,34 @@ export function ReviewScreen({
     if (heard !== "tgt") player.stop();
     setHeard("tgt");
   }, [heard, player]);
+
+  /* The track a step away in the order the rows are drawn, played once it is
+     loaded. The target sits above the first run, and the step down from it is
+     the selected run. The loaded run arrives with the next render, so the
+     playback waits for it in an effect. */
+  const [playQueued, setPlayQueued] = useState(false);
+  const stepRun = useCallback(
+    (step: 1 | -1) => {
+      if (heard === "tgt") {
+        if (step === 1) {
+          selectRun(from + shownAt);
+          setPlayQueued(true);
+        }
+        return;
+      }
+      const at = order.indexOf(shownAt) + step;
+      if (at < 0) {
+        selectTarget();
+        startTrack("tgt");
+        return;
+      }
+      const next = order[at];
+      if (next === undefined) return;
+      selectRun(from + next);
+      setPlayQueued(true);
+    },
+    [from, heard, order, selectRun, selectTarget, shownAt, startTrack],
+  );
 
   const playDeviation = useCallback(
     (side: "you" | "tgt", idx: number, kind: Focus["kind"]) => {
@@ -625,10 +701,18 @@ export function ReviewScreen({
       if (ev.code === "Space") {
         ev.preventDefault();
         if (playing) stop();
-        else void playYou(0);
+        else startTrack(range ? rangeTrack : "you");
       } else if (ev.key === "t") {
         if (playing === "tgt") stop();
-        else playTarget(0);
+        else startTrack("tgt");
+      } else if (ev.key === "n" || ev.key === "p") {
+        stepRun(ev.key === "n" ? 1 : -1);
+      } else if (ev.key === "l") {
+        setLoop((on) => !on);
+      } else if (ev.key === "Escape") {
+        // Playback first, so stopping a loop keeps the range it was playing.
+        if (playing) stop();
+        else setRange(null);
       } else if (ev.key === "Home") {
         ev.preventDefault();
         handle.chart?.scrollTo(0);
@@ -639,7 +723,13 @@ export function ReviewScreen({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [handle, playTarget, playYou, playing, rec.recorder, stop]);
+  }, [handle, playing, range, rangeTrack, rec.recorder, startTrack, stepRun, stop]);
+
+  useEffect(() => {
+    if (!playQueued) return;
+    setPlayQueued(false);
+    startTrack(range ? rangeTrack : "you");
+  }, [playQueued, range, rangeTrack, startTrack]);
 
   /* Open filling the width. Done once the chart exists and after the first
      layout, because the fit is measured off the real content — a short session
@@ -804,8 +894,10 @@ export function ReviewScreen({
         clock={clock}
         canPlayYou={!blank}
         fromFile={loaded.take.source !== MIC_SOURCE}
-        onPlayYou={() => void playYou()}
-        onPlayTarget={() => playTarget()}
+        onPlayYou={() => playTrack("you")}
+        onPlayTarget={() => playTrack("tgt")}
+        loop={loop}
+        onLoop={() => setLoop((on) => !on)}
         onStop={stop}
       />
 
@@ -933,14 +1025,18 @@ export function ReviewScreen({
           firstRun={recording ? 0 : from}
           onSelectRun={selectRun}
           onSelectTarget={selectTarget}
-          onPlayTrack={(side) => {
-            if (side === "you") void playYou();
-            else playTarget();
-          }}
+          onPlayTrack={playTrack}
           heard={heard}
+          playing={playing}
           settings={settings}
           focus={focus}
           playhead={playhead}
+          // Hidden while recording, and kept for when the take is discarded.
+          range={recording ? null : range}
+          onRange={(next) => {
+            if (!recording) setRange(next);
+          }}
+          onPlayRange={() => playTrack(rangeTrack)}
           handle={handle}
           onPlayChar={(side, from, to) => {
             if (side === "you") void playYou(from, to);
@@ -972,8 +1068,9 @@ export function ReviewScreen({
               <p className="legend howto">
                 click a character to hear it, a gap to hear it between what it
                 separates &nbsp;·&nbsp; click a track&rsquo;s name to pick it up,
-                again to play it &nbsp;·&nbsp; click the ruler to seek
-                &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
+                again to play it &nbsp;·&nbsp; click the ruler to seek, drag it to
+                pick a range to play &nbsp;·&nbsp; Esc stops playback, then clears the
+                range &nbsp;·&nbsp; L loops &nbsp;·&nbsp; N and P play the next and previous track &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
               </p>
               {/* The recording transport, which is otherwise only discoverable

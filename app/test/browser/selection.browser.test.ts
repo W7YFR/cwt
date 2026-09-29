@@ -12,10 +12,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ReviewScreen } from "@/ui/ReviewScreen";
-import { GUTTER, PAD_R, ROW_H, ZOOM_MIN, rowsFor } from "@/render/geometry";
+import { GUTTER, PAD_R, ROW_H, RULER_H, ZOOM_MIN, rowsFor } from "@/render/geometry";
 import { defaultSettings, reviewTake } from "@/timing";
 import { buildLayout, measureColumns } from "@/render/layout";
 import type { ReviewSettings } from "@/types";
@@ -276,5 +277,157 @@ describe("fitting the chart to the window", () => {
     // A real fit, not the floor — otherwise this asserts nothing.
     expect(app.ppu()).toBeGreaterThan(ZOOM_MIN);
     expect(contentWidth(app.ppu(), drawn)).toBeLessThanOrEqual(track());
+  });
+});
+
+describe("the loop switch", () => {
+  it("turns on and off from L and from its button", () => {
+    mount();
+    const loop = () =>
+      [...host.querySelectorAll("button")].find((b) => b.textContent === "Loop")!;
+    expect(loop().getAttribute("aria-pressed")).toBe("false");
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "l", bubbles: true }));
+    });
+    expect(loop().getAttribute("aria-pressed")).toBe("true");
+    act(() => loop().click());
+    expect(loop().getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
+describe("N and P", () => {
+  const press = (key: string) =>
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    });
+
+  const heard = () =>
+    [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Target"))!;
+
+  it("pick the next and previous run, and stop at the last", () => {
+    const app = mount();
+    press("n");
+    expect(app.picked()).toBe(1);
+    press("n");
+    expect(app.picked()).toBe(1);
+    press("p");
+    expect(app.picked()).toBe(0);
+  });
+
+  it("follow the order the rows are drawn in", () => {
+    const app = mount({ runSort: "newest" });
+    press("n");
+    expect(app.picked()).toBe(0);
+    press("p");
+    expect(app.picked()).toBe(1);
+  });
+
+  it("step from the first run to the target, and back to the selected run", async () => {
+    const app = mount({ runSort: "newest" });
+    press("n");
+    expect(app.picked()).toBe(0);
+    // A real key press, since a browser holds audio back until a gesture.
+    await act(async () => {
+      await userEvent.keyboard("p");
+      await userEvent.keyboard("p");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(app.picked(), "p on the first run keeps the run selected").toBe(1);
+    expect(heard().getAttribute("aria-pressed"), "and plays the target").toBe("true");
+    await act(async () => {
+      await userEvent.keyboard("p");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(heard().getAttribute("aria-pressed"), "p on the target does nothing").toBe("true");
+    await act(async () => {
+      await userEvent.keyboard("n");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(app.picked(), "n from the target picks the selected run").toBe(1);
+    const you = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Your sending"))!;
+    expect(you.getAttribute("aria-pressed"), "and plays it").toBe("true");
+    await act(async () => {
+      await userEvent.keyboard("{Escape}");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+  });
+
+  it("play the run they pick", async () => {
+    mount();
+    const you = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Your sending"))!;
+    // A real key press, since a browser holds audio back until a gesture.
+    await act(async () => {
+      await userEvent.keyboard("n");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(you.getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("Esc", () => {
+  it("stops what is playing", async () => {
+    mount();
+    const target = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Target"))!;
+    const frames = () => new Promise((done) => setTimeout(done, 100));
+    // A real click, since a browser holds audio back until a gesture. Inside
+    // act, because playback moves the playhead on every frame.
+    await act(async () => {
+      await userEvent.click(target);
+      await frames();
+    });
+    expect(target.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await frames();
+    });
+    expect(target.getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
+describe("a range, across runs", () => {
+  /** Blue pixels in the ruler band, where a range on your track is the only
+   *  blue thing of any size. */
+  function blueOnRuler(): number {
+    const canvas = host.querySelector("canvas")!;
+    const dpr = canvas.width / canvas.getBoundingClientRect().width;
+    const { data } = canvas
+      .getContext("2d")!
+      .getImageData(0, 0, canvas.width, Math.floor(RULER_H * dpr));
+    let blue = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3]! > 0 && data[i + 2]! - data[i]! > 40) blue++;
+    }
+    return blue;
+  }
+
+  it("stays when you pick another run, or the target", () => {
+    const app = mount();
+    const none = blueOnRuler();
+    const canvas = host.querySelector("canvas")!;
+    const box = canvas.getBoundingClientRect();
+    const at = (type: string, x: number, target: EventTarget) =>
+      act(() => {
+        const init = { clientX: box.left + x, clientY: box.top + 8, bubbles: true };
+        target.dispatchEvent(
+          type === "click"
+            ? new MouseEvent(type, init)
+            : new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: "mouse" }),
+        );
+      });
+    at("pointerdown", GUTTER + 40, canvas);
+    at("pointermove", GUTTER + 300, window);
+    at("pointerup", GUTTER + 300, window);
+    at("click", GUTTER + 300, canvas);
+    expect(blueOnRuler(), "the range is drawn").toBeGreaterThan(none + 100);
+
+    pick(1, app.runs);
+    expect(app.picked()).toBe(1);
+    expect(blueOnRuler(), "kept on the other run").toBeGreaterThan(none + 100);
+
+    // The target's name, then back to the first run.
+    pick(0, app.runs, rowsFor(app.runs, 1).tgt + ROW_H / 2);
+    pick(0, app.runs);
+    expect(app.picked()).toBe(0);
+    expect(blueOnRuler(), "kept through the target").toBeGreaterThan(none + 100);
   });
 });

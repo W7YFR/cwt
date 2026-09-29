@@ -11,12 +11,14 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
-import { buildLayout, timeToX } from "@/render/layout";
+import { buildLayout, rangeEdges, rangeTimes, timeToX } from "@/render/layout";
 import { trackBands } from "@/render/scene";
 import { contextWindow } from "@/render/focus";
-import { HEIGHT, GUTTER, PAD_R, ZOOM_MIN, rowsFor } from "@/render/geometry";
+import { HEIGHT, GUTTER, PAD_R, ROW_H, ZOOM_MIN, rowsFor } from "@/render/geometry";
 import type { BlockKind } from "@/types";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
+import { blankTake } from "@/io/take";
+import { defaultSettings, reviewTake } from "@/timing";
 
 const { review, settings } = reviewFrom(caseNamed(SLOPPY));
 
@@ -302,6 +304,158 @@ describe("the chart in a browser", () => {
       new WheelEvent("wheel", { deltaY: -240, clientX: 600, clientY: 60, bubbles: true }),
     );
     expect(onScroll).toHaveBeenCalled();
+  });
+
+  describe("a range on the ruler", () => {
+    function ranging() {
+      const cbs = { onRange: vi.fn(), onPlayRange: vi.fn(), onSeek: vi.fn(), onScroll: vi.fn() };
+      chart.destroy();
+      chart = createChart(host, canvas, cbs);
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null });
+      return cbs;
+    }
+    const onRuler = (type: string, x: number, target: EventTarget) => {
+      const rect = canvas.getBoundingClientRect();
+      const init = { clientX: rect.left + x, clientY: rect.top + 8, bubbles: true };
+      target.dispatchEvent(
+        type === "click"
+          ? new MouseEvent(type, init)
+          : new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: "mouse" }),
+      );
+    };
+    const drag = (from: number, to: number) => {
+      onRuler("pointerdown", from, canvas);
+      onRuler("pointermove", to, window);
+      onRuler("pointerup", to, window);
+      onRuler("click", to, canvas);
+    };
+
+    it("is picked out by a drag, which neither seeks nor pans", () => {
+      const cbs = ranging();
+      drag(GUTTER + 40, GUTTER + 300);
+      expect(cbs.onRange).toHaveBeenCalledTimes(1);
+      const r = cbs.onRange.mock.calls[0]![0];
+      // A range of the target's characters.
+      expect(r.first).toBeGreaterThanOrEqual(0);
+      expect(r.last).toBeGreaterThanOrEqual(r.first);
+      expect(cbs.onSeek).not.toHaveBeenCalled();
+      expect(cbs.onScroll).not.toHaveBeenCalled();
+    });
+
+    it("plays from a click inside it, and clears and seeks from one outside", () => {
+      const cbs = ranging();
+      drag(GUTTER + 40, GUTTER + 300);
+      const r = cbs.onRange.mock.calls[0]![0];
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null, range: r });
+
+      onRuler("click", GUTTER + 150, canvas);
+      expect(cbs.onPlayRange).toHaveBeenCalledTimes(1);
+      expect(cbs.onSeek).not.toHaveBeenCalled();
+
+      onRuler("click", GUTTER + 500, canvas);
+      expect(cbs.onRange).toHaveBeenLastCalledWith(null);
+      expect(cbs.onSeek).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves one end when that end is dragged", () => {
+      const cbs = ranging();
+      drag(GUTTER + 40, GUTTER + 300);
+      const r = cbs.onRange.mock.calls[0]![0];
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null, range: r });
+
+      // From the right end as drawn, out past more characters.
+      const layout = buildLayout(review, {
+        view: settings.view,
+        ppu: 30,
+        durationSec: review.take.durationSec,
+        charMarkers: settings.charMarkers,
+      });
+      const [, end] = rangeEdges(layout, rangeTimes(review.slots, r)!.tgt, "tgt");
+      drag(end, end + 200);
+      const moved = cbs.onRange.mock.calls[1]![0];
+      expect(moved.first).toBe(r.first);
+      expect(moved.last).toBeGreaterThan(r.last);
+    });
+
+    it("is picked on the target when nothing has been recorded", () => {
+      const cbs = ranging();
+      const take = blankTake({
+        expected: "CQ DE W7YFR",
+        expectedSource: "the test",
+        charWpm: 20,
+        farnsworthWpm: 20,
+      });
+      const blank = reviewTake(take, defaultSettings(take));
+      chart.update({ review: blank, settings: { ...settings, ppu: 30 }, focus: null });
+      drag(GUTTER + 40, GUTTER + 300);
+      const r = cbs.onRange.mock.calls[0]![0];
+      expect(r).not.toBeNull();
+      expect(r.last).toBeGreaterThanOrEqual(r.first);
+    });
+
+    it("is not offered by a chart that takes no ranges", () => {
+      const onSeek = vi.fn();
+      chart.destroy();
+      chart = createChart(host, canvas, { onSeek });
+      chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null });
+      drag(GUTTER + 40, GUTTER + 300);
+      // No drag started, so the release is a plain click: a seek.
+      expect(onSeek).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("the play button in the gutter", () => {
+    /** Blue pixels in a box of the gutter, in CSS pixels. The selected run's
+     *  name and its play button are drawn in your color. */
+    function blueIn(x0: number, x1: number, y0: number, y1: number): number {
+      const dpr = canvas.width / canvas.getBoundingClientRect().width;
+      const { data } = canvas
+        .getContext("2d")!
+        .getImageData(
+          Math.round(x0 * dpr),
+          Math.round(y0 * dpr),
+          Math.round((x1 - x0) * dpr),
+          Math.round((y1 - y0) * dpr),
+        );
+      let blue = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3]! > 0 && data[i + 2]! - data[i]! > 40) blue++;
+      }
+      return blue;
+    }
+
+    it("shows over the name of the track in hand, and a stop button while it plays", () => {
+      chart.destroy();
+      chart = createChart(host, canvas, { onPlayTrack: vi.fn(), onSelectRun: vi.fn() });
+      chart.update({ review, settings, focus: null });
+      const y = rowsFor(1, 0).runs[0]!.row + ROW_H / 2;
+      const cx = GUTTER / 2;
+      /** Whether the pixel at this point, in CSS pixels, is your color. */
+      const blueAt = (dx: number, dy: number) => blueIn(cx + dx - 0.5, cx + dx + 0.5, y + dy - 0.5, y + dy + 0.5) > 0;
+      // Inside the disc, clear of the name's letters and of the icon.
+      const onDisc = () => blueAt(-9, 7) && blueAt(9, -7);
+      expect(onDisc(), "no button before the pointer arrives").toBe(false);
+
+      const box = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(
+        new PointerEvent("pointermove", {
+          clientX: box.left + 8,
+          clientY: box.top + y,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "mouse",
+          bubbles: true,
+        }),
+      );
+      expect(onDisc(), "the disc").toBe(true);
+      expect(blueAt(0, 0), "the triangle, cut out of it").toBe(false);
+      // Right and up of center: outside the triangle, inside a stop square.
+      expect(blueAt(2.5, -2.5), "a play button").toBe(true);
+
+      chart.update({ review, settings, focus: null, playing: "you" });
+      expect(onDisc()).toBe(true);
+      expect(blueAt(2.5, -2.5), "a stop button while it plays").toBe(false);
+    });
   });
 
   it("plays a character when one is clicked without dragging", () => {
