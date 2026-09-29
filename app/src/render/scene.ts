@@ -341,11 +341,12 @@ function drawTicks(ctx: Ctx2D, scene: Scene): void {
 }
 
 /** Wash the range across every row, behind the marks, and mark its ends on
- *  the ruler as handles. In the color of the playhead that will play it. */
+ *  the ruler as handles. Placed by the target's characters, in the color of
+ *  the playhead that will play it. */
 function drawRange(ctx: Ctx2D, scene: Scene): void {
   if (!scene.range) return;
-  const side = rangeSide(scene.heard, scene.runs[scene.selected]?.blank === true);
-  const [x0, x1] = rangeEdges(scene.layout, scene.range, side);
+  const side = rangeSide(scene.heard, scene.range);
+  const [x0, x1] = rangeEdges(scene.layout, scene.range.tgt, "tgt");
   const w = x1 - x0;
   if (!visible(x0, w, scene)) return;
 

@@ -31,12 +31,12 @@ import {
   measureColumns,
   rangeBetween,
   rangeEdges,
-  rangeSide,
+  rangeTimes,
   timeToX,
   xToTime,
   type ColumnMetrics,
   type Layout,
-  type PlayRange,
+  type CharRange,
 } from "./layout";
 import {
   draw,
@@ -77,7 +77,7 @@ export interface ChartCallbacks {
   onSeek?: (at: { you: number; tgt: number }) => void;
   /** A drag on the ruler picked out a range, or a click cleared it (null).
    *  A chart without this has no ranges. */
-  onRange?: (range: PlayRange | null) => void;
+  onRange?: (range: CharRange | null) => void;
   /** The ruler was clicked inside the range. */
   onPlayRange?: () => void;
   /** Pointer moved over (or off) a block, for the tooltip. */
@@ -122,7 +122,7 @@ export interface ChartInput {
   settings: ReviewSettings;
   focus: Focus | null;
   /** The stretch of the ruler picked out to play. */
-  range?: PlayRange | null;
+  range?: CharRange | null;
 }
 
 export interface Chart {
@@ -278,7 +278,7 @@ export function createChart(
       hover,
       focus: input.focus,
       playhead,
-      range: pending ?? input.range ?? null,
+      range: timesOf(pending ?? input.range ?? null),
       driftMax,
       leadSec,
       charMarkers: input.settings.charMarkers,
@@ -431,7 +431,7 @@ export function createChart(
 
   let drag: Drag | null = null;
   /** The range a drag on the ruler is drawing, until it is released. */
-  let pending: PlayRange | null = null;
+  let pending: CharRange | null = null;
   let suppressClick = false;
 
   function localPos(ev: { clientX: number; clientY: number }): {
@@ -444,18 +444,27 @@ export function createChart(
 
   const contentXOf = (sx: number) => sx - GUTTER + scrollX;
 
-  const handSide = () => rangeSide(input?.heard, lanes[selected]?.blank === true);
+  /** Where a range falls on the run being read. */
+  const timesOf = (range: CharRange | null) =>
+    range && lanes[selected] ? rangeTimes(lanes[selected]!.slots, range) : null;
+
+  /** The range as drawn, on the target track: its times and its edges. */
+  function shown(): { times: readonly [number, number]; edges: [number, number] } | null {
+    const range = timesOf(input?.range ?? null);
+    if (!range || !layout) return null;
+    return { times: range.tgt, edges: rangeEdges(layout, range.tgt, "tgt") };
+  }
 
   /** The content x of the far end of the range, when screen x `sx` is on one
    *  of its ends as drawn. The far end is its own moment, not its drawn edge,
    *  so a drag leaves it where it was. */
   function grabbedEnd(sx: number): number | null {
-    if (!input?.range || !layout) return null;
-    const side = handSide();
-    const [x0, x1] = rangeEdges(layout, input.range, side);
+    const r = shown();
+    if (!r || !layout) return null;
+    const [x0, x1] = r.edges;
     const cx = contentXOf(sx);
-    if (Math.abs(cx - x1) <= RANGE_GRAB) return timeToX(layout, input.range[side][0], side);
-    if (Math.abs(cx - x0) <= RANGE_GRAB) return timeToX(layout, input.range[side][1], side);
+    if (Math.abs(cx - x1) <= RANGE_GRAB) return timeToX(layout, r.times[0], "tgt");
+    if (Math.abs(cx - x0) <= RANGE_GRAB) return timeToX(layout, r.times[1], "tgt");
     return null;
   }
 
@@ -557,14 +566,7 @@ export function createChart(
     if (drag.kind === "range") {
       if (!layout || !input) return;
       const lane = lanes[selected]!;
-      pending = rangeBetween(
-        layout,
-        lane.slots,
-        drag.anchor,
-        contentXOf(p.x),
-        handSide(),
-        ev.altKey,
-      );
+      pending = rangeBetween(layout, lane.slots, drag.anchor, contentXOf(p.x));
       paint();
     } else if (drag.kind === "thumb") {
       const span = drag.trackW - drag.thumbW;
@@ -756,8 +758,9 @@ export function createChart(
        outside it, a click clears the range and seeks. */
     if (p.y < RULER_H) {
       const at = contentXOf(p.x);
-      if (input?.range) {
-        const [x0, x1] = rangeEdges(layout, input.range, handSide());
+      const r = shown();
+      if (r) {
+        const [x0, x1] = r.edges;
         if (at >= x0 && at <= x1) {
           callbacks.onPlayRange?.();
           return;

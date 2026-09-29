@@ -11,7 +11,7 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
-import { buildLayout, timeToX } from "@/render/layout";
+import { buildLayout, rangeEdges, rangeTimes, timeToX } from "@/render/layout";
 import { trackBands } from "@/render/scene";
 import { contextWindow } from "@/render/focus";
 import { HEIGHT, GUTTER, PAD_R, ZOOM_MIN, rowsFor } from "@/render/geometry";
@@ -314,19 +314,19 @@ describe("the chart in a browser", () => {
       chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null });
       return cbs;
     }
-    const onRuler = (type: string, x: number, target: EventTarget, alt = false) => {
+    const onRuler = (type: string, x: number, target: EventTarget) => {
       const rect = canvas.getBoundingClientRect();
-      const init = { clientX: rect.left + x, clientY: rect.top + 8, bubbles: true, altKey: alt };
+      const init = { clientX: rect.left + x, clientY: rect.top + 8, bubbles: true };
       target.dispatchEvent(
         type === "click"
           ? new MouseEvent(type, init)
           : new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: "mouse" }),
       );
     };
-    const drag = (from: number, to: number, alt = false) => {
+    const drag = (from: number, to: number) => {
       onRuler("pointerdown", from, canvas);
-      onRuler("pointermove", to, window, alt);
-      onRuler("pointerup", to, window, alt);
+      onRuler("pointermove", to, window);
+      onRuler("pointerup", to, window);
       onRuler("click", to, canvas);
     };
 
@@ -335,15 +335,16 @@ describe("the chart in a browser", () => {
       drag(GUTTER + 40, GUTTER + 300);
       expect(cbs.onRange).toHaveBeenCalledTimes(1);
       const r = cbs.onRange.mock.calls[0]![0];
-      expect(r.you[1]).toBeGreaterThan(r.you[0]);
-      expect(r.tgt[1]).toBeGreaterThan(r.tgt[0]);
+      // A range of the target's characters.
+      expect(r.first).toBeGreaterThanOrEqual(0);
+      expect(r.last).toBeGreaterThanOrEqual(r.first);
       expect(cbs.onSeek).not.toHaveBeenCalled();
       expect(cbs.onScroll).not.toHaveBeenCalled();
     });
 
     it("plays from a click inside it, and clears and seeks from one outside", () => {
       const cbs = ranging();
-      drag(GUTTER + 40, GUTTER + 300, true);
+      drag(GUTTER + 40, GUTTER + 300);
       const r = cbs.onRange.mock.calls[0]![0];
       chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null, range: r });
 
@@ -358,14 +359,22 @@ describe("the chart in a browser", () => {
 
     it("moves one end when that end is dragged", () => {
       const cbs = ranging();
-      drag(GUTTER + 40, GUTTER + 300, true);
+      drag(GUTTER + 40, GUTTER + 300);
       const r = cbs.onRange.mock.calls[0]![0];
       chart.update({ review, settings: { ...settings, ppu: 30 }, focus: null, range: r });
 
-      drag(GUTTER + 300, GUTTER + 400, true);
+      // From the right end as drawn, out past more characters.
+      const layout = buildLayout(review, {
+        view: settings.view,
+        ppu: 30,
+        durationSec: review.take.durationSec,
+        charMarkers: settings.charMarkers,
+      });
+      const [, end] = rangeEdges(layout, rangeTimes(review.slots, r)!.tgt, "tgt");
+      drag(end, end + 200);
       const moved = cbs.onRange.mock.calls[1]![0];
-      expect(moved.you[0]).toBeCloseTo(r.you[0], 6);
-      expect(moved.you[1]).toBeGreaterThan(r.you[1]);
+      expect(moved.first).toBe(r.first);
+      expect(moved.last).toBeGreaterThan(r.last);
     });
 
     it("is picked on the target when nothing has been recorded", () => {
@@ -381,10 +390,7 @@ describe("the chart in a browser", () => {
       drag(GUTTER + 40, GUTTER + 300);
       const r = cbs.onRange.mock.calls[0]![0];
       expect(r).not.toBeNull();
-      // Snapped to the target's characters.
-      const starts = blank.slots.flatMap((sl) => (sl.ideal ? [sl.ideal.t0] : []));
-      expect(starts.some((t) => Math.abs(t - r.tgt[0]) < 1e-9)).toBe(true);
-      expect(r.tgt[1]).toBeGreaterThan(r.tgt[0]);
+      expect(r.last).toBeGreaterThanOrEqual(r.first);
     });
 
     it("is not offered by a chart that takes no ranges", () => {

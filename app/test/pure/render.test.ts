@@ -22,6 +22,8 @@ import {
   measureColumns,
   rangeBetween,
   rangeEdges,
+  rangeSide,
+  rangeTimes,
   sentCaption,
 } from "@/render/layout";
 import { contextSlots, contextWindow, focusSpan, hitTest, slotIndexAtTime } from "@/render/focus";
@@ -51,7 +53,7 @@ import {
   ZOOM_MIN,
   rowsFor,
 } from "@/render/geometry";
-import type { Review, ViewMode } from "@/types";
+import type { Review, Slot, ViewMode } from "@/types";
 
 const VIEWS: ViewMode[] = ["per-char", "absolute", "overlay"];
 
@@ -61,94 +63,73 @@ describe("a range picked on the ruler", () => {
   const both = (k: number) => !!review.slots[k]?.actual && !!review.slots[k]?.ideal;
   const i = review.slots.findIndex((_, k) => both(k) && both(k + 1));
   const j = i + 1;
+  /** A slot's place in the target: how many target characters come before it. */
+  const placeOf = (slots: readonly Slot[], k: number) =>
+    slots.slice(0, k).filter((sl) => sl.ideal).length;
+  const middle = (layout: Layout, ch: { t0: number; t1: number }) =>
+    (timeToX(layout, ch.t0, "tgt") + timeToX(layout, ch.t1, "tgt")) / 2;
 
-  it.each(VIEWS)("takes in every character a drag touches, in %s", (view) => {
+  it.each(VIEWS)("takes in every target character a drag touches, in %s", (view) => {
     const layout = layoutFor(review, view, 12);
     const a = review.slots[i]!;
     const b = review.slots[j]!;
-    // From inside the first character to inside the second.
-    const xa = (timeToX(layout, a.actual!.t0, "you") + timeToX(layout, a.actual!.t1, "you")) / 2;
-    const xb = (timeToX(layout, b.actual!.t0, "you") + timeToX(layout, b.actual!.t1, "you")) / 2;
-    const r = rangeBetween(layout, review.slots, xb, xa, "you", false)!;
-    expect(r.you[0]).toBeCloseTo(a.actual!.t0, 6);
-    expect(r.you[1]).toBeCloseTo(b.actual!.t1, 6);
-    // The target gets the same letters, on its own clock.
-    expect(r.tgt[0]).toBeCloseTo(a.ideal!.t0, 6);
-    expect(r.tgt[1]).toBeCloseTo(b.ideal!.t1, 6);
+    // From inside the second character back to inside the first.
+    const r = rangeBetween(layout, review.slots, middle(layout, b.ideal!), middle(layout, a.ideal!))!;
+    expect(r).toEqual({ first: placeOf(review.slots, i), last: placeOf(review.slots, j) });
+
+    // Each track plays its own characters for those letters.
+    const t = rangeTimes(review.slots, r)!;
+    expect(t.tgt[0]).toBeCloseTo(a.ideal!.t0, 9);
+    expect(t.tgt[1]).toBeCloseTo(b.ideal!.t1, 9);
+    expect(t.you![0]).toBeCloseTo(a.actual!.t0, 9);
+    expect(t.you![1]).toBeCloseTo(b.actual!.t1, 9);
   });
 
-  it("maps a free drag straight to time", () => {
-    const layout = layoutFor(review, "absolute", 12);
-    const a = review.slots[i]!.actual!;
-    const xa = (timeToX(layout, a.t0, "you") + timeToX(layout, a.t1, "you")) / 2;
-    const r = rangeBetween(layout, review.slots, xa, xa + 40, "you", true)!;
-    expect(r.you[0]).toBeCloseTo(xToTime(layout, xa, "you"), 6);
-    expect(r.you[1]).toBeCloseTo(xToTime(layout, xa + 40, "you"), 6);
+  it("holds the same letters on another run of the same target", () => {
+    const expected = "CQ DE W7YFR";
+    const one = reviewFrom(caseNamed(SLOPPY), { expected }).review;
+    const two = reviewFrom(caseNamed(CLEAN), { expected }).review;
+    const r = { first: 2, last: 3 }; // "DE": spaces are not characters
+    const onOne = rangeTimes(one.slots, r)!;
+    const onTwo = rangeTimes(two.slots, r)!;
+    // Each run's own "DE", on both tracks. The two were recorded against
+    // different target speeds, so the same letters are at different seconds.
+    const de = (rv: Review) => rv.slots.filter((sl) => sl.ideal).slice(2, 4);
+    for (const [rv, t] of [[one, onOne], [two, onTwo]] as const) {
+      const [d, e] = de(rv);
+      expect(d!.ideal!.char + e!.ideal!.char).toBe("DE");
+      expect(t.tgt).toEqual([d!.ideal!.t0, e!.ideal!.t1]);
+      expect(t.you).toEqual([d!.actual!.t0, e!.actual!.t1]);
+    }
+  });
+
+  it("plays on the target when the run has nothing recorded", () => {
+    const take = blankTake({
+      expected: "CQ DE W7YFR",
+      expectedSource: "the test",
+      charWpm: 20,
+      farnsworthWpm: 20,
+    });
+    const empty = reviewTake(take, defaultSettings(take));
+    const t = rangeTimes(empty.slots, { first: 0, last: 1 })!;
+    expect(t.you).toBeNull();
+    expect(rangeSide("you", t)).toBe("tgt");
   });
 
   it("reaches to the end of its last character's caption", () => {
     // Drawn as markers, a character is one tick and its caption runs past it.
     const layout = layoutFor(review, "per-char", 12, true);
-    const a = review.slots[i]!;
     const b = review.slots[j]!;
-    const r = rangeBetween(
-      layout,
-      review.slots,
-      timeToX(layout, a.actual!.t0, "you"),
-      timeToX(layout, b.actual!.t1, "you"),
-      "you",
-      false,
-    )!;
-    const [, x1] = rangeEdges(layout, r, "you");
-    const start = timeToX(layout, b.actual!.t0, "you");
+    const t = rangeTimes(review.slots, { first: placeOf(review.slots, i), last: placeOf(review.slots, j) })!;
+    const [, x1] = rangeEdges(layout, t.tgt, "tgt");
+    const start = slotSpan(layout, "tgt", j, false)![0];
     expect(x1).toBeGreaterThanOrEqual(start + b.ideal!.char.length * CAPTION_GLYPH_W);
-    expect(x1).toBeGreaterThan(timeToX(layout, b.actual!.t1, "you"));
+    expect(x1).toBeGreaterThan(timeToX(layout, b.ideal!.t1, "tgt"));
   });
 
-  it("holds a character sent early, which sits right of its own clock", () => {
-    // The word gap before <BK> is sent short. In the per-character view the
-    // prosign still sits at the start of its column, so its caption starts
-    // after the moment its marks began.
-    const base = reviewFrom(caseNamed(FARNSWORTH)).take;
-    const tl = idealTimeline("HEY <BK>", targetTiming(12, 12));
-    const segments: Array<readonly [0 | 1, number]> = [[0, 0.5]];
-    for (const bl of tl.blocks) {
-      const d = bl.t1 - bl.t0;
-      segments.push(
-        bl.kind === "dit" || bl.kind === "dah" ? [1, d] : [0, bl.kind === "word-gap" ? d * 0.85 : d],
-      );
-    }
-    segments.push([0, 0.5]);
-    const take = {
-      ...base,
-      segments,
-      expected: "HEY <BK>",
-      durationSec: segments.reduce((sum, seg) => sum + seg[1], 0),
-      target: { charWpm: 12, farnsworthWpm: 12, explicit: true },
-    };
-    const settings = { ...defaultSettings(take), charMarkers: true, view: "per-char" as const };
-    const early = reviewTake(take, settings);
-    const layout = buildLayout(early, {
-      view: "per-char",
-      ppu: 12,
-      durationSec: take.durationSec,
-      charMarkers: true,
-      columns: measureColumns([early.slots], 12, true),
-      run: 0,
-    });
-    const at = early.slots.findIndex((sl) => sl.ideal?.char === "<BK>");
-    const bk = early.slots[at]!.actual!;
-    const r = rangeBetween(layout, early.slots, 0, layout.width, "you", false)!;
-    const [x0, x1] = rangeEdges(layout, r, "you");
-    const start = slotSpan(layout, "you", at, false)![0];
-    expect(start).toBeGreaterThan(timeToX(layout, bk.t0, "you"));
-    expect(x1).toBeGreaterThan(start + "<BK>".length * CAPTION_GLYPH_W);
-    expect(x0).toBeLessThan(slotSpan(layout, "you", 0, false)![0]);
-  });
-
-  it("is nothing when the drag has no length", () => {
+  it("is nothing when the drag touches no character", () => {
     const layout = layoutFor(review, "absolute", 12);
-    expect(rangeBetween(layout, review.slots, 100, 100, "you", true)).toBeNull();
+    expect(rangeBetween(layout, review.slots, -50, -10)).toBeNull();
   });
 });
 

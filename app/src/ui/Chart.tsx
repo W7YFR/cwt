@@ -13,7 +13,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createChart, type Chart, type ChartCallbacks } from "@/render/canvas";
 import type { HitResult, Focus } from "@/render/focus";
-import type { PlayRange } from "@/render/layout";
+import type { CharRange } from "@/render/layout";
 import { HEIGHT } from "@/render/geometry";
 import { CLASS_LONG } from "./copy";
 import { isGraded } from "@/timing";
@@ -38,7 +38,7 @@ export interface ChartProps {
   settings: ReviewSettings;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
-  range?: PlayRange | null;
+  range?: CharRange | null;
   /* Optional: a chart can be shown purely to be looked at. The calibration
      preview is one — it has no transport of its own, so a click that seeks
      nothing would be a control that lies. */
@@ -187,7 +187,7 @@ export function ChartView({
       onSeek: (...a) => cb.current.onSeek?.(...a),
       // Read once: the chart takes ranges or it does not.
       ...(cb.current.onRange
-        ? { onRange: (r: PlayRange | null) => cb.current.onRange?.(r) }
+        ? { onRange: (r: CharRange | null) => cb.current.onRange?.(r) }
         : {}),
       onPlayRange: () => cb.current.onPlayRange?.(),
       onSelectRun: (...a) => cb.current.onSelectRun?.(...a),

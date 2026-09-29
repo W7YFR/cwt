@@ -16,7 +16,7 @@ import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
 import { contextWindow, type Focus } from "@/render/focus";
 import { PACED_STOP_AFTER_SEC, PLAY_PAD } from "@/render/geometry";
-import type { PlayRange } from "@/render/layout";
+import { rangeSide, rangeTimes, type CharRange } from "@/render/layout";
 import type { Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
@@ -551,13 +551,15 @@ export function ReviewScreen({
      you back into your own recording every time. */
   const [heard, setHeard] = useState<PlaySide>("you");
 
-  /* The stretch of the ruler picked out to play. Its seconds belong to one
-     recording and one target, so a different run or a different target
-     speed clears it. */
-  const [range, setRange] = useState<PlayRange | null>(null);
-  // With nothing recorded, a range is only the target's to play.
-  const rangeTrack: PlaySide = blank ? "tgt" : heard;
-  useEffect(() => setRange(null), [loaded.take.id, review.ideal.duration]);
+  /* The target's characters picked out to play. Every run is an attempt at
+     the same target, so only another target clears it. */
+  const [range, setRange] = useState<CharRange | null>(null);
+  useEffect(() => setRange(null), [review.ideal.text]);
+  // Where the range falls on the run being read.
+  const times = useMemo(() => (range ? rangeTimes(review.slots, range) : null), [range, review.slots]);
+  // A run with none of the range's characters, or nothing recorded, has only
+  // the target's to play.
+  const rangeTrack: PlaySide = times ? rangeSide(heard, times) : heard;
 
   const playYou = useCallback(
     async (from?: number, to?: number) => {
@@ -605,14 +607,15 @@ export function ReviewScreen({
   /** Start a track: its range when there is one, else the whole track. */
   const startTrack = useCallback(
     (side: PlaySide) => {
-      const from = range ? Math.max(range[side][0] - PLAY_PAD, 0) : undefined;
-      const to = range ? range[side][1] + PLAY_PAD : undefined;
+      const span = times?.[side] ?? null;
+      const from = span ? Math.max(span[0] - PLAY_PAD, 0) : undefined;
+      const to = span ? span[1] + PLAY_PAD : undefined;
       // The whole target starts in its lead-in, before zero.
       if (side === "you") void playYou(from ?? 0, to);
       else playTarget(from ?? -targetOptions.padSec, to);
       looping.current = side;
     },
-    [playTarget, playYou, range, targetOptions.padSec],
+    [playTarget, playYou, times, targetOptions.padSec],
   );
   restart.current = startTrack;
 

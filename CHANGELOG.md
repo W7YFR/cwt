@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- Drag along the ruler to pick a range to play. The range snaps to whole characters, or hold Alt to place its ends freely.
+- Drag along the ruler to pick a range of the target's characters to play. The range stays on those characters when you pick another run or the target.
 - With a range picked, **Your sending**, **Target**, space and a click inside the range play only the range.
 - Esc stops playback. With nothing playing, Esc clears the range.
 - **Loop**, or L, replays the range or the whole track each time it reaches its end.

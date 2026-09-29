@@ -501,84 +501,87 @@ export function xToTime(layout: Layout, x: number, side: "you" | "tgt"): number 
   return m[m.length - 1]![0];
 }
 
-/** A stretch of the ruler to play, in seconds on each track.
+/** A range of the target's characters, `first` to `last` inclusive, by their
+ *  place in the target.
  *
- * Seconds rather than pixels, so it holds its place through a zoom. Both
- * tracks, because one ruler runs over two clocks. */
+ * Characters rather than seconds. Every run is an attempt at the same target,
+ * so the range stays on the same letters when you pick another run, the
+ * target, or another target speed. */
+export interface CharRange {
+  readonly first: number;
+  readonly last: number;
+}
+
+/** Where a range falls on each track of one run, in seconds. `you` is null
+ *  when the run holds none of the range's characters. */
 export interface PlayRange {
-  readonly you: readonly [number, number];
+  readonly you: readonly [number, number] | null;
   readonly tgt: readonly [number, number];
 }
 
-/** The track a range is snapped, drawn and measured on: the one in hand,
- *  unless yours holds nothing yet. Then only the target has characters. */
-export function rangeSide(heard: "you" | "tgt" | undefined, blank: boolean): "you" | "tgt" {
-  return blank ? "tgt" : (heard ?? "you");
+/** Each slot's place in the target, or -1 for an extra character. Slots list
+ *  the target's characters in order, so a place is a count. */
+function targetPlaces(slots: readonly Slot[]): number[] {
+  let n = 0;
+  return slots.map((slot) => (slot.ideal ? n++ : -1));
 }
 
-/** Shortest range worth playing, in seconds. */
-const RANGE_MIN_SEC = 0.02;
+/** Where `range` falls on one run, from that run's own slots. Extra characters
+ *  sent inside the range belong to it. */
+export function rangeTimes(slots: readonly Slot[], range: CharRange): PlayRange | null {
+  const places = targetPlaces(slots);
+  const a = places.findIndex((p) => p >= range.first);
+  let b = -1;
+  places.forEach((p, i) => {
+    if (p >= 0 && p <= range.last) b = i;
+  });
+  if (a < 0 || b < a) return null;
 
-/** The range a drag from `xa` to `xb` selects, in content pixels.
- *
- * Snapped, it takes in every character on `side` that the drag touches, and
- * each track gets its own characters from those slots. That makes the target
- * range the same letters as yours even where the two tracks drift apart. A drag
- * that touches no character, or a `free` one, maps its ends straight to time. */
+  const span = (side: "you" | "tgt"): [number, number] | null => {
+    let t0 = Infinity;
+    let t1 = -Infinity;
+    for (let i = a; i <= b; i++) {
+      const ch = side === "you" ? slots[i]!.actual : slots[i]!.ideal;
+      if (!ch) continue;
+      t0 = Math.min(t0, ch.t0);
+      t1 = Math.max(t1, ch.t1);
+    }
+    return t0 < t1 ? [t0, t1] : null;
+  };
+  const tgt = span("tgt");
+  return tgt ? { you: span("you"), tgt } : null;
+}
+
+/** The track a range plays on: the one in hand, unless this run holds none
+ *  of its characters. */
+export function rangeSide(heard: "you" | "tgt" | undefined, range: PlayRange): "you" | "tgt" {
+  return (heard ?? "you") === "you" && range.you ? "you" : "tgt";
+}
+
+/** The target's characters a drag from `xa` to `xb` touches, in content
+ *  pixels on the target track. */
 export function rangeBetween(
   layout: Layout,
   slots: readonly Slot[],
   xa: number,
   xb: number,
-  side: "you" | "tgt",
-  free: boolean,
-): PlayRange | null {
+): CharRange | null {
   const lo = Math.min(xa, xb);
   const hi = Math.max(xa, xb);
-  const raw = (s: "you" | "tgt"): [number, number] => [
-    Math.max(xToTime(layout, lo, s), 0),
-    Math.max(xToTime(layout, hi, s), 0),
-  ];
-
-  let first = -1;
-  let last = -1;
-  if (!free) {
-    slots.forEach((slot, i) => {
-      const ch = side === "you" ? slot.actual : slot.ideal;
-      if (!ch) return;
-      const x0 = timeToX(layout, ch.t0, side);
-      const x1 = timeToX(layout, ch.t1, side);
-      if (x1 > lo && x0 < hi) {
-        if (first < 0) first = i;
-        last = i;
-      }
-    });
-  }
-
-  const snapped = (s: "you" | "tgt"): [number, number] | null => {
-    let a = Infinity;
-    let b = -Infinity;
-    for (let i = first; i <= last; i++) {
-      const ch = s === "you" ? slots[i]!.actual : slots[i]!.ideal;
-      if (!ch) continue;
-      a = Math.min(a, ch.t0);
-      b = Math.max(b, ch.t1);
-    }
-    return a < b ? [a, b] : null;
-  };
-
-  const range: PlayRange =
-    first < 0
-      ? { you: raw("you"), tgt: raw("tgt") }
-      : { you: snapped("you") ?? raw("you"), tgt: snapped("tgt") ?? raw("tgt") };
-  const [a, b] = range[side];
-  return b - a >= RANGE_MIN_SEC ? range : null;
+  const places = targetPlaces(slots);
+  const held = slots.flatMap((slot, i) => {
+    const ch = slot.ideal;
+    if (!ch) return [];
+    const inside = timeToX(layout, ch.t1, "tgt") > lo && timeToX(layout, ch.t0, "tgt") < hi;
+    return inside ? [places[i]!] : [];
+  });
+  return held.length ? { first: Math.min(...held), last: Math.max(...held) } : null;
 }
 
 /** Room left between a range's ends and what it holds, in pixels. */
 const RANGE_PAD = 4;
 
-/** Content x of each end of the range as drawn, on the track `side`.
+/** Content x of each end of a range as drawn, from its `times` on `side`.
  *
  * Each end reaches to the edge of the characters it holds, captions
  * included, and a little past. Drawn as a marker, a character is one tick
@@ -587,10 +590,10 @@ const RANGE_PAD = 4;
  * clock puts it when it was sent early or late. */
 export function rangeEdges(
   layout: Layout,
-  range: PlayRange,
+  times: readonly [number, number],
   side: "you" | "tgt",
 ): [number, number] {
-  const [t0, t1] = range[side];
+  const [t0, t1] = times;
   let x0 = timeToX(layout, t0, side);
   let x1 = timeToX(layout, t1, side);
   layout.items.forEach(({ slot }, i) => {
