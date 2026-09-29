@@ -510,6 +510,12 @@ export interface PlayRange {
   readonly tgt: readonly [number, number];
 }
 
+/** The track a range is snapped, drawn and measured on: the one in hand,
+ *  unless yours holds nothing yet. Then only the target has characters. */
+export function rangeSide(heard: "you" | "tgt" | undefined, blank: boolean): "you" | "tgt" {
+  return blank ? "tgt" : (heard ?? "you");
+}
+
 /** Shortest range worth playing, in seconds. */
 const RANGE_MIN_SEC = 0.02;
 

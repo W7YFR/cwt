@@ -555,6 +555,8 @@ export function ReviewScreen({
      recording and one target, so a different run or a different target
      speed clears it. */
   const [range, setRange] = useState<PlayRange | null>(null);
+  // With nothing recorded, a range is only the target's to play.
+  const rangeTrack: PlaySide = blank ? "tgt" : heard;
   useEffect(() => setRange(null), [loaded.take.id, review.ideal.duration]);
 
   const playYou = useCallback(
@@ -668,7 +670,7 @@ export function ReviewScreen({
       if (ev.code === "Space") {
         ev.preventDefault();
         if (playing) stop();
-        else startTrack(range ? heard : "you");
+        else startTrack(range ? rangeTrack : "you");
       } else if (ev.key === "t") {
         if (playing === "tgt") stop();
         else startTrack("tgt");
@@ -688,7 +690,7 @@ export function ReviewScreen({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [handle, heard, playing, range, rec.recorder, startTrack, stop]);
+  }, [handle, playing, range, rangeTrack, rec.recorder, startTrack, stop]);
 
   /* Open filling the width. Done once the chart exists and after the first
      layout, because the fit is measured off the real content — a short session
@@ -994,7 +996,7 @@ export function ReviewScreen({
           onRange={(next) => {
             if (!recording) setRange(next);
           }}
-          onPlayRange={() => playTrack(heard)}
+          onPlayRange={() => playTrack(rangeTrack)}
           handle={handle}
           onPlayChar={(side, from, to) => {
             if (side === "you") void playYou(from, to);

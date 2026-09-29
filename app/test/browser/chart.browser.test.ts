@@ -17,6 +17,8 @@ import { contextWindow } from "@/render/focus";
 import { HEIGHT, GUTTER, PAD_R, ZOOM_MIN, rowsFor } from "@/render/geometry";
 import type { BlockKind } from "@/types";
 import { caseNamed, reviewFrom, SLOPPY } from "../fixture";
+import { blankTake } from "@/io/take";
+import { defaultSettings, reviewTake } from "@/timing";
 
 const { review, settings } = reviewFrom(caseNamed(SLOPPY));
 
@@ -364,6 +366,25 @@ describe("the chart in a browser", () => {
       const moved = cbs.onRange.mock.calls[1]![0];
       expect(moved.you[0]).toBeCloseTo(r.you[0], 6);
       expect(moved.you[1]).toBeGreaterThan(r.you[1]);
+    });
+
+    it("is picked on the target when nothing has been recorded", () => {
+      const cbs = ranging();
+      const take = blankTake({
+        expected: "CQ DE W7YFR",
+        expectedSource: "the test",
+        charWpm: 20,
+        farnsworthWpm: 20,
+      });
+      const blank = reviewTake(take, defaultSettings(take));
+      chart.update({ review: blank, settings: { ...settings, ppu: 30 }, focus: null });
+      drag(GUTTER + 40, GUTTER + 300);
+      const r = cbs.onRange.mock.calls[0]![0];
+      expect(r).not.toBeNull();
+      // Snapped to the target's characters.
+      const starts = blank.slots.flatMap((sl) => (sl.ideal ? [sl.ideal.t0] : []));
+      expect(starts.some((t) => Math.abs(t - r.tgt[0]) < 1e-9)).toBe(true);
+      expect(r.tgt[1]).toBeGreaterThan(r.tgt[0]);
     });
 
     it("is not offered by a chart that takes no ranges", () => {

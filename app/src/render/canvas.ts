@@ -31,6 +31,7 @@ import {
   measureColumns,
   rangeBetween,
   rangeEdges,
+  rangeSide,
   timeToX,
   xToTime,
   type ColumnMetrics,
@@ -443,12 +444,14 @@ export function createChart(
 
   const contentXOf = (sx: number) => sx - GUTTER + scrollX;
 
+  const handSide = () => rangeSide(input?.heard, lanes[selected]?.blank === true);
+
   /** The content x of the far end of the range, when screen x `sx` is on one
    *  of its ends as drawn. The far end is its own moment, not its drawn edge,
    *  so a drag leaves it where it was. */
   function grabbedEnd(sx: number): number | null {
     if (!input?.range || !layout) return null;
-    const side = input.heard ?? "you";
+    const side = handSide();
     const [x0, x1] = rangeEdges(layout, input.range, side);
     const cx = contentXOf(sx);
     if (Math.abs(cx - x1) <= RANGE_GRAB) return timeToX(layout, input.range[side][0], side);
@@ -559,7 +562,7 @@ export function createChart(
         lane.slots,
         drag.anchor,
         contentXOf(p.x),
-        input.heard ?? "you",
+        handSide(),
         ev.altKey,
       );
       paint();
@@ -754,7 +757,7 @@ export function createChart(
     if (p.y < RULER_H) {
       const at = contentXOf(p.x);
       if (input?.range) {
-        const [x0, x1] = rangeEdges(layout, input.range, input.heard ?? "you");
+        const [x0, x1] = rangeEdges(layout, input.range, handSide());
         if (at >= x0 && at <= x1) {
           callbacks.onPlayRange?.();
           return;

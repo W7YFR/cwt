@@ -47,6 +47,7 @@ import {
   gapWidth,
   isRest,
   rangeEdges,
+  rangeSide,
   sentCaption,
   timeToX,
   type ColumnMetrics,
@@ -343,7 +344,7 @@ function drawTicks(ctx: Ctx2D, scene: Scene): void {
  *  the ruler as handles. In the color of the playhead that will play it. */
 function drawRange(ctx: Ctx2D, scene: Scene): void {
   if (!scene.range) return;
-  const side = scene.heard ?? "you";
+  const side = rangeSide(scene.heard, scene.runs[scene.selected]?.blank === true);
   const [x0, x1] = rangeEdges(scene.layout, scene.range, side);
   const w = x1 - x0;
   if (!visible(x0, w, scene)) return;
