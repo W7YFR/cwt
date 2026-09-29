@@ -989,8 +989,11 @@ export function ReviewScreen({
           settings={settings}
           focus={focus}
           playhead={playhead}
-          range={range}
-          onRange={setRange}
+          // Hidden while recording, and kept for when the take is discarded.
+          range={recording ? null : range}
+          onRange={(next) => {
+            if (!recording) setRange(next);
+          }}
           onPlayRange={() => playTrack(heard)}
           handle={handle}
           onPlayChar={(side, from, to) => {
