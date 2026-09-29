@@ -278,3 +278,18 @@ describe("fitting the chart to the window", () => {
     expect(contentWidth(app.ppu(), drawn)).toBeLessThanOrEqual(track());
   });
 });
+
+describe("the loop switch", () => {
+  it("turns on and off from L and from its button", () => {
+    mount();
+    const loop = () =>
+      [...host.querySelectorAll("button")].find((b) => b.textContent === "Loop")!;
+    expect(loop().getAttribute("aria-pressed")).toBe("false");
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "l", bubbles: true }));
+    });
+    expect(loop().getAttribute("aria-pressed")).toBe("true");
+    act(() => loop().click());
+    expect(loop().getAttribute("aria-pressed")).toBe("false");
+  });
+});

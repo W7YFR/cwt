@@ -799,6 +799,8 @@ button:disabled { opacity: .45; cursor: default; }
 }
 button.play { border-left: 3px solid var(--you); }
 button.play.alt { border-left-color: var(--tgt); }
+/* A switch rather than an action, so its state shows. */
+button.loop[aria-pressed="true"] { border-color: var(--you); color: var(--you); }
 button.on { background: var(--you); border-color: var(--you); color: #fff; }
 button.alt.on { background: var(--tgt); border-color: var(--tgt); }
 /* Fixed width, not min-width: the text changes every frame while playing, and

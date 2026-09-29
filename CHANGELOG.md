@@ -11,6 +11,8 @@ nothing to the site. The next release carries them.
 
 - Drag along the ruler to pick a range to play. The range snaps to whole characters, or hold Alt to place its ends freely.
 - With a range picked, **Your sending**, **Target**, space and a click inside the range play only the range. Esc clears it.
+- While a track plays, `[` and `]` set the start and end of the range at the playhead.
+- **Loop**, or L, replays the range or the whole track each time it reaches its end.
 
 ### Fixed
 

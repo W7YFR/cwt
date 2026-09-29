@@ -5,7 +5,8 @@
  * path and the schedule are all exercised against the real implementation.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { createPlayer } from "@/audio/player";
 import { keyingEnvelope, RAMP_SEC } from "@/audio/schedule";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
@@ -71,6 +72,31 @@ describe("the keying schedule", () => {
     expect(tail.points.length).toBeGreaterThan(0);
     expect(tail.points.length).toBeLessThan(whole.points.length);
     expect(tail.duration).toBeCloseTo(IDEAL.duration + 0.5 - 1, 6);
+  });
+});
+
+describe("live playback", () => {
+  /* A loop replays only what ran to its end. Stopping it has to say so, or a
+     press of Stop would start the loop over. */
+  it("says whether it reached its end or was stopped", async () => {
+    const ended = vi.fn();
+    const player = createPlayer({ onEnded: ended });
+    try {
+      // A real click, since a browser holds audio back until a gesture.
+      const go = document.createElement("button");
+      go.textContent = "go";
+      go.onclick = () => player.playTarget(IDEAL, { peak: 0.5, padSec: 0, from: 0, to: 0.1 });
+      document.body.append(go);
+      await userEvent.click(go);
+      go.remove();
+      await vi.waitFor(() => expect(ended).toHaveBeenCalledWith("done"), { timeout: 2000 });
+
+      player.playTarget(IDEAL, { peak: 0.5, padSec: 0 });
+      player.stop();
+      expect(ended).toHaveBeenLastCalledWith("stopped");
+    } finally {
+      player.destroy();
+    }
   });
 });
 

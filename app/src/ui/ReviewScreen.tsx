@@ -228,6 +228,15 @@ export function ReviewScreen({
   // the whole screen sixty times a second; the chart takes it directly.
   const [playhead, setPlayhead] = useState<{ t: number; side: PlaySide } | null>(null);
 
+  /* Loop repeats what a track's play control started: the range, or the
+     whole track. The player is made once, so it reaches the latest of these
+     through refs. */
+  const [loop, setLoop] = useState(false);
+  const loopRef = useRef(loop);
+  loopRef.current = loop;
+  const looping = useRef<PlaySide | null>(null);
+  const restart = useRef<(side: PlaySide) => void>(() => {});
+
   const playerRef = useRef<Player | null>(null);
   if (!playerRef.current) {
     playerRef.current = createPlayer({
@@ -235,10 +244,12 @@ export function ReviewScreen({
         setPlayhead({ t, side });
         setClock(t);
       },
-      onEnded: () => {
+      onEnded: (reason) => {
         setPlaying(null);
         setPlayhead(null);
         setClock(null);
+        const side = looping.current;
+        if (reason === "done" && loopRef.current && side) restart.current(side);
       },
       onError: setStatus,
     });
@@ -549,6 +560,7 @@ export function ReviewScreen({
   const playYou = useCallback(
     async (from?: number, to?: number) => {
       setHeard("you");
+      looping.current = null;
       if (playing === "you" && from === undefined) {
         player.stop();
         return;
@@ -572,6 +584,7 @@ export function ReviewScreen({
   const playTarget = useCallback(
     (from?: number, to?: number) => {
       setHeard("tgt");
+      looping.current = null;
       if (playing === "tgt" && from === undefined) {
         player.stop();
         return;
@@ -587,25 +600,27 @@ export function ReviewScreen({
   );
 
 
-  /** Play a track: its range when there is one, else the whole track. A
-   *  second press stops it. */
+  /** Start a track: its range when there is one, else the whole track. */
+  const startTrack = useCallback(
+    (side: PlaySide) => {
+      const from = range ? Math.max(range[side][0] - PLAY_PAD, 0) : undefined;
+      const to = range ? range[side][1] + PLAY_PAD : undefined;
+      // The whole target starts in its lead-in, before zero.
+      if (side === "you") void playYou(from ?? 0, to);
+      else playTarget(from ?? -targetOptions.padSec, to);
+      looping.current = side;
+    },
+    [playTarget, playYou, range, targetOptions.padSec],
+  );
+  restart.current = startTrack;
+
+  /** A track's play control: start it, or stop it when it is playing. */
   const playTrack = useCallback(
     (side: PlaySide) => {
-      if (!range) {
-        if (side === "you") void playYou();
-        else playTarget();
-        return;
-      }
-      if (playing === side) {
-        player.stop();
-        return;
-      }
-      const from = Math.max(range[side][0] - PLAY_PAD, 0);
-      const to = range[side][1] + PLAY_PAD;
-      if (side === "you") void playYou(from, to);
-      else playTarget(from, to);
+      if (playing === side) player.stop();
+      else startTrack(side);
     },
-    [playTarget, playYou, player, playing, range],
+    [player, playing, startTrack],
   );
 
   /* Picking up another track ends whatever is playing.
@@ -653,12 +668,16 @@ export function ReviewScreen({
       if (ev.code === "Space") {
         ev.preventDefault();
         if (playing) stop();
-        else if (range) playTrack(heard);
-        else void playYou(0);
+        else startTrack(range ? heard : "you");
       } else if (ev.key === "t") {
         if (playing === "tgt") stop();
-        else if (range) playTrack("tgt");
-        else playTarget(0);
+        else startTrack("tgt");
+      } else if (ev.key === "l") {
+        setLoop((on) => !on);
+      } else if (ev.key === "[") {
+        handle.chart?.markRange("start");
+      } else if (ev.key === "]") {
+        handle.chart?.markRange("end");
       } else if (ev.key === "Escape" && range) {
         setRange(null);
       } else if (ev.key === "Home") {
@@ -671,7 +690,7 @@ export function ReviewScreen({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [handle, heard, playTarget, playTrack, playYou, playing, range, rec.recorder, stop]);
+  }, [handle, heard, playing, range, rec.recorder, startTrack, stop]);
 
   /* Open filling the width. Done once the chart exists and after the first
      layout, because the fit is measured off the real content — a short session
@@ -838,6 +857,8 @@ export function ReviewScreen({
         fromFile={loaded.take.source !== MIC_SOURCE}
         onPlayYou={() => playTrack("you")}
         onPlayTarget={() => playTrack("tgt")}
+        loop={loop}
+        onLoop={() => setLoop((on) => !on)}
         onStop={stop}
       />
 
@@ -1005,7 +1026,8 @@ export function ReviewScreen({
                 click a character to hear it, a gap to hear it between what it
                 separates &nbsp;·&nbsp; click a track&rsquo;s name to pick it up,
                 again to play it &nbsp;·&nbsp; click the ruler to seek, drag it to
-                pick a range to play (Esc clears it) &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
+                pick a range to play (Esc clears it) &nbsp;·&nbsp; [ and ] set the
+                range&rsquo;s ends at the playhead &nbsp;·&nbsp; L loops &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
               </p>
               {/* The recording transport, which is otherwise only discoverable
