@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.5.0 — 2026-09-29
+
 ### Added
 
 - Drag along the ruler to pick a range of the target's characters to play. The range stays on those characters when you pick another run or the target.
