@@ -190,8 +190,6 @@ export function defaultSettings(take: Take): ReviewSettings {
     zenMode: false,
     zenProgress: false,
     zenGrading: false,
-    flashCard: false,
-    wordPreview: false,
     runSort: "oldest",
     gainDb: 0,
     view: "per-char",

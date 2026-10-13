@@ -85,8 +85,18 @@ export const CHAR_MARKERS_HELP =
 
 export const ZEN_MODE_HELP =
   "While you record, the message alone on screen in large type, with the " +
-  "clock and the way to stop. No beat and no count-in — the take ends when " +
-  "you say it does, so it cannot run with the paced aids.";
+  "clock and the way to stop. No beat and no count-in.";
+
+export const PLAIN_MODE_HELP =
+  "Record with the chart in view, and no cursor or count-in.";
+
+/** What each recording mode does, for the switch in the record bar. Their
+ *  options are in Settings. */
+export const MODE_HELP = {
+  plain: PLAIN_MODE_HELP,
+  paced: PACE_CURSOR_HELP,
+  zen: ZEN_MODE_HELP,
+} as const;
 
 export const ZEN_PROGRESS_HELP =
   "Color each character of the message as you start to key it, so you can " +
@@ -97,20 +107,6 @@ export const ZEN_GRADING_HELP =
   "Put a dot under each character you key, in place of coloring the letters. " +
   "It turns blue once the character is read back right, and red if it was " +
   "wrong or left out.";
-
-export const ZEN_PACING_HELP =
-  "Not while Zen mode is on: one puts a beat in front of you, the other " +
-  "takes the page away.";
-
-export const FLASH_CARD_HELP =
-  "The next character to send, large, with a countdown. At speed the " +
-  "chart\u2019s captions are small, moving, and nowhere near where you are " +
-  "looking. It shows what comes next, never what you just sent.";
-
-export const WORD_PREVIEW_HELP =
-  "Spell the word under the card, greening each letter as it passes. The " +
-  "card shows one character at a time, which says nothing about where a word " +
-  "ends.";
 
 export const PACE_LEAD_HELP =
   "How long the count-in runs before the cursor reaches the first " +
@@ -216,3 +212,29 @@ export const SHOW_CHART_CONTROLS_HELP =
   "The row above the chart: the order the rows are in, the axis, which " +
   "attempts are drawn, and the zoom. The cog stays either way, so there is " +
   "always a way back.";
+
+/* Why a setting is barred. Each is shown on the setting itself, dimmed in
+   place, above what the setting does. A barred setting stays where it is, so
+   the panel does not move under the pointer as other settings change. */
+
+export const NEEDS_LIVE_PROGRESS = "Needs Live progress.";
+export const NEEDS_RUNS = "Needs more than one run.";
+export const NEEDS_RUNS_SHOWN = "Needs more than one run on the chart.";
+export const ONE_INPUT = "This is the only input the browser offers.";
+export const CAL_FILE = "Not for a recording opened from disk. A file is read exactly as recorded.";
+export const CAL_NONE = "No calibration is saved for this input. Calibrate to make one.";
+export const CAL_REREADING = "Re-reading the session.";
+
+export const LOOP_HELP =
+  "Replay what plays, the range or the whole track, each time it reaches " +
+  "its end. L turns it on and off.";
+
+export const MIC_HELP = "The input the next recording is made from.";
+export const CAL_HELP =
+  "The correction for this input's sound path. Changing it re-reads the " +
+  "recordings on screen.";
+
+/** A barred setting's tooltip: why it is barred, then what it does. */
+export function barredTitle(reason: string | null, help: string): string {
+  return reason ? `${reason}\n\n${help}` : help;
+}

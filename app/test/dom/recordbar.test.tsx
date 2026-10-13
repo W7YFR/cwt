@@ -8,12 +8,12 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
 import { RecordBar } from "@/ui/Record";
+import { modeOf, modePatch } from "@/ui/mode";
 import type { RecorderHandle } from "@/ui/useRecorder";
-import type { Profile } from "@/io/profiles";
 
 const IDLE: RecorderHandle = {
   devices: [],
@@ -35,37 +35,13 @@ function bar(over: Partial<React.ComponentProps<typeof RecordBar>> = {}) {
   return render(
     <RecordBar
       rec={IDLE}
-      deviceId={undefined}
-      onDeviceChange={() => {}}
-      profiles={[]}
-      profileId={undefined}
-      onProfileChange={() => {}}
       appliesToTake
-      rereading={false}
       leadLeft={null}
       onClear={() => {}}
       {...over}
     />,
   );
 }
-
-/** A saved calibration, so the picker has something to offer. The numbers are
- *  not what is under test — only that a choice exists. */
-const PROFILE: Profile = {
-  id: "p1",
-  nickname: "shack desk",
-  deviceId: undefined,
-  deviceLabel: undefined,
-  wpm: 20,
-  releaseOffsetSec: 0.003,
-  measuredOffsetSec: 0.003,
-  spreadSec: 0.0005,
-  elements: 90,
-  verdict: "good",
-  decaySec: 0.02,
-  maxWpm: 30,
-  recordedAt: "2026-09-01T10:00:00+00:00",
-};
 
 /* The one button on this bar that needs a microphone, and the three things it
    can mean. The landing screen splits ask-versus-record across two buttons
@@ -152,104 +128,22 @@ describe("the record bar in a session", () => {
     expect(onClear).toHaveBeenCalled();
   });
 
-  it("offers the calibration picker only when there is a calibration to pick", () => {
-    /* One option is not a decision. Offering "No calibration" and nothing else
-       is a control whose every state is the state it is already in. */
-    const { rerender } = bar({ onCalibrate: () => {} });
-    expect(screen.queryByLabelText(/^calibration$/i)).toBeNull();
-
-    rerender(
-      <RecordBar
-        rec={IDLE}
-        deviceId={undefined}
-        onDeviceChange={() => {}}
-        profiles={[PROFILE]}
-        profileId={undefined}
-        onProfileChange={() => {}}
-        appliesToTake
-        rereading={false}
-        leadLeft={null}
-        onCalibrate={() => {}}
-      />,
-    );
-    expect(screen.getByLabelText(/^calibration$/i)).toBeTruthy();
-  });
-
-  it("puts the way into calibrating beside the picker that needs it", () => {
-    /* The picker is where you find out you have nothing to pick. Without this
-       the only ways in are the landing screen and the configuration screen,
-       neither of which is where you are standing when you notice. */
-    const onCalibrate = vi.fn();
-    const { container } = bar({ onCalibrate, configuring: true });
-    const button = screen.getByTestId("calibrate");
-    // Inside the picker rather than out in the row of session actions: it is
-    // about the control next to it, not about the session.
-    expect(container.querySelector("[data-testid='calpick']")).toContainElement(button);
-    button.click();
-    expect(onCalibrate).toHaveBeenCalled();
-  });
-
-  it("still offers calibrating when the take came from a file", () => {
-    /* The reported bug: opening a file left the device picker on the
-       configuration row and took the calibrate button away with it, because
-       the button hung off the calibration picker and a file has none — it is
-       read exactly as recorded. But calibrating is about the input, not about
-       the take in front of you, and which microphone plus what to correct it
-       by are the two halves of one setup. */
-    const onCalibrate = vi.fn();
-    bar({ onCalibrate, configuring: true, appliesToTake: false, source: "a.wav" });
-
-    // No picker to hang off, and the way in is there all the same.
-    expect(screen.queryByLabelText(/^calibration$/i)).toBeNull();
-    expect(screen.getByTestId("calchip")).toBeInTheDocument();
-    const button = screen.getByTestId("calibrate");
-    button.click();
-    expect(onCalibrate).toHaveBeenCalled();
-  });
-
-  it("does not claim a file is being read under a calibration", () => {
-    /* The same button, and one word of its explanation different. A file is
-       read exactly as recorded, so the saved measurement is not in use on
-       what is on screen — and the microphone take beside it is the one place
-       that claim is true. */
-    const both = { onCalibrate: () => {}, configuring: true, profiles: [PROFILE], profileId: "p1" };
-
-    bar({ ...both, appliesToTake: true });
-    expect(screen.getByTestId("calibrate").getAttribute("title")).toMatch(/in use/i);
-
-    cleanup();
-    bar({ ...both, appliesToTake: false, source: "a.wav" });
-    const title = screen.getByTestId("calibrate").getAttribute("title")!;
-    expect(title).not.toMatch(/in use/i);
-    // Still says which one it would be measuring again.
-    expect(title).toMatch(PROFILE.nickname);
-  });
-
-  it("keeps the setup behind the configuration it belongs to", () => {
-    /* Which microphone, and what to correct it by. You cannot reach this
-       screen without having answered the first, and the answer holds until
-       something is unplugged — so in the row you work in, both are controls
-       you use once and read past every time after. */
+  it("leaves the setup to the settings panel", () => {
+    /* Which microphone and what to correct it by are set once and left alone.
+       They live in the panel's Audio group; the bar is for the session. */
     const devices = [
       { deviceId: "a", label: "one" },
       { deviceId: "b", label: "two" },
     ];
-    const rec = { ...IDLE, devices };
-    bar({ rec, onCalibrate: () => {} });
-    expect(screen.queryByLabelText(/input device/i)).toBeNull();
+    bar({ rec: { ...IDLE, devices } });
+    expect(screen.queryByLabelText(/input device|microphone/i)).toBeNull();
+    expect(screen.queryByLabelText(/^calibration$/i)).toBeNull();
     expect(screen.queryByTestId("calibrate")).toBeNull();
-
-    cleanup();
-    bar({ rec, onCalibrate: () => {}, configuring: true });
-    expect(screen.getByLabelText(/input device/i)).toBeInTheDocument();
-    expect(screen.getByTestId("calibrate")).toBeInTheDocument();
   });
 
-  it("does not offer calibrating against a recording that cannot use it", () => {
-    // An opened file is read exactly as recorded — there is no picker there,
-    // so there is nothing for the button to sit beside.
-    bar({ onCalibrate: () => {}, appliesToTake: false });
-    expect(screen.queryByTestId("calibrate")).toBeNull();
+  it("still says a file is read exactly as recorded", () => {
+    bar({ appliesToTake: false, source: "a.wav" });
+    expect(screen.getByTestId("calchip")).toHaveTextContent(/read exactly as recorded/i);
   });
 });
 
@@ -308,3 +202,33 @@ describe("opening a recording from the bar", () => {
   });
 });
 
+
+/* Plain, Paced or Zen, beside the button that records. One control for one
+   choice: the cursor and Zen mode cannot run together, so picking one is the
+   whole of the rule. */
+describe("the recording mode", () => {
+  it("shows the mode in force, and picks another", async () => {
+    const user = userEvent.setup();
+    const onMode = vi.fn();
+    bar({ mode: "paced", onMode });
+    const group = screen.getByRole("group", { name: /recording mode/i });
+    const pressed = [...group.querySelectorAll("button")].filter(
+      (b) => b.getAttribute("aria-pressed") === "true",
+    );
+    expect(pressed.map((b) => b.textContent)).toEqual(["Paced"]);
+    await user.click(screen.getByRole("button", { name: "Zen" }));
+    expect(onMode).toHaveBeenCalledWith("zen");
+  });
+
+  it("is the two settings it has always been", () => {
+    expect(modeOf({ zenMode: false, paceCursor: false })).toBe("plain");
+    expect(modeOf({ zenMode: false, paceCursor: true })).toBe("paced");
+    expect(modeOf({ zenMode: true, paceCursor: false })).toBe("zen");
+    // Zen wins over a cursor saved from before the two were one choice.
+    expect(modeOf({ zenMode: true, paceCursor: true })).toBe("zen");
+    for (const m of ["plain", "paced", "zen"] as const) {
+      expect(modeOf(modePatch(m))).toBe(m);
+    }
+    expect(modePatch("zen")).toEqual({ zenMode: true, paceCursor: false });
+  });
+});

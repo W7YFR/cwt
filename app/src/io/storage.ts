@@ -396,8 +396,6 @@ export interface Prefs {
   showChartControls?: boolean;
   showRuns?: "all" | "last5" | "last3" | "last";
   captionAll?: boolean;
-  flashCard?: boolean;
-  wordPreview?: boolean;
   zenMode?: boolean;
   zenProgress?: boolean;
   zenGrading?: boolean;
@@ -550,8 +548,6 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   showChartControls: isBool,
   showRuns: oneOf("all", "last5", "last3", "last"),
   captionAll: isBool,
-  flashCard: isBool,
-  wordPreview: isBool,
   zenMode: isBool,
   zenProgress: isBool,
   zenGrading: isBool,

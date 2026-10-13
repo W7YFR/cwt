@@ -7,6 +7,23 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records.
+
+### Changed
+
+- **Settings** groups its settings in sections: **Audio**, **Target**, **Grading**, **Zen mode**, **Pacing**, **Chart** and **Page**.
+- A setting that another setting rules out stays in place, dimmed, and its tooltip says why.
+- **Microphone**, **Calibration**, **Listening level** and **Loop** are in **Audio**, under **Settings**.
+- **Ignore character construction** is now **Spacing only**, and **Clock axis while pacing** is now **Clock axis**.
+- The track that plays always shows its stop button on the chart.
+
+### Removed
+
+- The **Your sending** and **Target** buttons, the stop button above the chart and the playback clock. Play and stop a track from the chart, or press space or T.
+- The flash card and **Word preview**.
+
 ## v1.6.0 — 2026-10-13
 
 ### Added

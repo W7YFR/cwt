@@ -1263,11 +1263,16 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
           [scene.rows.drift + 7, "DRIFT", C["ink-dim"], null],
         ];
   /* The play button takes the place of the name and scores of the track in
-     hand. Text around it would peek out past its edges. */
-  let button: { name: GutterName; color: string } | null = null;
+     hand. Text around it would peek out past its edges. The track playing
+     has one too, hovered or not: it is the only way to stop it from the
+     chart, and a way to stop that appears only under the pointer is one you
+     have to go looking for while the sound runs. */
+  const sounding: GutterName | null =
+    scene.playing === "tgt" ? "tgt" : scene.playing === "you" ? (scene.selected ?? null) : null;
+  const buttons: Array<{ name: GutterName; color: string }> = [];
   for (const [y, label, color, name] of rows) {
-    if (name !== null && name === scene.picking && scene.pickingInHand) {
-      button = { name, color };
+    if (name !== null && ((name === scene.picking && scene.pickingInHand) || name === sounding)) {
+      buttons.push({ name, color });
       continue;
     }
     ctx.fillStyle = color;
@@ -1279,7 +1284,7 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
     for (const [r, lane] of scene.runs.entries()) {
       // Nothing was keyed into it, so every figure would be a reading off an
       // empty recording — the same reason the band below dashes them.
-      if (lane.blank || button?.name === r) continue;
+      if (lane.blank || buttons.some((b) => b.name === r)) continue;
       const top = scene.rows.runs[r]!.row;
       ctx.fillStyle = C[scoreBand(lane.analysis.withinTolFrac, CONSISTENT_BANDS)];
       ctx.fillText(`${Math.round(lane.analysis.withinTolFrac * 100)}%`, 4, top + 20);
@@ -1307,10 +1312,9 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
     scene.rows.drift + 20,
   );
 
-  if (button) {
+  for (const button of buttons) {
     const top = button.name === "tgt" ? scene.rows.tgt : scene.rows.runs[button.name]!.row;
-    const playing = scene.playing === (button.name === "tgt" ? "tgt" : "you");
-    drawPlayButton(ctx, top + ROW_H / 2, button.color, C.panel, playing);
+    drawPlayButton(ctx, top + ROW_H / 2, button.color, C.panel, button.name === sounding);
   }
 }
 

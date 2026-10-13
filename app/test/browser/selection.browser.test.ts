@@ -281,17 +281,18 @@ describe("fitting the chart to the window", () => {
 });
 
 describe("the loop switch", () => {
-  it("turns on and off from L and from its button", () => {
+  it("turns on and off from L and from its box in Audio", () => {
     mount();
-    const loop = () =>
-      [...host.querySelectorAll("button")].find((b) => b.textContent === "Loop")!;
-    expect(loop().getAttribute("aria-pressed")).toBe("false");
+    act(() => host.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click());
+    const loop = () => host.querySelector<HTMLInputElement>("#loop")!;
+    expect(host.querySelector("[data-panel='audio']")).toContainElement(loop());
+    expect(loop().checked).toBe(false);
     act(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "l", bubbles: true }));
     });
-    expect(loop().getAttribute("aria-pressed")).toBe("true");
+    expect(loop().checked).toBe(true);
     act(() => loop().click());
-    expect(loop().getAttribute("aria-pressed")).toBe("false");
+    expect(loop().checked).toBe(false);
   });
 });
 
@@ -301,8 +302,8 @@ describe("N and P", () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
     });
 
-  const heard = () =>
-    [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Target"))!;
+  /** Which track is playing, as the chart's section says. */
+  const playing = () => host.querySelector(".canvas-wrap")!.getAttribute("data-playing");
 
   it("pick the next and previous run, and stop at the last", () => {
     const app = mount();
@@ -333,19 +334,18 @@ describe("N and P", () => {
       await new Promise((done) => setTimeout(done, 100));
     });
     expect(app.picked(), "p on the first run keeps the run selected").toBe(1);
-    expect(heard().getAttribute("aria-pressed"), "and plays the target").toBe("true");
+    expect(playing(), "and plays the target").toBe("tgt");
     await act(async () => {
       await userEvent.keyboard("p");
       await new Promise((done) => setTimeout(done, 100));
     });
-    expect(heard().getAttribute("aria-pressed"), "p on the target does nothing").toBe("true");
+    expect(playing(), "p on the target does nothing").toBe("tgt");
     await act(async () => {
       await userEvent.keyboard("n");
       await new Promise((done) => setTimeout(done, 100));
     });
     expect(app.picked(), "n from the target picks the selected run").toBe(1);
-    const you = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Your sending"))!;
-    expect(you.getAttribute("aria-pressed"), "and plays it").toBe("true");
+    expect(playing(), "and plays it").toBe("you");
     await act(async () => {
       await userEvent.keyboard("{Escape}");
       await new Promise((done) => setTimeout(done, 100));
@@ -354,33 +354,32 @@ describe("N and P", () => {
 
   it("play the run they pick", async () => {
     mount();
-    const you = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Your sending"))!;
     // A real key press, since a browser holds audio back until a gesture.
     await act(async () => {
       await userEvent.keyboard("n");
       await new Promise((done) => setTimeout(done, 100));
     });
-    expect(you.getAttribute("aria-pressed")).toBe("true");
+    expect(host.querySelector(".canvas-wrap")!.getAttribute("data-playing")).toBe("you");
   });
 });
 
 describe("Esc", () => {
   it("stops what is playing", async () => {
     mount();
-    const target = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Target"))!;
+    const playing = () => host.querySelector(".canvas-wrap")!.getAttribute("data-playing");
     const frames = () => new Promise((done) => setTimeout(done, 100));
-    // A real click, since a browser holds audio back until a gesture. Inside
-    // act, because playback moves the playhead on every frame.
+    // A real key press, since a browser holds audio back until a gesture.
+    // Inside act, because playback moves the playhead on every frame.
     await act(async () => {
-      await userEvent.click(target);
+      await userEvent.keyboard("t");
       await frames();
     });
-    expect(target.getAttribute("aria-pressed")).toBe("true");
+    expect(playing()).toBe("tgt");
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       await frames();
     });
-    expect(target.getAttribute("aria-pressed")).toBe("false");
+    expect(playing()).toBe("");
   });
 });
 

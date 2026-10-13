@@ -397,11 +397,6 @@ export interface ReviewSettings {
    *  blue or red once the character has been read back, by whether it was
    *  sent right. */
   zenGrading: boolean;
-  /** Show the next character to send, large, with a countdown to it. */
-  flashCard: boolean;
-  /** Spell the word being sent under the card, greening each letter as it
-   *  passes. The card alone says nothing about where a word ends. */
-  wordPreview: boolean;
   /** What order the attempts in a session are drawn in. Changes where a row
    *  sits and nothing else — not what it is called, and not what is graded. */
   runSort: RunSort;

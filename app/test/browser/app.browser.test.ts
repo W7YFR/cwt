@@ -886,17 +886,15 @@ const showDownloads = () => tickSetting("show-downloads");
     await served();
     await mount();
 
-    const open = () =>
-      act(async () => {
-        container.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click();
-      });
-    const zen = () => container.querySelector<HTMLInputElement>("#zen-mode")!;
+    const zen = () =>
+      [...container.querySelectorAll<HTMLButtonElement>("[data-testid='mode'] button")].find(
+        (b) => b.textContent === "Zen",
+      )!;
 
-    await open();
     await act(async () => {
       zen().click();
     });
-    expect(zen().checked).toBe(true);
+    expect(zen().getAttribute("aria-pressed")).toBe("true");
 
     // Past the settings debounce, so the setting has been written.
     await act(async () => {
@@ -909,8 +907,7 @@ const showDownloads = () => tickSetting("show-downloads");
     root = null;
     container.innerHTML = "";
     await mount();
-    await open();
-    expect(zen().checked, "the next visit starts on").toBe(true);
+    expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
   });
 
   it("puts the repeat count beside the message, not under it", async () => {
@@ -1103,13 +1100,20 @@ const showDownloads = () => tickSetting("show-downloads");
     }
 
     // The header's own row, where the controls are smaller but the rule is the
-    // same one.
-    const bar = [...container.querySelectorAll<HTMLElement>(".recordbar > *")].map((el) => {
-      const r = el.getBoundingClientRect();
-      return r.top + r.height / 2;
-    });
+    // same one. Per wrapped line, as above: the bar wraps on a narrow window.
+    const bar = [...container.querySelectorAll<HTMLElement>(".recordbar > *")];
     expect(bar.length).toBeGreaterThan(1);
-    expect(Math.max(...bar) - Math.min(...bar)).toBeLessThanOrEqual(1);
+    const barLines = new Map<number, number[]>();
+    for (const el of bar) {
+      const r = el.getBoundingClientRect();
+      const mids = barLines.get(Math.round(r.top / 20)) ?? [];
+      mids.push(r.top + r.height / 2);
+      barLines.set(Math.round(r.top / 20), mids);
+    }
+    for (const [line, mids] of barLines) {
+      const spread = Math.max(...mids) - Math.min(...mids);
+      expect(spread, `record bar line ${line} spread ${spread.toFixed(1)}px`).toBeLessThanOrEqual(1);
+    }
   });
 
   it("gives a banner a band of its own height, not of its words", async () => {
@@ -1269,14 +1273,12 @@ const showDownloads = () => tickSetting("show-downloads");
         [...container.querySelectorAll("button")].find((b) =>
           re.test(`${b.getAttribute("aria-label") ?? ""} ${b.textContent ?? ""}`),
         )!;
-      expect(named(/your sending/i).disabled, "play yours").toBe(true);
       expect(named(/your audio/i).disabled, "download yours").toBe(true);
       expect(named(/json report/i).disabled, "json").toBe(true);
       // And nothing left to clear.
       expect(container.querySelector("[data-testid='clear-take']")).toBeNull();
 
-      // What still works is everything about the target.
-      expect(named(/target$/i).disabled, "play target").toBe(false);
+      // What still works is recording again.
       expect(named(/record another/i).disabled, "record").toBe(false);
       // And opening a file, which is exactly when it is allowed: a cleared
       // session has no speed of its own for a recording to contradict.

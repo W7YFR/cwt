@@ -111,13 +111,7 @@ function show(rec: RecorderHandle, source?: string) {
         ),
         createElement(RecordBar, {
           rec,
-          deviceId: undefined,
-          onDeviceChange: () => {},
-          profiles: [],
-          profileId: undefined,
-          onProfileChange: () => {},
           appliesToTake: false,
-          rereading: false,
           leadLeft: null,
           onClear: () => {},
           onNewSession: () => {},

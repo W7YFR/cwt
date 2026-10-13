@@ -216,9 +216,7 @@ describe("the view while pacing", () => {
   });
 
   it("leaves the view alone when nothing is pacing the chart", async () => {
-    /* The flash card runs on the same schedule but never touches the chart, so
-       it is no reason to take a view away from somebody. */
-    const app = mount({ paceCursor: false, flashCard: true, view: "per-char" });
+    const app = mount({ paceCursor: false, view: "per-char" });
     await record();
     expect(app.view()).toBe("per-char");
   });

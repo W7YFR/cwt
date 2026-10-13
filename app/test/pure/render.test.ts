@@ -1514,6 +1514,22 @@ describe("the play button in the gutter", () => {
     expect(stop(ctx, runY)).toBe(true);
   });
 
+  it("stays on the track that plays, without the pointer over it", () => {
+    const you = drawn({ picking: null, pickingInHand: false, playing: "you", selected: 0 });
+    expect(stop(you, runY)).toBe(true);
+    expect(you.texts()).not.toContain("RUN 1");
+
+    const tgt = drawn({ picking: null, pickingInHand: false, playing: "tgt" });
+    expect(stop(tgt, tgtY)).toBe(true);
+    expect(disc(tgt, runY)).toBe(false);
+  });
+
+  it("stays on the track that plays while another is under the pointer", () => {
+    const ctx = drawn({ picking: "tgt", pickingInHand: true, heard: "tgt", playing: "you", selected: 0 });
+    expect(stop(ctx, runY)).toBe(true);
+    expect(play(ctx, tgtY)).toBe(true);
+  });
+
   it("is on the target's row when the target is in hand", () => {
     const ctx = drawn({ picking: "tgt", pickingInHand: true, heard: "tgt" });
     expect(ctx.texts()).not.toContain("TGT");
