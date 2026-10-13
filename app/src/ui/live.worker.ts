@@ -9,7 +9,7 @@
  * makes the count later, never behind by more and more.
  */
 
-import { LiveFollower } from "@/timing/live";
+import { LiveFollower, type Progress } from "@/timing/live";
 import { targetTiming } from "@/timing/model";
 
 /** Starts a take, or starts it over. Replies carry `gen`, so the page can drop
@@ -29,9 +29,8 @@ export interface LiveAudio {
   readonly samples: Float32Array;
 }
 
-export interface LiveReached {
+export interface LiveReached extends Progress {
   readonly gen: number;
-  readonly reached: number;
 }
 
 /** The least time between the start of one pass and the next. Fast enough that
@@ -55,7 +54,7 @@ function pass(): void {
   if (!follower || !fresh) return;
   fresh = false;
   lastPass = performance.now();
-  scope.postMessage({ gen, reached: follower.step() });
+  scope.postMessage({ gen, ...follower.step() });
 }
 
 scope.onmessage = (ev) => {

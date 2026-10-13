@@ -80,9 +80,10 @@ const wait = (ms: number) =>
   });
 
 describe("live progress", () => {
-  it("colors the message as it is keyed", async () => {
+  it("colors the message as it is keyed, and stops at its end", async () => {
     recorder = await startRecording();
     const rec = recorder;
+    let finished = 0;
     act(() =>
       root.render(
         createElement(ZenMode, {
@@ -92,7 +93,7 @@ describe("live progress", () => {
           level: 0,
           busy: false,
           live: { recorder: rec, charWpm: WPM, farnsworthWpm: WPM },
-          onFinish: () => {},
+          onFinish: () => finished++,
           onRestart: () => {},
           onDiscard: () => {},
         }),
@@ -111,5 +112,6 @@ describe("live progress", () => {
     expect(seen[seen.length - 1], `counts seen: ${seen.join(" ")}`).toBe(9);
     // On the way, not all at the end.
     expect(seen.some((n) => n > 0 && n < 9), `counts seen: ${seen.join(" ")}`).toBe(true);
+    expect(finished, "the take finished itself, once").toBe(1);
   }, 20_000);
 });

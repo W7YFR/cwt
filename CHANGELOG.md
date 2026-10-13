@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- **Live progress**, under **Zen mode**, turns each character of the message blue as you start to key it.
+- **Live progress**, under **Zen mode**, turns each character of the message blue as you start to key it. The take stops itself once the last character has been read.
 
 ### Development
 

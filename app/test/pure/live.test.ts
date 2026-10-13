@@ -12,38 +12,47 @@ import { DATA_DIR } from "../oracle-fs";
 import { readWav } from "../wav";
 import { keyingPlan, synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
-import { Decimator, LiveFollower, keyedSymbols, reached } from "@/timing/live";
+import { Decimator, LiveFollower, graded, keyedSymbols } from "@/timing/live";
 
-describe("how far the sender has got", () => {
+describe("grading what has been sent", () => {
   const CQ = keyedSymbols("CQ DE W7YFR");
+  /** The verdicts as one string: + right, x wrong. */
+  const marks = (target: readonly string[], sent: readonly string[]) =>
+    graded(target, sent)
+      .map((ok) => (ok ? "+" : "x"))
+      .join("");
 
-  it("counts the characters that match", () => {
-    expect(reached(CQ, [])).toBe(0);
-    expect(reached(CQ, ["C", "Q", "D"])).toBe(3);
+  it("grades each character sent right", () => {
+    expect(marks(CQ, [])).toBe("");
+    expect(marks(CQ, ["C", "Q", "D"])).toBe("+++");
   });
 
-  it("does not move for a click before the first character", () => {
-    expect(reached(CQ, ["E"])).toBe(0);
-    expect(reached(CQ, ["E", "E"])).toBe(0);
-    expect(reached(CQ, ["E", "C", "Q"])).toBe(2);
+  it("grades nothing for a click before the first character", () => {
+    expect(marks(CQ, ["E"])).toBe("");
+    expect(marks(CQ, ["E", "E"])).toBe("");
+    expect(marks(CQ, ["E", "C", "Q"])).toBe("++");
   });
 
-  it("passes a wrong character when the next one matches", () => {
-    expect(reached(CQ, ["C", "Q", "X"])).toBe(2);
-    expect(reached(CQ, ["C", "Q", "X", "E"])).toBe(4);
+  it("marks a wrong character wrong at once", () => {
+    expect(marks(CQ, ["C", "Q", "X"])).toBe("++x");
+    expect(marks(CQ, ["C", "Q", "X", "E"])).toBe("++x+");
   });
 
-  it("passes a dropped character when the next one matches", () => {
-    expect(reached(CQ, ["C", "Q", "E"])).toBe(4);
+  it("marks a dropped character wrong", () => {
+    expect(marks(CQ, ["C", "Q", "E"])).toBe("++x+");
+  });
+
+  it("gives an extra character no place", () => {
+    expect(marks(CQ, ["C", "Q", "D", "D", "E", "W"])).toBe("+++++");
   });
 
   it("matches a character by its Morse", () => {
-    expect(reached(keyedSymbols("TU <BT> 73"), ["T", "U", "="])).toBe(3);
+    expect(marks(keyedSymbols("TU <BT> 73"), ["T", "U", "="])).toBe("+++");
   });
 
   it("follows into the next pass", () => {
     const twice = [...CQ, ...CQ];
-    expect(reached(twice, [...CQ, "C", "Q"])).toBe(CQ.length + 2);
+    expect(graded(twice, [...CQ, "C", "Q"]).length).toBe(CQ.length + 2);
   });
 });
 
@@ -82,7 +91,7 @@ function follow(file: string, message: string, wpm: number): number[] {
     const piece =
       at < wav.samples.length ? wav.samples.subarray(at, at + step) : new Float32Array(step);
     for (let k = 0; k < piece.length; k += 128) f.push(piece.subarray(k, k + 128));
-    counts.push(f.step());
+    counts.push(f.step().reached);
   }
   return counts;
 }
@@ -146,7 +155,7 @@ describe("the character being keyed", () => {
       const reachedAt: number[] = [];
       for (let at = 0; at < samples.length; at += step) {
         f.push(samples.subarray(at, at + step));
-        const n = f.step();
+        const n = f.step().reached;
         while (reachedAt.length < n) reachedAt.push(Math.min(at + step, samples.length) / rate);
       }
 
@@ -160,4 +169,50 @@ describe("the character being keyed", () => {
       });
     });
   }
+});
+
+describe("grading a take as it is sent", () => {
+  /** The last reading of a whole take, fed at the sheet's step. */
+  function last(samples: Float32Array, rate: number, target: string, wpm: number) {
+    const f = new LiveFollower(rate, keyedSymbols(target), targetTiming(wpm, wpm));
+    const step = Math.round(rate * 0.15);
+    let out = f.step();
+    for (let at = 0; at < samples.length; at += step) {
+      f.push(samples.subarray(at, at + step));
+      out = f.step();
+    }
+    return out.graded.map((ok) => (ok ? "+" : "x")).join("");
+  }
+
+  it("marks the one character sent wrong", () => {
+    const timing = targetTiming(20, 20);
+    const { samples, rate } = synthesize("CQ DE W7YXR", timing, { rate: 48000, padSec: 0.5 });
+    expect(last(samples, rate, "CQ DE W7YFR", 20)).toBe("+++++++x+");
+  });
+
+  it("marks a character left out", () => {
+    const timing = targetTiming(20, 20);
+    const { samples, rate } = synthesize("CQ DE W7FR", timing, { rate: 48000, padSec: 0.5 });
+    expect(last(samples, rate, "CQ DE W7YFR", 20)).toBe("++++++x++");
+  });
+
+  it("grades a whole recording right, to its last character", () => {
+    const file = "k3ng/cq-de-w7yfr/k3ng-webcam-cq-de-w7yfr-15wpm.wav";
+    if (!existsSync(join(DATA_DIR, file))) return;
+    const wav = readWav(join(DATA_DIR, file));
+    expect(last(wav.samples, wav.rate, "CQ DE W7YFR", 15)).toBe("+++++++++");
+  });
+
+  it("grades nothing past what has been read back", () => {
+    // Cut in the middle of the F: the characters before it are graded, the F
+    // is reached but not yet read.
+    const timing = targetTiming(20, 20);
+    const { samples, rate } = synthesize("CQ DE W7YF", timing, { rate: 48000, padSec: 0 });
+    const cut = samples.subarray(0, samples.length - Math.round(rate * timing.unitSec * 2));
+    const f = new LiveFollower(rate, keyedSymbols("CQ DE W7YFR"), timing);
+    f.push(cut);
+    const at = f.step();
+    expect(at.graded.length).toBe(7);
+    expect(at.reached).toBe(8);
+  });
 });

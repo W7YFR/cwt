@@ -136,20 +136,25 @@ export function keyedSymbols(message: string): string[] {
  *  long drill stay well under it. */
 const MAX_CELLS = 4_000_000;
 
-/** How many characters of the target the sender has reached.
+/** A verdict on each character of the target the sender has finished, in
+ *  order: true when it was sent right.
  *
  * The sent characters are aligned against the start of the target, with the
- * rest of the target free to go unsent. The count ends at the last character
- * that matched. A wrong or dropped character is passed when the next one
- * matches, and not before: a click before the first character decodes as an
- * E, and that must not move the count.
+ * rest of the target free to go unsent. A dropped character is wrong, and so
+ * is one sent as something else. An extra character has no place in the
+ * target and gets no verdict.
+ *
+ * Where two ends of the target cost the same, the further one is taken: CQE
+ * against CQDE is a dropped D, not an extra E. Nothing is graded until one
+ * character matches. A click before the first character decodes as an E, and
+ * that is not a wrong C.
  *
  * Characters are compared by their Morse, as in the review: `=` and `<BT>` are
  * the same character sent. */
-export function reached(target: readonly string[], sent: readonly string[]): number {
+export function graded(target: readonly string[], sent: readonly string[]): boolean[] {
   const n = target.length;
   const m = sent.length;
-  if (m === 0 || n === 0 || (n + 1) * (m + 1) > MAX_CELLS) return 0;
+  if (m === 0 || n === 0 || (n + 1) * (m + 1) > MAX_CELLS) return [];
   const kt = target.map(canonicalChar);
   const ks = sent.map(canonicalChar);
 
@@ -165,31 +170,33 @@ export function reached(target: readonly string[], sent: readonly string[]): num
     }
   }
 
-  // The end of the target that costs least. On a tie, the further one: CQE
-  // against CQDE is a dropped D, not an extra E. The walk back below stops at
-  // a match, so the further end never counts a character that did not match.
   let i = 0;
   for (let k = 1; k <= n; k++) if (d[k * w + m]! <= d[i * w + m]!) i = k;
+  const out: boolean[] = new Array<boolean>(i).fill(false);
 
-  // Walk back to the last match.
+  // Walk back. Target characters the walk passes without a match stay wrong.
   let j = m;
+  let matched = false;
   while (i > 0 && j > 0) {
     const here = d[i * w + j]!;
     const same = kt[i - 1] === ks[j - 1];
     if (here === d[(i - 1) * w + j - 1]! + (same ? 0 : 1)) {
-      if (same) return i;
+      if (same) {
+        out[i - 1] = true;
+        matched = true;
+      }
       i--;
       j--;
     } else if (here === d[(i - 1) * w + j]! + 1) i--;
     else j--;
   }
-  return 0;
+  return matched ? out : [];
 }
 
 /** Two characters that match the message are what says the tone is the
  *  sender's. Before that a click or a hum can win, and a tone locked on one
  *  would hold every later pass to it. */
-const TONE_LOCK_REACHED = 2;
+const TONE_LOCK_MATCHED = 2;
 
 /** Whether a character being keyed is enough to say the sender has started.
  *
@@ -198,17 +205,25 @@ const TONE_LOCK_REACHED = 2;
  * dits. So the first character counts only once it has a dah or a second
  * element, and only while it keys as the start of the message's first
  * character. */
-function started(keying: string, matched: number, first: string): boolean {
-  if (matched > 0) return true;
+function started(keying: string, matched: boolean, first: string): boolean {
+  if (matched) return true;
   return (keying.length > 1 || keying.includes("-")) && first.startsWith(keying);
+}
+
+export interface Progress {
+  /** How many characters of the target the sender has reached. The
+   *  character being keyed counts from its first element. */
+  readonly reached: number;
+  /** A verdict on each finished character, in order. See `graded`. */
+  readonly graded: readonly boolean[];
 }
 
 /** One take, followed from its first sample.
  *
  * Feed it audio with `push` and ask `step` how far the sender has got. The
- * character being keyed counts from its first element. The count never goes
- * back: a pass that reads less than the last one is a misreading, not a
- * sender who took a character back. */
+ * reached count never goes back: a pass that reads less than the last one is
+ * a misreading, not a sender who took a character back. The verdicts are the
+ * latest reading, and a later character can change one. */
 export class LiveFollower {
   private readonly audio: Decimator;
   private readonly target: readonly string[];
@@ -229,15 +244,16 @@ export class LiveFollower {
     this.audio.push(samples);
   }
 
-  step(): number {
+  step(): Progress {
     const sent = sentSymbols(this.audio.samples(), this.audio.rate, this.timing, this.toneHz);
-    const now = reached(this.target, sent.symbols);
+    const verdicts = graded(this.target, sent.symbols);
+    const matches = verdicts.filter(Boolean).length;
     const at =
-      sent.keying !== null && started(sent.keying, now, this.first)
-        ? Math.min(now + 1, this.target.length)
-        : now;
+      sent.keying !== null && started(sent.keying, matches > 0, this.first)
+        ? Math.min(verdicts.length + 1, this.target.length)
+        : verdicts.length;
     if (at > this.best) this.best = at;
-    if (this.toneHz === undefined && now >= TONE_LOCK_REACHED) this.toneHz = sent.toneHz;
-    return this.best;
+    if (this.toneHz === undefined && matches >= TONE_LOCK_MATCHED) this.toneHz = sent.toneHz;
+    return { reached: Math.max(this.best, verdicts.length), graded: verdicts };
   }
 }

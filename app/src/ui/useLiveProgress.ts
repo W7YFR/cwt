@@ -1,14 +1,15 @@
 /* How far through the message the sender has got, while the take runs.
  *
  * The recorder is read on a timer and what it captured since the last read
- * goes to a worker, which decodes and answers with a count. See
- * live.worker.ts and timing/live.ts.
+ * goes to a worker, which decodes and answers with a count and a verdict on
+ * each finished character. See live.worker.ts and timing/live.ts.
  *
  * The count only ever rises within one take. Restart starts it again from 0.
  */
 
 import { useEffect, useState } from "react";
 import type { Recorder } from "@/capture/mic";
+import type { Progress } from "@/timing/live";
 import type { LiveAudio, LiveReached, LiveStart } from "./live.worker";
 
 /** How often the recorder is read. The worker sets its own pace; this only
@@ -21,12 +22,17 @@ export interface LiveSource {
   readonly farnsworthWpm: number;
 }
 
-/** The count of target characters reached, or 0 with no source.
+const NONE: Progress = { reached: 0, graded: [] };
+
+/** How far the sender has got, or nothing with no source.
  *
  * `target` is the take's characters in order, as `keyedSymbols` gives them,
  * every pass included. */
-export function useLiveProgress(source: LiveSource | null, target: readonly string[]): number {
-  const [reached, setReached] = useState(0);
+export function useLiveProgress(
+  source: LiveSource | null,
+  target: readonly string[],
+): Progress {
+  const [progress, setProgress] = useState<Progress>(NONE);
   const recorder = source?.recorder ?? null;
   const charWpm = source?.charWpm ?? 0;
   const farnsworthWpm = source?.farnsworthWpm ?? 0;
@@ -34,7 +40,7 @@ export function useLiveProgress(source: LiveSource | null, target: readonly stri
   const key = target.join("\u0000");
 
   useEffect(() => {
-    setReached(0);
+    setProgress(NONE);
     if (!recorder || target.length === 0) return;
 
     let worker: Worker;
@@ -48,13 +54,15 @@ export function useLiveProgress(source: LiveSource | null, target: readonly stri
     let gen = 0;
     let read = 0;
     let restarts = recorder.restarts();
+    let shown = "";
     let best = 0;
 
     const begin = () => {
       gen++;
       read = 0;
+      shown = "";
       best = 0;
-      setReached(0);
+      setProgress(NONE);
       const start: LiveStart = {
         type: "start",
         gen,
@@ -67,9 +75,15 @@ export function useLiveProgress(source: LiveSource | null, target: readonly stri
     };
 
     worker.onmessage = (ev: MessageEvent<LiveReached>) => {
-      if (ev.data.gen !== gen || ev.data.reached <= best) return;
-      best = ev.data.reached;
-      setReached(best);
+      if (ev.data.gen !== gen) return;
+      const { graded } = ev.data;
+      best = Math.max(best, ev.data.reached);
+      const reached = best;
+      // Most passes change nothing, and a render per pass would be for nothing.
+      const now = `${reached}:${graded.map((ok) => (ok ? 1 : 0)).join("")}`;
+      if (now === shown) return;
+      shown = now;
+      setProgress({ reached, graded });
     };
 
     begin();
@@ -93,5 +107,5 @@ export function useLiveProgress(source: LiveSource | null, target: readonly stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder, charWpm, farnsworthWpm, key]);
 
-  return recorder ? reached : 0;
+  return recorder ? progress : NONE;
 }

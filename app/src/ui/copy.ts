@@ -91,7 +91,8 @@ export const ZEN_MODE_HELP =
 
 export const ZEN_PROGRESS_HELP =
   "Color each character of the message as you start to key it, so you can " +
-  "see where you are.";
+  "see where you are. The take stops itself once the last character has " +
+  "been read.";
 
 export const ZEN_PACING_HELP =
   "Not while Zen mode is on: one puts a beat in front of you, the other " +

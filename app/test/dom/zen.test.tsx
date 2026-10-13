@@ -236,9 +236,11 @@ describe("live progress on the zen sheet", () => {
       this.sent.push(msg);
     }
     terminate() {}
-    reply(reached: number) {
+    /** `graded` as a string: + right, x wrong. */
+    reply(reached: number, graded = "") {
       const gen = this.sent.filter((m) => m.type === "start").at(-1)!.gen;
-      act(() => this.onmessage?.({ data: { gen, reached } }));
+      const verdicts = Array.from(graded, (c) => c === "+");
+      act(() => this.onmessage?.({ data: { gen, reached, graded: verdicts } }));
     }
   }
 
@@ -261,7 +263,7 @@ describe("live progress on the zen sheet", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  function sheet(live: boolean) {
+  function sheet(live: boolean, onFinish = vi.fn()) {
     return render(
       <ZenMode
         message="CQ <SK>"
@@ -270,17 +272,18 @@ describe("live progress on the zen sheet", () => {
         level={0}
         busy={false}
         live={live ? { recorder, charWpm: 20, farnsworthWpm: 20 } : null}
-        onFinish={vi.fn()}
+        onFinish={onFinish}
         onRestart={vi.fn()}
         onDiscard={vi.fn()}
       />,
     );
   }
 
-  const keyed = () =>
-    Array.from(screen.getByTestId("zen-message").querySelectorAll(".zenkeyed")).map(
+  const drawn = (cls: string) =>
+    Array.from(screen.getByTestId("zen-message").querySelectorAll(`.${cls}`)).map(
       (el) => el.textContent,
     );
+  const keyed = () => drawn("zenkeyed");
 
   it("asks for every pass, a prosign as one character", () => {
     sheet(true);
@@ -317,7 +320,7 @@ describe("live progress on the zen sheet", () => {
       expect(keyed()).toEqual([]);
       // A late answer about the take before is dropped.
       const stale = FakeWorker.last!;
-      act(() => stale.onmessage?.({ data: { gen: 1, reached: 5 } }));
+      act(() => stale.onmessage?.({ data: { gen: 1, reached: 5, graded: [] } }));
       expect(keyed()).toEqual([]);
     } finally {
       vi.useRealTimers();
@@ -328,5 +331,38 @@ describe("live progress on the zen sheet", () => {
     sheet(false);
     expect(FakeWorker.last).toBeNull();
     expect(keyed()).toEqual([]);
+  });
+
+  it("finishes the take once the last character is read back", () => {
+    const onFinish = vi.fn();
+    sheet(true, onFinish);
+    FakeWorker.last!.reply(6, "+++++");
+    expect(onFinish, "the last character is still being keyed").not.toHaveBeenCalled();
+    FakeWorker.last!.reply(6, "++++++");
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    // Once: a later pass that reads the same end does not finish it again.
+    FakeWorker.last!.reply(6, "+++++x");
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("finishes again after a restart", () => {
+    vi.useFakeTimers();
+    try {
+      const onFinish = vi.fn();
+      sheet(true, onFinish);
+      FakeWorker.last!.reply(6, "++++++");
+      restarts = 1;
+      act(() => vi.advanceTimersByTime(200));
+      FakeWorker.last!.reply(6, "++++++");
+      expect(onFinish).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never finishes a take without live progress", () => {
+    const onFinish = vi.fn();
+    sheet(false, onFinish);
+    expect(onFinish).not.toHaveBeenCalled();
   });
 });

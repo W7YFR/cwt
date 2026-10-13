@@ -50,8 +50,9 @@ export interface ZenModeProps {
   /** Analyzing the take just stopped — the same state that bars the button. */
   readonly busy: boolean;
   /** Where to follow the take from, with **Live progress** on. Each character
-   *  of the message changes color as it starts to be keyed. Absent, the message
-   *  stays one color. */
+   *  of the message changes color as it starts to be keyed, and the take
+   *  finishes itself once the last one has been read. Absent, the message
+   *  stays one color and the take runs until it is stopped. */
   readonly live?: LiveSource | null | undefined;
   onFinish(): void;
   onRestart(): void;
@@ -90,7 +91,25 @@ export function ZenMode({
     () => parts.flatMap((pass) => pass.filter((p) => p.at >= 0).map((p) => p.text)),
     [parts],
   );
-  const reached = useLiveProgress(live, target);
+  const { reached, graded } = useLiveProgress(live, target);
+
+  /* The end of the message, read back: every character of every pass has a
+     verdict, so the key has been up for a character gap after the last one.
+     There is nothing left to send, and nothing left to wait for.
+
+     Once per take. A restart clears the verdicts, and that arms it again.
+     `onFinish` is held in a ref because the screen behind rebuilds it on
+     every render. */
+  const finish = useRef(onFinish);
+  finish.current = onFinish;
+  const finished = useRef(false);
+  const ended = live !== null && target.length > 0 && graded.length >= target.length;
+  useEffect(() => {
+    if (graded.length === 0) finished.current = false;
+    if (!ended || finished.current) return;
+    finished.current = true;
+    finish.current();
+  }, [ended, graded.length]);
   const box = useRef<HTMLDivElement>(null);
   const text = useRef<HTMLDivElement>(null);
   const clock = useRef<HTMLSpanElement>(null);
