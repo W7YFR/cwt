@@ -7,7 +7,8 @@
  * begins, the chart slides the next word to the left edge. Waiting until the
  * letter was read back left a lag after every word; this way the next word is
  * in view while the last letter is still being keyed. Ahead of the target
- * speed or behind it, the chart is where you are.
+ * speed or behind it, the chart is where you are. Within a word wider than
+ * the view, the letter being keyed is kept in view as well.
  *
  * A component that draws nothing, so the count it holds re-renders only this
  * and not the review behind it.
@@ -63,6 +64,23 @@ export function FollowSending({
     const ch = ideal.chars[anchor];
     if (ch) handle.chart?.reveal(ch.t0, "tgt");
   }, [anchor, ideal, handle]);
+
+  /* Within a word, the character being keyed stays in view. A word wider than
+     the view would otherwise run its later letters off the right edge, since
+     the slide above waits for its last letter. A word that fits never moves
+     the view here. The last letter of a word is the slide's, and it leaves
+     that letter off to the left on purpose. */
+  const at = reached - 1;
+  const lastOfWord = firsts.includes(at + 1) && at + 1 < ideal.chars.length;
+  useEffect(() => {
+    const ch = ideal.chars[at];
+    if (!ch || lastOfWord) return;
+    handle.chart?.keepInView(ch.t0, ch.t1, "tgt");
+  }, [at, lastOfWord, ideal, handle]);
+
+  /* The take is over, or following was turned off: the view goes back into
+     its frame, so the review does not open on empty space past the end. */
+  useEffect(() => () => handle.chart?.endReveal(), [handle]);
 
   return null;
 }

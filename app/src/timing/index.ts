@@ -188,6 +188,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     showChartControls: true,
     showRuns: "all",
     zenMode: false,
+    plainFollow: true,
     zenProgress: false,
     zenGrading: false,
     runSort: "oldest",

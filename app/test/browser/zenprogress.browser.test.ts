@@ -208,7 +208,12 @@ describe("following the sending in Plain mode", () => {
     const ideal = idealTimeline(MESSAGE, targetTiming(WPM, WPM));
     const revealed: number[] = [];
     const handle = {
-      chart: { reveal: (t: number) => revealed.push(t) } as unknown as Chart,
+      chart: {
+        reveal: (t: number) => revealed.push(t),
+        // Every word of CQ DE W7YFR fits a real chart; this one keeps nothing.
+        keepInView: () => {},
+        endReveal: () => {},
+      } as unknown as Chart,
     };
     act(() =>
       root.render(

@@ -326,6 +326,7 @@ describe("controls", () => {
     expect(row("target")).toContainElement(screen.getByLabelText("Break length in seconds"));
     expect(row("target")).toContainElement(screen.getByLabelText("Repeat pause in seconds"));
     expect(row("grading")).toContainElement(screen.getByLabelText(/^spacing only$/i));
+    expect(row("plain")).toContainElement(screen.getByLabelText(/^follow$/i));
     expect(row("zen")).toContainElement(screen.getByLabelText(/live progress/i));
     expect(row("pacing")).toContainElement(screen.getByLabelText(/^clock axis$/i));
     expect(row("pacing")).toContainElement(screen.getByLabelText("Delay start in seconds"));
@@ -333,7 +334,7 @@ describe("controls", () => {
     expect(row("display")).toContainElement(screen.getByLabelText(/^scores$/i));
     expect(row("audio")).toContainElement(container.querySelector<HTMLElement>("#gain"));
     expect(row("extras")).toContainElement(screen.getByLabelText(/advanced grading/i));
-    for (const name of ["audio", "target", "grading", "zen", "pacing", "display", "extras"]) {
+    for (const name of ["audio", "target", "grading", "plain", "zen", "pacing", "display", "extras"]) {
       expect(row(name).querySelector(".uplabel")!.textContent, name).not.toBe("");
     }
   });
@@ -548,6 +549,16 @@ describe("controls", () => {
     expect(screen.queryByLabelText(/word preview/i)).toBeNull();
   });
 
+
+  it("follows the sending in Plain mode unless asked not to", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderView({ onChange, open: true });
+    const box = screen.getByLabelText(/^follow$/i) as HTMLInputElement;
+    expect(box.checked, "on to start").toBe(true);
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledWith({ plainFollow: false });
+  });
 
   it("leaves the choice of mode to the record bar", () => {
     /* Zen mode and the cursor are picked beside the record button. The panel

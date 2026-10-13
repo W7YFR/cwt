@@ -953,7 +953,7 @@ export function ReviewScreen({
           reproduced inside it, keys and all. */}
       {/* Plain mode: the chart follows what is being sent. Zen mode covers the
           chart, and Paced mode moves it on the clock. */}
-      {rec.recorder && modeOf(settings) === "plain" && (
+      {rec.recorder && modeOf(settings) === "plain" && settings.plainFollow && (
         <FollowSending
           recorder={rec.recorder}
           charWpm={settings.charWpm}

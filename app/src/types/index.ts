@@ -387,6 +387,10 @@ export interface ReviewSettings {
    *
    * Saved with the other aids, so a reload keeps it. */
   zenMode: boolean;
+  /** In Plain mode, slide the next word to the left edge of the chart as the
+   *  last letter of a word begins. Off, the chart does not scroll while you
+   *  record. */
+  plainFollow: boolean;
   /** In Zen mode, color each character of the message as it starts to be
    *  keyed.
    *

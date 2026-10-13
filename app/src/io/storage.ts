@@ -397,6 +397,7 @@ export interface Prefs {
   showRuns?: "all" | "last5" | "last3" | "last";
   captionAll?: boolean;
   zenMode?: boolean;
+  plainFollow?: boolean;
   zenProgress?: boolean;
   zenGrading?: boolean;
   runSort?: string;
@@ -549,6 +550,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   showRuns: oneOf("all", "last5", "last3", "last"),
   captionAll: isBool,
   zenMode: isBool,
+  plainFollow: isBool,
   zenProgress: isBool,
   zenGrading: isBool,
   runSort: isStr,

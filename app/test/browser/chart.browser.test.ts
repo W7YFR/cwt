@@ -710,12 +710,59 @@ describe("the chart in a browser", () => {
       expect(chart.scrollAt()).toBeCloseTo(want, 0);
       expect(midway, "on its way rather than already there").toBeLessThan(want);
 
-      // Clamped at both ends, like playback.
-      chart.reveal(review.take.durationSec, "tgt");
+      // Past the end if it has to be, so the last word reaches the edge like
+      // every other; and back into the frame once following ends.
+      const end = review.take.durationSec;
+      chart.reveal(end, "tgt");
       await settle();
+      expect(chart.scrollAt()).toBeCloseTo(timeToX(layout, end, "tgt") - trackW * 0.1, 0);
+      expect(chart.scrollAt()).toBeGreaterThan(maxScroll);
+      chart.endReveal();
       expect(chart.scrollAt()).toBeCloseTo(maxScroll, 0);
+
+      // Never before the start.
       chart.reveal(0, "tgt");
       await settle();
+      expect(chart.scrollAt()).toBe(0);
+    });
+
+    it("keeps a span in view, moving only when it is not", async () => {
+      /* For a word wider than the view: the letter being keyed stays on
+         screen, and lands at the left edge when it would not be. */
+      const { layout, trackW, maxScroll } = set("clamped");
+      expect(maxScroll).toBeGreaterThan(0);
+      const settle = () => new Promise((r) => setTimeout(r, 500));
+      const x = (t: number) => timeToX(layout, t, "tgt");
+      const end = review.take.durationSec;
+      /** The time at `px` content pixels. */
+      const at = (px: number) => {
+        let lo = 0;
+        let hi = end;
+        for (let i = 0; i < 40; i++) {
+          const mid = (lo + hi) / 2;
+          if (x(mid) < px) lo = mid;
+          else hi = mid;
+        }
+        return lo;
+      };
+
+      chart.keepInView(at(trackW * 0.3), at(trackW * 0.6), "tgt");
+      await settle();
+      expect(chart.scrollAt(), "in view: nothing moves").toBe(0);
+
+      const t0 = at(trackW * 0.8);
+      chart.keepInView(t0, at(trackW * 1.1), "tgt");
+      await settle();
+      expect(chart.scrollAt()).toBeCloseTo(Math.min(x(t0) - trackW * 0.1, maxScroll), 0);
+      chart.endReveal();
+    });
+
+    it("leaves a message that fits on screen alone", async () => {
+      chart.destroy();
+      chart = createChart(host, canvas);
+      chart.update({ review, settings: { ...settings, ppu: ZOOM_MIN }, focus: null });
+      chart.reveal(review.take.durationSec / 2, "tgt");
+      await new Promise((r) => setTimeout(r, 500));
       expect(chart.scrollAt()).toBe(0);
     });
 

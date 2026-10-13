@@ -41,6 +41,7 @@ import {
   ZEN_PROGRESS_HELP,
   ZEN_GRADING_HELP,
   LOOP_HELP,
+  PLAIN_FOLLOW_HELP,
   PACE_LEAD_HELP,
   BREAK_HELP,
   REPEAT_PAUSE_HELP,
@@ -613,9 +614,21 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
         </div>
       </Section>
 
-      {/* The options of the two ways to record. Which one records is picked
+      {/* The options of the three ways to record. Which one records is picked
           beside the record button; these are set ahead of it, so they stay
           live whichever is picked. */}
+      <Section name="plain" title="Plain mode">
+        <div className="aid">
+          <Check
+            id="plain-follow"
+            label="Follow"
+            help={PLAIN_FOLLOW_HELP}
+            checked={s.plainFollow}
+            onChange={(v) => onChange({ plainFollow: v })}
+          />
+        </div>
+      </Section>
+
       <Section name="zen" title="Zen mode">
         <div className="aid">
           <Check

@@ -87,6 +87,10 @@ export const ZEN_MODE_HELP =
   "While you record, the message alone on screen in large type, with the " +
   "clock and the way to stop. No beat and no count-in.";
 
+export const PLAIN_FOLLOW_HELP =
+  "While you record, slide the next word to the left edge of the chart as " +
+  "you begin the last letter of a word. Off, the chart stays where it is.";
+
 export const PLAIN_MODE_HELP =
   "Record with the chart in view, and no cursor or count-in.";
 
