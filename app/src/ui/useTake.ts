@@ -157,6 +157,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     zenGrading: p.zenGrading ?? base.zenGrading,
     runSort: (p.runSort as ReviewSettings["runSort"]) ?? base.runSort,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
+    ppu: p.ppu ?? base.ppu,
   };
 }
 
@@ -339,6 +340,7 @@ export function useTake(): TakeState {
         zenGrading: next.zenGrading,
         runSort: next.runSort,
         view: next.view,
+        ppu: next.ppu,
       });
       // The rest of the settings belong to the take, so they ride along with
       // it rather than becoming preferences for every future recording.

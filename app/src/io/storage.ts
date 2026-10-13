@@ -384,6 +384,9 @@ export interface Prefs {
   farnsworthWpm?: number;
   expected?: string;
   view?: string;
+  /** The chart's zoom, so a reload of a screen with nothing recorded in it
+   *  keeps it. A session keeps its own, with its takes. */
+  ppu?: number;
   times?: number;
   collapseRests?: boolean;
   paceCursor?: boolean;
@@ -538,6 +541,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   farnsworthWpm: isNum,
   expected: isStr,
   view: isStr,
+  ppu: isNum,
   times: isNum,
   collapseRests: isBool,
   paceCursor: isBool,

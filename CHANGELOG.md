@@ -28,6 +28,7 @@ nothing to the site. The next release carries them.
 ### Fixed
 
 - A reload on the practice screen, before anything is recorded, stays on the practice screen. It no longer goes back to the start screen.
+- A reload keeps the chart's zoom. It no longer fits the chart to the width again.
 
 ## v1.6.0 — 2026-10-13
 

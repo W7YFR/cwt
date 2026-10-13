@@ -46,6 +46,9 @@ import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
 
 export interface ReviewScreenProps {
+  /** The session was brought back by a reload. Its zoom is the one it was
+   *  left at, so the chart keeps it rather than fitting on opening. */
+  restored?: boolean;
   loaded: LoadedTake;
   review: Review;
   /** Every attempt in this session, oldest first, all against one target. */
@@ -158,6 +161,7 @@ function saveBlob(blob: Blob, filename: string): void {
 }
 
 export function ReviewScreen({
+  restored = false,
   loaded,
   review,
   stack,
@@ -706,7 +710,6 @@ export function ReviewScreen({
      layout, because the fit is measured off the real content — a short session
      stranded in a third of the chart is the one thing a timing chart has no use
      for, and empty pixels tell you nothing. */
-  const fitted = useRef<string | null>(null);
   /* What the fit is about: the attempts on the chart, not the one being read.
      Keyed on the selected take it re-fitted on every click of a run name —
      each attempt is a slightly different length, so each got a slightly
@@ -716,6 +719,10 @@ export function ReviewScreen({
      change, and re-fitting on a tolerance slider would undo the zoom you just
      set by hand. */
   const stackId = stack.map((r) => r.take.id).join(" ");
+  /* Already fitted, when a reload brought this session back: the zoom it was
+     left at is the one to keep. Anything that changes the runs after that
+     fits as usual. */
+  const fitted = useRef<string | null>(restored ? stackId : null);
   useEffect(() => {
     // Recording into the session, or starting a new one, still gets the fit a
     // first attempt gets — that changes which takes are on the chart.

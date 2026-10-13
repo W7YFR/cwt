@@ -910,6 +910,49 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
   });
 
+  it("keeps the zoom it was left at across a reload", async () => {
+    const zoom = () => container.querySelector<HTMLInputElement>("#zoom")!;
+    const setZoom = async (v: number) => {
+      await act(async () => {
+        const input = zoom();
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, String(v));
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      // Past the settings debounce, so it has been written.
+      await act(async () => {
+        await new Promise((res) => setTimeout(res, 600));
+      });
+    };
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
+
+    // A recorded session.
+    await served();
+    await mount();
+    const fittedTo = Number(zoom().value);
+    const chosen = fittedTo > 30 ? 20 : 40;
+    await setZoom(chosen);
+    expect(Number(zoom().value)).toBe(chosen);
+    await reload();
+    expect(Number(zoom().value), "the session's zoom").toBe(chosen);
+
+    // And the practice screen with nothing recorded in it.
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".brandmark")!.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
+    });
+    const other = chosen === 20 ? 35 : 25;
+    await setZoom(other);
+    await reload();
+    expect(Number(zoom().value), "the practice screen's zoom").toBe(other);
+  });
+
   it("comes back to practice after a reload, with nothing recorded yet", async () => {
     /* A reload is not a decision to leave. With nothing recorded there is no
        session to restore, but the screen you were on still is. */

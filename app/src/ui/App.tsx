@@ -59,6 +59,10 @@ export function App(): React.ReactElement {
      until the wait is long enough to be worth explaining — a slow network, or
      a large recording coming back off disk. */
   const [booting, setBooting] = useState(true);
+  /* The review on screen was brought back by a reload, and keeps the zoom it
+     was left at. Cleared on leaving it, so coming back from the landing
+     screen fits the chart as it always has. */
+  const [restored, setRestored] = useState(false);
   const [slowBoot, setSlowBoot] = useState(false);
   const [opening, setOpening] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
@@ -106,6 +110,7 @@ export function App(): React.ReactElement {
           );
           if (!live) return;
           take.adoptSession(entries, recallSelected());
+          setRestored(true);
           return;
         }
 
@@ -117,7 +122,10 @@ export function App(): React.ReactElement {
         /* The practice screen with nothing recorded in it yet: what Practice
            opens, with the message it was opened with. */
         if (!saved) {
-          if (recallPracticing()) take.reset({ expected: loadPrefs().expected ?? "" });
+          if (recallPracticing()) {
+            take.reset({ expected: loadPrefs().expected ?? "" });
+            setRestored(true);
+          }
           return;
         }
         take.adopt(saved.take, await saved.audio.arrayBuffer(), {
@@ -126,6 +134,7 @@ export function App(): React.ReactElement {
           // megabytes of audio on every page load for no gain.
           remember: false,
         });
+        setRestored(true);
       } catch (e: unknown) {
         if (live) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -373,6 +382,7 @@ export function App(): React.ReactElement {
         />
       ) : take.loaded && take.review ? (
         <ReviewScreen
+          restored={restored}
           loaded={take.loaded}
           review={take.review}
           stack={take.reviews}
@@ -425,6 +435,7 @@ export function App(): React.ReactElement {
           }}
           onBack={() => {
             take.clear();
+            setRestored(false);
             setError(null);
           }}
         />
