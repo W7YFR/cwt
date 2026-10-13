@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Development
+
+- `source-map-js` is updated to 1.2.2, which fixes an `npm audit` warning.
+
 ## v1.5.0 — 2026-09-29
 
 ### Added
