@@ -10,7 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Live progress**, under **Zen mode**, turns each character of the message blue as you start to key it. The take stops itself a second or so after the last character.
-- **Live grading**, under **Live progress**, puts a dot under each character you key, in place of the blue letters. The dot turns blue if you sent the character right and red if not.
+- **Live grading**, under **Live progress**, puts a dot under each character, in place of the blue letters. The dot turns blue if you sent the character right and red if it was wrong or left out.
 
 ### Changed
 
@@ -18,7 +18,7 @@ nothing to the site. The next release carries them.
 
 ### Development
 
-- `source-map-js` is updated to 1.2.2, which fixes an `npm audit` warning.
+- `source-map-js` is updated to 1.2.2.
 
 ## v1.5.0 — 2026-09-29
 
