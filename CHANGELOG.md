@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.6.0 — 2026-10-13
+
 ### Added
 
 - **Live progress**, under **Zen mode**, turns each character of the message blue as you start to key it. The take stops itself a second or so after the last character.
