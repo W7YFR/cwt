@@ -16,10 +16,12 @@
  * spending the rest of the recording path already declines.
  */
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { CHAR_TO_MORSE, SYMBOL_RE } from "@/morse";
 import { passCount } from "@/timing";
 import { fmtElapsed } from "./format";
 import { LevelMeter } from "./Record";
+import { useLiveProgress, type LiveSource } from "./useLiveProgress";
 
 /** The type never goes below this, however many passes are asked for: past it
  *  the sheet stops being something you can read at a glance, which is the only
@@ -47,6 +49,10 @@ export interface ZenModeProps {
   readonly level: number;
   /** Analyzing the take just stopped — the same state that bars the button. */
   readonly busy: boolean;
+  /** Where to follow the take from, with **Live progress** on. Each character
+   *  of the message changes color as it starts to be keyed. Absent, the message
+   *  stays one color. */
+  readonly live?: LiveSource | null | undefined;
   onFinish(): void;
   onRestart(): void;
   onDiscard(): void;
@@ -58,6 +64,7 @@ export function ZenMode({
   elapsed,
   level,
   busy,
+  live = null,
   onFinish,
   onRestart,
   onDiscard,
@@ -66,6 +73,24 @@ export function ZenMode({
      counts with — so the sheet and the audio cannot disagree about how many
      there are. */
   const passes = Array.from({ length: passCount(times) }, (_, i) => i);
+
+  /* Each pass as the parts it is drawn in. A part that can be keyed carries
+     its place in the whole take, counted across passes, which is what the
+     live count is a count of. Spaces and breaks carry none. */
+  const parts = useMemo(() => {
+    const one = message.match(SYMBOL_RE) ?? [];
+    let at = 0;
+    return passes.map(() =>
+      one.map((text) => ({ text, at: text in CHAR_TO_MORSE ? at++ : -1 })),
+    );
+    // `passes` is rebuilt every render; its length is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message, passes.length]);
+  const target = useMemo(
+    () => parts.flatMap((pass) => pass.filter((p) => p.at >= 0).map((p) => p.text)),
+    [parts],
+  );
+  const reached = useLiveProgress(live, target);
   const box = useRef<HTMLDivElement>(null);
   const text = useRef<HTMLDivElement>(null);
   const clock = useRef<HTMLSpanElement>(null);
@@ -150,9 +175,19 @@ export function ZenMode({
           ref={text}
         >
           {message ? (
-            passes.map((_, at) => (
+            parts.map((pass, at) => (
               <p className="zenpass" key={at}>
-                {message}
+                {live
+                  ? pass.map((p, i) =>
+                      p.at < 0 ? (
+                        p.text
+                      ) : (
+                        <span key={i} className={p.at < reached ? "zenkeyed" : undefined}>
+                          {p.text}
+                        </span>
+                      ),
+                    )
+                  : message}
               </p>
             ))
           ) : (

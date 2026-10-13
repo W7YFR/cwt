@@ -178,7 +178,16 @@ describe("the landing screen", () => {
     for (const [key, expected] of [["Enter", stop], ["Escape", cancel]] as const) {
       stop.mockClear();
       cancel.mockClear();
-      const rec = { elapsed: () => 1, peek: () => new Float32Array(0), stop, cancel, restart: vi.fn() };
+      const rec = {
+        elapsed: () => 1,
+        peek: () => new Float32Array(0),
+        rate: 48000,
+        since: () => new Float32Array(0),
+        restarts: () => 0,
+        stop,
+        cancel,
+        restart: vi.fn(),
+      };
       vi.spyOn(mic, "startRecording").mockResolvedValue(rec);
       const view = renderLanding();
       await settled();
@@ -211,6 +220,9 @@ describe("the landing screen", () => {
     const rec = {
       elapsed: () => 1,
       peek: () => new Float32Array(0),
+      rate: 48000,
+      since: () => new Float32Array(0),
+      restarts: () => 0,
       stop: vi.fn(),
       cancel: vi.fn(),
       restart,
@@ -264,6 +276,9 @@ describe("the landing screen", () => {
     const start = vi.spyOn(mic, "startRecording").mockResolvedValue({
       elapsed: () => 0,
       peek: () => new Float32Array(0),
+      rate: 48000,
+      since: () => new Float32Array(0),
+      restarts: () => 0,
       stop: vi.fn(),
       cancel: vi.fn(),
       restart: vi.fn(),

@@ -43,6 +43,7 @@ import {
   TIMES_HELP,
   ZEN_MODE_HELP,
   ZEN_PACING_HELP,
+  ZEN_PROGRESS_HELP,
   PACE_LEAD_HELP,
   BREAK_HELP,
   REPEAT_PAUSE_HELP,
@@ -628,6 +629,22 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                   Zen mode
                 </label>
               </div>
+
+              {/* Only with Zen mode on. Progress on a sheet that is not
+                  shown is a setting for nothing. */}
+              {s.zenMode && (
+                <div className="group">
+                  <label className="check" title={ZEN_PROGRESS_HELP}>
+                    <input
+                      type="checkbox"
+                      id="zen-progress"
+                      checked={s.zenProgress}
+                      onChange={(e) => onChange({ zenProgress: e.target.checked })}
+                    />{" "}
+                    Live progress
+                  </label>
+                </div>
+              )}
 
               <div className="group">
                 <label className="check" title={s.zenMode ? ZEN_PACING_HELP : PACE_CURSOR_HELP}>

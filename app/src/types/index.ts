@@ -392,6 +392,12 @@ export interface ReviewSettings {
    * carries from take to take within one, so a zen session is not a box to
    * re-tick after every attempt. */
   zenMode: boolean;
+  /** In Zen mode, color each character of the message as it starts to be
+   *  keyed.
+   *
+   * Progress only: a wrong character is never marked as wrong. Saved with
+   * the other aids, because it does nothing until Zen mode is on. */
+  zenProgress: boolean;
   /** Show the next character to send, large, with a countdown to it. */
   flashCard: boolean;
   /** Spell the word being sent under the card, greening each letter as it

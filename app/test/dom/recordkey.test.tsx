@@ -43,6 +43,9 @@ function listening(startKey: boolean, onStart?: () => void) {
   const start = vi.spyOn(mic, "startRecording").mockResolvedValue({
     elapsed: () => 0,
     peek: () => new Float32Array(0),
+    rate: 48000,
+    since: () => new Float32Array(0),
+    restarts: () => 0,
     stop: vi.fn(),
     cancel: vi.fn(),
     restart: vi.fn(),

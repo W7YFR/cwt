@@ -89,6 +89,10 @@ export const ZEN_MODE_HELP =
   "you say it does, so it cannot run with the paced aids. Off again next " +
   "time you open the app.";
 
+export const ZEN_PROGRESS_HELP =
+  "Color each character of the message as you start to key it, so you can " +
+  "see where you are.";
+
 export const ZEN_PACING_HELP =
   "Not while Zen mode is on: one puts a beat in front of you, the other " +
   "takes the page away.";

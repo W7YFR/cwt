@@ -156,6 +156,14 @@ export interface Recorder {
   elapsed(): number;
   /** The most recent frames, for a level meter or a live waveform. */
   peek(): Float32Array;
+  /** The capture rate, in samples per second. */
+  readonly rate: number;
+  /** Everything captured from sample `from` on, as one copy. Read on a timer
+   *  by whatever follows the take while it runs. */
+  since(from: number): Float32Array;
+  /** How many times the take has been started over. A reader that sees this
+   *  change starts again from sample 0. */
+  restarts(): number;
   /** Stop, release the device, and hand back what was captured. */
   stop(): Promise<AudioClip>;
   /** Throw the take away and keep recording on the same open device. */
@@ -231,6 +239,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
 
   let chunks: Float32Array[] = [];
   let total = 0;
+  let restarts = 0;
   let lastReport = 0;
   let stopped = false;
   const maxFrames = Math.ceil(maxSeconds * ctx.sampleRate);
@@ -284,10 +293,29 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   return {
     elapsed: () => total / ctx.sampleRate,
     peek: () => chunks[chunks.length - 1] ?? new Float32Array(0),
+    rate: ctx.sampleRate,
+    since(from) {
+      const out = new Float32Array(Math.max(0, total - from));
+      // From the newest chunk back, so a read costs what it returns and not
+      // the length of the take.
+      let end = total;
+      let at = out.length;
+      for (let i = chunks.length - 1; i >= 0 && end > from; i--) {
+        const c = chunks[i]!;
+        const start = end - c.length;
+        const part = start >= from ? c : c.subarray(from - start);
+        at -= part.length;
+        out.set(part, at);
+        end = start;
+      }
+      return out;
+    },
+    restarts: () => restarts,
     restart() {
       chunks = [];
       total = 0;
       lastReport = 0;
+      restarts++;
     },
     async stop() {
       const clip = collect();

@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Live progress**, under **Zen mode**, turns each character of the message blue as you start to key it.
+
 ### Development
 
 - `source-map-js` is updated to 1.2.2, which fixes an `npm audit` warning.

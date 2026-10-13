@@ -1485,6 +1485,8 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   color: var(--ink);
 }
 .zenpass { margin: 0; }
+/* Keyed, with Live progress on. The blue the chart draws your sending in. */
+.zenkeyed { color: var(--you); }
 .zennothing {
   margin: 0;
   font-size: 15px;
