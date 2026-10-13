@@ -405,6 +405,7 @@ export interface Prefs {
   captionAll?: boolean;
   zenMode?: boolean;
   plainFollow?: boolean;
+  plainGrading?: boolean;
   zenProgress?: boolean;
   zenGrading?: boolean;
   runSort?: string;
@@ -560,6 +561,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   captionAll: isBool,
   zenMode: isBool,
   plainFollow: isBool,
+  plainGrading: isBool,
   zenProgress: isBool,
   zenGrading: isBool,
   runSort: isStr,

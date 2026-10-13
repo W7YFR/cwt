@@ -93,6 +93,11 @@ export const PLAIN_FOLLOW_HELP =
   "after the last character. Off, the chart stays where it is and the take " +
   "runs until you stop it.";
 
+export const PLAIN_GRADING_HELP =
+  "Put a dot under each character of the target on the chart as you key " +
+  "it. It turns blue once the character is read back right, and red if it " +
+  "was wrong or left out.";
+
 export const PLAIN_MODE_HELP =
   "Record with the chart in view, and no cursor or count-in.";
 

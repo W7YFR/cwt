@@ -189,6 +189,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     showRuns: "all",
     zenMode: false,
     plainFollow: true,
+    plainGrading: false,
     zenProgress: false,
     zenGrading: false,
     runSort: "oldest",

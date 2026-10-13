@@ -958,15 +958,20 @@ export function ReviewScreen({
 
       {/* Over everything, while the take runs. The record bar it covers is
           reproduced inside it, keys and all. */}
-      {/* Plain mode: the chart follows what is being sent. Zen mode covers the
-          chart, and Paced mode moves it on the clock. */}
-      {rec.recorder && modeOf(settings) === "plain" && settings.plainFollow && (
+      {/* Plain mode: the chart follows what is being sent, and marks it with
+          Live grading on. Zen mode covers the chart, and Paced mode moves it
+          on the clock. */}
+      {rec.recorder &&
+        modeOf(settings) === "plain" &&
+        (settings.plainFollow || settings.plainGrading) && (
         <FollowSending
           recorder={rec.recorder}
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
           ideal={incoming.ideal}
           handle={handle}
+          follow={settings.plainFollow}
+          grade={settings.plainGrading}
           onFinish={() => void rec.finish()}
         />
       )}

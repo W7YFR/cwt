@@ -10,6 +10,9 @@
  * speed or behind it, the chart is where you are. Within a word wider than
  * the view, the letter being keyed is kept in view as well.
  *
+ * The same reading marks the target's characters on the chart with Live
+ * grading on, as Zen mode marks its message.
+ *
  * A component that draws nothing, so the count it holds re-renders only this
  * and not the review behind it.
  */
@@ -28,8 +31,15 @@ export interface FollowSendingProps {
   /** The target the chart draws, every pass included. */
   readonly ideal: Timeline;
   readonly handle: ChartHandle;
+  /** Follow: slide the chart along with the sending, and finish the take at
+   *  the end of the message. */
+  readonly follow: boolean;
+  /** Live grading: mark the target's characters on the chart as they are
+   *  keyed and read back. */
+  readonly grade: boolean;
   /** The sender is done: every character read back, and the key up a while
-   *  after the last. Called once per take, as Zen mode's is. */
+   *  after the last. Called once per take, as Zen mode's is, with `follow`
+   *  on. */
   onFinish(): void;
 }
 
@@ -39,6 +49,8 @@ export function FollowSending({
   farnsworthWpm,
   ideal,
   handle,
+  follow,
+  grade,
   onFinish,
 }: FollowSendingProps): null {
   /* The characters the chart draws, so a count of them is an index into it. */
@@ -57,10 +69,18 @@ export function FollowSending({
   const finished = useRef(false);
   useEffect(() => {
     if (graded.length === 0) finished.current = false;
-    if (!done || finished.current) return;
+    if (!follow || !done || finished.current) return;
     finished.current = true;
     finish.current();
-  }, [done, graded.length]);
+  }, [follow, done, graded.length]);
+
+  /* Live grading: the target's characters marked on the chart as they are
+     begun and read back. Cleared when the take is over, where the review's
+     own reading takes over. */
+  useEffect(() => {
+    handle.chart?.setLiveMarks(grade ? { chars: ideal.chars, reached, graded } : null);
+  }, [grade, ideal, reached, graded, handle]);
+  useEffect(() => () => handle.chart?.setLiveMarks(null), [handle]);
 
   /* The index of each word's first character, by the same rule the chart
      highlights words by: a word gap or a pause opens one. */
@@ -83,8 +103,8 @@ export function FollowSending({
   }
   useEffect(() => {
     const ch = ideal.chars[anchor];
-    if (ch) handle.chart?.reveal(ch.t0, "tgt");
-  }, [anchor, ideal, handle]);
+    if (follow && ch) handle.chart?.reveal(ch.t0, "tgt");
+  }, [follow, anchor, ideal, handle]);
 
   /* Within a word, the character being keyed stays in view. A word wider than
      the view would otherwise run its later letters off the right edge, since
@@ -95,13 +115,17 @@ export function FollowSending({
   const lastOfWord = firsts.includes(at + 1) && at + 1 < ideal.chars.length;
   useEffect(() => {
     const ch = ideal.chars[at];
-    if (!ch || lastOfWord) return;
+    if (!follow || !ch || lastOfWord) return;
     handle.chart?.keepInView(ch.t0, ch.t1, "tgt");
-  }, [at, lastOfWord, ideal, handle]);
+  }, [follow, at, lastOfWord, ideal, handle]);
 
   /* The take is over, or following was turned off: the view goes back into
      its frame, so the review does not open on empty space past the end. */
-  useEffect(() => () => handle.chart?.endReveal(), [handle]);
+  useEffect(() => {
+    if (follow) return () => handle.chart?.endReveal();
+    handle.chart?.endReveal();
+    return undefined;
+  }, [follow, handle]);
 
   return null;
 }

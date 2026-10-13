@@ -1548,3 +1548,43 @@ describe("the play button in the gutter", () => {
     expect(disc(ctx, runY)).toBe(false);
   });
 });
+
+describe("live grading marks on the target", () => {
+  /* While a Plain take runs with Live grading on, a dot under each target
+     character begun: the text color until it is read back, then blue if right
+     and red if wrong. The same colors as Zen mode's dots. */
+  const { review } = reviewFrom(caseNamed(SLOPPY));
+  const C = FALLBACK_PALETTE;
+  const fills = (ctx: ReturnType<typeof recordingCtx>, color: string) =>
+    ctx.ofType("fill").filter((c) => c.fill === color).length;
+
+  for (const view of ["per-char", "absolute"] as const) {
+    it(`draws a dot per character begun, in its state's color, in the ${view} view`, () => {
+      const base = sceneFor(review, view, 12);
+      const chars = review.ideal.chars;
+      const plain = recordingCtx();
+      draw(plain, base);
+      const marked = recordingCtx();
+      draw(marked, {
+        ...base,
+        liveMarks: new Map([
+          [chars[0]!, "right"],
+          [chars[1]!, "wrong"],
+          [chars[2]!, "pending"],
+        ]),
+      });
+      expect(fills(marked, C.you) - fills(plain, C.you), "right").toBe(1);
+      expect(fills(marked, C.bad) - fills(plain, C.bad), "wrong").toBe(1);
+      expect(fills(marked, C.ink) - fills(plain, C.ink), "pending").toBe(1);
+    });
+  }
+
+  it("draws nothing without marks", () => {
+    const base = sceneFor(review, "per-char", 12);
+    const a = recordingCtx();
+    draw(a, base);
+    const b = recordingCtx();
+    draw(b, { ...base, liveMarks: null });
+    expect(b.ofType("fill").length).toBe(a.ofType("fill").length);
+  });
+});

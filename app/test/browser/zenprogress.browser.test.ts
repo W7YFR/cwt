@@ -208,12 +208,16 @@ describe("following the sending in Plain mode", () => {
     const ideal = idealTimeline(MESSAGE, targetTiming(WPM, WPM));
     const revealed: number[] = [];
     let finished = 0;
+    let marks: { reached: number; graded: readonly boolean[] } | null = null;
     const handle = {
       chart: {
         reveal: (t: number) => revealed.push(t),
         // Every word of CQ DE W7YFR fits a real chart; this one keeps nothing.
         keepInView: () => {},
         endReveal: () => {},
+        setLiveMarks: (m: typeof marks) => {
+          if (m) marks = m;
+        },
       } as unknown as Chart,
     };
     act(() =>
@@ -224,6 +228,8 @@ describe("following the sending in Plain mode", () => {
           farnsworthWpm: WPM,
           ideal,
           handle,
+          follow: true,
+          grade: true,
           onFinish: () => finished++,
         }),
       ),
@@ -242,5 +248,45 @@ describe("following the sending in Plain mode", () => {
     // And the take finished itself at the end of the message, once.
     expect(halfway, "not halfway through").toBe(0);
     expect(finished).toBe(1);
+    // And Live grading marked every character, each read back right.
+    expect(marks!.reached).toBe(c.length);
+    expect(marks!.graded).toEqual(c.map(() => true));
+  }, 20_000);
+
+  it("marks without following when Follow is off", async () => {
+    recorder = await startRecording();
+    const rec = recorder;
+    const ideal = idealTimeline(MESSAGE, targetTiming(WPM, WPM));
+    let moved = 0;
+    let finished = 0;
+    let marks: { reached: number } | null = null;
+    const handle = {
+      chart: {
+        reveal: () => moved++,
+        keepInView: () => moved++,
+        endReveal: () => {},
+        setLiveMarks: (m: typeof marks) => {
+          if (m) marks = m;
+        },
+      } as unknown as Chart,
+    };
+    act(() =>
+      root.render(
+        createElement(FollowSending, {
+          recorder: rec,
+          charWpm: WPM,
+          farnsworthWpm: WPM,
+          ideal,
+          handle,
+          follow: false,
+          grade: true,
+          onFinish: () => finished++,
+        }),
+      ),
+    );
+    for (let t = 0; t < mic.seconds + 1.5; t += 0.25) await wait(250);
+    expect(moved, "the chart stays where it is").toBe(0);
+    expect(finished, "and the take runs until it is stopped").toBe(0);
+    expect(marks!.reached).toBe(ideal.chars.length);
   }, 20_000);
 });

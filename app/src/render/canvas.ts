@@ -10,7 +10,7 @@
  * (a click).
  */
 
-import type { Block, Review, ReviewSettings } from "@/types";
+import type { Block, Char, Review, ReviewSettings } from "@/types";
 import {
   DRAG_SLOP,
   GUTTER,
@@ -44,6 +44,7 @@ import {
   trackBands,
   type GutterName,
   type Lane,
+  type LiveMark,
   type Scene,
   type Viewport,
 } from "./scene";
@@ -163,6 +164,13 @@ export interface Chart {
   /** Stop following: give up any scroll past the end that `reveal` took, so
    *  the view is back in its frame. */
   endReveal(): void;
+  /** Mark the target's characters as a running take reaches them: `reached`
+   *  of `chars` begun, and a verdict on each of the first `graded.length`.
+   *  `chars` are the target's own, as the chart draws them. Null clears the
+   *  marks. */
+  setLiveMarks(
+    live: { chars: readonly Char[]; reached: number; graded: readonly boolean[] } | null,
+  ): void;
   /** Where the view currently sits, in content pixels.
    *
    * Read-only and purely diagnostic: the scroll is owned here because it moves
@@ -257,6 +265,8 @@ export function createChart(
   let glide = 0;
   /** How far past the end `reveal` has taken the view, in content pixels. */
   let overscroll = 0;
+  /** The target characters a running take has reached. */
+  let liveMarks: Map<Char, LiveMark> | null = null;
   /** Where a running glide is headed, so a check made during it is made
    *  against where the view will be. */
   let heading: number | null = null;
@@ -317,6 +327,7 @@ export function createChart(
       focus: input.focus,
       playhead,
       range: timesOf(pending ?? input.range ?? null),
+      liveMarks,
       driftMax,
       leadSec,
       charMarkers: input.settings.charMarkers,
@@ -1008,6 +1019,22 @@ export function createChart(
       const x1 = timeToX(layout, t1, side);
       if (x0 >= at && x1 <= at + v.trackW) return;
       this.reveal(t0, side);
+    },
+
+    setLiveMarks(live) {
+      if (!live) {
+        if (!liveMarks) return;
+        liveMarks = null;
+        paint();
+        return;
+      }
+      const next = new Map<Char, LiveMark>();
+      for (let i = 0; i < live.reached && i < live.chars.length; i++) {
+        const verdict = live.graded[i];
+        next.set(live.chars[i]!, verdict === undefined ? "pending" : verdict ? "right" : "wrong");
+      }
+      liveMarks = next;
+      paint();
     },
 
     endReveal() {

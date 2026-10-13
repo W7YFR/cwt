@@ -203,6 +203,28 @@ export interface Scene {
   range?: PlayRange | null;
   /** Filled in by draw(), read by the gutter: the drift axis bound. */
   driftMax?: number;
+  /** While a Plain take runs with Live grading on: a dot under each target
+   *  character begun, as Zen mode draws under its message. */
+  liveMarks?: ReadonlyMap<Char, LiveMark> | null;
+}
+
+/** A target character's state in a take that is running: begun, or read back
+ *  right or wrong. */
+export type LiveMark = "pending" | "right" | "wrong";
+
+/** A dot under a target character's name, centered on it. Text color until
+ *  the character is read back, then blue if right and red if wrong — Zen
+ *  mode's colors, so the two read the same. */
+function drawLiveMark(ctx: Ctx2D, scene: Scene, ch: Char, start: number): void {
+  const mark = scene.liveMarks?.get(ch);
+  if (!mark) return;
+  const C = scene.palette;
+  const r = 2.5;
+  const x = start + ctx.measureText(ch.char).width / 2;
+  const y = tgtCapY(scene) + 8;
+  ctx.fillStyle = mark === "right" ? C.you : mark === "wrong" ? C.bad : C.ink;
+  roundRect(ctx, x - r, y - r, 2 * r, 2 * r, r);
+  ctx.fill();
 }
 
 function roundRect(
@@ -504,6 +526,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
       ctx.fillStyle = C.ink;
       ctx.font = `600 12px ${C.mono}`;
       caption(ctx, ideal.char, bx, tgtCapY(scene));
+      drawLiveMark(ctx, scene, ideal, bx);
     }
 
     // Where the character starts, when the gaps arriving here disagree about
@@ -606,6 +629,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       ctx.fillStyle = C["ink-dim"];
       ctx.font = `600 11px ${C.mono}`;
       caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
+      drawLiveMark(ctx, scene, slot.ideal, it.ix);
     }
   }
 

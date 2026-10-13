@@ -391,6 +391,10 @@ export interface ReviewSettings {
    *  last letter of a word begins. Off, the chart does not scroll while you
    *  record. */
   plainFollow: boolean;
+  /** In Plain mode, a dot under each target character on the chart as it is
+   *  keyed: blue once read back right, red if wrong. Zen mode's Live grading,
+   *  on the chart. */
+  plainGrading: boolean;
   /** In Zen mode, color each character of the message as it starts to be
    *  keyed.
    *
