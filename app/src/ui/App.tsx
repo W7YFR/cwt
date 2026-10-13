@@ -14,6 +14,7 @@ import {
   loadPrefs,
   recallSelected,
   recallSession,
+  recallPracticing,
   recallTake,
   savePrefs,
 } from "@/io/storage";
@@ -112,7 +113,13 @@ export function App(): React.ReactElement {
            ordering is what is new; the takes themselves are stored the way
            they always were, so an old one still opens. */
         const saved = await recallTake();
-        if (!live || !saved) return;
+        if (!live) return;
+        /* The practice screen with nothing recorded in it yet: what Practice
+           opens, with the message it was opened with. */
+        if (!saved) {
+          if (recallPracticing()) take.reset({ expected: loadPrefs().expected ?? "" });
+          return;
+        }
         take.adopt(saved.take, await saved.audio.arrayBuffer(), {
           settings: saved.settings,
           // It came from storage; writing it straight back would copy a few

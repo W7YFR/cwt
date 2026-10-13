@@ -910,6 +910,35 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
   });
 
+  it("comes back to practice after a reload, with nothing recorded yet", async () => {
+    /* A reload is not a decision to leave. With nothing recorded there is no
+       session to restore, but the screen you were on still is. */
+    localStorage.setItem("cwt:prefs", JSON.stringify({ expected: "CQ DE W7YFR" }));
+    await mount();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
+    });
+    expect(container.querySelector("[data-testid='scores']")).not.toBeNull();
+
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
+    await reload();
+    expect(container.querySelector("[data-testid='practice']"), "not the landing screen").toBeNull();
+    expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank")).toBe("true");
+    expect(container.querySelector<HTMLInputElement>("#expected")!.value).toBe("CQ DE W7YFR");
+
+    // Leaving for the landing screen is a decision, and a reload keeps it.
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".brandmark")!.click();
+    });
+    await reload();
+    expect(container.querySelector("[data-testid='practice']")).not.toBeNull();
+  });
+
   it("puts the repeat count beside the message, not under it", async () => {
     /* The message group claims a whole row by itself — it is the only control
        here whose useful width has no upper bound — so a small field after it

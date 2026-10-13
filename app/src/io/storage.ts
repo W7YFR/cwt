@@ -370,6 +370,10 @@ export interface Prefs {
    * them, not a second copy of them. Which also means a take outlives the
    * session it was recorded in, and a history view can still find it. */
   session?: { ids: string[]; selected: number };
+  /** The practice screen was open with nothing recorded in it, so a reload
+   *  opens it again rather than the landing screen. A session, when there is
+   *  one, comes back instead. */
+  practicing?: boolean;
   /** Calibration's speed, from saves that hold no `charWpm`. Read by
    *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
@@ -526,6 +530,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   profileId: isStr,
   currentId: isStr,
   session: isSession,
+  practicing: isBool,
   keyerWpm: isNum,
   gainDb: isNum,
   tolerance: isNum,
@@ -703,6 +708,20 @@ export async function recallSession(): Promise<StoredTake[]> {
 /** Which attempt of the remembered session was being read. */
 export function recallSelected(): number {
   return loadPrefs().session?.selected ?? 0;
+}
+
+/** Say whether the practice screen is open with nothing recorded in it, so a
+ *  reload can come back to it. */
+export function rememberPracticing(on: boolean): void {
+  const next = { ...loadPrefs() };
+  if (on) next.practicing = true;
+  else delete next.practicing;
+  savePrefs(next);
+}
+
+/** Whether the practice screen was open with nothing recorded in it. */
+export function recallPracticing(): boolean {
+  return loadPrefs().practicing === true;
 }
 
 /** Stop coming back to the current take.

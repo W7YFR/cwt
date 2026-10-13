@@ -25,6 +25,10 @@ nothing to the site. The next release carries them.
 - The **Your sending** and **Target** buttons, the stop button above the chart and the playback clock. Play and stop a track from the chart, or press space or T.
 - The flash card and **Word preview**.
 
+### Fixed
+
+- A reload on the practice screen, before anything is recorded, stays on the practice screen. It no longer goes back to the start screen.
+
 ## v1.6.0 — 2026-10-13
 
 ### Added

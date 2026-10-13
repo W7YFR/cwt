@@ -25,6 +25,7 @@ import {
 import { profileForSource, type Profile } from "@/io/profiles";
 import {
   forgetCurrentTake,
+  rememberPracticing,
   loadPrefs,
   loadSpeed,
   rememberSettings,
@@ -572,10 +573,11 @@ export function useTake(): TakeState {
     takeIdRef.current = null;
     settingsRef.current = s;
     setSettingsRaw(s);
-    /* Deliberately not remembered. There is nothing in it to come back to, and
-       a reload should land on the landing screen rather than on an empty
-       review somebody has to work out how to leave. */
+    /* No take to come back to, since there is nothing in it. But the screen
+       is: a reload while practicing opens practice again, not the landing
+       screen. */
     forgetCurrentTake();
+    rememberPracticing(true);
   }, []);
 
   const clear = useCallback(() => {
@@ -587,6 +589,7 @@ export function useTake(): TakeState {
     // away — but a reload should now land on the landing screen, because that
     // is where this click put you.
     forgetCurrentTake();
+    rememberPracticing(false);
   }, []);
 
   /* Every attempt, graded against the same target at the same settings.
