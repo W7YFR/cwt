@@ -44,6 +44,7 @@ import {
   ZEN_MODE_HELP,
   ZEN_PACING_HELP,
   ZEN_PROGRESS_HELP,
+  ZEN_GRADING_HELP,
   PACE_LEAD_HELP,
   BREAK_HELP,
   REPEAT_PAUSE_HELP,
@@ -642,6 +643,22 @@ export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElemen
                       onChange={(e) => onChange({ zenProgress: e.target.checked })}
                     />{" "}
                     Live progress
+                  </label>
+                </div>
+              )}
+
+              {/* Only with Live progress on: grading reads the same live
+                  decode. */}
+              {s.zenMode && s.zenProgress && (
+                <div className="group">
+                  <label className="check" title={ZEN_GRADING_HELP}>
+                    <input
+                      type="checkbox"
+                      id="zen-grading"
+                      checked={s.zenGrading}
+                      onChange={(e) => onChange({ zenGrading: e.target.checked })}
+                    />{" "}
+                    Live grading
                   </label>
                 </div>
               )}

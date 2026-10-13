@@ -1487,6 +1487,24 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 .zenpass { margin: 0; }
 /* Keyed, with Live progress on. The blue the chart draws your sending in. */
 .zenkeyed { color: var(--you); }
+/* With Live grading on, a dot under the character: the text color until it
+   has been read back, then blue if right and red if wrong. Out of the flow and
+   sized in em, so it moves nothing and the measured fit still holds. The space
+   between lines has room for it. */
+.zenpending, .zenright, .zenwrong { position: relative; }
+.zenpending::after, .zenright::after, .zenwrong::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.08em;
+  width: 0.12em;
+  height: 0.12em;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+}
+.zenright::after { background: var(--you); }
+.zenwrong::after { background: var(--bad); }
 .zennothing {
   margin: 0;
   font-size: 15px;

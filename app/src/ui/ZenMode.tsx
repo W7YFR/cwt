@@ -54,9 +54,27 @@ export interface ZenModeProps {
    *  finishes itself once the last one has been read. Absent, the message
    *  stays one color and the take runs until it is stopped. */
   readonly live?: LiveSource | null | undefined;
+  /** With **Live grading** on, a dot under each character started: pending
+   *  until it has been read back, then right or wrong. Needs `live`. */
+  readonly grade?: boolean | undefined;
   onFinish(): void;
   onRestart(): void;
   onDiscard(): void;
+}
+
+/** The class a character of the message is drawn with once it has been
+ *  started. Ungraded, it turns blue. Graded, the letter keeps its color and a
+ *  dot under it shows the progress instead: pending until the character has
+ *  been read back, then right or wrong. */
+function shade(
+  at: number,
+  reached: number,
+  graded: readonly boolean[] | null,
+): string | undefined {
+  if (at >= reached) return undefined;
+  if (!graded) return "zenkeyed";
+  if (at >= graded.length) return "zenpending";
+  return graded[at] ? "zenright" : "zenwrong";
 }
 
 export function ZenMode({
@@ -66,6 +84,7 @@ export function ZenMode({
   level,
   busy,
   live = null,
+  grade = false,
   onFinish,
   onRestart,
   onDiscard,
@@ -201,7 +220,7 @@ export function ZenMode({
                       p.at < 0 ? (
                         p.text
                       ) : (
-                        <span key={i} className={p.at < reached ? "zenkeyed" : undefined}>
+                        <span key={i} className={shade(p.at, reached, grade ? graded : null)}>
                           {p.text}
                         </span>
                       ),

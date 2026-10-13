@@ -393,6 +393,10 @@ export interface ReviewSettings {
    * Progress only: a wrong character is never marked as wrong. Saved with
    * the other aids, because it does nothing until Zen mode is on. */
   zenProgress: boolean;
+  /** With Live progress on, a dot under each character started. It turns
+   *  blue or red once the character has been read back, by whether it was
+   *  sent right. */
+  zenGrading: boolean;
   /** Show the next character to send, large, with a countdown to it. */
   flashCard: boolean;
   /** Spell the word being sent under the card, greening each letter as it

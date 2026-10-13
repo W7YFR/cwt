@@ -93,6 +93,11 @@ export const ZEN_PROGRESS_HELP =
   "see where you are. The take stops itself once the last character has " +
   "been read.";
 
+export const ZEN_GRADING_HELP =
+  "Put a dot under each character you key, in place of coloring the letters. " +
+  "It turns blue once the character is read back right, and red if it was " +
+  "wrong or left out.";
+
 export const ZEN_PACING_HELP =
   "Not while Zen mode is on: one puts a beat in front of you, the other " +
   "takes the page away.";

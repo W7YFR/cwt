@@ -581,6 +581,18 @@ describe("controls", () => {
     expect(onChange).toHaveBeenCalledWith({ zenProgress: true });
   });
 
+  it("offers live grading only with live progress on", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderView({ onChange, open: true });
+    rerender(view({ zenMode: true, zenProgress: false }, onChange));
+    expect(screen.queryByLabelText(/live grading/i)).toBeNull();
+
+    rerender(view({ zenMode: true, zenProgress: true }, onChange));
+    await user.click(screen.getByLabelText(/live grading/i));
+    expect(onChange).toHaveBeenCalledWith({ zenGrading: true });
+  });
+
   it("offers nothing that makes the card flash", async () => {
     /* The card used to strobe on the beat, with a dial for how far ahead. A
        bright flash several times a second is a hazard for anyone

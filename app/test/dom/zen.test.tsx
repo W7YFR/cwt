@@ -263,7 +263,7 @@ describe("live progress on the zen sheet", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  function sheet(live: boolean, onFinish = vi.fn()) {
+  function sheet(live: boolean, grade = false, onFinish = vi.fn()) {
     return render(
       <ZenMode
         message="CQ <SK>"
@@ -272,6 +272,7 @@ describe("live progress on the zen sheet", () => {
         level={0}
         busy={false}
         live={live ? { recorder, charWpm: 20, farnsworthWpm: 20 } : null}
+        grade={grade}
         onFinish={onFinish}
         onRestart={vi.fn()}
         onDiscard={vi.fn()}
@@ -333,9 +334,29 @@ describe("live progress on the zen sheet", () => {
     expect(keyed()).toEqual([]);
   });
 
+  it("grades a character once it is read back, with grading on", () => {
+    sheet(true, true);
+    FakeWorker.last!.reply(4, "+x+");
+    expect(drawn("zenright")).toEqual(["C", "<SK>"]);
+    expect(drawn("zenwrong")).toEqual(["Q"]);
+    // The one being keyed is not known yet.
+    expect(drawn("zenpending")).toEqual(["C"]);
+    // The letters keep their color: the dots are the whole of it.
+    expect(keyed()).toEqual([]);
+  });
+
+  it("keeps every character blue with grading off", () => {
+    sheet(true, false);
+    FakeWorker.last!.reply(4, "+x+");
+    expect(drawn("zenright")).toEqual([]);
+    expect(drawn("zenwrong")).toEqual([]);
+    expect(drawn("zenpending")).toEqual([]);
+    expect(keyed()).toEqual(["C", "Q", "<SK>", "C"]);
+  });
+
   it("finishes the take once the last character is read back", () => {
     const onFinish = vi.fn();
-    sheet(true, onFinish);
+    sheet(true, false, onFinish);
     FakeWorker.last!.reply(6, "+++++");
     expect(onFinish, "the last character is still being keyed").not.toHaveBeenCalled();
     FakeWorker.last!.reply(6, "++++++");
@@ -349,7 +370,7 @@ describe("live progress on the zen sheet", () => {
     vi.useFakeTimers();
     try {
       const onFinish = vi.fn();
-      sheet(true, onFinish);
+      sheet(true, false, onFinish);
       FakeWorker.last!.reply(6, "++++++");
       restarts = 1;
       act(() => vi.advanceTimersByTime(200));
@@ -362,7 +383,7 @@ describe("live progress on the zen sheet", () => {
 
   it("never finishes a take without live progress", () => {
     const onFinish = vi.fn();
-    sheet(false, onFinish);
+    sheet(false, false, onFinish);
     expect(onFinish).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Live progress**, under **Zen mode**, turns each character of the message blue as you start to key it. The take stops itself once the last character has been read.
+- **Live grading**, under **Live progress**, puts a dot under each character you key, in place of the blue letters. The dot turns blue if you sent the character right and red if not.
 
 ### Changed
 

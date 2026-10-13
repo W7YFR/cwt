@@ -154,6 +154,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     wordPreview: p.wordPreview ?? base.wordPreview,
     zenMode: p.zenMode ?? base.zenMode,
     zenProgress: p.zenProgress ?? base.zenProgress,
+    zenGrading: p.zenGrading ?? base.zenGrading,
     runSort: (p.runSort as ReviewSettings["runSort"]) ?? base.runSort,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
   };
@@ -183,6 +184,7 @@ function personal(prev: ReviewSettings) {
     captionAll: prev.captionAll,
     zenMode: prev.zenMode,
     zenProgress: prev.zenProgress,
+    zenGrading: prev.zenGrading,
     flashCard: prev.flashCard,
     wordPreview: prev.wordPreview,
     runSort: prev.runSort,
@@ -251,6 +253,7 @@ export function useTake(): TakeState {
       captionAll: false,
       zenMode: false,
       zenProgress: false,
+      zenGrading: false,
       flashCard: false,
       wordPreview: false,
       runSort: "oldest",
@@ -336,6 +339,7 @@ export function useTake(): TakeState {
         wordPreview: next.wordPreview,
         zenMode: next.zenMode,
         zenProgress: next.zenProgress,
+        zenGrading: next.zenGrading,
         runSort: next.runSort,
         view: next.view,
       });

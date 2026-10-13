@@ -998,6 +998,7 @@ export function ReviewScreen({
                 }
               : null
           }
+          grade={settings.zenGrading}
           onFinish={() => void rec.finish()}
           onRestart={rec.restart}
           onDiscard={() => void rec.discard()}

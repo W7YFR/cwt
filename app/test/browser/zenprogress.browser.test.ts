@@ -80,7 +80,7 @@ const wait = (ms: number) =>
   });
 
 describe("live progress", () => {
-  it("colors the message as it is keyed, and stops at its end", async () => {
+  it("colors and grades the message as it is keyed, and stops at its end", async () => {
     recorder = await startRecording();
     const rec = recorder;
     let finished = 0;
@@ -93,6 +93,7 @@ describe("live progress", () => {
           level: 0,
           busy: false,
           live: { recorder: rec, charWpm: WPM, farnsworthWpm: WPM },
+          grade: true,
           onFinish: () => finished++,
           onRestart: () => {},
           onDiscard: () => {},
@@ -100,7 +101,8 @@ describe("live progress", () => {
       ),
     );
 
-    const keyed = () => host.querySelectorAll(".zenkeyed").length;
+    // Started, or read back: anything colored.
+    const keyed = () => host.querySelectorAll(".zenkeyed, .zenright, .zenwrong").length;
     const seen: number[] = [];
     const until = mic.seconds + 1.5;
     for (let t = 0; t < until; t += 0.25) {
@@ -112,6 +114,85 @@ describe("live progress", () => {
     expect(seen[seen.length - 1], `counts seen: ${seen.join(" ")}`).toBe(9);
     // On the way, not all at the end.
     expect(seen.some((n) => n > 0 && n < 9), `counts seen: ${seen.join(" ")}`).toBe(true);
+    const right = host.querySelectorAll<HTMLElement>(".zenright");
+    expect(right.length, "every character right").toBe(9);
+    // The verdict is a dot under the character, in the theme's blue. The
+    // letter itself keeps the text color.
+    const dot = getComputedStyle(right[0]!, "::after");
+    const blue = getComputedStyle(document.documentElement).getPropertyValue("--you").trim();
+    const probe = document.createElement("span");
+    probe.style.color = blue;
+    document.body.append(probe);
+    const blueRgb = getComputedStyle(probe).color;
+    probe.remove();
+    expect(parseFloat(dot.width), "a dot is drawn").toBeGreaterThan(0);
+    expect(dot.backgroundColor).toBe(blueRgb);
+    expect(getComputedStyle(right[0]!).color).not.toBe(blueRgb);
+    // The message is sized to fill the sheet. The dots must not push it over.
+    const text = host.querySelector<HTMLElement>(".zenmessage")!;
+    expect(text.scrollHeight, "the dots add no scroll").toBeLessThanOrEqual(text.clientHeight + 1);
     expect(finished, "the take finished itself, once").toBe(1);
   }, 20_000);
+});
+
+describe("the grading dots", () => {
+  it("fit under every line when the passes fill the sheet", async () => {
+    /* Eight passes, so the type is as large as the height allows and the last
+       line sits at the bottom of the box. A stand-in worker grades every
+       character at once. */
+    const posted: Array<{ type: string; gen?: number; target?: string[] }> = [];
+    let answer: ((ev: { data: unknown }) => void) | null = null;
+    class Graded {
+      set onmessage(fn: (ev: { data: unknown }) => void) {
+        answer = fn;
+      }
+      postMessage(msg: { type: string }) {
+        posted.push(msg);
+      }
+      terminate() {}
+    }
+    const real = window.Worker;
+    (window as unknown as { Worker: unknown }).Worker = Graded;
+    try {
+      recorder = await startRecording();
+      const rec = recorder;
+      act(() =>
+        root.render(
+          createElement(ZenMode, {
+            message: "CQ CQ DE W7YFR K",
+            times: 8,
+            elapsed: () => 0,
+            level: 0,
+            busy: false,
+            live: { recorder: rec, charWpm: WPM, farnsworthWpm: WPM },
+            grade: true,
+            onFinish: () => {},
+            onRestart: () => {},
+            onDiscard: () => {},
+          }),
+        ),
+      );
+      await wait(100);
+      const start = posted.find((m) => m.type === "start")!;
+      const n = start.target!.length;
+      // All but the last right, the last wrong: both kinds of dot drawn.
+      const graded = Array.from({ length: n }, (_, i) => i < n - 1);
+      act(() => answer!({ data: { gen: start.gen, reached: n, graded } }));
+      await wait(50);
+
+      expect(host.querySelectorAll(".zenright").length).toBe(n - 1);
+      expect(host.querySelectorAll(".zenwrong").length).toBe(1);
+      const text = host.querySelector<HTMLElement>(".zenmessage")!;
+      expect(text.scrollHeight, "the dots add no scroll").toBeLessThanOrEqual(
+        text.clientHeight + 1,
+      );
+      // And the last dot is inside the box.
+      const last = host.querySelector<HTMLElement>(".zenwrong")!;
+      const dotBottom = last.getBoundingClientRect().bottom
+        - parseFloat(getComputedStyle(last, "::after").bottom);
+      expect(dotBottom).toBeLessThanOrEqual(text.getBoundingClientRect().bottom + 1);
+    } finally {
+      (window as unknown as { Worker: unknown }).Worker = real;
+    }
+  });
 });
