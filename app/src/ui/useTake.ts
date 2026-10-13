@@ -152,6 +152,9 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     captionAll: p.captionAll ?? base.captionAll,
     flashCard: p.flashCard ?? base.flashCard,
     wordPreview: p.wordPreview ?? base.wordPreview,
+    zenMode: p.zenMode ?? base.zenMode,
+    zenProgress: p.zenProgress ?? base.zenProgress,
+    zenGrading: p.zenGrading ?? base.zenGrading,
     runSort: (p.runSort as ReviewSettings["runSort"]) ?? base.runSort,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
   };
@@ -180,6 +183,8 @@ function personal(prev: ReviewSettings) {
     showRuns: prev.showRuns,
     captionAll: prev.captionAll,
     zenMode: prev.zenMode,
+    zenProgress: prev.zenProgress,
+    zenGrading: prev.zenGrading,
     flashCard: prev.flashCard,
     wordPreview: prev.wordPreview,
     runSort: prev.runSort,
@@ -247,6 +252,8 @@ export function useTake(): TakeState {
          it are the thing being compared. */
       captionAll: false,
       zenMode: false,
+      zenProgress: false,
+      zenGrading: false,
       flashCard: false,
       wordPreview: false,
       runSort: "oldest",
@@ -330,6 +337,9 @@ export function useTake(): TakeState {
         captionAll: next.captionAll,
         flashCard: next.flashCard,
         wordPreview: next.wordPreview,
+        zenMode: next.zenMode,
+        zenProgress: next.zenProgress,
+        zenGrading: next.zenGrading,
         runSort: next.runSort,
         view: next.view,
       });
@@ -524,15 +534,9 @@ export function useTake(): TakeState {
          preferences. A snapshot saved with a take can be older than they are,
          and lacks any setting added since. */
       const kept = entries[pick]?.settings ?? entries[entries.length - 1]?.settings;
-      /* Zen mode is the exception, and coming back is exactly when it matters:
-         it takes the whole page away on the next record, and a session restored
-         from a tab closed last week would do that with nothing on screen
-         connecting it to a box ticked then. Every other setting is worth
-         waking up in; this one is chosen for the sitting. */
       const next = {
         ...(kept ?? openingSettings(lanes[pick]!.take, settingsRef.current)),
         ...personal(settingsRef.current),
-        zenMode: false,
       };
       settingsRef.current = next;
       setSettingsRaw(next);

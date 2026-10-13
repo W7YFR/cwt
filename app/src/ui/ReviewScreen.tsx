@@ -989,6 +989,16 @@ export function ReviewScreen({
           elapsed={liveClock}
           level={rec.level}
           busy={rec.busy}
+          live={
+            settings.zenProgress && rec.recorder
+              ? {
+                  recorder: rec.recorder,
+                  charWpm: settings.charWpm,
+                  farnsworthWpm: settings.farnsworthWpm,
+                }
+              : null
+          }
+          grade={settings.zenGrading}
           onFinish={() => void rec.finish()}
           onRestart={rec.restart}
           onDiscard={() => void rec.discard()}

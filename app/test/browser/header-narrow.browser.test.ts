@@ -62,6 +62,9 @@ const RUNNING: RecorderHandle = {
   recorder: {
     elapsed: () => 6.4,
     peek: () => new Float32Array(0),
+    rate: 48000,
+    since: () => new Float32Array(0),
+    restarts: () => 0,
     stop: async () => ({ samples: new Float32Array(0), rate: 8000, peak: 0 }),
     restart: () => {},
     cancel: async () => {},

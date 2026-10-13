@@ -185,6 +185,9 @@ describe("the zen sheet", () => {
       const handle = {
         elapsed: () => 0,
         peek: () => new Float32Array(0),
+        rate: 48000,
+        since: () => new Float32Array(0),
+        restarts: () => 0,
         stop: vi.fn().mockResolvedValue({ samples: new Float32Array(1), rate: 8000 }),
         cancel: vi.fn().mockResolvedValue(undefined),
         restart: vi.fn(),
@@ -217,5 +220,172 @@ describe("the zen sheet", () => {
       });
       await waitFor(() => expect(handle[called]).toHaveBeenCalled(), SETTLE);
     });
+  });
+});
+
+describe("live progress on the zen sheet", () => {
+  /** Stands in for the decode worker. The test answers for it. */
+  class FakeWorker {
+    static last: FakeWorker | null = null;
+    onmessage: ((ev: { data: unknown }) => void) | null = null;
+    sent: Array<{ type: string; gen?: number; target?: string[] }> = [];
+    constructor() {
+      FakeWorker.last = this;
+    }
+    postMessage(msg: { type: string }) {
+      this.sent.push(msg);
+    }
+    terminate() {}
+    /** `graded` as a string: + right, x wrong. */
+    reply(reached: number, graded = "", done = false) {
+      const gen = this.sent.filter((m) => m.type === "start").at(-1)!.gen;
+      const verdicts = Array.from(graded, (c) => c === "+");
+      act(() => this.onmessage?.({ data: { gen, reached, graded: verdicts, done } }));
+    }
+  }
+
+  let restarts = 0;
+  const recorder = {
+    elapsed: () => 0,
+    peek: () => new Float32Array(0),
+    rate: 48000,
+    since: () => new Float32Array(0),
+    restarts: () => restarts,
+    stop: vi.fn(),
+    restart: vi.fn(),
+    cancel: vi.fn(),
+  };
+
+  beforeEach(() => {
+    restarts = 0;
+    FakeWorker.last = null;
+    vi.stubGlobal("Worker", FakeWorker);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  function sheet(live: boolean, grade = false, onFinish = vi.fn()) {
+    return render(
+      <ZenMode
+        message="CQ <SK>"
+        times={2}
+        elapsed={() => 0}
+        level={0}
+        busy={false}
+        live={live ? { recorder, charWpm: 20, farnsworthWpm: 20 } : null}
+        grade={grade}
+        onFinish={onFinish}
+        onRestart={vi.fn()}
+        onDiscard={vi.fn()}
+      />,
+    );
+  }
+
+  const drawn = (cls: string) =>
+    Array.from(screen.getByTestId("zen-message").querySelectorAll(`.${cls}`)).map(
+      (el) => el.textContent,
+    );
+  const keyed = () => drawn("zenkeyed");
+
+  it("asks for every pass, a prosign as one character", () => {
+    sheet(true);
+    expect(FakeWorker.last!.sent[0]).toMatchObject({
+      type: "start",
+      target: ["C", "Q", "<SK>", "C", "Q", "<SK>"],
+    });
+  });
+
+  it("colors the characters reached, into the next pass", () => {
+    sheet(true);
+    expect(keyed()).toEqual([]);
+    FakeWorker.last!.reply(4);
+    expect(keyed()).toEqual(["C", "Q", "<SK>", "C"]);
+    // The text reads the same with the colors on.
+    expect(screen.getAllByText((_, el) => el?.className === "zenpass").map((p) => p.textContent))
+      .toEqual(["CQ <SK>", "CQ <SK>"]);
+  });
+
+  it("never takes a character back", () => {
+    sheet(true);
+    FakeWorker.last!.reply(3);
+    FakeWorker.last!.reply(2);
+    expect(keyed()).toEqual(["C", "Q", "<SK>"]);
+  });
+
+  it("starts over with the take", () => {
+    vi.useFakeTimers();
+    try {
+      sheet(true);
+      FakeWorker.last!.reply(3);
+      restarts = 1;
+      act(() => vi.advanceTimersByTime(200));
+      expect(keyed()).toEqual([]);
+      // A late answer about the take before is dropped.
+      const stale = FakeWorker.last!;
+      act(() => stale.onmessage?.({ data: { gen: 1, reached: 5, graded: [] } }));
+      expect(keyed()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts no worker with the option off", () => {
+    sheet(false);
+    expect(FakeWorker.last).toBeNull();
+    expect(keyed()).toEqual([]);
+  });
+
+  it("grades a character once it is read back, with grading on", () => {
+    sheet(true, true);
+    FakeWorker.last!.reply(4, "+x+");
+    expect(drawn("zenright")).toEqual(["C", "<SK>"]);
+    expect(drawn("zenwrong")).toEqual(["Q"]);
+    // The one being keyed is not known yet.
+    expect(drawn("zenpending")).toEqual(["C"]);
+    // The letters keep their color: the dots are the whole of it.
+    expect(keyed()).toEqual([]);
+  });
+
+  it("keeps every character blue with grading off", () => {
+    sheet(true, false);
+    FakeWorker.last!.reply(4, "+x+");
+    expect(drawn("zenright")).toEqual([]);
+    expect(drawn("zenwrong")).toEqual([]);
+    expect(drawn("zenpending")).toEqual([]);
+    expect(keyed()).toEqual(["C", "Q", "<SK>", "C"]);
+  });
+
+  it("finishes the take once the sender is done", () => {
+    const onFinish = vi.fn();
+    sheet(true, false, onFinish);
+    FakeWorker.last!.reply(6, "+++++");
+    expect(onFinish, "the last character is still being keyed").not.toHaveBeenCalled();
+    FakeWorker.last!.reply(6, "++++++");
+    expect(onFinish, "read back, but the wait is not over").not.toHaveBeenCalled();
+    FakeWorker.last!.reply(6, "++++++", true);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    // Once: a later pass that reads the same end does not finish it again.
+    FakeWorker.last!.reply(6, "+++++x", true);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("finishes again after a restart", () => {
+    vi.useFakeTimers();
+    try {
+      const onFinish = vi.fn();
+      sheet(true, false, onFinish);
+      FakeWorker.last!.reply(6, "++++++", true);
+      restarts = 1;
+      act(() => vi.advanceTimersByTime(200));
+      FakeWorker.last!.reply(6, "++++++", true);
+      expect(onFinish).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never finishes a take without live progress", () => {
+    const onFinish = vi.fn();
+    sheet(false, false, onFinish);
+    expect(onFinish).not.toHaveBeenCalled();
   });
 });

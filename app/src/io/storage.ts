@@ -398,6 +398,9 @@ export interface Prefs {
   captionAll?: boolean;
   flashCard?: boolean;
   wordPreview?: boolean;
+  zenMode?: boolean;
+  zenProgress?: boolean;
+  zenGrading?: boolean;
   runSort?: string;
   /** Who is sending, for drills that key your own details. */
   user?: Partial<UserInfo>;
@@ -549,6 +552,9 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   captionAll: isBool,
   flashCard: isBool,
   wordPreview: isBool,
+  zenMode: isBool,
+  zenProgress: isBool,
+  zenGrading: isBool,
   runSort: isStr,
   user: isUser,
   customDrills: isCustomDrills,

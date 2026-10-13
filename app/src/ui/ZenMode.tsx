@@ -16,10 +16,12 @@
  * spending the rest of the recording path already declines.
  */
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { CHAR_TO_MORSE, SYMBOL_RE } from "@/morse";
 import { passCount } from "@/timing";
 import { fmtElapsed } from "./format";
 import { LevelMeter } from "./Record";
+import { useLiveProgress, type LiveSource } from "./useLiveProgress";
 
 /** The type never goes below this, however many passes are asked for: past it
  *  the sheet stops being something you can read at a glance, which is the only
@@ -47,9 +49,32 @@ export interface ZenModeProps {
   readonly level: number;
   /** Analyzing the take just stopped — the same state that bars the button. */
   readonly busy: boolean;
+  /** Where to follow the take from, with **Live progress** on. Each character
+   *  of the message changes color as it starts to be keyed, and the take
+   *  finishes itself once the last one has been read. Absent, the message
+   *  stays one color and the take runs until it is stopped. */
+  readonly live?: LiveSource | null | undefined;
+  /** With **Live grading** on, a dot under each character started: pending
+   *  until it has been read back, then right or wrong. Needs `live`. */
+  readonly grade?: boolean | undefined;
   onFinish(): void;
   onRestart(): void;
   onDiscard(): void;
+}
+
+/** The class a character of the message is drawn with once it has been
+ *  started. Ungraded, it turns blue. Graded, the letter keeps its color and a
+ *  dot under it shows the progress instead: pending until the character has
+ *  been read back, then right or wrong. */
+function shade(
+  at: number,
+  reached: number,
+  graded: readonly boolean[] | null,
+): string | undefined {
+  if (at >= reached) return undefined;
+  if (!graded) return "zenkeyed";
+  if (at >= graded.length) return "zenpending";
+  return graded[at] ? "zenright" : "zenwrong";
 }
 
 export function ZenMode({
@@ -58,6 +83,8 @@ export function ZenMode({
   elapsed,
   level,
   busy,
+  live = null,
+  grade = false,
   onFinish,
   onRestart,
   onDiscard,
@@ -66,6 +93,42 @@ export function ZenMode({
      counts with — so the sheet and the audio cannot disagree about how many
      there are. */
   const passes = Array.from({ length: passCount(times) }, (_, i) => i);
+
+  /* Each pass as the parts it is drawn in. A part that can be keyed carries
+     its place in the whole take, counted across passes, which is what the
+     live count is a count of. Spaces and breaks carry none. */
+  const parts = useMemo(() => {
+    const one = message.match(SYMBOL_RE) ?? [];
+    let at = 0;
+    return passes.map(() =>
+      one.map((text) => ({ text, at: text in CHAR_TO_MORSE ? at++ : -1 })),
+    );
+    // `passes` is rebuilt every render; its length is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message, passes.length]);
+  const target = useMemo(
+    () => parts.flatMap((pass) => pass.filter((p) => p.at >= 0).map((p) => p.text)),
+    [parts],
+  );
+  const { reached, graded, done } = useLiveProgress(live, target);
+
+  /* The end of the message, read back: every character of every pass has a
+     verdict, and the key has stayed up a while after the last one. See
+     `END_QUIET_DITS` for how long, and why.
+
+     Once per take. A restart clears the verdicts, and that arms it again.
+     `onFinish` is held in a ref because the screen behind rebuilds it on
+     every render. */
+  const finish = useRef(onFinish);
+  finish.current = onFinish;
+  const finished = useRef(false);
+  const ended = live !== null && done;
+  useEffect(() => {
+    if (graded.length === 0) finished.current = false;
+    if (!ended || finished.current) return;
+    finished.current = true;
+    finish.current();
+  }, [ended, graded.length]);
   const box = useRef<HTMLDivElement>(null);
   const text = useRef<HTMLDivElement>(null);
   const clock = useRef<HTMLSpanElement>(null);
@@ -150,9 +213,19 @@ export function ZenMode({
           ref={text}
         >
           {message ? (
-            passes.map((_, at) => (
+            parts.map((pass, at) => (
               <p className="zenpass" key={at}>
-                {message}
+                {live
+                  ? pass.map((p, i) =>
+                      p.at < 0 ? (
+                        p.text
+                      ) : (
+                        <span key={i} className={shade(p.at, reached, grade ? graded : null)}>
+                          {p.text}
+                        </span>
+                      ),
+                    )
+                  : message}
               </p>
             ))
           ) : (

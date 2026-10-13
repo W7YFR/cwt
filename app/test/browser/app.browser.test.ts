@@ -882,11 +882,7 @@ const showDownloads = () => tickSetting("show-downloads");
     }
   });
 
-  it("asks for zen mode every sitting rather than remembering it", async () => {
-    /* It is the only setting on the page that takes the page away. Remembered
-       with the other aids, a box ticked days ago blanks the screen on the next
-       record and nothing on screen connects the two. Every other practice aid
-       is saved; this one is chosen. */
+  it("remembers zen mode across visits, like the other aids", async () => {
     await served();
     await mount();
 
@@ -900,21 +896,21 @@ const showDownloads = () => tickSetting("show-downloads");
     await act(async () => {
       zen().click();
     });
-    expect(zen().checked, "it is on for this sitting").toBe(true);
+    expect(zen().checked).toBe(true);
 
-    // Past the settings debounce, so anything that was going to be written has.
+    // Past the settings debounce, so the setting has been written.
     await act(async () => {
       await new Promise((res) => setTimeout(res, 600));
     });
-    expect(Object.keys(loadPrefs()), "nothing of it is saved").not.toContain("zenMode");
+    expect(loadPrefs().zenMode, "it is saved").toBe(true);
 
-    // And the next visit opens without it.
+    // And the next visit opens with it.
     act(() => root!.unmount());
     root = null;
     container.innerHTML = "";
     await mount();
     await open();
-    expect(zen().checked, "the next visit starts off").toBe(false);
+    expect(zen().checked, "the next visit starts on").toBe(true);
   });
 
   it("puts the repeat count beside the message, not under it", async () => {

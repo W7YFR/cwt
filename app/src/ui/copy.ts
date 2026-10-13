@@ -86,8 +86,17 @@ export const CHAR_MARKERS_HELP =
 export const ZEN_MODE_HELP =
   "While you record, the message alone on screen in large type, with the " +
   "clock and the way to stop. No beat and no count-in — the take ends when " +
-  "you say it does, so it cannot run with the paced aids. Off again next " +
-  "time you open the app.";
+  "you say it does, so it cannot run with the paced aids.";
+
+export const ZEN_PROGRESS_HELP =
+  "Color each character of the message as you start to key it, so you can " +
+  "see where you are. The take stops itself a second or so after the last " +
+  "character, so you still have a chance to send it again.";
+
+export const ZEN_GRADING_HELP =
+  "Put a dot under each character you key, in place of coloring the letters. " +
+  "It turns blue once the character is read back right, and red if it was " +
+  "wrong or left out.";
 
 export const ZEN_PACING_HELP =
   "Not while Zen mode is on: one puts a beat in front of you, the other " +
