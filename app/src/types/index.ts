@@ -385,12 +385,7 @@ export interface ReviewSettings {
    * sending, large, and the way to stop. Mutually exclusive with pacing, which
    * is the whole point of it.
    *
-   * Deliberately NOT saved with the other aids. It is the only setting on the
-   * page that takes the page away, and one that had been remembered from some
-   * earlier visit would blank the screen on a record nobody connected to a
-   * checkbox they ticked days ago. Chosen for the sitting you are in — it
-   * carries from take to take within one, so a zen session is not a box to
-   * re-tick after every attempt. */
+   * Saved with the other aids, so a reload keeps it. */
   zenMode: boolean;
   /** In Zen mode, color each character of the message as it starts to be
    *  keyed.

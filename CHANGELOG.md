@@ -11,6 +11,10 @@ nothing to the site. The next release carries them.
 
 - **Live progress**, under **Zen mode**, turns each character of the message blue as you start to key it. The take stops itself once the last character has been read.
 
+### Changed
+
+- **Zen mode** stays on when you reload the page or come back later.
+
 ### Development
 
 - `source-map-js` is updated to 1.2.2, which fixes an `npm audit` warning.
