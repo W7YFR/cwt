@@ -22,7 +22,7 @@ export interface LiveSource {
   readonly farnsworthWpm: number;
 }
 
-const NONE: Progress = { reached: 0, graded: [] };
+const NONE: Progress = { reached: 0, graded: [], done: false };
 
 /** How far the sender has got, or nothing with no source.
  *
@@ -76,14 +76,14 @@ export function useLiveProgress(
 
     worker.onmessage = (ev: MessageEvent<LiveReached>) => {
       if (ev.data.gen !== gen) return;
-      const { graded } = ev.data;
+      const { graded, done } = ev.data;
       best = Math.max(best, ev.data.reached);
       const reached = best;
       // Most passes change nothing, and a render per pass would be for nothing.
-      const now = `${reached}:${graded.map((ok) => (ok ? 1 : 0)).join("")}`;
+      const now = `${reached}:${graded.map((ok) => (ok ? 1 : 0)).join("")}:${done}`;
       if (now === shown) return;
       shown = now;
-      setProgress({ reached, graded });
+      setProgress({ reached, graded, done });
     };
 
     begin();

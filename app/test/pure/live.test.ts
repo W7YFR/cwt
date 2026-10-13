@@ -12,7 +12,14 @@ import { DATA_DIR } from "../oracle-fs";
 import { readWav } from "../wav";
 import { keyingPlan, synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
-import { Decimator, LiveFollower, graded, keyedSymbols } from "@/timing/live";
+import {
+  Decimator,
+  END_QUIET_DITS,
+  END_QUIET_SEC,
+  LiveFollower,
+  graded,
+  keyedSymbols,
+} from "@/timing/live";
 
 describe("grading what has been sent", () => {
   const CQ = keyedSymbols("CQ DE W7YFR");
@@ -214,5 +221,45 @@ describe("grading a take as it is sent", () => {
     const at = f.step();
     expect(at.graded.length).toBe(7);
     expect(at.reached).toBe(8);
+  });
+});
+
+describe("the end of the message", () => {
+  /* The last character is read back after a character gap. The take is done
+     only once the key has stayed up four dits and a second after it, so the
+     sender still has a chance to send it again. */
+  it("waits after the last character before it is done", () => {
+    const timing = targetTiming(20, 20);
+    const { samples, rate } = synthesize("CQ DE W7YFR", timing, { rate: 48000, padSec: 0 });
+    const f = new LiveFollower(rate, keyedSymbols("CQ DE W7YFR"), timing);
+    f.push(samples);
+
+    const wait = END_QUIET_DITS * timing.unitSec + END_QUIET_SEC;
+    const quiet = (sec: number) => f.push(new Float32Array(Math.round(sec * rate)));
+
+    quiet(timing.unitSec * 3);
+    const read = f.step();
+    expect(read.graded.length, "the last character is read back").toBe(9);
+    expect(read.done, "but the take is not done").toBe(false);
+
+    quiet(wait - timing.unitSec * 3 - 0.1);
+    expect(f.step().done, "just before the wait is over").toBe(false);
+    quiet(0.2);
+    expect(f.step().done, "once the wait is over").toBe(true);
+  });
+
+  it("starts the wait over when the sender keys again", () => {
+    const timing = targetTiming(20, 20);
+    const { samples, rate } = synthesize("CQ DE W7YFR", timing, { rate: 48000, padSec: 0 });
+    const f = new LiveFollower(rate, keyedSymbols("CQ DE W7YFR"), timing);
+    f.push(samples);
+    f.push(new Float32Array(Math.round(0.8 * rate)));
+    // Sends the R again, part way through the wait.
+    const r = synthesize("R", timing, { rate: 48000, padSec: 0 }).samples;
+    f.push(r);
+    f.push(new Float32Array(Math.round(0.8 * rate)));
+    expect(f.step().done, "less than the wait since the second R").toBe(false);
+    f.push(new Float32Array(Math.round(0.6 * rate)));
+    expect(f.step().done).toBe(true);
   });
 });

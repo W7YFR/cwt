@@ -104,7 +104,8 @@ describe("live progress", () => {
     // Started, or read back: anything colored.
     const keyed = () => host.querySelectorAll(".zenkeyed, .zenright, .zenwrong").length;
     const seen: number[] = [];
-    const until = mic.seconds + 1.5;
+    // Past the end, and past the wait after it.
+    const until = mic.seconds + 2.5;
     for (let t = 0; t < until; t += 0.25) {
       await wait(250);
       seen.push(keyed());

@@ -110,11 +110,11 @@ export function ZenMode({
     () => parts.flatMap((pass) => pass.filter((p) => p.at >= 0).map((p) => p.text)),
     [parts],
   );
-  const { reached, graded } = useLiveProgress(live, target);
+  const { reached, graded, done } = useLiveProgress(live, target);
 
   /* The end of the message, read back: every character of every pass has a
-     verdict, so the key has been up for a character gap after the last one.
-     There is nothing left to send, and nothing left to wait for.
+     verdict, and the key has stayed up a while after the last one. See
+     `END_QUIET_DITS` for how long, and why.
 
      Once per take. A restart clears the verdicts, and that arms it again.
      `onFinish` is held in a ref because the screen behind rebuilds it on
@@ -122,7 +122,7 @@ export function ZenMode({
   const finish = useRef(onFinish);
   finish.current = onFinish;
   const finished = useRef(false);
-  const ended = live !== null && target.length > 0 && graded.length >= target.length;
+  const ended = live !== null && done;
   useEffect(() => {
     if (graded.length === 0) finished.current = false;
     if (!ended || finished.current) return;

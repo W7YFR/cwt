@@ -237,10 +237,10 @@ describe("live progress on the zen sheet", () => {
     }
     terminate() {}
     /** `graded` as a string: + right, x wrong. */
-    reply(reached: number, graded = "") {
+    reply(reached: number, graded = "", done = false) {
       const gen = this.sent.filter((m) => m.type === "start").at(-1)!.gen;
       const verdicts = Array.from(graded, (c) => c === "+");
-      act(() => this.onmessage?.({ data: { gen, reached, graded: verdicts } }));
+      act(() => this.onmessage?.({ data: { gen, reached, graded: verdicts, done } }));
     }
   }
 
@@ -354,15 +354,17 @@ describe("live progress on the zen sheet", () => {
     expect(keyed()).toEqual(["C", "Q", "<SK>", "C"]);
   });
 
-  it("finishes the take once the last character is read back", () => {
+  it("finishes the take once the sender is done", () => {
     const onFinish = vi.fn();
     sheet(true, false, onFinish);
     FakeWorker.last!.reply(6, "+++++");
     expect(onFinish, "the last character is still being keyed").not.toHaveBeenCalled();
     FakeWorker.last!.reply(6, "++++++");
+    expect(onFinish, "read back, but the wait is not over").not.toHaveBeenCalled();
+    FakeWorker.last!.reply(6, "++++++", true);
     expect(onFinish).toHaveBeenCalledTimes(1);
     // Once: a later pass that reads the same end does not finish it again.
-    FakeWorker.last!.reply(6, "+++++x");
+    FakeWorker.last!.reply(6, "+++++x", true);
     expect(onFinish).toHaveBeenCalledTimes(1);
   });
 
@@ -371,10 +373,10 @@ describe("live progress on the zen sheet", () => {
     try {
       const onFinish = vi.fn();
       sheet(true, false, onFinish);
-      FakeWorker.last!.reply(6, "++++++");
+      FakeWorker.last!.reply(6, "++++++", true);
       restarts = 1;
       act(() => vi.advanceTimersByTime(200));
-      FakeWorker.last!.reply(6, "++++++");
+      FakeWorker.last!.reply(6, "++++++", true);
       expect(onFinish).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();

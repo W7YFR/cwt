@@ -90,8 +90,8 @@ export const ZEN_MODE_HELP =
 
 export const ZEN_PROGRESS_HELP =
   "Color each character of the message as you start to key it, so you can " +
-  "see where you are. The take stops itself once the last character has " +
-  "been read.";
+  "see where you are. The take stops itself a second or so after the last " +
+  "character, so you still have a chance to send it again.";
 
 export const ZEN_GRADING_HELP =
   "Put a dot under each character you key, in place of coloring the letters. " +

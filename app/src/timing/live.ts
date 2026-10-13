@@ -84,6 +84,8 @@ export interface Sent {
   /** The elements of the character still being keyed, or null when the key
    *  has been up for a character gap. */
   readonly keying: string | null;
+  /** How long the key has been up since the last element, in seconds. */
+  readonly quietSec: number;
   /** The tone this pass decoded at. */
   readonly toneHz: number;
 }
@@ -98,7 +100,7 @@ export function sentSymbols(
   timing: Timing,
   toneHz?: number,
 ): Sent {
-  const none = { symbols: [], keying: null, toneHz: toneHz ?? 0 };
+  const none = { symbols: [], keying: null, quietSec: 0, toneHz: toneHz ?? 0 };
   if (samples.length === 0) return none;
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {
@@ -118,10 +120,12 @@ export function sentSymbols(
 
   let end = 0;
   for (const s of segments) end += s[1];
-  const done = end - last.t1 >= timing.elementCharSplit;
+  const quietSec = end - last.t1;
+  const done = quietSec >= timing.elementCharSplit;
   return {
     symbols: (done ? chars : chars.slice(0, -1)).map((c) => c.char),
     keying: done ? null : last.pattern,
+    quietSec,
     toneHz: found.toneHz,
   };
 }
@@ -216,7 +220,19 @@ export interface Progress {
   readonly reached: number;
   /** A verdict on each finished character, in order. See `graded`. */
   readonly graded: readonly boolean[];
+  /** Every character has been read back, and the key has stayed up long
+   *  enough after the last one that the sender is done. */
+  readonly done: boolean;
 }
+
+/** How long the key must stay up after the last character before the take
+ *  counts as done: this many dits, plus `END_QUIET_SEC`.
+ *
+ * The last character is read back after a character gap, but the sender may
+ * still be reaching to send it again. The wait gives them that chance, and
+ * keying again starts it over. */
+export const END_QUIET_DITS = 4;
+export const END_QUIET_SEC = 1;
 
 /** One take, followed from its first sample.
  *
@@ -254,6 +270,10 @@ export class LiveFollower {
         : verdicts.length;
     if (at > this.best) this.best = at;
     if (this.toneHz === undefined && matches >= TONE_LOCK_MATCHED) this.toneHz = sent.toneHz;
-    return { reached: Math.max(this.best, verdicts.length), graded: verdicts };
+    const done =
+      verdicts.length === this.target.length &&
+      sent.keying === null &&
+      sent.quietSec >= END_QUIET_DITS * this.timing.unitSec + END_QUIET_SEC;
+    return { reached: Math.max(this.best, verdicts.length), graded: verdicts, done };
   }
 }
