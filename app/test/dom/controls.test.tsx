@@ -534,12 +534,25 @@ describe("controls", () => {
     expect(onChange).toHaveBeenLastCalledWith({ paceLeadSec: 5 });
   });
 
+  it("offers live grading in Plain mode, off to start and always live", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { container } = renderView({ onChange, open: true });
+    const box = container.querySelector<HTMLInputElement>("#plain-grading")!;
+    expect(container.querySelector("[data-panel='plain']")).toContainElement(box);
+    expect(box.checked).toBe(false);
+    expect(box).toBeEnabled();
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledWith({ plainGrading: true });
+  });
+
   it("bars live grading until live progress is on", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { rerender } = renderView({ onChange, open: true });
     rerender(view({ zenMode: true, zenProgress: false }, onChange));
-    const box = () => screen.getByLabelText(/live grading/i) as HTMLInputElement;
+    // Zen's: Plain has one of its own, below.
+    const box = () => document.querySelector<HTMLInputElement>("#zen-grading")!;
     expect(box()).toBeDisabled();
     expect(box().closest("label")!.getAttribute("title")).toMatch(/needs live progress/i);
 
