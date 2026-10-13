@@ -464,9 +464,11 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .viewpanel {
   display: grid;
   /* Columns, so a panel that is opened rarely and read whole fills the width
-     rather than stacking down the left. As many as fit, each at least wide
-     enough for its longest label. */
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+     rather than stacking down the left. As many as fit, each wide enough for
+     its longest label — and a fixed width, not a share of the row: a column
+     that stretched with the window moved every setting in it as the window
+     was resized, and only the number of columns should change. */
+  grid-template-columns: repeat(auto-fill, 180px);
   align-items: start;
   gap: 16px 32px;
 }
@@ -475,7 +477,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 .viewpanel .modes { grid-column: 1 / -1; }
 .viewpanel .modesrow {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, 180px);
   align-items: start;
   gap: 16px 32px;
 }
@@ -485,9 +487,18 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    it plays back. */
 .viewpanel [data-panel="audio"] { grid-column: span 2; }
 /* Closer than the other lines, so the microphone and the calibration share
-   one line in two columns. */
+   one line in two columns. Fixed widths for the two selects: a select is as
+   wide as its longest option, and a long microphone name pushed the
+   calibration onto a line of its own. */
 .viewpanel [data-panel="audio"] .panelgroups { column-gap: 12px; }
-@media (max-width: 520px) {
+.viewpanel [data-panel="audio"] select { width: 150px; text-overflow: ellipsis; }
+/* Out of the flow while empty, so it takes no gap. Not hidden: a live region
+   that is not rendered does not announce what is written into it. */
+.viewpanel [data-panel="audio"] .hint:empty { position: absolute; }
+/* Too narrow for two columns: one, the width of the window, and Audio's two
+   lines wrap inside it. */
+@media (max-width: 440px) {
+  .viewpanel, .viewpanel .modesrow { grid-template-columns: 1fr; }
   .viewpanel [data-panel="audio"] { grid-column: auto; }
 }
 /* Every other section is a column of its settings. */

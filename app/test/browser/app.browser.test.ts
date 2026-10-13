@@ -910,6 +910,43 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
   });
 
+  it("holds the settings still as the window is resized", async () => {
+    /* A section is a fixed width: resizing changes how many fit on a line,
+       and nothing else. The microphone and the calibration share one line at
+       every width with room for two columns. */
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    try {
+      localStorage.setItem("cwt:prefs", JSON.stringify({ settingsOpen: true }));
+      await served();
+      await mount();
+      const measure = () => {
+        const widths = [...container.querySelectorAll<HTMLElement>(".viewpanel [data-panel]")]
+          .filter((e) => e.dataset.panel !== "modes")
+          .map((e) => Math.round(e.getBoundingClientRect().width));
+        const mid = (sel: string) => {
+          const b = container.querySelector(sel)!.getBoundingClientRect();
+          return b.top + b.height / 2;
+        };
+        return { widths, apart: Math.abs(mid("#input-device") - mid("#calibration")) };
+      };
+      const seen = [];
+      for (const width of [1400, 1000, 700]) {
+        await act(async () => {
+          await page.viewport(width, 900);
+        });
+        seen.push(measure());
+      }
+      for (const m of seen) {
+        expect(m.widths, "every section the same size").toEqual(seen[0]!.widths);
+        expect(m.apart, "microphone and calibration on one line").toBeLessThan(3);
+      }
+    } finally {
+      await act(async () => {
+        await page.viewport(w, h);
+      });
+    }
+  });
+
   it("keeps the settings open, or closed, across a reload", async () => {
     const open = () => container.querySelector(".chartsettings")!.getAttribute("data-open");
     const toggle = () =>
