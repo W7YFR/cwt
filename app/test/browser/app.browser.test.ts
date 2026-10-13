@@ -910,6 +910,30 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
   });
 
+  it("keeps the settings open, or closed, across a reload", async () => {
+    const open = () => container.querySelector(".chartsettings")!.getAttribute("data-open");
+    const toggle = () =>
+      act(async () => {
+        container.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click();
+      });
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
+    await served();
+    await mount();
+    expect(open()).toBe("false");
+    await toggle();
+    expect(open()).toBe("true");
+    await reload();
+    expect(open(), "still open").toBe("true");
+    await toggle();
+    await reload();
+    expect(open(), "still closed").toBe("false");
+  });
+
   it("keeps the zoom it was left at across a reload", async () => {
     const zoom = () => container.querySelector<HTMLInputElement>("#zoom")!;
     const setZoom = async (v: number) => {

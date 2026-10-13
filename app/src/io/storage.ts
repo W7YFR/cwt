@@ -374,6 +374,8 @@ export interface Prefs {
    *  opens it again rather than the landing screen. A session, when there is
    *  one, comes back instead. */
   practicing?: boolean;
+  /** The settings panel was open, so a reload opens it again. */
+  settingsOpen?: boolean;
   /** Calibration's speed, from saves that hold no `charWpm`. Read by
    *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
@@ -535,6 +537,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   currentId: isStr,
   session: isSession,
   practicing: isBool,
+  settingsOpen: isBool,
   keyerWpm: isNum,
   gainDb: isNum,
   tolerance: isNum,
@@ -722,6 +725,14 @@ export function rememberPracticing(on: boolean): void {
   const next = { ...loadPrefs() };
   if (on) next.practicing = true;
   else delete next.practicing;
+  savePrefs(next);
+}
+
+/** Say whether the settings panel is open, so a reload can open it again. */
+export function rememberSettingsOpen(open: boolean): void {
+  const next = { ...loadPrefs() };
+  if (open) next.settingsOpen = true;
+  else delete next.settingsOpen;
   savePrefs(next);
 }
 

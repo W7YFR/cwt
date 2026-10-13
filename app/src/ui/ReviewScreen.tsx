@@ -38,6 +38,7 @@ import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
+import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
 import { reviewTake } from "@/timing";
 import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
@@ -188,10 +189,14 @@ export function ReviewScreen({
      while the dialog is up: a key that starts a recording behind an open
      dialog answers a question nobody asked. */
   const [starting, setStarting] = useState(false);
-  /* Whether the chart settings are on show. Not a setting itself: it is where
-     you are looking rather than anything about the chart, and it has no
-     business outliving the page or riding along in a saved report. */
-  const [chartSettings, setChartSettings] = useState(false);
+  /* Whether the settings are on show. Not a setting itself, and never in a
+     saved report: it is where you are looking. But a reload is not a choice
+     to look elsewhere, so it is remembered for the next page load. */
+  const [chartSettings, setChartSettingsRaw] = useState(() => loadPrefs().settingsOpen === true);
+  const setChartSettings = useCallback((open: boolean) => {
+    setChartSettingsRaw(open);
+    rememberSettingsOpen(open);
+  }, []);
   const headerRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
   /* Where the page was when opening the settings scrolled it, or null when
@@ -220,7 +225,7 @@ export function ReviewScreen({
     const back = returnTo.current;
     returnTo.current = null;
     if (back !== null) scrollPage(scroller, back);
-  }, [chartSettings]);
+  }, [chartSettings, setChartSettings]);
 
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [status, setStatus] = useState("");
