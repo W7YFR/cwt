@@ -967,6 +967,7 @@ export function ReviewScreen({
           farnsworthWpm={settings.farnsworthWpm}
           ideal={incoming.ideal}
           handle={handle}
+          onFinish={() => void rec.finish()}
         />
       )}
 

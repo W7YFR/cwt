@@ -14,7 +14,7 @@
  * and not the review behind it.
  */
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { Recorder } from "@/capture/mic";
 import type { Timeline } from "@/types";
 import { opensWord } from "@/timing/timeline";
@@ -28,6 +28,9 @@ export interface FollowSendingProps {
   /** The target the chart draws, every pass included. */
   readonly ideal: Timeline;
   readonly handle: ChartHandle;
+  /** The sender is done: every character read back, and the key up a while
+   *  after the last. Called once per take, as Zen mode's is. */
+  onFinish(): void;
 }
 
 export function FollowSending({
@@ -36,10 +39,28 @@ export function FollowSending({
   farnsworthWpm,
   ideal,
   handle,
+  onFinish,
 }: FollowSendingProps): null {
   /* The characters the chart draws, so a count of them is an index into it. */
   const target = useMemo(() => ideal.chars.map((c) => c.char), [ideal]);
-  const { reached } = useLiveProgress({ recorder, charWpm, farnsworthWpm }, target);
+  const { reached, graded, done } = useLiveProgress(
+    { recorder, charWpm, farnsworthWpm },
+    target,
+  );
+
+  /* The end of the message: the take finishes itself, as it does in Zen mode
+     with Live progress on. Once per take; a restart clears the reading, and
+     that arms it again. `onFinish` is held in a ref because the screen behind
+     rebuilds it on every render. */
+  const finish = useRef(onFinish);
+  finish.current = onFinish;
+  const finished = useRef(false);
+  useEffect(() => {
+    if (graded.length === 0) finished.current = false;
+    if (!done || finished.current) return;
+    finished.current = true;
+    finish.current();
+  }, [done, graded.length]);
 
   /* The index of each word's first character, by the same rule the chart
      highlights words by: a word gap or a pause opens one. */

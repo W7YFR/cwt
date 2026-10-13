@@ -89,7 +89,9 @@ export const ZEN_MODE_HELP =
 
 export const PLAIN_FOLLOW_HELP =
   "While you record, slide the next word to the left edge of the chart as " +
-  "you begin the last letter of a word. Off, the chart stays where it is.";
+  "you begin the last letter of a word, and stop the take a second or so " +
+  "after the last character. Off, the chart stays where it is and the take " +
+  "runs until you stop it.";
 
 export const PLAIN_MODE_HELP =
   "Record with the chart in view, and no cursor or count-in.";

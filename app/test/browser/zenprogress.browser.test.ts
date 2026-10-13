@@ -202,11 +202,12 @@ describe("the grading dots", () => {
 });
 
 describe("following the sending in Plain mode", () => {
-  it("slides the next word to the left edge as a word's last letter begins", async () => {
+  it("slides the next word in as a word's last letter begins, and stops at the end", async () => {
     recorder = await startRecording();
     const rec = recorder;
     const ideal = idealTimeline(MESSAGE, targetTiming(WPM, WPM));
     const revealed: number[] = [];
+    let finished = 0;
     const handle = {
       chart: {
         reveal: (t: number) => revealed.push(t),
@@ -223,15 +224,23 @@ describe("following the sending in Plain mode", () => {
           farnsworthWpm: WPM,
           ideal,
           handle,
+          onFinish: () => finished++,
         }),
       ),
     );
     // In steps: React holds updates until each act ends.
-    for (let t = 0; t < mic.seconds + 1.5; t += 0.25) await wait(250);
+    let halfway = -1;
+    for (let t = 0; t < mic.seconds + 1.5; t += 0.25) {
+      await wait(250);
+      if (halfway < 0 && t >= mic.seconds / 2) halfway = finished;
+    }
 
     // CQ DE W7YFR: CQ at the start, then DE as the Q begins, then W7YFR as
     // the E begins. The last word has none after it, so its R moves nothing.
     const c = ideal.chars;
     expect(revealed).toEqual([c[0]!.t0, c[2]!.t0, c[4]!.t0]);
+    // And the take finished itself at the end of the message, once.
+    expect(halfway, "not halfway through").toBe(0);
+    expect(finished).toBe(1);
   }, 20_000);
 });

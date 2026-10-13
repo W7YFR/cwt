@@ -10,7 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records.
-- In **Plain** mode, when the message is wider than the chart, the chart slides the next word to its left edge as you begin the last letter of a word. **Follow**, under **Recording modes** › **Plain** in **Settings**, turns this off.
+- In **Plain** mode, when the message is wider than the chart, the chart slides the next word to its left edge as you begin the last letter of a word, and the take stops itself a second or so after the last character. **Follow**, under **Recording modes** › **Plain** in **Settings**, turns both off.
 
 ### Changed
 
