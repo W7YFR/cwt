@@ -466,13 +466,27 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   /* Columns, so a panel that is opened rarely and read whole fills the width
      rather than stacking down the left. As many as fit, each at least wide
      enough for its longest label. */
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   align-items: start;
   gap: 16px 32px;
 }
+/* The recording modes, a row of their own under the rest, laid out on the
+   same columns so their sections line up with the ones above. */
+.viewpanel .modes { grid-column: 1 / -1; }
+.viewpanel .modesrow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  align-items: start;
+  gap: 16px 32px;
+}
+/* Each mode's name, under the group's: the same caption, a step quieter. */
+.viewpanel .modesrow .uplabel { color: var(--ink-faint); }
 /* Two lines that each want room across: where the sound comes from, and how
    it plays back. */
 .viewpanel [data-panel="audio"] { grid-column: span 2; }
+/* Closer than the other lines, so the microphone and the calibration share
+   one line in two columns. */
+.viewpanel [data-panel="audio"] .panelgroups { column-gap: 12px; }
 @media (max-width: 520px) {
   .viewpanel [data-panel="audio"] { grid-column: auto; }
 }

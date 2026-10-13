@@ -10,11 +10,11 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records.
-- In **Plain** mode, when the message is wider than the chart, the chart slides the next word to its left edge as you begin the last letter of a word. **Follow**, under **Plain mode** in **Settings**, turns this off.
+- In **Plain** mode, when the message is wider than the chart, the chart slides the next word to its left edge as you begin the last letter of a word. **Follow**, under **Recording modes** › **Plain** in **Settings**, turns this off.
 
 ### Changed
 
-- **Settings** groups its settings in sections: **Audio**, **Target**, **Grading**, **Plain mode**, **Zen mode**, **Pacing**, **Chart** and **Page**.
+- **Settings** groups its settings in sections: **Audio**, **Target**, **Grading**, **Chart** and **Page**, and **Plain**, **Zen** and **Pacing** under **Recording modes**.
 - A setting that another setting rules out stays in place, dimmed, and its tooltip says why.
 - **Microphone**, **Calibration**, **Listening level** and **Loop** are in **Audio**, under **Settings**.
 - **Ignore character construction** is now **Spacing only**, and **Clock axis while pacing** is now **Clock axis**.

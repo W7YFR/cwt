@@ -614,67 +614,6 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
         </div>
       </Section>
 
-      {/* The options of the three ways to record. Which one records is picked
-          beside the record button; these are set ahead of it, so they stay
-          live whichever is picked. */}
-      <Section name="plain" title="Plain mode">
-        <div className="aid">
-          <Check
-            id="plain-follow"
-            label="Follow"
-            help={PLAIN_FOLLOW_HELP}
-            checked={s.plainFollow}
-            onChange={(v) => onChange({ plainFollow: v })}
-          />
-        </div>
-      </Section>
-
-      <Section name="zen" title="Zen mode">
-        <div className="aid">
-          <Check
-            id="zen-progress"
-            label="Live progress"
-            help={ZEN_PROGRESS_HELP}
-            checked={s.zenProgress}
-            onChange={(v) => onChange({ zenProgress: v })}
-          />
-          <Check
-            id="zen-grading"
-            label="Live grading"
-            help={ZEN_GRADING_HELP}
-            checked={s.zenGrading}
-            barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
-            onChange={(v) => onChange({ zenGrading: v })}
-          />
-        </div>
-      </Section>
-
-      <Section name="pacing" title="Pacing">
-        <div className="aid">
-          <Check
-            id="pace-absolute"
-            label="Clock axis"
-            help={PACE_ABSOLUTE_HELP}
-            checked={s.paceAbsolute}
-            onChange={(v) => onChange({ paceAbsolute: v })}
-          />
-          <div className="group">
-            <NumberField
-              id="pace-lead"
-              name="Delay start"
-              unit="s"
-              spoken="seconds"
-              help={PACE_LEAD_HELP}
-              value={s.paceLeadSec}
-              min={PACE_LEAD_MIN_SEC}
-              max={PACE_LEAD_MAX_SEC}
-              step={1}
-              onChange={(v) => onChange({ paceLeadSec: v })}
-            />
-          </div>
-        </div>
-      </Section>
-
       <Section name="display" title="Chart">
         <div className="panelgroups">
           <Check
@@ -743,6 +682,75 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
           />
         </div>
       </Section>
+
+      {/* The options of the three ways to record, on a row of their own: they
+          are the settings changed from one sitting to the next, and the rest
+          are set once. Which mode records is picked beside the record button;
+          these are set ahead of it, so they stay live whichever is picked. */}
+      <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">
+        <span className="uplabel" id="panel-modes">
+          Recording modes
+        </span>
+        <div className="modesrow">
+          <Section name="plain" title="Plain">
+            <div className="aid">
+              <Check
+                id="plain-follow"
+                label="Follow"
+                help={PLAIN_FOLLOW_HELP}
+                checked={s.plainFollow}
+                onChange={(v) => onChange({ plainFollow: v })}
+              />
+            </div>
+          </Section>
+
+          <Section name="zen" title="Zen">
+            <div className="aid">
+              <Check
+                id="zen-progress"
+                label="Live progress"
+                help={ZEN_PROGRESS_HELP}
+                checked={s.zenProgress}
+                onChange={(v) => onChange({ zenProgress: v })}
+              />
+              <Check
+                id="zen-grading"
+                label="Live grading"
+                help={ZEN_GRADING_HELP}
+                checked={s.zenGrading}
+                barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
+                onChange={(v) => onChange({ zenGrading: v })}
+              />
+            </div>
+          </Section>
+
+          <Section name="pacing" title="Pacing">
+            <div className="aid">
+              <Check
+                id="pace-absolute"
+                label="Clock axis"
+                help={PACE_ABSOLUTE_HELP}
+                checked={s.paceAbsolute}
+                onChange={(v) => onChange({ paceAbsolute: v })}
+              />
+              <div className="group">
+                <NumberField
+                  id="pace-lead"
+                  name="Delay start"
+                  unit="s"
+                  spoken="seconds"
+                  help={PACE_LEAD_HELP}
+                  value={s.paceLeadSec}
+                  min={PACE_LEAD_MIN_SEC}
+                  max={PACE_LEAD_MAX_SEC}
+                  step={1}
+                  onChange={(v) => onChange({ paceLeadSec: v })}
+                />
+              </div>
+            </div>
+          </Section>
+        </div>
+      </div>
     </div>
   );
 }

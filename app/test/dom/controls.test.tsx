@@ -326,6 +326,13 @@ describe("controls", () => {
     expect(row("target")).toContainElement(screen.getByLabelText("Break length in seconds"));
     expect(row("target")).toContainElement(screen.getByLabelText("Repeat pause in seconds"));
     expect(row("grading")).toContainElement(screen.getByLabelText(/^spacing only$/i));
+    // The three ways to record, together in a group of their own.
+    for (const mode of ["plain", "zen", "pacing"]) {
+      expect(row("modes"), mode).toContainElement(row(mode) as HTMLElement);
+    }
+    expect(screen.getByRole("group", { name: "Recording modes" })).toBe(row("modes"));
+    expect(row("plain").querySelector(".uplabel")!.textContent).toBe("Plain");
+    expect(row("zen").querySelector(".uplabel")!.textContent).toBe("Zen");
     expect(row("plain")).toContainElement(screen.getByLabelText(/^follow$/i));
     expect(row("zen")).toContainElement(screen.getByLabelText(/live progress/i));
     expect(row("pacing")).toContainElement(screen.getByLabelText(/^clock axis$/i));
