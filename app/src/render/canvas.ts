@@ -146,6 +146,11 @@ export interface Chart {
    * moment you are meant to act on is always in the same place. */
   setFollow(mode: "clamped" | "centered"): void;
   scrollTo(x: number): void;
+  /** Glide the view so the moment `t` sits just inside the left edge,
+   *  without drawing anything there: for following the sending when nothing
+   *  on screen marks it. Clamped like playback, so it never scrolls past
+   *  either end. */
+  reveal(t: number, side: "you" | "tgt"): void;
   /** Where the view currently sits, in content pixels.
    *
    * Read-only and purely diagnostic: the scroll is owned here because it moves
@@ -164,6 +169,14 @@ export interface Chart {
 /** Where a running playhead is held across the track, as a fraction of its
  *  width. Left of center: what is coming matters more than what has gone. */
 const PLAYHEAD_HOLD = 0.4;
+
+/** How far in from the left edge `reveal` lands a moment, as a fraction of
+ *  the track's width: enough that it does not sit on the edge. */
+const REVEAL_INSET = 0.1;
+
+/** How long `reveal` takes to slide: long enough to see where the content
+ *  went, short enough not to be waited for. */
+const GLIDE_MS = 160;
 
 /** Marks and gaps behave differently on a click — see `onClick`. */
 function isGap(kind: Block["kind"]): boolean {
@@ -228,6 +241,8 @@ export function createChart(
   let destroyed = false;
   let leadSec = 0;
   let follow: "clamped" | "centered" = "clamped";
+  /** The frame of a running `reveal`, so a new one can take over from it. */
+  let glide = 0;
 
   function viewport(): Viewport {
     const viewW = Math.max(host.clientWidth, GUTTER + 40);
@@ -928,6 +943,33 @@ export function createChart(
     },
 
     scrollTo: (x: number) => doScrollTo(x, false),
+
+    reveal(t, side) {
+      if (!layout) return;
+      const v = viewport();
+      if (!v.maxScroll) return;
+      const to = Math.min(
+        Math.max(timeToX(layout, t, side) - v.trackW * REVEAL_INSET, 0),
+        v.maxScroll,
+      );
+      cancelAnimationFrame(glide);
+      const from = scrollX;
+      if (Math.abs(to - from) < 0.5) return;
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        scrollX = to;
+        paint();
+        return;
+      }
+      const start = performance.now();
+      const step = (now: number) => {
+        const k = Math.min(1, (now - start) / GLIDE_MS);
+        scrollX = from + (to - from) * (1 - (1 - k) ** 3);
+        paint();
+        if (k < 1) glide = requestAnimationFrame(step);
+      };
+      glide = requestAnimationFrame(step);
+    },
+
     scrollAt: () => scrollX,
 
     refreshTheme() {
@@ -1024,6 +1066,7 @@ export function createChart(
 
     destroy() {
       destroyed = true;
+      cancelAnimationFrame(glide);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);

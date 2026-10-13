@@ -694,6 +694,31 @@ describe("the chart in a browser", () => {
       }
     });
 
+    it("reveals a moment just inside the left edge, gliding there, without a playhead", async () => {
+      /* What Plain mode follows the sending with: as each word is finished,
+         the next one slides to the left edge. Nothing is drawn there. */
+      const { layout, trackW, maxScroll } = set("clamped");
+      expect(maxScroll, "the recording is wider than the track").toBeGreaterThan(0);
+      const settle = () => new Promise((r) => setTimeout(r, 500));
+      const t = review.take.durationSec / 3;
+      const want = Math.min(Math.max(timeToX(layout, t, "tgt") - trackW * 0.1, 0), maxScroll);
+
+      chart.reveal(t, "tgt");
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      const midway = chart.scrollAt();
+      await settle();
+      expect(chart.scrollAt()).toBeCloseTo(want, 0);
+      expect(midway, "on its way rather than already there").toBeLessThan(want);
+
+      // Clamped at both ends, like playback.
+      chart.reveal(review.take.durationSec, "tgt");
+      await settle();
+      expect(chart.scrollAt()).toBeCloseTo(maxScroll, 0);
+      chart.reveal(0, "tgt");
+      await settle();
+      expect(chart.scrollAt()).toBe(0);
+    });
+
     it("puts the view back inside its frame on the way out", () => {
       // Leaving `centered` has to undo the overscroll; the clamp will not run
       // while the mode is still on.

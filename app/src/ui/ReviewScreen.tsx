@@ -31,6 +31,7 @@ import {
 import { ZenMode } from "./ZenMode";
 import { pacedEnd, pacedStart, recordLimit } from "./pacing";
 import { modeOf, modePatch } from "./mode";
+import { FollowSending } from "./FollowSending";
 import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
@@ -950,6 +951,18 @@ export function ReviewScreen({
 
       {/* Over everything, while the take runs. The record bar it covers is
           reproduced inside it, keys and all. */}
+      {/* Plain mode: the chart follows what is being sent. Zen mode covers the
+          chart, and Paced mode moves it on the clock. */}
+      {rec.recorder && modeOf(settings) === "plain" && (
+        <FollowSending
+          recorder={rec.recorder}
+          charWpm={settings.charWpm}
+          farnsworthWpm={settings.farnsworthWpm}
+          ideal={incoming.ideal}
+          handle={handle}
+        />
+      )}
+
       {settings.zenMode && recording && liveClock && (
         <ZenMode
           message={settings.expected}

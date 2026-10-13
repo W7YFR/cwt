@@ -10,6 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records.
+- In **Plain** mode, the chart slides the next word into view as you begin the last letter of a word.
 
 ### Changed
 

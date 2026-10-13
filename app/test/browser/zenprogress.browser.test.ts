@@ -13,6 +13,9 @@ import { startRecording, type Recorder } from "@/capture/mic";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
 import { ZenMode } from "@/ui/ZenMode";
+import { FollowSending } from "@/ui/FollowSending";
+import type { Chart } from "@/render/canvas";
+import { idealTimeline } from "@/timing";
 import "@/ui/base.css";
 
 const MESSAGE = "CQ DE W7YFR";
@@ -196,4 +199,34 @@ describe("the grading dots", () => {
       (window as unknown as { Worker: unknown }).Worker = real;
     }
   });
+});
+
+describe("following the sending in Plain mode", () => {
+  it("slides the next word to the left edge as a word's last letter begins", async () => {
+    recorder = await startRecording();
+    const rec = recorder;
+    const ideal = idealTimeline(MESSAGE, targetTiming(WPM, WPM));
+    const revealed: number[] = [];
+    const handle = {
+      chart: { reveal: (t: number) => revealed.push(t) } as unknown as Chart,
+    };
+    act(() =>
+      root.render(
+        createElement(FollowSending, {
+          recorder: rec,
+          charWpm: WPM,
+          farnsworthWpm: WPM,
+          ideal,
+          handle,
+        }),
+      ),
+    );
+    // In steps: React holds updates until each act ends.
+    for (let t = 0; t < mic.seconds + 1.5; t += 0.25) await wait(250);
+
+    // CQ DE W7YFR: CQ at the start, then DE as the Q begins, then W7YFR as
+    // the E begins. The last word has none after it, so its R moves nothing.
+    const c = ideal.chars;
+    expect(revealed).toEqual([c[0]!.t0, c[2]!.t0, c[4]!.t0]);
+  }, 20_000);
 });
