@@ -56,6 +56,9 @@
 
 * { box-sizing: border-box; }
 
+/* The app's name in running text, always in the blue of your sending. */
+.appname { color: var(--you); }
+
 /* Room for the scrollbar is kept whether or not there is one, so a screen
    that grows past the window does not narrow the page and move everything
    centered to the left. On both edges, not just the right: the bands with a
@@ -1729,7 +1732,6 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
    frame would only crowd them. */
 .calibrate .panel .lede,
 .calibrate .panel .advice { max-width: none; }
-.calibrate .panel .appname { color: var(--you); }
 .calibrate .panel .calsteps { align-self: stretch; }
 
 /* The two settings side by side, under the rule a section has. */

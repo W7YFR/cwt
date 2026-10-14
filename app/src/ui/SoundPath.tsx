@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { AppName } from "./Wordmark";
 
 export function SoundPathHelp({ onClose }: { onClose(): void }): React.ReactElement {
   const box = useRef<HTMLDivElement>(null);
@@ -50,50 +51,45 @@ export function SoundPathHelp({ onClose }: { onClose(): void }): React.ReactElem
           if (e.key === "Escape") onClose();
         }}
       >
-        <h2 id="soundpath-title">Getting the signal in</h2>
+        <h2 id="soundpath-title">Getting your keying into <AppName /></h2>
 
         {/* The scrolling part. The title and the way out are outside it, so
             neither can be read off the bottom of a short window. */}
         <div className="prose">
           <p>
-            What this tool grades is mostly silence — the gap inside a character,
-            the gap between two of them, the gap between words. Anything that
-            keeps a note sounding after the key comes up spends that silence, and
-            the mark reads longer than you sent it.
+            <AppName /> times every dit, dah and gap you send. If the sound keeps ringing
+            after you let go of the key, it eats into the gap that follows, and
+            your timing looks worse than it is.
           </p>
 
-          <h3>Plug in if you can</h3>
+          <h3>Best: a direct connection</h3>
           <p>
-            Line out from the radio, a soundcard interface, or a virtual audio
-            device carrying the sidetone straight into the browser. The sound
-            never becomes air, so nothing gets added to it on the way and the app
-            reads what you keyed. There is nothing here to calibrate.
+            Connect your keyer&rsquo;s sidetone straight to your computer: a
+            cable from your radio&rsquo;s line out, an audio interface, or a
+            virtual audio device. <AppName /> then hears exactly what you sent, and you
+            do not need to calibrate.
           </p>
 
-          <h3>A microphone hears the room too</h3>
+          <h3>Using a microphone</h3>
           <p>
-            Point one at a speaker and it picks up the sound twice: once
-            directly, then again off the walls a moment later. Those reflections
-            arrive after the key is already up, so every mark trails off into the
-            gap behind it. Distance is what governs how much — the closer the
-            microphone, the less room there is in what it hears.
+            A microphone also hears the sound bounce off the walls. That makes
+            every dit and dah ring on a little after you let go. The closer the
+            microphone is to the speaker, the less of this it hears.
           </p>
           <p>
-            Calibration can measure that trail and take it back off your timing.
-            What it cannot undo is anything that changes from one mark to the
-            next — a level that moves on its own, or sending fast enough that the
-            trail covers a whole dit.
+            Calibration measures the ring and corrects for it. It cannot fix a
+            ring so long that it runs into the next dit, or a level that keeps
+            changing.
           </p>
 
-          <h3>If you are on a microphone</h3>
+          <h3>Tips</h3>
           <ul>
-            <li>Move it close, and point it at the speaker.</li>
-            <li>Turn off any automatic level or enhancement.</li>
-            <li>Start slower than you think you need to.</li>
+            <li>Put the microphone close to the speaker, pointing at it.</li>
+            <li>Turn off automatic level control and any sound enhancement.</li>
+            <li>Start at a slower speed than you normally send.</li>
             <li>
-              Then calibrate, and read the verdict beside it. A calibration
-              belongs to a microphone <i>in a position</i> — move it and it is no
-              longer describing your setup.
+              Calibrate again whenever you move the microphone. A calibration
+              only fits the spot where you made it.
             </li>
           </ul>
         </div>

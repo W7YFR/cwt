@@ -16,6 +16,7 @@ nothing to the site. The next release carries them.
 - The calibration result sits on a card too, with left-aligned text. A failed calibration says **Let’s try that again…**, its explanation is one paragraph, and the verdict under **Your setup** names the speed it judges, such as **At 25 wpm**.
 - A successful calibration says **Success!**, and a short tail is rated **Excellent**. The explanation under it no longer contradicts the correction it found.
 - **Configuration** sits on a card like the calibration screens, with **Done** at the bottom. A switch shows one part at a time: **User**, **Drills** or **Calibration**.
+- **Need help?** explains how to get your keying into CWT in shorter, plainer words.
 - On the practice screen, the header, the chart settings, the speeds and message, and the scores sit on panels like the rest of the app.
 - Under **Calibration recordings**, a recording saved as a calibration shows that calibration's name, and **Save** puts the name at the front of the file.
 

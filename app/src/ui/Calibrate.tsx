@@ -47,7 +47,7 @@ import {
 import type { AudioClip } from "@/types";
 import { IconPlay, IconStop } from "./Icons";
 import { Cog, DevicePicker, LevelMeter, RecDot } from "./Record";
-import { APP_NAME } from "./Wordmark";
+import { AppName } from "./Wordmark";
 import { useRecorder } from "./useRecorder";
 
 /** Speed to offer first, when nothing better is known. Slow enough that a room
@@ -473,7 +473,7 @@ function Wizard(props: CalibrateProps): React.ReactElement {
 
         <div className="lede preamble" data-testid="setup-note">
           <p>
-            The best way to use <span className="appname">{APP_NAME}</span> is
+            The best way to use <AppName /> is
             by connecting your keyer&rsquo;s sidetone directly to your computer. This prevents microphone issues
             that make it difficult to process your keying.
           </p>
@@ -887,7 +887,7 @@ function Result(props: ResultProps): React.ReactElement {
         ? (
             <>
               Your setup makes every element a little longer than you sent it.
-              Save this calibration, and <span className="appname">{APP_NAME}</span>{" "}
+              Save this calibration, and <AppName />{" "}
               corrects for that in every recording you make with this setup.
             </>
           )

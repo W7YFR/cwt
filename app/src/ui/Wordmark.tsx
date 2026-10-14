@@ -24,6 +24,12 @@ import { wordmarkCols, wordmarkText } from "./wordmarks";
 export const APP_NAME = "CWT";
 export const APP_LONG_NAME = "CW Trainer";
 
+/** The name in running text. Always in the blue of your sending, so it reads
+ *  as the app's name wherever it appears. */
+export function AppName(): React.ReactElement {
+  return <span className="appname">{APP_NAME}</span>;
+}
+
 /** Morse for C, W and T — the letters above, keyed. */
 export const APP_MORSE = "-.-.  .--  -";
 
