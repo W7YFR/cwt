@@ -9,8 +9,8 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records.
-- In **Plain** mode, the take stops itself a second or so after the last character. When the message is wider than the chart, the chart also slides the next word to its left edge as you begin the last letter of a word. **Follow**, under **Recording modes** › **Plain** in **Settings**, turns both off.
+- **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records. They replace the **Zen mode** and **Pacing cursor** checkboxes.
+- In **Plain** mode, the take stops itself a second or so after the last character, and a message wider than the chart slides the next word into view as you begin a word's last letter. **Follow**, under **Recording modes** › **Plain**, turns both off.
 - **Live grading**, under **Recording modes** › **Plain**, puts a dot under each target character on the chart as you key it. The dot turns blue if you sent the character right and red if not.
 
 ### Changed
@@ -29,8 +29,8 @@ nothing to the site. The next release carries them.
 
 ### Fixed
 
-- A reload on the practice screen, before anything is recorded, stays on the practice screen. It no longer goes back to the start screen.
-- A reload keeps the chart's zoom. It no longer fits the chart to the width again.
+- A reload on the practice screen stays there, even before anything is recorded.
+- A reload keeps the chart's zoom.
 - A reload keeps **Settings** open if it was open.
 
 ## v1.6.0 — 2026-10-13
