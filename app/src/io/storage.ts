@@ -374,8 +374,13 @@ export interface Prefs {
    *  opens it again rather than the landing screen. A session, when there is
    *  one, comes back instead. */
   practicing?: boolean;
+  /** The newest landing screen this visitor has passed through — see
+   *  LANDING_VERSION in ui/Landing.tsx. */
+  landingSeen?: number;
   /** The settings panel was open, so a reload opens it again. */
   settingsOpen?: boolean;
+  /** Which half of Configuration was on show. */
+  configTab?: string;
   /** Calibration's speed, from saves that hold no `charWpm`. Read by
    *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
@@ -537,7 +542,9 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   currentId: isStr,
   session: isSession,
   practicing: isBool,
+  landingSeen: isNum,
   settingsOpen: isBool,
+  configTab: isStr,
   keyerWpm: isNum,
   gainDb: isNum,
   tolerance: isNum,
@@ -734,6 +741,40 @@ export function rememberSettingsOpen(open: boolean): void {
   if (open) next.settingsOpen = true;
   else delete next.settingsOpen;
   savePrefs(next);
+}
+
+/** Say which landing screen this visitor has passed through. */
+export function rememberLandingSeen(version: number): void {
+  if (loadPrefs().landingSeen === version) return;
+  savePrefs({ ...loadPrefs(), landingSeen: version });
+}
+
+/** The newest landing screen this visitor has passed through, or 0. */
+export function recallLandingSeen(): number {
+  return loadPrefs().landingSeen ?? 0;
+}
+
+/* Per tab, not per visitor. Going back to the landing screen is a decision,
+   and a reload keeps it; a new visit still passes the landing screen by. */
+const LANDING_ASKED_KEY = "cwt:landing";
+
+/** Say whether the landing screen was asked for in this tab. */
+export function rememberLandingAsked(on: boolean): void {
+  try {
+    if (on) sessionStorage.setItem(LANDING_ASKED_KEY, "1");
+    else sessionStorage.removeItem(LANDING_ASKED_KEY);
+  } catch {
+    // No session storage: a reload passes the landing screen by.
+  }
+}
+
+/** Whether the landing screen was asked for in this tab. */
+export function recallLandingAsked(): boolean {
+  try {
+    return sessionStorage.getItem(LANDING_ASKED_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 /** Whether the practice screen was open with nothing recorded in it. */

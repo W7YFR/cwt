@@ -49,6 +49,14 @@ function open(over: Partial<React.ComponentProps<typeof Settings>> = {}) {
   return { ...render(<Settings {...props} />), props };
 }
 
+/** Open on one part of Configuration. */
+function openOn(tab: string, over: Partial<React.ComponentProps<typeof Settings>> = {}) {
+  savePrefs({ ...loadPrefs(), configTab: tab });
+  return open(over);
+}
+const openCalibration = (over: Partial<React.ComponentProps<typeof Settings>> = {}) =>
+  openOn("calibration", over);
+
 beforeEach(() => localStorage.clear());
 
 describe("the configuration screen", () => {
@@ -58,7 +66,7 @@ describe("the configuration screen", () => {
        carries its number. */
     saveProfile(PROFILE());
     saveProfile(PROFILE({ id: "p2", nickname: "across the room", releaseOffsetSec: 0.034 }));
-    open();
+    openCalibration();
     const rows = screen.getAllByTestId("calrow");
     expect(rows).toHaveLength(2);
     for (const row of rows) expect(row.textContent).toMatch(/\d+\.\d ms/);
@@ -70,7 +78,7 @@ describe("the configuration screen", () => {
        attention and there is no undo. */
     saveProfile(PROFILE());
     const user = userEvent.setup();
-    const { props } = open();
+    const { props } = openCalibration();
 
     await user.click(screen.getByTestId("delete-profile"));
     expect(loadProfiles()).toHaveLength(1);
@@ -83,7 +91,7 @@ describe("the configuration screen", () => {
   it("keeps it when the answer is no", async () => {
     saveProfile(PROFILE());
     const user = userEvent.setup();
-    open();
+    openCalibration();
     await user.click(screen.getByTestId("delete-profile"));
     await user.click(screen.getByRole("button", { name: /^keep$/i }));
     expect(loadProfiles()).toHaveLength(1);
@@ -96,7 +104,7 @@ describe("the configuration screen", () => {
     saveProfile(PROFILE());
     selectProfile("p1");
     const user = userEvent.setup();
-    open({ profileId: "p1" });
+    openCalibration({ profileId: "p1" });
 
     await user.click(screen.getByTestId("delete-profile"));
     await user.click(screen.getByRole("button", { name: /^delete$/i }));
@@ -107,7 +115,7 @@ describe("the configuration screen", () => {
   it("says which one is in use before deleting it", async () => {
     saveProfile(PROFILE());
     const user = userEvent.setup();
-    open({ profileId: "p1" });
+    openCalibration({ profileId: "p1" });
     await user.click(screen.getByTestId("delete-profile"));
     // The consequence is specific to this row and worth saying once, at the
     // moment it applies.
@@ -120,11 +128,40 @@ describe("the user section", () => {
   /** Lets the calibration list finish loading inside act. */
   const settle = () => act(async () => {});
 
-  it("comes first, then drills, then calibration", async () => {
+  it("comes first; drills and calibration are the other two parts", async () => {
+    const user = userEvent.setup();
     open();
     await settle();
-    const titles = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(titles).toEqual(["User", "Drills", "Calibration"]);
+    const titles = () => screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(titles()).toEqual(["User"]);
+
+    await user.click(screen.getByRole("button", { name: "Drills" }));
+    expect(titles()).toEqual(["Drills"]);
+
+    await user.click(screen.getByRole("button", { name: "Calibration" }));
+    expect(titles()).toEqual(["Saved calibrations", "Calibration recordings"]);
+    expect(screen.getByRole("button", { name: "Calibration" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("remembers which part was on show", async () => {
+    const user = userEvent.setup();
+    const { unmount } = open();
+    await settle();
+    await user.click(screen.getByRole("button", { name: "Calibration" }));
+    unmount();
+    open();
+    await settle();
+    expect(screen.getByRole("button", { name: "Calibration" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("closes from one Done, at the foot", async () => {
+    const user = userEvent.setup();
+    const { props } = open();
+    await settle();
+    const done = screen.getAllByRole("button", { name: "Done" });
+    expect(done).toHaveLength(1);
+    await user.click(done[0]!);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
   it("saves each field as it is typed, and reads it back", async () => {
@@ -207,7 +244,7 @@ describe("the drills section", () => {
   }
 
   it("saves the box as one drill, with each line break as a break", async () => {
-    open();
+    openOn("drills");
     await settle();
     const user = await write("cq cq de {CALLSIGN} k\n\n  {callsign}   de k7abc ");
     expect(box().value).toBe("CQ CQ DE {callsign} K\n\n  {callsign}   DE K7ABC ");
@@ -222,7 +259,7 @@ describe("the drills section", () => {
   });
 
   it("refuses a slot it does not know and a symbol with no Morse", async () => {
-    open();
+    openOn("drills");
     await settle();
     await write("HI {nmae}\nHI #");
     expect(screen.getByTestId("drill-problems").textContent).toMatch(/\{nmae\} is not a slot/);
@@ -236,7 +273,7 @@ describe("the drills section", () => {
       { id: "custom/a", text: "AAA" },
       { id: "custom/b", text: "BBB" },
     ]);
-    open();
+    openOn("drills");
     await settle();
     await user.click(screen.getAllByTestId("delete-drill")[0]!);
     expect(loadCustomDrills()).toEqual([{ id: "custom/b", text: "BBB" }]);
@@ -249,7 +286,7 @@ describe("the drills section", () => {
       { id: "custom/a", text: "AAA | BBB" },
       { id: "custom/b", text: "CCC" },
     ]);
-    open();
+    openOn("drills");
     await settle();
     await user.click(screen.getAllByTestId("edit-drill")[0]!);
     expect(box().value).toBe("AAA\nBBB");
@@ -270,7 +307,7 @@ describe("the drills section", () => {
   it("cancels an edit without changing the drill", async () => {
     const user = userEvent.setup();
     saveCustomDrills([{ id: "custom/a", text: "AAA" }]);
-    open();
+    openOn("drills");
     await settle();
     await user.click(screen.getByTestId("edit-drill"));
     await user.type(box(), "B");
@@ -283,7 +320,7 @@ describe("the drills section", () => {
   it("ends the edit when the drill being edited is deleted", async () => {
     const user = userEvent.setup();
     saveCustomDrills([{ id: "custom/a", text: "AAA" }]);
-    open();
+    openOn("drills");
     await settle();
     await user.click(screen.getByTestId("edit-drill"));
     await user.click(screen.getByTestId("delete-drill"));
@@ -294,7 +331,7 @@ describe("the drills section", () => {
 
   it("says which details a saved drill still needs", async () => {
     saveCustomDrills([{ id: "custom/a", text: "DE {callsign}" }]);
-    open();
+    openOn("drills");
     await settle();
     expect(screen.getByTestId("drillrow").textContent).toMatch(/Needs Callsign/);
   });
@@ -302,7 +339,7 @@ describe("the drills section", () => {
   it("lists the slots with the user's values, and adds one at the cursor", async () => {
     const user = userEvent.setup();
     saveUser({ ...loadUser(), callsign: "W7YFR" });
-    open();
+    openOn("drills");
     await settle();
     expect(screen.queryByTestId("drill-help")).toBeNull();
     await user.click(screen.getByTestId("drill-help-toggle"));
@@ -319,7 +356,7 @@ describe("the drills section", () => {
 
   it("adds a slot picked from the menu at the cursor", async () => {
     const user = userEvent.setup();
-    open();
+    openOn("drills");
     await settle();
     await write("DE  K");
     box().setSelectionRange(3, 3);

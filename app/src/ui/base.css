@@ -56,6 +56,18 @@
 
 * { box-sizing: border-box; }
 
+/* The app's name in running text, always in the blue of your sending. */
+.appname { color: var(--you); }
+
+/* Room for the scrollbar is kept whether or not there is one, so a screen
+   that grows past the window does not narrow the page and move everything
+   centered to the left. On both edges, not just the right: the bands with a
+   background cannot paint into a gutter, so one on the right alone left a
+   strip there that the left side did not have. As a margin on each side it
+   is symmetric, and the page stays centered on the window. Where scrollbars
+   overlay the page and take no room, this does nothing. */
+html { scrollbar-gutter: stable both-edges; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -76,7 +88,13 @@ header {
   align-items: center;
   gap: 8px 20px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--line);
+  /* A panel like the others below it, hung from the top of the window: no
+     border and no rounding on the edge that meets the window. In from the
+     sides by the page's margin, so it lines up with the chart. */
+  margin: 0 20px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
   background: var(--panel);
   /* Pinned to the top as the page scrolls, so the way to record, start a
      session or open the settings is always in reach. Under the chart's
@@ -297,7 +315,10 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   display: flex;
   align-items: center;
   padding: 11px 20px;
-  border-bottom: 1px solid var(--line);
+  /* A panel, like the bands above it. */
+  margin: 12px 20px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   background: var(--panel);
 }
 /* Two rows, not one that wraps.
@@ -411,7 +432,6 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   order: 1;
 }
 .cornergroup .cornerbtn { position: static; }
-.cornergroup button:not(.iconbtn) { font-size: 12px; padding: 0 10px; }
 .srcrow { order: 2; }
 /* On a narrow screen the row takes a whole line, so the group goes beside the
    brand on the first line and the row below it. After the rules above, which
@@ -443,16 +463,20 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 200ms ease;
+  margin: 0 20px;
 }
 .chartsettings[data-open="true"] { grid-template-rows: 1fr; }
 /* The clip the roll happens inside. On the track's own child, since that is
    the box the track is sizing. */
 .chartsettings > div { overflow: hidden; }
-/* Inside the clip, so the rule under the band is revealed with the band rather
-   than sitting across the page waiting for it. */
+/* A panel, drawn inside the clip so it rolls open whole: its gap above, its
+   border and its corners all arrive with it, and closed it takes no room. */
 .chartsettings .viewpanel {
   padding: 10px 20px 12px;
-  border-bottom: 1px solid var(--line);
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
 }
 /* Asked not to animate: still opens, just already open. */
 @media (prefers-reduced-motion: reduce) {
@@ -470,7 +494,12 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
      was resized, and only the number of columns should change. */
   grid-template-columns: repeat(auto-fill, 180px);
   align-items: start;
-  gap: 16px 32px;
+  /* 20 between columns: six of them, Audio's two and one for each of the
+     other four sections, then fit one row in 1180px. Inside a panel, with its
+     margin, border and padding, that fits a window no wider than the one a
+     full-bleed band needed at 32. The columns stay 180: Break length and its
+     box need nearly all of one. */
+  gap: 16px 20px;
 }
 /* The recording modes, a row of their own under the rest, laid out on the
    same columns so their sections line up with the ones above. */
@@ -479,7 +508,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   display: grid;
   grid-template-columns: repeat(auto-fill, 180px);
   align-items: start;
-  gap: 16px 32px;
+  gap: 16px 20px;
 }
 /* Each mode's name, under the group's: the same caption, a step quieter. */
 .viewpanel .modesrow .uplabel { color: var(--ink-faint); }
@@ -491,7 +520,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    wide as its longest option, and a long microphone name pushed the
    calibration onto a line of its own. */
 .viewpanel [data-panel="audio"] .panelgroups { column-gap: 12px; }
-.viewpanel [data-panel="audio"] select { width: 150px; text-overflow: ellipsis; }
+.viewpanel [data-panel="audio"] select { width: 140px; text-overflow: ellipsis; }
 /* Out of the flow while empty, so it takes no gap. Not hidden: a live region
    that is not rendered does not announce what is written into it. */
 .viewpanel [data-panel="audio"] .hint:empty { position: absolute; }
@@ -543,7 +572,10 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   flex-wrap: wrap;
   gap: 10px 22px;
   padding: 12px 20px;
-  border-bottom: 1px solid var(--line);
+  /* A panel, like the header above it and the scores below. */
+  margin: 12px 20px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   background: var(--panel);
 }
 /* Two bands, and that is the whole of the alignment scheme.
@@ -799,7 +831,7 @@ button.alt.on { background: var(--tgt); border-color: var(--tgt); }
 }
 
 /* ---- canvas ------------------------------------------------------------ */
-.canvas-wrap { padding: 14px 20px 4px; }
+.canvas-wrap { padding: 12px 20px 0; }
 
 /* The canvas is always exactly the container's width and does its own
    scrolling, so there's no native scrollbar to clash with the dark panel — and
@@ -914,8 +946,9 @@ canvas.resizing { cursor: ew-resize; }
 .report {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 14px;
-  padding: 14px 20px 28px;
+  /* 12 above and between, the gap every panel on this screen keeps. */
+  gap: 12px;
+  padding: 12px 20px 28px;
   align-items: start;
 }
 .card {
@@ -1019,7 +1052,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
    26 of drawing is the 40 the page reserves — so nothing below moves to make
    room for it.
 
-   Drawn and coloured like the name in the review header, hover and all. Two
+   Drawn and colored like the name in the review header, hover and all. Two
    small drawings of two names, both of them links; a third treatment for the
    second one would be a difference that means nothing. */
 .callsign {
@@ -1126,98 +1159,89 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   font-size: 15px;
   line-height: 1.6;
 }
-.landing .ways {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  justify-content: center;
+.landing .lede + .start { margin-top: 6px; }
+/* The way in. The one large control on the screen, and the only one that
+   needs to be: everything else here is a line of small print around it. */
+.landing .start {
   width: 100%;
-  max-width: 780px;
-}
-/* Across both of the other two, because it is not a third way in — it is what
-   the other two are for. */
-.way.practice { flex: 1 1 100%; }
-/* Equal halves. Grown from a basis of their own content, the card holding a
-   device picker came out wider than the one holding a sentence — a difference
-   in width that says nothing, between two things offered as alternatives. */
-.landing .ways > .way:not(.practice) { flex: 1 1 0; min-width: min(320px, 100%); }
-
-.way {
-  flex: 1 1 320px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 22px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-}
-.way h2 {
-  margin: 0;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--ink-dim);
-}
-.way p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
-/* A state, not a caption. This is the whole of what the Record card can say
-   once the browser has blocked the microphone — there is no control under it,
-   because none of them would do anything — so it carries the card on its own
-   and is coloured like the condition it reports rather than like the small
-   print it sits at the size of. */
-.way .blocked {
-  color: var(--warn);
-  text-align: center;
-  padding: 4px 0;
   max-width: 320px;
+  height: auto;
+  padding: 13px 22px;
+  border-radius: 8px;
+  font-size: 16px;
 }
-/* The ways in. One width between them, so three buttons doing the same kind of
-   thing on one screen read as three of a kind rather than as a hierarchy
-   nobody intended — the widest was the one in the widest card, which is an
-   accident of layout rather than a claim about importance. */
-.way .big, .calibrate .big {
+.landing .openfile { font-size: 13px; }
+
+/* The calibration wizard's steps. One width between them, so the buttons
+   that move it on read as one kind of thing. */
+.calibrate .big {
   font-size: 14px;
   border-radius: 8px;
   width: 100%;
   max-width: 320px;
 }
-/* Taller than the page's one button height, and the one place that is worth
-   it: these are the whole of what the first screen asks, on a screen with room
-   to ask it. Everywhere else a button sits on a band of controls, where being
-   taller than its neighbors is a misalignment rather than an emphasis. */
-.way .big {
-  font-size: 15px;
-  height: auto;
-  padding: 11px 22px;
-}
-/* The picker above the button it feeds. Same width, because two controls
-   stacked on one card and doing one job should not be two widths. */
-.way select {
-  width: 100%;
-  max-width: 320px;
-}
-.way.drop.over { border-color: var(--you); background: var(--panel-2); }
 
-.intended-field {
+/* ---- a panel ------------------------------------------------------------- */
+
+/* One card holding a whole screen's content: a title, sections under rules,
+   and the way out at the foot. The calibration setup and result use it, and
+   so does Configuration. Left-aligned, because it is read rather than glanced
+   at, and a left edge is what the eye comes back to at every line. */
+.panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 16px;
   width: 100%;
-  max-width: 520px;
+  max-width: 600px;
+  box-sizing: border-box;
+  padding: 28px 32px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
   text-align: left;
 }
-/* A question, not a field label. Set as small uppercase tracking it read as
-   one more caption on a screen full of them and got skipped — and without it
-   the grading has only the decode to compare against, which is a meaningless
-   100% for accuracy. */
-.intended-field label {
-  font-size: 16px;
-  color: var(--ink);
-  text-align: center;
+.panel > h2 { margin: 0; font-size: 20px; }
+/* A switch between a panel's halves: sized to its words, not stretched. */
+.panel > .modeswitch { align-self: flex-start; }
+/* Wide enough for a chart, or for three fields on a row. */
+.panel.wide { max-width: 960px; }
+/* A section: under a rule, captioned the way the practice screen captions
+   its controls. */
+.panelsec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
 }
-.intended-field input { width: 100%; }
-.intended-field .hint { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.panelsec > .uplabel,
+.panelsec > h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+/* A labeled control in a panel: the name above it, small and uppercase. */
+.panelfield { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.panelfield .fieldname {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+/* The way on at the right, the other way at the left. */
+.panelfoot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 480px) {
+  .panel { padding: 22px 18px; }
+}
 
 /* ---- a dialog over the page ---------------------------------------------- */
 
@@ -1692,16 +1716,52 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
    and centering the items makes the order hard to follow. */
 .calibrate .preamble { display: flex; flex-direction: column; gap: 12px; }
 .calibrate .preamble p { margin: 0; }
-.calibrate .drilllist {
+/* A list you read down, so its own left edge, inset from the box it is in. */
+.calibrate .calsteps {
   margin: 0;
-  padding-left: 22px;
+  padding: 12px 18px 12px 38px;
   text-align: left;
   align-self: center;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
 }
-.calibrate .drilllist .hint { display: block; }
+.calibrate .calsteps .hint { display: block; }
+
+/* The wizard's setup and result are panels — see "a panel" below. Its steps
+   in between stay on the bare page: they are read from across a desk, and a
+   frame would only crowd them. */
+.calibrate .panel .lede,
+.calibrate .panel .advice { max-width: none; }
+.calibrate .panel .calsteps { align-self: stretch; }
+
+/* The two settings side by side, under the rule a section has. */
+.calibrate .calsetup {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px 32px;
+}
+.calibrate .calinput { display: flex; align-items: center; gap: 6px; }
+.calibrate .calinput input { width: 5em; text-align: center; }
+.calibrate .calinput .unit { font-size: 13px; color: var(--ink-dim); }
+.calibrate .calmic select { width: 100%; }
+/* As tall as the picker it stands in for, so the two fields line up. */
+.calibrate .calmic .micname {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calibrate .calkeeps { margin: 0; }
+
+@media (max-width: 480px) {
+  .calibrate .calsetup { grid-template-columns: 1fr; }
+}
 .calibrate .banner { border: 1px solid var(--line); border-radius: 8px; max-width: 52ch; }
 
 .calibrate .prompt {
@@ -1786,38 +1846,26 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
  * carried those three across a headline, a verdict word, a paragraph at the
  * bottom and a choice of buttons, which is four places to look before knowing
  * whether the thing worked. */
-.calibrate .outcome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  max-width: 56ch;
-  padding: 16px 20px;
-  border: 1px solid var(--line);
-  /* The tone reads off the top edge rather than off the text: a whole block of
-     colored words is harder to read than black ones, and a rule above the
-     headline is visible before the headline has been. */
-  border-top: 3px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-}
-.calibrate .outcome[data-tone="ok"] { border-top-color: var(--ok); }
-.calibrate .outcome[data-tone="warn"] { border-top-color: var(--warn); }
-.calibrate .outcome[data-tone="bad"] { border-top-color: var(--bad); }
+/* The answer, at the top of the result card. Its tone reads off the card's
+   top edge rather than off the text: a whole block of colored words is harder
+   to read than plain ones, and a rule above the headline is seen before the
+   headline is. */
+.calibrate .outcome { display: flex; flex-direction: column; gap: 8px; }
+.panel[data-tone="ok"] { border-top: 3px solid var(--ok); }
+.panel[data-tone="warn"] { border-top: 3px solid var(--warn); }
+.panel[data-tone="bad"] { border-top: 3px solid var(--bad); }
 /* The claim, set as the sentence the headline is short for. Full-strength ink
    against the advice below it, which is the next thing to do rather than the
    finding itself. */
-.calibrate .outcome .meaning {
-  margin: 0;
-  color: var(--ink);
-  line-height: 1.6;
-}
-.calibrate .outcome .advice { margin: 0; }
+.calibrate .outcome .explain { margin: 0; line-height: 1.6; color: var(--ink-dim); }
+/* One color for the whole paragraph: the headline above is the white. */
+.calibrate .outcome .explain .advice { color: inherit; }
+/* A drill with nothing in it. Still pointed at, so the reason shows. */
+.calibrate .sections button[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 
 .calibrate .readout {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 10px 26px;
   margin: 0;
 }
@@ -1830,16 +1878,8 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
 }
 .calibrate .readout dd { margin: 0; font-size: 15px; }
 
-/* The caption over the setup figures. Same treatment the other groups on this
-   screen get, so "what your setup does" and "what I heard" read as two shelves
-   of the same cabinet. */
-.calibrate > .uplabel {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--ink-dim);
-  margin-bottom: -6px;
-}
+.calibrate .panelsec .panelfield input[type="text"] { width: 100%; max-width: 420px; text-align: left; }
+
 
 .verdict.clean, .verdict.good { color: var(--ok); }
 .verdict.marginal { color: var(--warn); }
@@ -1850,31 +1890,10 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
    part of a calibration somebody can check with their own eyes. */
 /* Hearing each drill back. Worth having on a refusal above all: "the drills
    disagree" becomes obvious the moment the dah drill plays somebody's dits. */
-.calibrate .sections {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.calibrate .sections .uplabel {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--ink-dim);
-}
+.calibrate .sections .rowbuttons { justify-content: flex-start; }
 .calibrate .sections .ico { margin-right: 6px; font-style: normal; }
 
-.calibrate .readback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 18px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  max-width: 46ch;
-}
+.calibrate .readback { gap: 4px; }
 .calibrate .readback strong {
   font-family: var(--mono);
   font-size: clamp(16px, 2.6vw, 22px);
@@ -1949,19 +1968,17 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 26px;
+  align-items: center;
   padding: 28px 20px;
-  max-width: 780px;
-  margin: 0 auto;
   width: 100%;
+  box-sizing: border-box;
 }
-.setshead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.settings h2 { margin: 0; font-size: 20px; }
-.settings h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-dim); }
-.settings h4 { margin: 0 0 10px; font-size: 13px; color: var(--ink); }
+/* Three fields to a row, which is all the user details want. */
+.settings .panel { max-width: 780px; gap: 22px; }
 .settings .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
-.calsection { display: flex; flex-direction: column; gap: 20px; }
-.calsection > h3 { margin-bottom: -10px; }
+/* Rows sit a shade darker than the panel they are on, the way the calibration
+   steps do, or they vanish into it. */
+.panel .callist li { background: var(--bg); }
 .userfields {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1986,16 +2003,14 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
   border: 0;
   min-width: 0;
 }
-/* The section heading's type one step down, so a group reads as part of the
-   section and not as one more field. */
+/* A group within the section: a plain subheading, so it reads as neither
+   one more section caption nor one more field name. */
 .usergroup legend {
   padding: 0;
   margin: 6px 0 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--ink-dim);
+  color: var(--ink);
 }
 .callist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .callist li {
@@ -2015,8 +2030,7 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
 button.danger { border-color: var(--bad); color: var(--bad); }
 
 /* Custom drills: the text box, its help panel, and the saved list. */
-.drillsettings { display: flex; flex-direction: column; gap: 10px; }
-.drillsettings h3, .drillsettings .lede { margin-bottom: 0; }
+.drillsettings .lede { margin-bottom: 0; }
 .drillsettings .fieldrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .drillsettings .fieldrow label {
   font-size: 11px;
@@ -2079,6 +2093,9 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 /* Overriding the measurement. Below the preview, because a slider whose
    effect you cannot see is guesswork with extra steps. */
 .advanced { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.panel .advanced { align-items: flex-start; }
+.panel .advanced .advbody { align-items: flex-start; max-width: none; }
+.panel .advanced .sliderow { justify-content: flex-start; }
 .advanced .advbody {
   display: flex;
   flex-direction: column;
@@ -2123,53 +2140,31 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 
 .calibrate .advice { color: var(--ink); max-width: 46ch; }
 
-/* Whether this microphone has been measured, said out loud.
-   A panel rather than a line of controls, because it is the one thing on the
-   landing screen that silently changes every number the review will report —
-   see ui/Landing.tsx. */
-.calstatus {
+/* Which microphone, and whether it has been measured, said small under the way
+   in, under the microphone it is about — see ui/Landing.tsx. */
+.calline {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-2);
-}
-/* On the landing card, the same width as the button above it. Sized to its own
-   contents it came out narrower than everything it sits under, which reads as
-   a panel that failed to fill rather than as one that was meant to be small. */
-.way .calstatus {
-  width: 100%;
-  max-width: 320px;
-  box-sizing: border-box;
-}
-.calstatus .calstate {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
+  color: var(--ink-dim);
 }
-/* Centered under the panel's own width rather than starting at its left edge:
-   the card above it is a column of centered things, and one line beginning at
-   the margin reads as belonging to something else. The dot rides with the
-   words, which is the point of it. */
-.way .calstatus .calstate { justify-content: center; }
-/* Sized by its own words, like the line above it, rather than stretched to the
-   panel. The panel keeps the width every other control on the card has; what
-   is inside it is two centered runs of text, and a button filling the box
-   under a line that does not read as the wrong one being emphasized. */
-.way .calactions { justify-content: center; }
-.way .calactions button { flex: 0 0 auto; }
-/* Under the panel, and the quietest thing in it: it is the way out to reading
-   rather than one of the choices on offer. */
-.calstatus .calhelp { align-self: center; font-size: 12px; margin-top: -2px; }
-.calstatus .calstate b { font-weight: 600; }
-.calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.calline p { margin: 0; }
+.calline .calstate { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 8px; }
+.calline .calstate b { font-weight: 600; color: var(--ink); }
+.calline .calnum { font-variant-numeric: tabular-nums; }
+.calline .hint { font-size: 12px; }
+.calline .calstate .link { font-size: 13px; }
+/* The picker sets the width the line under it is read against, so it is not
+   left to size itself to the longest device name. */
+.calline select { width: 100%; max-width: 320px; margin-bottom: 4px; }
+.calline .micname { color: var(--ink); margin-bottom: 2px; }
+.calline .micblocked { color: var(--warn); margin-bottom: 2px; }
+.calline > .link { margin-bottom: 4px; }
 /* Not the recording light: this one does not blink, and its color is the
    whole message. */
-.calstatus .dot {
+.calline .dot {
   flex: none;
   width: 8px;
   height: 8px;
@@ -2177,18 +2172,8 @@ button.danger { border-color: var(--bad); color: var(--bad); }
   background: var(--ghost);
   transform: translateY(-1px);
 }
-.calstatus.ok .dot { background: var(--ok); }
-.calstatus.warn .dot { background: var(--warn); }
-.calstatus.none .dot { background: var(--warn); }
-.calstatus .hint { margin: 0; font-size: 12px; line-height: 1.5; }
-/* The button spans the panel. It is the only thing in here to do when nothing
-   has been calibrated, and a button sized to its own text reads as an aside. */
-.calactions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.calactions select { flex: 1 1 160px; min-width: 0; }
-.calactions button { flex: 1 1 100%; justify-content: center; }
-/* Once there is a calibration the panel has two things in it, and the pair
-   share the width rather than stacking. */
-.calactions select ~ button { flex: 0 1 auto; }
+.calline.ok .dot { background: var(--ok); }
+.calline.warn .dot, .calline.none .dot { background: var(--warn); }
 
 /* The same fact, in the room the review header has for it. */
 .calchip {

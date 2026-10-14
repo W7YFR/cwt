@@ -44,9 +44,9 @@ function bar(over: Partial<React.ComponentProps<typeof RecordBar>> = {}) {
 }
 
 /* The one button on this bar that needs a microphone, and the three things it
-   can mean. The landing screen splits ask-versus-record across two buttons
-   because it has the room; here the split is in what the click does, and the
-   states have to agree or the two screens teach different lessons. */
+   can mean. The split between asking and recording is in what the click does,
+   and the landing screen no longer asks first — so this is where a first
+   visit meets the question. */
 describe("the record button and the state of the microphone", () => {
   it("records, once there is a microphone to record from", () => {
     const start = vi.fn();
@@ -64,6 +64,8 @@ describe("the record button and the state of the microphone", () => {
     const button = screen.getByTestId("record-another");
     // Live, because there is something useful behind it.
     expect(button).toBeEnabled();
+    // In words, not only in a tooltip: a red dot promises a recording.
+    expect(button).toHaveTextContent(/allow microphone/i);
     button.click();
     /* The whole point: a take started here would come from whatever the
        default input happens to be, chosen by nobody. */

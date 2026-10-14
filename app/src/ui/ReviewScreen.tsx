@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IconDownload } from "./Icons";
+import { IconDownload, IconUser } from "./Icons";
 import { createPlayer, type PlaySide, type Player } from "@/audio/player";
 import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
@@ -827,17 +827,21 @@ export function ReviewScreen({
         />
 
         {/* The corner of the header, and last in it — which is where the eye
-            finds it and so where the tab order has to reach it. Advanced and
-            the cog are one group in the flow, pushed to the right end of the
-            first line: they never split, and the rest of the row takes the
-            width left of them. Advanced shows only while the settings are
-            open, before the cog so the cog stays the last stop. */}
+            finds it and so where the tab order has to reach it. Configuration
+            and the cog are one group in the flow, pushed to the right end of
+            the first line: they never split, and the rest of the row takes
+            the width left of them. Configuration comes first, so the cog stays
+            the last stop. */}
         <div className="cornergroup">
-          {chartSettings && (
-            <button data-testid="advanced" onClick={onConfigure}>
-              Advanced
-            </button>
-          )}
+          <button
+            className="iconbtn cornerbtn"
+            data-testid="advanced"
+            aria-label="Configuration"
+            title="Configuration"
+            onClick={onConfigure}
+          >
+            <IconUser />
+          </button>
           <ChartSettingsButton
             open={chartSettings}
             onToggle={toggleChartSettings}

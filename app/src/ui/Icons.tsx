@@ -96,6 +96,16 @@ export function IconCog(): React.ReactElement {
   );
 }
 
+/** You: a head over shoulders. Solid, like the cog it sits beside. */
+export function IconUser(): React.ReactElement {
+  return (
+    <Icon name="user">
+      <circle cx="8" cy="5.1" r="2.8" />
+      <path d="M2.6 14A5.4 4.9 0 0 1 13.4 14Z" />
+    </Icon>
+  );
+}
+
 /** The record dot. Colored by `.recdot` around it, like the character was. */
 export function IconRecord(): React.ReactElement {
   return (

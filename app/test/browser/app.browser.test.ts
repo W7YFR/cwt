@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App, BOOT_MESSAGE_DELAY_MS } from "@/ui/App";
+import { LANDING_VERSION } from "@/ui/Landing";
 import { loadPrefs, recallTake, rememberTake } from "@/io/storage";
 import { encodeWavBuffer } from "@/audio/wav";
 import { synthesize } from "@/audio/synth";
@@ -128,6 +129,7 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 afterEach(async () => {
@@ -172,28 +174,8 @@ async function drop(name: string) {
   });
 }
 
-/** Wait for the landing screen's Record card to know its own mind.
- *
- * Which control belongs in that card — record, ask for access, or a line
- * saying the browser has blocked it — is read off the device list, and until
- * that comes back the card holds nothing but its heading. That is a second
- * round trip after the database read, and a fixed wait that covered the first
- * did not reliably cover both: the card was still empty at 40ms and full by
- * 200ms on this machine, which is the kind of margin that passes here and
- * fails in CI.
- *
- * Returns immediately when there is no landing screen to wait for, so the
- * takes that mount straight into the review are unaffected. */
-async function landingSettled() {
-  for (let i = 0; i < 100; i++) {
-    const card = container.querySelector(".ways > .way");
-    // Its heading alone means the card is still deciding.
-    if (!card || card.childElementCount > 1) return;
-    await act(async () => {
-      await new Promise((res) => setTimeout(res, 20));
-    });
-  }
-}
+/** The landing screen is on the page. */
+const onLanding = () => container.querySelector("[data-testid='practice']") !== null;
 
 async function mount() {
   root = createRoot(container);
@@ -205,13 +187,12 @@ async function mount() {
   await act(async () => {
     await new Promise((res) => setTimeout(res, 40));
   });
-  await landingSettled();
 }
 
 describe("the app", () => {
   it("shows the landing screen when nothing was handed to it", async () => {
     await mount();
-    expect(container.textContent).toContain("Start recording");
+    expect(onLanding()).toBe(true);
     expect(container.querySelector("canvas")).toBeNull();
   });
 
@@ -269,16 +250,15 @@ describe("the app", () => {
     // Mid-boot: the gate is up, and it is saying nothing.
     expect(container.querySelector(".busy")).not.toBeNull();
     expect(container.textContent).not.toMatch(/loading|looking/i);
-    expect(container.textContent).not.toContain("Start recording");
+    expect(onLanding()).toBe(false);
 
     // Finish well inside the delay, the way a real boot does.
     await act(async () => {
       release();
       await new Promise((res) => setTimeout(res, 80));
     });
-    // The gate is down; the Record card still has its own lookup to finish.
-    await landingSettled();
-    expect(container.textContent).toContain("Start recording");
+    // The gate is down.
+    expect(onLanding()).toBe(true);
     expect(container.textContent).not.toMatch(/loading|looking/i);
   });
 
@@ -300,7 +280,7 @@ describe("the app", () => {
     });
     expect(container.textContent).toMatch(/looking for your last session/i);
     // And it is still a gate: the landing screen has not been let through.
-    expect(container.textContent).not.toContain("Start recording");
+    expect(onLanding()).toBe(false);
     await act(async () => {
       release();
       await new Promise((res) => setTimeout(res, 20));
@@ -486,9 +466,7 @@ const showDownloads = () => tickSetting("show-downloads");
     await act(async () => {
       brand.click();
     });
-    // A fresh landing screen, so a fresh look at the device list.
-    await landingSettled();
-    expect(container.textContent).toContain("Start recording");
+    expect(onLanding()).toBe(true);
   });
 
   /* Two tests rather than one with an unmount in the middle of it.
@@ -709,10 +687,12 @@ const showDownloads = () => tickSetting("show-downloads");
        a few pixels high. */
     const outer = band.getBoundingClientRect();
     const inner = scores.getBoundingClientRect();
-    // Against the interior: the rule under the band is part of its border box
-    // and would count as a pixel of space that is not space.
-    const rule = parseFloat(getComputedStyle(band).borderBottomWidth) || 0;
-    expect(inner.top - outer.top).toBeCloseTo(outer.bottom - rule - inner.bottom, 0);
+    // Against the interior: the band's borders are part of its border box and
+    // would count as space that is not space.
+    const style = getComputedStyle(band);
+    const top = parseFloat(style.borderTopWidth) || 0;
+    const bottom = parseFloat(style.borderBottomWidth) || 0;
+    expect(inner.top - outer.top - top).toBeCloseTo(outer.bottom - bottom - inner.bottom, 0);
   });
 
   it("reaches the corner button where the eye finds it, last in the header", async () => {
@@ -760,9 +740,10 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
-  it("puts Advanced beside the cog while settings are open", async () => {
+  it("keeps Configuration beside the cog, open or closed", async () => {
     /* Grouped with the cog in the flow: the two never split, and the row
-       takes the width left of them rather than running underneath. */
+       takes the width left of them rather than running underneath. Always
+       there, so the way to Configuration is not hidden behind the cog. */
     const [w, h] = [window.innerWidth, window.innerHeight];
     await page.viewport(1600, 900);
     try {
@@ -772,15 +753,20 @@ const showDownloads = () => tickSetting("show-downloads");
       const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
       const row = container.querySelector<HTMLElement>("header .recordbar")!;
       const first = () => row.querySelector("button")!.getBoundingClientRect();
-      expect(advanced(), "hidden while settings are closed").toBeNull();
+      const beside = () => {
+        const a = advanced()!.getBoundingClientRect();
+        const c = cog.getBoundingClientRect();
+        expect(c.left - a.right, "just left of the cog").toBeCloseTo(8, 0);
+        expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
+      };
+      expect(advanced(), "there while settings are closed").not.toBeNull();
+      expect(advanced()!.getAttribute("aria-label")).toBe("Configuration");
+      beside();
       const before = first();
 
       await act(async () => cog.click());
       const controls = [...container.querySelectorAll<HTMLElement>("header button, header select")];
-      const a = advanced()!.getBoundingClientRect();
-      const c = cog.getBoundingClientRect();
-      expect(c.left - a.right, "just left of the cog").toBeCloseTo(8, 0);
-      expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
+      beside();
       expect(first().top, "the row stays where it was").toBeCloseTo(before.top, 0);
       expect(first().left).toBeCloseTo(before.left, 0);
 
@@ -1082,6 +1068,57 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(container.querySelector("[data-testid='practice']")).not.toBeNull();
   });
 
+  describe("the landing screen on a returning visit", () => {
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
+    /* A new visit rather than a reload: a new tab starts with an empty
+       session storage, and the visitor's preferences are still there. */
+    const revisit = async () => {
+      sessionStorage.clear();
+      await reload();
+    };
+
+    it("is passed once it has been passed", async () => {
+      await mount();
+      expect(onLanding(), "a first visit").toBe(true);
+      await act(async () => {
+        container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
+      });
+      expect(loadPrefs().landingSeen).toBe(LANDING_VERSION);
+
+      // Left on the landing screen, so only the pass can explain a skip.
+      await act(async () => {
+        container.querySelector<HTMLButtonElement>(".brandmark")!.click();
+      });
+      await revisit();
+      expect(onLanding(), "a returning visit").toBe(false);
+      expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank")).toBe("true");
+    });
+
+    it("comes back once its version is raised", async () => {
+      localStorage.setItem("cwt:prefs", JSON.stringify({ landingSeen: LANDING_VERSION - 1 }));
+      await mount();
+      expect(onLanding()).toBe(true);
+    });
+
+    it("stays for a reload once it has been asked for", async () => {
+      localStorage.setItem("cwt:prefs", JSON.stringify({ landingSeen: LANDING_VERSION }));
+      await mount();
+      expect(onLanding(), "passed").toBe(false);
+      await act(async () => {
+        container.querySelector<HTMLButtonElement>(".brandmark")!.click();
+      });
+      await reload();
+      expect(onLanding(), "the reload").toBe(true);
+      await revisit();
+      expect(onLanding(), "the next visit").toBe(false);
+    });
+  });
+
   it("puts the repeat count beside the message, not under it", async () => {
     /* The message group claims a whole row by itself — it is the only control
        here whose useful width has no upper bound — so a small field after it
@@ -1143,7 +1180,10 @@ const showDownloads = () => tickSetting("show-downloads");
 
     const box = mark.getBoundingClientRect();
     expect(Math.round(box.top)).toBe(14);
-    expect(Math.round(box.left)).toBe(20);
+    /* From the page's own edge, not the window's: the scrollbar gutter is kept
+       on both sides, so where scrollbars take room the page starts inside it. */
+    const page = container.querySelector<HTMLElement>(".app")!.getBoundingClientRect();
+    expect(Math.round(box.left - page.left)).toBe(20);
     // Fitted to a row height, like the drawing in the review header.
     expect(Math.round(box.height)).toBe(26);
 
@@ -1568,7 +1608,7 @@ const showDownloads = () => tickSetting("show-downloads");
 
     expect(container.textContent).toContain(TAKE.source);
     expect(container.querySelector("canvas")).not.toBeNull();
-    expect(container.textContent).not.toContain("Start recording");
+    expect(onLanding()).toBe(false);
   });
 
   it("stays on the landing screen after you deliberately start over", async () => {
@@ -1591,7 +1631,7 @@ const showDownloads = () => tickSetting("show-downloads");
       async () => new Response("", { status: 404 }),
     ) as unknown as typeof fetch;
     await mount();
-    expect(container.textContent).toContain("Start recording");
+    expect(onLanding()).toBe(true);
   });
 
   it("never lands the keyboard on the file dialog itself", async () => {
@@ -1604,7 +1644,7 @@ const showDownloads = () => tickSetting("show-downloads");
        to do by hiding the whole feature from the keyboard, which is worse than
        the problem. */
     for (const [screen, opener] of [
-      ["landing", ".way.drop button"],
+      ["landing", ".landing .openfile"],
       ["review", "[data-testid='open-file']"],
     ] as const) {
       if (screen === "review") await served();

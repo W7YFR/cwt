@@ -7,6 +7,37 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.8.0 — 2026-10-14
+
+### Changed
+
+- The start screen leads with **Start practicing**, and Enter presses it, with the microphone, its calibration and **or open a recording** under it. Recording and the intended message are on the practice screen only.
+- A returning visit skips the start screen and opens on the practice screen.
+- Before the browser allows the microphone, the record button reads **Allow microphone**.
+- The calibration setup sits on a card, with left-aligned text. **Keyer speed** and **Microphone** sit side by side, and the microphone is named even when there is only one.
+- The calibration result sits on a card too. A failed one says **Let’s try that again…**, and **Your setup** names the speed it judges, such as **At 25 wpm**.
+- A successful calibration says **Success!**, and a short tail is rated **Excellent**.
+- When the calibration drills disagree but the setup is fine, the result says so and asks only for a new recording.
+- A calibration result with nothing to save no longer shows the **With this calibration** chart.
+- A user icon beside the settings cog opens **Configuration**, in place of the **Advanced** button. It shows whether the settings are open or not.
+- **Configuration** sits on a card like the calibration screens, with **Done** at the bottom. A switch shows one part at a time: **User**, **Drills** or **Calibration**.
+- **Need help?** explains how to get your keying into CWT in shorter, plainer words.
+- On the practice screen, the header, the chart settings, the speeds and message, and the scores sit on panels like the rest of the app.
+- Under **Calibration recordings**, a recording saved as a calibration shows that calibration's name, and **Save** puts the name at the front of the file.
+
+### Fixed
+
+- The list of calibration prompts no longer runs into its border.
+- Opening the settings no longer shifts the page sideways when a scrollbar appears.
+- A successful calibration's explanation no longer contradicts the correction it found.
+- Clicking the charts on a calibration result plays the target or your recording. The note under a single chart no longer says **Both**.
+- A calibration result has a play button for every drill, named, rather than **Other keying**. A drill with nothing in it is grayed out, and its tooltip says it was not captured.
+
+### Development
+
+- On the dev server, `?calexample` lists one real calibration for each result, and `?calexample=success`, `clean`, `noisy` or `failed` opens one. Builds leave it out.
+- Raise `LANDING_VERSION` in `app/src/ui/Landing.tsx` to show the start screen once more to returning visitors.
+
 ## v1.7.0 — 2026-10-14
 
 ### Added

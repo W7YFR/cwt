@@ -379,15 +379,14 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
        reads as a finding on a screen already reporting that something went
        wrong, and it is not one. */
     expect(screen.queryByTestId("verdict")).toBeNull();
-    // Nothing to play back either — every section of it is silence.
+    // Nothing to play back either — no drill has anything in it.
     expect(screen.queryByTestId("sections")).toBeNull();
   });
 
-  it("offers each stretch of the recording back, named", async () => {
-    /* The wizard's own account of what it heard. On a refusal this is the
-       most useful thing on the screen: hearing the dah drill play back
-       somebody's dits explains "the drills disagree" in a way the number
-       cannot. */
+  it("offers each drill of the recording back, named", async () => {
+    /* On a refusal this is the most useful thing on the screen: hearing the
+       dah drill play back somebody's dits explains "the drills disagree" in a
+       way the number cannot. */
     const user = userEvent.setup();
     renderWizard();
     await begin(user);
@@ -395,7 +394,7 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     await screen.findByTestId("outcome");
 
     const buttons = screen.getAllByTestId("section-play");
-    expect(buttons.length).toBeGreaterThanOrEqual(DRILLS.length);
+    expect(buttons.map((b) => b.dataset.section)).toEqual(DRILLS.map((d) => d.key));
     // Named, not numbered — the label is what makes hearing it useful.
     for (const b of buttons) expect(b.textContent!.trim().length).toBeGreaterThan(2);
   });

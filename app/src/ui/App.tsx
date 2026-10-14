@@ -12,22 +12,25 @@ import {
 } from "@/io/profiles";
 import {
   loadPrefs,
+  recallLandingAsked,
+  recallLandingSeen,
   recallSelected,
   recallSession,
   recallPracticing,
   recallTake,
+  rememberLandingAsked,
+  rememberLandingSeen,
   savePrefs,
 } from "@/io/storage";
 import type { AudioClip } from "@/types";
 import { APP_VERSION } from "@/build-info";
 import { Calibrate } from "./Calibrate";
-import { Landing } from "./Landing";
+import { LANDING_VERSION, Landing } from "./Landing";
 import { Settings } from "./Settings";
 import { ReviewScreen } from "./ReviewScreen";
 import { useFileDrop } from "./useFileDrop";
 import { OPEN_FILE_CLOSED } from "./copy";
 import { useMicAccess } from "./useMicAccess";
-import { recordLimit } from "./pacing";
 import { useTake } from "./useTake";
 
 /** How long the boot may take before it says anything.
@@ -66,6 +69,25 @@ export function App(): React.ReactElement {
   const [slowBoot, setSlowBoot] = useState(false);
   const [opening, setOpening] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
+  /* Dev only: `?calexample` lists real calibrations, one for each outcome,
+     and `?calexample=success` (or clean, noisy, failed) opens one. Imported
+     dynamically inside the DEV check, so a build leaves the module out. */
+  const [calExample, setCalExample] = useState<{ clip: AudioClip; wpm: number } | undefined>();
+  const [devScreen, setDevScreen] = useState<React.ReactElement | null>(null);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const name = new URLSearchParams(window.location.search).get("calexample");
+    if (name === null) return;
+    void import("./calExample").then(async (m) => {
+      if (!m.isCalExample(name)) {
+        setDevScreen(<m.CalExamplePicker />);
+        return;
+      }
+      const clip = await m.loadCalExample(name);
+      setCalExample({ clip, wpm: m.EXAMPLE_WPM });
+      setCalibrating(true);
+    });
+  }, []);
   const [configuring, setConfiguring] = useState(false);
 
   /* Which calibration is being applied, held here because it changes what the
@@ -89,7 +111,9 @@ export function App(): React.ReactElement {
   /* Where a session comes from on the way in.
      1. The session you were in the middle of, out of IndexedDB. A reload must
         not drop recordings you just spent a minute keying.
-     2. Nothing, which is the ordinary first visit and not an error. */
+     2. The practice screen, for a visitor who has passed through this
+        landing screen before — unless this tab went back to it.
+     3. Nothing, which is the ordinary first visit and not an error. */
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -125,6 +149,10 @@ export function App(): React.ReactElement {
           if (recallPracticing()) {
             take.reset({ expected: loadPrefs().expected ?? "" });
             setRestored(true);
+          } else if (!recallLandingAsked() && recallLandingSeen() >= LANDING_VERSION) {
+            /* Not restored: nothing was left open, so the chart fits as it
+               does on any new arrival. */
+            take.reset({ expected: loadPrefs().expected ?? "" });
           }
           return;
         }
@@ -190,6 +218,15 @@ export function App(): React.ReactElement {
     scroller.scrollTop = 0;
   }, [screen]);
 
+  /* Reaching the review by any way in — the button, a file, a session brought
+     back — is having passed the landing screen. From then on a visit opens
+     onto the review. */
+  useEffect(() => {
+    if (screen !== "review") return;
+    rememberLandingSeen(LANDING_VERSION);
+    rememberLandingAsked(false);
+  }, [screen]);
+
   const chooseDevice = useCallback((id: string | undefined) => {
     setDeviceId(id);
     const next = { ...loadPrefs() };
@@ -247,12 +284,6 @@ export function App(): React.ReactElement {
       }
     },
     [intended, profile, take],
-  );
-
-  // The landing screen records against the intended message at the set speeds.
-  const landingLimit = useMemo(
-    () => recordLimit({ ...take.settings, expected: intended }) ?? undefined,
-    [intended, take.settings],
   );
 
   /* Opening a file lives here rather than on the landing screen, because a
@@ -331,7 +362,7 @@ export function App(): React.ReactElement {
         </p>
       )}
 
-      {opening ? (
+      {devScreen ?? (opening ? (
         <div className="busy" role="status">
           measuring your sending…
         </div>
@@ -358,6 +389,7 @@ export function App(): React.ReactElement {
       ) : calibrating ? (
         <Calibrate
           current={profile}
+          example={calExample}
           deviceId={deviceId}
           onConfigure={() => {
             setError(null);
@@ -369,6 +401,7 @@ export function App(): React.ReactElement {
             setProfiles(loadProfiles());
             setProfileId(saved.id);
             setCalibrating(false);
+            setCalExample(undefined);
             take.adoptSavedSpeed();
           }}
           /* Both ways out, because the speed is stated when the wizard starts
@@ -377,6 +410,7 @@ export function App(): React.ReactElement {
              that follows is at that speed either way. */
           onClose={() => {
             setCalibrating(false);
+            setCalExample(undefined);
             take.adoptSavedSpeed();
           }}
         />
@@ -435,33 +469,29 @@ export function App(): React.ReactElement {
           }}
           onBack={() => {
             take.clear();
+            rememberLandingAsked(true);
             setRestored(false);
             setError(null);
           }}
         />
       ) : (
         <Landing
-          expected={intended}
-          onExpectedChange={chooseIntended}
-          onAudio={onAudio}
-          onFile={(file) => void openFile(file)}
-          onError={setError}
-          maxSeconds={landingLimit}
-          deviceId={deviceId}
-          onDeviceChange={chooseDevice}
-          profiles={profiles}
-          profileId={profileId}
-          onProfileChange={chooseProfile}
-          onCalibrate={() => {
-            setError(null);
-            setCalibrating(true);
-          }}
           onPractice={() => {
             setError(null);
             take.reset({ expected: intended });
           }}
+          onFile={(file) => void openFile(file)}
+          onError={setError}
+          deviceId={deviceId}
+          onDeviceChange={chooseDevice}
+          profiles={profiles}
+          profileId={profileId}
+          onCalibrate={() => {
+            setError(null);
+            setCalibrating(true);
+          }}
         />
-      )}
+      ))}
 
       <Footer />
     </div>

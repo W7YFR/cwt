@@ -28,6 +28,7 @@ import {
   analyzeCalibration,
   cueCount,
   playablesOf,
+  setupIsFine,
   type Drill,
   type CalibrationRun,
 } from "@/io/calibration";
@@ -47,7 +48,7 @@ import {
 import type { AudioClip } from "@/types";
 import { IconPlay, IconStop } from "./Icons";
 import { Cog, DevicePicker, LevelMeter, RecDot } from "./Record";
-import { APP_NAME } from "./Wordmark";
+import { AppName } from "./Wordmark";
 import { useRecorder } from "./useRecorder";
 
 /** Speed to offer first, when nothing better is known. Slow enough that a room
@@ -158,6 +159,9 @@ export interface CalibrateProps {
   onConfigure(): void;
   /** Injected so a test does not have to mock the clock. */
   now?(): Date;
+  /** Dev only: open straight on the result for this recording, keyed at
+   *  this speed. Nothing is kept. See ui/calExample.ts. */
+  example?: { clip: AudioClip; wpm: number } | undefined;
 }
 
 /** The wizard, with the one way to the configuration screen beside it.
@@ -251,6 +255,17 @@ function Wizard(props: CalibrateProps): React.ReactElement {
   /* The id of the attempt just recorded, so saving a profile can point back at
      the audio it came from. */
   const attempt = useRef<string | null>(null);
+
+  // Dev only, once: the example recording, analyzed as a take would be.
+  const example = props.example;
+  useEffect(() => {
+    if (!example) return;
+    setWpmText(String(example.wpm));
+    setClip(example.clip);
+    const forAnalysis = normalized(example.clip);
+    setRun(analyzeCalibration(forAnalysis.samples, forAnalysis.rate, example.wpm));
+    setStage("result");
+  }, [example]);
 
   const rec = useRecorder({ deviceId: props.deviceId, onClip, onError });
 
@@ -466,65 +481,93 @@ function Wizard(props: CalibrateProps): React.ReactElement {
 
   return (
     <div className="calibrate">
-      <h2>Calibrate your microphone.</h2>
+      {/* On a card, so the setup reads as one contained thing rather than a
+          column of loose text and controls on the bare page. */}
+      <div className="panel">
+        <h2>Calibrate your microphone.</h2>
 
-      <div className="lede preamble" data-testid="setup-note">
-        <p>
-          The best way to use {APP_NAME} is by connecting your keyer&rsquo;s
-          sidetone directly to your computer. This prevents microphone issues
-          that make it difficult to process your keying. If a direct line in is
-          not possible, calibration is your next best option.
-        </p>
-        <p>
-          During calibration you will receive {DRILLS.length} prompts, separated
-          by a {REST_SEC} second pause. In order, you will send:
-        </p>
-        {/* Built from the drill list rather than retyped beside it, so the
-            promise on this screen and the sequence that follows cannot drift
-            apart — the count, the order and the length of the message are all
-            the same constants the recording runs on. */}
-        <ol className="drilllist" data-testid="drilllist">
-          {DRILLS.map((d) => (
-            <li key={d.key} data-step={d.key}>
-              {d.summary}
-              {d.note && <span className="hint"> {d.note}</span>}
-            </li>
-          ))}
-        </ol>
-      </div>
+        <div className="lede preamble" data-testid="setup-note">
+          <p>
+            The best way to use <AppName /> is
+            by connecting your keyer&rsquo;s sidetone directly to your computer. This prevents microphone issues
+            that make it difficult to process your keying.
+          </p>
+          <p>If a direct line in is not possible, calibration is your next best option.</p>
+          <p>
+            During calibration you will receive {DRILLS.length} prompts, separated
+            by a {REST_SEC} second pause.
+            <br />
+            In order, you will send:
+          </p>
+          {/* Built from the drill list rather than retyped beside it, so the
+              promise on this screen and the sequence that follows cannot drift
+              apart — the count, the order and the length of the message are all
+              the same constants the recording runs on.
 
-      {props.current && (
-        <p className="hint" data-testid="keeps-current">
-          <b>Note:</b> Your previous calibration <b>{props.current.nickname}</b> will be retained.<br />
-          Running the wizard again creates a new
-          calibration and keeps the old ones.
-        </p>
-      )}
+              Not `drilllist`: that is the drill picker's scrolling box, and its
+              border and zero padding came along with the name. */}
+          <ol className="calsteps" data-testid="drilllist">
+            {DRILLS.map((d) => (
+              <li key={d.key} data-step={d.key}>
+                {d.summary}
+                {d.note && <span className="hint"> {d.note}</span>}
+              </li>
+            ))}
+          </ol>
+        </div>
 
-      <label className="field row">
-        <span className="fieldname">Keyer speed</span>
-        <input
-          type="number"
-          min={5}
-          max={40}
-          value={wpmText}
-          aria-label="Keyer speed in words per minute"
-          onChange={(e) => setWpmText(e.target.value)}
-        />
-      </label>
+        {/* The two things to set, side by side under one rule, each named
+            above its control. Stacked and centered they read as a column of
+            unrelated leftovers. */}
+        <div className="panelsec calsetup">
+          <label className="panelfield">
+            <span className="fieldname">Keyer speed</span>
+            <span className="calinput">
+              <input
+                type="number"
+                min={5}
+                max={40}
+                value={wpmText}
+                aria-label="Keyer speed in words per minute"
+                onChange={(e) => setWpmText(e.target.value)}
+              />
+              <span className="unit">wpm</span>
+            </span>
+          </label>
 
-      <DevicePicker
-        label="Microphone"
-        devices={rec.devices}
-        value={props.deviceId}
-        onChange={props.onDeviceChange}
-      />
+          {/* Named even with one input, so you know what you are about to
+              calibrate. A choice only where there is one. */}
+          {rec.devices.length > 0 && (
+            <div className="panelfield calmic">
+              <span className="fieldname">Microphone</span>
+              {rec.devices.length > 1 ? (
+                <DevicePicker
+                  devices={rec.devices}
+                  value={props.deviceId}
+                  onChange={props.onDeviceChange}
+                />
+              ) : (
+                <span className="micname">{rec.devices[0]!.label}</span>
+              )}
+            </div>
+          )}
+        </div>
 
-      <div className="rowbuttons">
-        <button className="big" onClick={() => void start()}>
-          <RecDot /> Start calibrating
-        </button>
-        <button onClick={props.onClose}>Back</button>
+        {props.current && (
+          <p className="hint calkeeps" data-testid="keeps-current">
+            Your calibration <b>{props.current.nickname}</b> is kept. This one
+            is saved beside it.
+          </p>
+        )}
+
+        {/* The way on at the right and the way back at the left, the order
+            every dialog puts them in. */}
+        <div className="panelfoot">
+          <button onClick={props.onClose}>Back</button>
+          <button className="primary" onClick={() => void start()}>
+            <RecDot /> Start calibrating
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -614,7 +657,7 @@ interface ResultProps {
    screen "nothing to correct" is the headline's job and two of them side by
    side read as one finding said twice. */
 const VERDICT_LABEL: Record<string, string> = {
-  clean: "No tail at all",
+  clean: "Excellent",
   good: "Good",
   marginal: "Marginal",
   unusable: "Not usable",
@@ -642,10 +685,10 @@ export function outcomeOf(run: CalibrationRun): Outcome {
 }
 
 const HEADLINE: Record<Outcome, string> = {
-  failed: "Couldn't measure it",
+  failed: "Let’s try that again…",
   noisy: "The drills didn't agree",
   clean: "Nothing to correct",
-  measured: "Measured",
+  measured: "Success!",
 };
 
 /** Whether this outcome is one to be pleased about, for the color. Three
@@ -676,7 +719,7 @@ function Sections({
 
   useEffect(() => () => player.current?.destroy(), []);
 
-  const parts = clip ? playablesOf(run) : [];
+  const parts = clip ? playablesOf(run, clip.samples.length / clip.rate) : [];
 
   const play = (key: string, fromSec: number, toSec: number) => {
     if (!clip) return;
@@ -693,10 +736,11 @@ function Sections({
     void player.current.playBuffer(bytes.current, fromSec, toSec);
   };
 
-  if (parts.length === 0) return null;
+  // Nothing keyed at all: four buttons that play nothing would be noise.
+  if (!parts.some((p) => p.captured)) return null;
 
   return (
-    <div className="sections" data-testid="sections">
+    <section className="panelsec sections" data-testid="sections">
       <span className="uplabel">What I heard</span>
       <div className="rowbuttons">
         {parts.map((p) => (
@@ -704,14 +748,20 @@ function Sections({
             key={p.key}
             data-testid="section-play"
             data-section={p.key}
-            onClick={() => play(p.key, p.fromSec, p.toSec)}
+            /* Barred with aria-disabled rather than disabled, so the pointer
+               still reaches the reason. */
+            aria-disabled={!p.captured || undefined}
+            title={p.captured ? undefined : "Not captured: nothing was heard while this drill ran."}
+            onClick={() => {
+              if (p.captured) play(p.key, p.fromSec, p.toSec);
+            }}
           >
             <i className="ico">{playing === p.key ? <IconStop /> : <IconPlay />}</i>
             {p.label}
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -849,171 +899,204 @@ function Result(props: ResultProps): React.ReactElement {
     outcome === "failed"
       ? run.problem
       : outcome === "measured"
-        ? "There is a correction here worth storing. Saved, every recording from this setup is read through it."
+        ? (
+            <>
+              Your setup makes every element a little longer than you sent it.
+              Save this calibration, and <AppName />{" "}
+              corrects for that in every recording you make with this setup.
+            </>
+          )
         : outcome === "clean"
           ? "Your elements are arriving the length they were sent, so there is nothing to take back off."
-          : `The two drills landed ${ms(run.calibration!.spreadSec)} apart, so there is no single number to take from them.`;
+          : /* The recording's fault, not the setup's, and when the setup is fine that
+               has to come first — or the amber headline and a green
+               "Excellent" below it read as two answers to one question. */
+            `${setupIsFine(run.quality) ? "Your setup looks fine, but the" : "The"} held dits and held dahs came out ${ms(run.calibration!.spreadSec)} apart, so there is no single correction to take from them.`;
 
   return (
     <div className="calibrate result">
-      {/* One block, at the top, answering the only question anybody brings to
-          this screen: did that work, and what do I do now. What it concluded,
-          what that means in this recording's numbers, and what to do about it
-          — in that order, and nowhere else on the page. Everything below is
-          evidence for it rather than more findings to weigh. */}
-      <div
-        className="outcome"
-        data-testid="outcome"
-        data-outcome={outcome}
-        data-tone={TONE[outcome]}
-        // Kept alongside: "did it measure anything" and "is there anything to
-        // store" are still the two facts the rest of the screen branches on.
-        data-usable={String(run.usable)}
-        data-nothing={String(nothing && run.usable)}
-      >
-        <h2>{HEADLINE[outcome]}</h2>
-        {meaning && (
-          <p className="meaning" role={outcome === "failed" ? "alert" : undefined}
-             data-reason={run.reason ?? ""}>
-            {meaning}
+      {/* One card, like the setup before it: the answer at the top, then the
+          evidence for it in sections under rules, then the way on. Read down
+          a left edge rather than a centered column. */}
+      <div className="panel wide" data-tone={TONE[outcome]}>
+        {/* What it concluded, what that means in this recording's numbers, and
+            what to do about it — in that order, and nowhere else on the page.
+            Everything below is evidence for it rather than more findings. */}
+        <div
+          className="outcome"
+          data-testid="outcome"
+          data-outcome={outcome}
+          data-tone={TONE[outcome]}
+          // Kept alongside: "did it measure anything" and "is there anything to
+          // store" are still the two facts the rest of the screen branches on.
+          data-usable={String(run.usable)}
+          data-nothing={String(nothing && run.usable)}
+        >
+          <h2>{HEADLINE[outcome]}</h2>
+          {/* One paragraph. As two, the gap between them fell in the middle of
+              three sentences and read as a mistake. */}
+          <p className="explain">
+            {meaning && (
+              <span className="meaning" role={outcome === "failed" ? "alert" : undefined}
+                    data-reason={run.reason ?? ""}>
+                {meaning}
+              </span>
+            )}
+            {meaning && " "}
+            <span className="advice" data-testid="advice">{run.advice}</span>
           </p>
-        )}
-        <p className="lede advice" data-testid="advice">{run.advice}</p>
-      </div>
-
-      {/* Captioned, because these are about the path between your keyer and the
-          decoder — what it does to the end of an element — and unlabeled under
-          a headline about the calibration they read as a second opinion on it.
-          A setup can be marginal and still have nothing to correct. */}
-      <span className="uplabel">What your setup does</span>
-      <dl className="readout">
-        {told && (
-          <div>
-            <dt>Verdict</dt>
-            <dd
-              className={`verdict ${run.quality.verdict}`}
-              data-testid="verdict"
-              data-verdict={run.quality.verdict}
-            >
-              {verdictLabel}
-            </dd>
-          </div>
-        )}
-        {Number.isFinite(run.quality.decaySec) && (
-          <div>
-            <dt title={CAL_TAIL_HELP}>Tail</dt>
-            <dd>{ms(run.quality.decaySec)} after each element</dd>
-          </div>
-        )}
-        {Number.isFinite(run.quality.maxWpm) && (
-          <div>
-            {/* "Good to 18 wpm" is the sentence somebody wants; "Max WPM 18"
-                is the same number filed under a heading they have to turn back
-                into one. */}
-            <dt title={CAL_MAXWPM_HELP}>Good to</dt>
-            <dd>{run.quality.maxWpm} wpm</dd>
-          </div>
-        )}
-        {run.calibration && !nothing && (
-          <div>
-            <dt title={CAL_CORRECTION_HELP}>Correction</dt>
-            {/* Says what happens, rather than naming a direction and leaving
-                the reader to work out whose. The offset is not removed from
-                the recording — it is moved across the boundary between a mark
-                and the silence after it, which is exactly where a tail put it
-                in the first place. */}
-            <dd>{ms(run.calibration.releaseOffsetSec)} moves from the mark to the gap</dd>
-          </div>
-        )}
-      </dl>
-
-      <Sections run={run} clip={props.clip} />
-
-      {run.readback && (
-        <div className="readback" data-testid="readback">
-          <span className="uplabel">What I read back</span>
-          <strong data-testid="readback-text">{run.readback.text}</strong>
-          <span className="hint">at {run.readback.charWpm.toFixed(1)} wpm</span>
         </div>
-      )}
 
-      {props.clip && (
-        <>
-          {/* The readback says whether the decode is right. A calibration is
-              about whether the *lengths* are right, and only the chart shows
-              that — so the target is worth asking for here even though the
-              drill did not. */}
-          <label className="field">
-            <span className="fieldname">What did you send?</span>
-            <input
-              type="text"
-              spellCheck={false}
-              autoComplete="off"
-              placeholder="optional — gives the chart something to aim at"
-              value={props.expected}
-              ref={sent.ref}
-              onChange={sent.onChange}
-              aria-label="What did you send"
-              data-testid="cal-expected"
+        {/* Captioned, because these are about the path between your keyer and
+            the decoder — what it does to the end of an element — and unlabeled
+            under a headline about the calibration they read as a second
+            opinion on it. A setup can be marginal and still have nothing to
+            correct. */}
+        <section className="panelsec">
+          <span className="uplabel">Your setup</span>
+          <dl className="readout">
+            {told && (
+              <div>
+                {/* Judged at the speed you keyed, which says so: beside "Good
+                to" a bare "Not usable" read as the opposite of it. */}
+            <dt>At {props.wpm} wpm</dt>
+                <dd
+                  className={`verdict ${run.quality.verdict}`}
+                  data-testid="verdict"
+                  data-verdict={run.quality.verdict}
+                >
+                  {verdictLabel}
+                </dd>
+              </div>
+            )}
+            {Number.isFinite(run.quality.decaySec) && (
+              <div>
+                <dt title={CAL_TAIL_HELP}>Tail</dt>
+                <dd>{ms(run.quality.decaySec)} after each element</dd>
+              </div>
+            )}
+            {Number.isFinite(run.quality.maxWpm) && (
+              <div>
+                {/* "Good to 18 wpm" is the sentence somebody wants; "Max WPM
+                    18" is the same number filed under a heading they have to
+                    turn back into one. */}
+                <dt title={CAL_MAXWPM_HELP}>Good to</dt>
+                <dd>{run.quality.maxWpm} wpm</dd>
+              </div>
+            )}
+            {run.calibration && !nothing && (
+              <div>
+                <dt title={CAL_CORRECTION_HELP}>Correction</dt>
+                {/* Says what happens, rather than naming a direction and
+                    leaving the reader to work out whose. The offset is not
+                    removed from the recording — it is moved across the
+                    boundary between a mark and the silence after it, which is
+                    exactly where a tail put it in the first place. */}
+                <dd>{ms(run.calibration.releaseOffsetSec)} moves from the mark to the gap</dd>
+              </div>
+            )}
+          </dl>
+        </section>
+
+        <Sections run={run} clip={props.clip} />
+
+        {run.readback && (
+          <section className="panelsec readback" data-testid="readback">
+            <span className="uplabel">What I read back</span>
+            <strong data-testid="readback-text">{run.readback.text}</strong>
+            <span className="hint">at {run.readback.charWpm.toFixed(1)} wpm</span>
+          </section>
+        )}
+
+        {props.clip && (
+          <section className="panelsec">
+            {/* The readback says whether the decode is right. A calibration is
+                about whether the *lengths* are right, and only the chart shows
+                that — so the target is worth asking for here even though the
+                drill did not. */}
+            <label className="panelfield">
+              <span className="fieldname">What did you send?</span>
+              <input
+                type="text"
+                spellCheck={false}
+                autoComplete="off"
+                placeholder="optional — gives the chart something to aim at"
+                value={props.expected}
+                ref={sent.ref}
+                onChange={sent.onChange}
+                aria-label="What did you send"
+                data-testid="cal-expected"
+              />
+            </label>
+            <CalPreview
+              clip={props.clip}
+              run={run}
+              expected={props.expected}
+              wpm={props.wpm}
+              /* The calibrated chart only beside a calibration on offer. Shown
+                 with nothing to save, it previews something you cannot have. */
+              withCalibration={canSave}
             />
-          </label>
-          <CalPreview
-            clip={props.clip}
-            run={run}
-            expected={props.expected}
-            wpm={props.wpm}
+          </section>
+        )}
+
+        {measured.calibration && (
+          <Advanced
+            measuredSec={measured.calibration.releaseOffsetSec}
+            wpm={measured.calibration.wpm}
+            value={props.offsetSec}
+            onChange={props.onOffsetSec}
           />
-        </>
-      )}
+        )}
 
-      {measured.calibration && (
-        <Advanced
-          measuredSec={measured.calibration.releaseOffsetSec}
-          wpm={measured.calibration.wpm}
-          value={props.offsetSec}
-          onChange={props.onOffsetSec}
-        />
-      )}
+        {canSave && (
+          <section className="panelsec">
+            <label className="panelfield">
+              <span className="fieldname">Name this calibration to reuse it later</span>
+              <input
+                type="text"
+                placeholder={props.suggestion}
+                value={props.nickname}
+                aria-label="Name this calibration"
+                data-testid="nickname"
+                onChange={(e) => props.onNickname(e.target.value)}
+              />
+            </label>
+          </section>
+        )}
 
-      {canSave ? (
-        <>
-          <label className="group">
-            Name this calibration to reuse it later
-            <input
-              type="text"
-              placeholder={props.suggestion}
-              value={props.nickname}
-              aria-label="Name this calibration"
-              data-testid="nickname"
-              onChange={(e) => props.onNickname(e.target.value)}
-            />
-          </label>
-          <div className="rowbuttons">
-            <button className="big" onClick={props.onSave}>
-              Save and use it
-            </button>
-            <button onClick={props.onRetry}>Record again</button>
-          </div>
-        </>
-      ) : nothing && run.usable ? (
-        /* Nothing measured means nothing to store. A profile whose offset is
-           inside its own noise corrects nothing when applied — the apply step
-           returns early on it — while every report made under it would claim a
-           calibration was in force. So the way out is to leave without one. */
-        <div className="rowbuttons">
-          <button className="big" onClick={props.onClose}>
-            Skip
-          </button>
-          <button onClick={props.onRetry}>Record again</button>
+        {/* The way on at the right, the other way at the left — the same
+            footer the setup card ends with. */}
+        <div className="panelfoot">
+          {canSave ? (
+            <>
+              <button onClick={props.onRetry}>Record again</button>
+              <button className="primary" onClick={props.onSave}>
+                Save and use it
+              </button>
+            </>
+          ) : nothing && run.usable ? (
+            /* Nothing measured means nothing to store. A profile whose offset
+               is inside its own noise corrects nothing when applied — the apply
+               step returns early on it — while every report made under it
+               would claim a calibration was in force. So the way out is to
+               leave without one. */
+            <>
+              <button onClick={props.onRetry}>Record again</button>
+              <button className="primary" onClick={props.onClose}>
+                Skip
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={props.onClose}>Back</button>
+              <button className="primary" onClick={props.onRetry}>
+                Try again
+              </button>
+            </>
+          )}
         </div>
-      ) : (
-        <div className="rowbuttons">
-          <button className="big" onClick={props.onRetry}>
-            Try again
-          </button>
-          <button onClick={props.onClose}>Back</button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -286,7 +286,9 @@ export function setupAdvice(q: SetupQuality): string {
   const wpm = Number.isFinite(q.maxWpm) ? q.maxWpm : 0;
   switch (q.verdict) {
     case "clean":
-      return "Nothing measurable between your keyer and the decoder — this reads at any speed you can send.";
+      /* About the tail only. It sits beside a correction on a calibration
+         that measured one, so it must not claim nothing was measured. */
+      return "The tail after each element is short, so this setup reads well at any speed you can send.";
     case "good":
       /* Named subject, not the passive. "A little is added to every element"
          sits a few lines under "0.8 ms off every element" and reads as a

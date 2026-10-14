@@ -298,9 +298,13 @@ export function RecordBar({
             button would open a prompt the browser never shows. Unasked, it asks
             — the landing screen separates the two for the same reason, and here
             the separation is in what the click does rather than in which button
-            you clicked. Otherwise it records, which is what it is for. */}
+            you clicked. Otherwise it records, which is what it is for.
+
+            Unasked, it also says so in words. The landing screen no longer
+            asks first, so this is where a first visit meets the question, and
+            a red dot that opens a permission prompt is not what it promised. */}
         <button
-          className="iconbtn"
+          className={rec.needAccess ? undefined : "iconbtn"}
           data-testid="record-another"
           onClick={() => void (rec.needAccess ? rec.grantAccess() : rec.start())}
           disabled={rec.busy || rec.blocked || rec.probing}
@@ -320,6 +324,7 @@ export function RecordBar({
           }
         >
           <RecDot />
+          {rec.needAccess && " Allow microphone"}
         </button>
         {/* Not "back": this keeps the session — the message, the speeds, the
             pacing cursor — and drops only what was recorded into it, which is
