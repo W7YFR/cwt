@@ -1,55 +1,36 @@
-/* The first screen, and the wiring that carries the intended message into the
- * take that gets recorded. */
+/* The first screen: the front door. */
 
 import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
-import { act } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import * as mic from "@/capture/mic";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as mic from "@/capture/mic";
 import { Landing } from "@/ui/Landing";
 import { WORDMARKS, wordmarkText } from "@/ui/wordmarks";
 import { resetVisitRoll } from "@/ui/wordmarks";
 
 function renderLanding(overrides: Partial<React.ComponentProps<typeof Landing>> = {}) {
   const props = {
-    expected: "",
-    onExpectedChange: vi.fn(),
-    onAudio: vi.fn(),
+    onPractice: vi.fn(),
     onFile: vi.fn(),
     onError: vi.fn(),
     deviceId: undefined,
     onDeviceChange: vi.fn(),
     profiles: [],
     profileId: undefined,
-    onProfileChange: vi.fn(),
     onCalibrate: vi.fn(),
-    onPractice: vi.fn(),
     ...overrides,
   };
   return { ...render(<Landing {...props} />), props };
 }
 
-/** One microphone, named.
- *
- * A name is the whole point of the fixture: the browser withholds them until
- * permission has been granted, so a list of named inputs is how this page
- * knows it is past that gate. An empty list would put every test below on the
- * "Grant Mic Access" screen, which is a different screen with a different
- * button on it.
- *
- * One rather than several, so the device picker stays hidden — it only draws
- * where there is a choice to make, and these tests are not about the choice.
- */
+/** One microphone, named. The browser withholds names until permission has
+ *  been granted, so a named list is how the page knows it is past that gate. */
 const GRANTED = [
   { deviceId: "default", kind: "audioinput", label: "Built-in Microphone", groupId: "g" },
 ];
 
 /** What a browser hands back before it has been allowed the microphone: the
- *  inputs are there, with the names stripped off.
- *
- *  One entry, which is what Chrome hands back however many are attached — the
- *  placeholder is not a count, and a rule that read it as one is what
- *  `micpermission.test.tsx` now holds the line on. */
+ *  inputs are there, with the names stripped off. */
 const UNGRANTED = [{ deviceId: "", kind: "audioinput", label: "", groupId: "" }];
 
 function mockDevices(devices: unknown[]) {
@@ -66,27 +47,17 @@ function mockDevices(devices: unknown[]) {
 
 beforeEach(() => {
   // jsdom has no media devices at all, so every test says what it wants the
-  // browser to be. Granted is the default: it is the state the page spends
-  // all of its life in, and the one before it is a single screen with a
-  // single button.
+  // browser to be. Granted is the default.
   mockDevices(GRANTED);
 });
 
-/* The device lookup is an effect that resolves a promise, so its state update
- * lands after a synchronous test body has already asserted — React reports
- * that as an un-acted update. Waiting for it once keeps the output clean and
- * the assertions honest about what has rendered.
- *
- * Waiting for the *answer*, not for the question. This used to wait only for
- * `enumerateDevices` to have been called, which is a barrier a synchronous
- * query can still beat: the Record card renders nothing until the list comes
- * back, because which of its three controls belongs there is read off that
- * list. A test that got past the old barrier and then reached for the record
- * button was reaching into the frame before there was one. */
+/* The device lookup is an effect that resolves a promise. Waiting for its
+ * answer keeps the assertions honest about what has rendered. */
 async function settled() {
   await waitFor(() =>
     expect(
-      screen.queryByRole("button", { name: /Start recording/i }) ??
+      screen.queryByTestId("mic-name") ??
+        screen.queryByLabelText("Input device") ??
         screen.queryByTestId("grant-mic") ??
         screen.queryByTestId("mic-denied"),
     ).not.toBeNull(),
@@ -163,223 +134,80 @@ describe("the landing screen", () => {
     }
   });
 
-  it("finishes on Enter and throws the take away on Escape, from anywhere", async () => {
-    // From a focused text field in particular. That is the case the usual
-    // "ignore it if a control has focus" guard gets wrong: you type what you
-    // are about to send, then key it — your hand is on the paddle and the
-    // intended-message box is still focused. Making you find the mouse would
-    // put a second of reaching at the end of every take.
-    const stop = vi.fn().mockResolvedValue({ samples: new Float32Array(8), rate: 8000, peak: 1 });
-    const cancel = vi.fn().mockResolvedValue(undefined);
-    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue({
-      getTracks: () => [],
-    });
-
-    for (const [key, expected] of [["Enter", stop], ["Escape", cancel]] as const) {
-      stop.mockClear();
-      cancel.mockClear();
-      const rec = {
-        elapsed: () => 1,
-        peek: () => new Float32Array(0),
-        rate: 48000,
-        since: () => new Float32Array(0),
-        restarts: () => 0,
-        stop,
-        cancel,
-        restart: vi.fn(),
-      };
-      vi.spyOn(mic, "startRecording").mockResolvedValue(rec);
-      const view = renderLanding();
+  describe("the way in", () => {
+    it("is the first control on the screen", async () => {
+      renderLanding();
       await settled();
-      await act(async () => {
-        screen.getByRole("button", { name: /Start recording/i }).click();
-      });
-      // Recording, and the focus is where it would really be.
-      const field = screen.getByLabelText(/going to send/i);
-      field.focus();
-      expect(document.activeElement).toBe(field);
+      // Before the calibration line, the file link and anything else. The
+      // callsign in the corner is a link out, not a control on this screen.
+      const first = screen.getAllByRole("button")[0];
+      expect(first).toBe(screen.getByTestId("practice"));
+      expect(first).toHaveTextContent(/start practicing/i);
+    });
 
-      await act(async () => {
-        fireEvent.keyDown(document, { key });
-      });
-      expect(expected, `${key} did nothing`).toHaveBeenCalled();
-      expect(key === "Enter" ? cancel : stop).not.toHaveBeenCalled();
+    it("opens the practice screen", async () => {
+      const user = userEvent.setup();
+      const { props } = renderLanding();
+      await settled();
+      await user.click(screen.getByTestId("practice"));
+      expect(props.onPractice).toHaveBeenCalledTimes(1);
+    });
 
-      view.unmount();
-    }
+    it("opens on Enter, from nowhere in particular", async () => {
+      const user = userEvent.setup();
+      const { props } = renderLanding();
+      await settled();
+      await user.keyboard("{Enter}");
+      expect(props.onPractice).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves Enter to a control that has the focus", async () => {
+      // Enter on Calibrate calibrates. Taking the key from it would do
+      // something other than what the focus ring says.
+      const user = userEvent.setup();
+      const { props } = renderLanding();
+      await settled();
+      screen.getByRole("button", { name: /^calibrate$/i }).focus();
+      await user.keyboard("{Enter}");
+      expect(props.onCalibrate).toHaveBeenCalledTimes(1);
+      expect(props.onPractice).not.toHaveBeenCalled();
+    });
+
+    it("leaves Enter alone while the help is open", async () => {
+      const user = userEvent.setup();
+      const { props } = renderLanding();
+      await settled();
+      await user.click(screen.getByTestId("sound-path-open"));
+      await user.keyboard("{Enter}");
+      expect(props.onPractice).not.toHaveBeenCalled();
+    });
+
+    it("asks nothing else first", async () => {
+      // Recording and the intended message are on the practice screen.
+      renderLanding();
+      await settled();
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.queryByRole("button", { name: /start recording/i })).toBeNull();
+    });
   });
 
-  it("starts the take over on R, but not while you are typing one", async () => {
-    /* R is a letter, and the intended-message box is very likely focused: bound
-       the way Enter and Escape are, typing the R of "W7YFR" would throw the
-       take away. It gets the guard those two deliberately do without. */
-    const restart = vi.fn();
-    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue({
-      getTracks: () => [],
-    });
-    const rec = {
-      elapsed: () => 1,
-      peek: () => new Float32Array(0),
-      rate: 48000,
-      since: () => new Float32Array(0),
-      restarts: () => 0,
-      stop: vi.fn(),
-      cancel: vi.fn(),
-      restart,
-    };
-    vi.spyOn(mic, "startRecording").mockResolvedValue(rec);
-    renderLanding();
-    await settled();
-    await act(async () => {
-      screen.getByRole("button", { name: /Start recording/i }).click();
+  describe("opening a recording", () => {
+    it("is a link, not a card", async () => {
+      renderLanding();
+      await settled();
+      const open = screen.getByRole("button", { name: /open a recording/i });
+      expect(open).toHaveClass("link");
     });
 
-    const field = screen.getByLabelText(/going to send/i);
-    await act(async () => {
-      fireEvent.keyDown(field, { key: "r" });
+    it("hands a file picked from the dialog up to be opened", async () => {
+      const user = userEvent.setup();
+      const { props, container } = renderLanding();
+      await settled();
+      const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+      const file = new File(["x"], "take.wav", { type: "audio/wav" });
+      await user.upload(input, file);
+      expect(props.onFile).toHaveBeenCalledWith(file);
     });
-    expect(restart, "R in a text field").not.toHaveBeenCalled();
-
-    await act(async () => {
-      fireEvent.keyDown(document.body, { key: "r" });
-    });
-    expect(restart).toHaveBeenCalledTimes(1);
-
-    // And the browser keeps its own reload.
-    await act(async () => {
-      fireEvent.keyDown(document.body, { key: "r", metaKey: true });
-    });
-    expect(restart).toHaveBeenCalledTimes(1);
-  });
-
-  it("leaves Enter and Escape alone when there is nothing being recorded", async () => {
-    // Otherwise they would be doing something invisible on a page that is
-    // mostly a text field. R is the exception, and has its own test below.
-    const start = vi.spyOn(mic, "startRecording");
-    renderLanding();
-    await settled();
-    await act(async () => {
-      fireEvent.keyDown(document, { key: "Enter" });
-      fireEvent.keyDown(document, { key: "Escape" });
-    });
-    expect(start).not.toHaveBeenCalled();
-  });
-
-  it("starts a recording on R, under the same guard that starting one over gets", async () => {
-    /* One key for one idea: R goes, from here. Nothing to remember about
-       which state you are in — it starts a take, and starts a running one
-       over. The guard has to hold either way, because the box you are most
-       likely typing into is a call sign away from an R. */
-    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue({
-      getTracks: () => [],
-    });
-    const start = vi.spyOn(mic, "startRecording").mockResolvedValue({
-      elapsed: () => 0,
-      peek: () => new Float32Array(0),
-      rate: 48000,
-      since: () => new Float32Array(0),
-      restarts: () => 0,
-      stop: vi.fn(),
-      cancel: vi.fn(),
-      restart: vi.fn(),
-    });
-    renderLanding();
-    await settled();
-
-    const field = screen.getByLabelText(/going to send/i);
-    await act(async () => {
-      fireEvent.keyDown(field, { key: "r" });
-    });
-    expect(start, "R in a text field").not.toHaveBeenCalled();
-
-    await act(async () => {
-      fireEvent.keyDown(document.body, { key: "r", metaKey: true });
-    });
-    expect(start, "the browser keeps its own reload").not.toHaveBeenCalled();
-
-    await act(async () => {
-      fireEvent.keyDown(document.body, { key: "r" });
-    });
-    expect(start).toHaveBeenCalledTimes(1);
-  });
-
-  it("offers both ways in, with recording first", async () => {
-    const { container } = renderLanding();
-    await settled();
-    const headings = Array.from(container.querySelectorAll(".way h2")).map(
-      (h) => h.textContent,
-    );
-    // Recording is the point of the tool; reading a file is how you check one
-    // you already have. The order says which is which.
-    expect(headings[0]).toMatch(/Record/i);
-    expect(headings[1]).toMatch(/open a recording/i);
-  });
-
-  it("takes the intended message before you record, not after", async () => {
-    const user = userEvent.setup();
-    const onExpectedChange = vi.fn();
-    renderLanding({ onExpectedChange });
-    // Asking afterwards would mean typing what you meant to send once you had
-    // already seen what came out, which is not the same question.
-    await user.type(screen.getByLabelText(/going to send/i), "sos");
-    expect(onExpectedChange).toHaveBeenLastCalledWith("S");
-  });
-
-  it("says a recording can be dropped anywhere, not just on the card", async () => {
-    renderLanding();
-    await settled();
-    // Aiming at a particular rectangle is work nobody should have to do; the
-    // page answers a drop wherever it lands. See test/dom/filedrop.test.tsx.
-    expect(screen.getByText(/drop one anywhere on the page/i)).toBeInTheDocument();
-  });
-
-  it("hands a file picked from the dialog up to be opened", async () => {
-    const { props } = renderLanding();
-    await settled();
-    const file = new File(["RIFF"], "take.wav", { type: "audio/wav" });
-    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
-    fireEvent.change(input, { target: { files: [file] } });
-    expect(props.onFile).toHaveBeenCalledWith(file);
-  });
-
-  it("says the message is optional, because timing works without it", async () => {
-    renderLanding();
-    await settled();
-    expect(screen.getByText(/optional/i)).toBeInTheDocument();
-  });
-
-  it("reports a denied microphone in words a person can act on", async () => {
-    const user = userEvent.setup();
-    const onError = vi.fn();
-    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new DOMException("Permission denied", "NotAllowedError"),
-    );
-    renderLanding({ onError });
-    await settled();
-    await user.click(screen.getByRole("button", { name: /Start recording/i }));
-    await waitFor(() => expect(onError).toHaveBeenCalled());
-    expect(onError.mock.calls[0]![0]).toMatch(/denied/i);
-    expect(onError.mock.calls[0]![0]).toMatch(/address bar/i);
-  });
-
-  it("offers a device picker only when there is a choice to make", async () => {
-    const { unmount } = renderLanding();
-    await waitFor(() =>
-      expect(navigator.mediaDevices.enumerateDevices).toHaveBeenCalled(),
-    );
-    expect(screen.queryByLabelText("Input device")).not.toBeInTheDocument();
-    unmount();
-
-    (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { kind: "audioinput", deviceId: "a", label: "Built-in Microphone" },
-      { kind: "audioinput", deviceId: "b", label: "BlackHole 2ch" },
-    ]);
-    renderLanding();
-    const picker = await screen.findByLabelText("Input device");
-    expect(picker).toBeInTheDocument();
-    // A loopback device is an ordinary input to the browser, which is what
-    // makes keying an app on the same machine work at all.
-    expect(screen.getByRole("option", { name: "BlackHole 2ch" })).toBeInTheDocument();
   });
 
   describe("the way back to the site this one lives on", () => {
@@ -445,101 +273,98 @@ describe("the landing screen", () => {
   /* Before the browser has said yes, the inputs are there but anonymous — so
      the picker has nothing to show and the record button would be doing two
      things at once. This is the screen that separates them. */
-  describe("before microphone access has been granted", () => {
-    it("asks for access instead of offering to record", async () => {
-      mockDevices(UNGRANTED);
+  describe("the microphone", () => {
+    it("names the one input there is", async () => {
+      // Calibrating means nothing without knowing which input it is for.
       renderLanding();
-      expect(await screen.findByTestId("grant-mic")).toBeInTheDocument();
-      // The whole point: not one click that both asks and records.
-      expect(screen.queryByRole("button", { name: /Start recording/i })).toBeNull();
-      // And nothing claiming to be a choice while the names are withheld.
+      await settled();
+      expect(screen.getByTestId("mic-name")).toHaveTextContent("Built-in Microphone");
       expect(screen.queryByLabelText("Input device")).toBeNull();
     });
 
-    it("asks without recording anything", async () => {
-      mockDevices(UNGRANTED);
-      const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
-      const stop = vi.fn();
-      getUserMedia.mockResolvedValue({ getTracks: () => [{ stop }] });
-      const start = vi.spyOn(mic, "startRecording");
+    it("offers a choice where there is one", async () => {
+      mockDevices([
+        { kind: "audioinput", deviceId: "a", label: "Built-in Microphone", groupId: "g" },
+        { kind: "audioinput", deviceId: "b", label: "BlackHole 2ch", groupId: "g" },
+      ]);
+      const user = userEvent.setup();
+      const { props } = renderLanding();
+      await settled();
+      await user.selectOptions(screen.getByLabelText("Input device"), "b");
+      expect(props.onDeviceChange).toHaveBeenCalledWith("b");
+    });
 
+    it("never records from it", async () => {
+      const start = vi.spyOn(mic, "startRecording");
       const user = userEvent.setup();
       renderLanding();
-      await user.click(await screen.findByTestId("grant-mic"));
-
-      // A stream opened only to be told yes, and handed straight back.
-      expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
-      expect(stop).toHaveBeenCalled();
-      // Emphatically not a take.
+      await settled();
+      await user.keyboard("r");
       expect(start).not.toHaveBeenCalled();
     });
 
-    it("shows the picker and the record button once the names arrive", async () => {
-      mockDevices(UNGRANTED);
-      const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
-      getUserMedia.mockImplementation(async () => {
-        // Granting is what makes the browser willing to name them, so the
-        // list the page re-reads afterwards is a different list.
-        (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
-          { kind: "audioinput", deviceId: "a", label: "Built-in Microphone", groupId: "g" },
-          { kind: "audioinput", deviceId: "b", label: "BlackHole 2ch", groupId: "g" },
-        ]);
-        return { getTracks: () => [{ stop: vi.fn() }] };
+    describe("before access has been granted", () => {
+      it("asks, and offers no choice while the names are withheld", async () => {
+        mockDevices(UNGRANTED);
+        renderLanding();
+        await settled();
+        expect(screen.getByTestId("grant-mic")).toBeInTheDocument();
+        expect(screen.queryByLabelText("Input device")).toBeNull();
       });
 
-      const user = userEvent.setup();
-      renderLanding();
-      await user.click(await screen.findByTestId("grant-mic"));
+      it("asks without recording anything", async () => {
+        mockDevices(UNGRANTED);
+        const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
+        const stop = vi.fn();
+        getUserMedia.mockResolvedValue({ getTracks: () => [{ stop }] });
+        const start = vi.spyOn(mic, "startRecording");
+        const user = userEvent.setup();
+        renderLanding();
+        await settled();
+        await user.click(screen.getByTestId("grant-mic"));
+        // A stream opened only to be told yes, and handed straight back.
+        expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+        expect(stop).toHaveBeenCalled();
+        expect(start).not.toHaveBeenCalled();
+      });
 
-      expect(await screen.findByLabelText("Input device")).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "BlackHole 2ch" })).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /Start recording/i }),
-      ).toBeInTheDocument();
-      expect(screen.queryByTestId("grant-mic")).toBeNull();
-    });
+      it("shows the picker once the names arrive", async () => {
+        mockDevices(UNGRANTED);
+        const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
+        getUserMedia.mockImplementation(async () => {
+          (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
+            { kind: "audioinput", deviceId: "a", label: "Built-in Microphone", groupId: "g" },
+            { kind: "audioinput", deviceId: "b", label: "BlackHole 2ch", groupId: "g" },
+          ]);
+          return { getTracks: () => [{ stop: vi.fn() }] };
+        });
+        const user = userEvent.setup();
+        renderLanding();
+        await settled();
+        await user.click(screen.getByTestId("grant-mic"));
+        expect(await screen.findByLabelText("Input device")).toBeInTheDocument();
+        expect(screen.queryByTestId("grant-mic")).toBeNull();
+      });
 
-    it("stops offering to record once the browser has refused", async () => {
-      mockDevices(UNGRANTED);
-      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new DOMException("Permission denied", "NotAllowedError"),
-      );
-      const user = userEvent.setup();
-      renderLanding();
-      await user.click(await screen.findByTestId("grant-mic"));
-
-      /* Nothing on this page can lift a block, so every button that reaches
-         for the microphone is a button that fails silently. What is left is
-         saying where the switch actually is. */
-      const blocked = await screen.findByTestId("mic-denied");
-      expect(blocked.textContent).toMatch(/blocked/i);
-      expect(blocked.textContent).toMatch(/settings/i);
-      expect(screen.queryByTestId("grant-mic")).toBeNull();
-      expect(screen.queryByRole("button", { name: /Start recording/i })).toBeNull();
-
-      // And the other way in is untouched: a file does not need a microphone.
-      expect(screen.getByRole("button", { name: /Choose a file/i })).toBeInTheDocument();
-    });
-
-    it("says so in words a person can act on when the prompt is refused", async () => {
-      mockDevices(UNGRANTED);
-      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new DOMException("Permission denied", "NotAllowedError"),
-      );
-      const user = userEvent.setup();
-      const { props } = renderLanding();
-      await user.click(await screen.findByTestId("grant-mic"));
-      expect(props.onError).toHaveBeenCalledWith(expect.stringMatching(/denied/i));
+      it("says so, and stops asking, once the browser has refused", async () => {
+        mockDevices(UNGRANTED);
+        (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new DOMException("Permission denied", "NotAllowedError"),
+        );
+        const user = userEvent.setup();
+        const { props } = renderLanding();
+        await settled();
+        await user.click(screen.getByTestId("grant-mic"));
+        expect(await screen.findByTestId("mic-denied")).toHaveTextContent(/blocked/i);
+        expect(screen.queryByTestId("grant-mic")).toBeNull();
+        expect(props.onError).toHaveBeenCalledWith(expect.stringMatching(/denied/i));
+        // A file does not need a microphone.
+        expect(screen.getByRole("button", { name: /open a recording/i })).toBeInTheDocument();
+      });
     });
   });
 
-
-  /* Whether a calibration is being applied changes every number the review
-     reports, by about the size of the room. Somebody who cannot tell at a
-     glance which state they are in is one click from a measurement they will
-     misread — and the first report from real use was that the way in was hard
-     to find at all. */
-  describe("the calibration panel", () => {
+  describe("the calibration line", () => {
     const PROFILE = {
       id: "p1",
       nickname: "close to the rig",
@@ -555,12 +380,10 @@ describe("the landing screen", () => {
       recordedAt: "2026-09-12T10:00:00+00:00",
     };
 
-    it("says so, in a real button, when nothing has been calibrated", async () => {
+    it("says so, and offers to calibrate, when nothing has been calibrated", async () => {
       const { props } = renderLanding();
       await settled();
       expect(screen.getByTestId("calstatus").dataset.state).toBe("none");
-      // A button, not link-shaped text: the first report from real use was
-      // that the way in could not be found.
       const buttons = screen.getAllByRole("button");
       const calibrate = buttons.find((b) => b.textContent?.match(/calibrat/i))!;
       await userEvent.click(calibrate);
@@ -577,50 +400,13 @@ describe("the landing screen", () => {
       const numbers = screen.getByTestId("calnum").textContent!;
       expect(numbers).toContain((PROFILE.releaseOffsetSec * 1000).toFixed(1));
       expect(numbers).toContain(PROFILE.verdict);
-      await settled();
     });
-
-    describe("starting a practice", () => {
-    /* Recording without hearing the target first, and without a cursor to keep
-       time against, is keying blind — and everything that fixes that lives one
-       screen in. This is the door to it. */
-    it("opens with a message", async () => {
-      const user = userEvent.setup();
-      const { props } = renderLanding({ expected: "CQ DE W7YFR" });
-      await settled();
-      await user.click(screen.getByTestId("practice"));
-      expect(props.onPractice).toHaveBeenCalled();
-    });
-
-    it("opens without one too", async () => {
-      /* The target is built from the intended message and there is little to
-         practice against without one — but the box for it is right there on
-         the next screen, and a door that will not open is a worse way to say
-         so than the room itself saying it. */
-      const user = userEvent.setup();
-      const { props } = renderLanding({ expected: "" });
-      await settled();
-      expect(screen.getByTestId("practice")).toBeEnabled();
-      await user.click(screen.getByTestId("practice"));
-      expect(props.onPractice).toHaveBeenCalled();
-    });
-  });
 
     it("flags a profile in use that was measured on another input", async () => {
       // The exact mistake named profiles exist to prevent.
       renderLanding({ profiles: [PROFILE], profileId: "p1", deviceId: "yeti" });
       await settled();
       expect(screen.getByTestId("calstatus").dataset.state).toBe("elsewhere");
-      await settled();
-    });
-
-    it("offers the saved ones, and no calibration among them", async () => {
-      const { props } = renderLanding({ profiles: [PROFILE], profileId: "p1" });
-      await settled();
-      const select = screen.getByLabelText(/microphone calibration/i);
-      await userEvent.selectOptions(select, "");
-      expect(props.onProfileChange).toHaveBeenCalledWith(undefined);
-      await settled();
     });
 
     describe("what the app is listening through", () => {
@@ -639,7 +425,6 @@ describe("the landing screen", () => {
 
         await user.click(screen.getByTestId("sound-path-close"));
         expect(screen.queryByTestId("sound-path")).toBeNull();
-        await settled();
       });
 
       it("closes on Escape, like every other sheet", async () => {
@@ -651,7 +436,6 @@ describe("the landing screen", () => {
         expect(screen.getByTestId("sound-path")).toBe(document.activeElement);
         await user.keyboard("{Escape}");
         expect(screen.queryByTestId("sound-path")).toBeNull();
-        await settled();
       });
 
       it("leaves the calibration alone", async () => {
@@ -661,7 +445,6 @@ describe("the landing screen", () => {
         await settled();
         await user.click(screen.getByTestId("sound-path-open"));
         await user.click(screen.getByTestId("sound-path-close"));
-        expect(props.onProfileChange).not.toHaveBeenCalled();
         expect(props.onCalibrate).not.toHaveBeenCalled();
       });
     });

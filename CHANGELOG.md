@@ -7,6 +7,16 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- The start screen leads with **Start practicing**, and Enter presses it. Under it are the microphone and its calibration; recording and the intended message are on the practice screen only.
+- A returning visit skips the start screen and opens on the practice screen.
+- Before the browser allows the microphone, the record button reads **Allow microphone**.
+
+### Development
+
+- Raise `LANDING_VERSION` in `app/src/ui/Landing.tsx` to show the start screen once more to returning visitors.
+
 ## v1.7.0 — 2026-10-14
 
 ### Added

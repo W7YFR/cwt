@@ -1126,98 +1126,27 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   font-size: 15px;
   line-height: 1.6;
 }
-.landing .ways {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  justify-content: center;
+.landing .lede + .start { margin-top: 6px; }
+/* The way in. The one large control on the screen, and the only one that
+   needs to be: everything else here is a line of small print around it. */
+.landing .start {
   width: 100%;
-  max-width: 780px;
-}
-/* Across both of the other two, because it is not a third way in — it is what
-   the other two are for. */
-.way.practice { flex: 1 1 100%; }
-/* Equal halves. Grown from a basis of their own content, the card holding a
-   device picker came out wider than the one holding a sentence — a difference
-   in width that says nothing, between two things offered as alternatives. */
-.landing .ways > .way:not(.practice) { flex: 1 1 0; min-width: min(320px, 100%); }
-
-.way {
-  flex: 1 1 320px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 22px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-}
-.way h2 {
-  margin: 0;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--ink-dim);
-}
-.way p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
-/* A state, not a caption. This is the whole of what the Record card can say
-   once the browser has blocked the microphone — there is no control under it,
-   because none of them would do anything — so it carries the card on its own
-   and is coloured like the condition it reports rather than like the small
-   print it sits at the size of. */
-.way .blocked {
-  color: var(--warn);
-  text-align: center;
-  padding: 4px 0;
   max-width: 320px;
+  height: auto;
+  padding: 13px 22px;
+  border-radius: 8px;
+  font-size: 16px;
 }
-/* The ways in. One width between them, so three buttons doing the same kind of
-   thing on one screen read as three of a kind rather than as a hierarchy
-   nobody intended — the widest was the one in the widest card, which is an
-   accident of layout rather than a claim about importance. */
-.way .big, .calibrate .big {
+.landing .openfile { font-size: 13px; }
+
+/* The calibration wizard's steps. One width between them, so the buttons
+   that move it on read as one kind of thing. */
+.calibrate .big {
   font-size: 14px;
   border-radius: 8px;
   width: 100%;
   max-width: 320px;
 }
-/* Taller than the page's one button height, and the one place that is worth
-   it: these are the whole of what the first screen asks, on a screen with room
-   to ask it. Everywhere else a button sits on a band of controls, where being
-   taller than its neighbors is a misalignment rather than an emphasis. */
-.way .big {
-  font-size: 15px;
-  height: auto;
-  padding: 11px 22px;
-}
-/* The picker above the button it feeds. Same width, because two controls
-   stacked on one card and doing one job should not be two widths. */
-.way select {
-  width: 100%;
-  max-width: 320px;
-}
-.way.drop.over { border-color: var(--you); background: var(--panel-2); }
-
-.intended-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  max-width: 520px;
-  text-align: left;
-}
-/* A question, not a field label. Set as small uppercase tracking it read as
-   one more caption on a screen full of them and got skipped — and without it
-   the grading has only the decode to compare against, which is a meaningless
-   100% for accuracy. */
-.intended-field label {
-  font-size: 16px;
-  color: var(--ink);
-  text-align: center;
-}
-.intended-field input { width: 100%; }
-.intended-field .hint { text-transform: none; letter-spacing: 0; font-size: 12px; }
 
 /* ---- a dialog over the page ---------------------------------------------- */
 
@@ -2123,53 +2052,31 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 
 .calibrate .advice { color: var(--ink); max-width: 46ch; }
 
-/* Whether this microphone has been measured, said out loud.
-   A panel rather than a line of controls, because it is the one thing on the
-   landing screen that silently changes every number the review will report —
-   see ui/Landing.tsx. */
-.calstatus {
+/* Which microphone, and whether it has been measured, said small under the way
+   in, under the microphone it is about — see ui/Landing.tsx. */
+.calline {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-2);
-}
-/* On the landing card, the same width as the button above it. Sized to its own
-   contents it came out narrower than everything it sits under, which reads as
-   a panel that failed to fill rather than as one that was meant to be small. */
-.way .calstatus {
-  width: 100%;
-  max-width: 320px;
-  box-sizing: border-box;
-}
-.calstatus .calstate {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
+  color: var(--ink-dim);
 }
-/* Centered under the panel's own width rather than starting at its left edge:
-   the card above it is a column of centered things, and one line beginning at
-   the margin reads as belonging to something else. The dot rides with the
-   words, which is the point of it. */
-.way .calstatus .calstate { justify-content: center; }
-/* Sized by its own words, like the line above it, rather than stretched to the
-   panel. The panel keeps the width every other control on the card has; what
-   is inside it is two centered runs of text, and a button filling the box
-   under a line that does not read as the wrong one being emphasized. */
-.way .calactions { justify-content: center; }
-.way .calactions button { flex: 0 0 auto; }
-/* Under the panel, and the quietest thing in it: it is the way out to reading
-   rather than one of the choices on offer. */
-.calstatus .calhelp { align-self: center; font-size: 12px; margin-top: -2px; }
-.calstatus .calstate b { font-weight: 600; }
-.calstatus .calnum { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.calline p { margin: 0; }
+.calline .calstate { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 8px; }
+.calline .calstate b { font-weight: 600; color: var(--ink); }
+.calline .calnum { font-variant-numeric: tabular-nums; }
+.calline .hint { font-size: 12px; }
+.calline .calstate .link { font-size: 13px; }
+/* The picker sets the width the line under it is read against, so it is not
+   left to size itself to the longest device name. */
+.calline select { width: 100%; max-width: 320px; margin-bottom: 4px; }
+.calline .micname { color: var(--ink); margin-bottom: 2px; }
+.calline .micblocked { color: var(--warn); margin-bottom: 2px; }
+.calline > .link { margin-bottom: 4px; }
 /* Not the recording light: this one does not blink, and its color is the
    whole message. */
-.calstatus .dot {
+.calline .dot {
   flex: none;
   width: 8px;
   height: 8px;
@@ -2177,18 +2084,8 @@ button.danger { border-color: var(--bad); color: var(--bad); }
   background: var(--ghost);
   transform: translateY(-1px);
 }
-.calstatus.ok .dot { background: var(--ok); }
-.calstatus.warn .dot { background: var(--warn); }
-.calstatus.none .dot { background: var(--warn); }
-.calstatus .hint { margin: 0; font-size: 12px; line-height: 1.5; }
-/* The button spans the panel. It is the only thing in here to do when nothing
-   has been calibrated, and a button sized to its own text reads as an aside. */
-.calactions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.calactions select { flex: 1 1 160px; min-width: 0; }
-.calactions button { flex: 1 1 100%; justify-content: center; }
-/* Once there is a calibration the panel has two things in it, and the pair
-   share the width rather than stacking. */
-.calactions select ~ button { flex: 0 1 auto; }
+.calline.ok .dot { background: var(--ok); }
+.calline.warn .dot, .calline.none .dot { background: var(--warn); }
 
 /* The same fact, in the room the review header has for it. */
 .calchip {
