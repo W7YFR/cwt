@@ -466,65 +466,91 @@ function Wizard(props: CalibrateProps): React.ReactElement {
 
   return (
     <div className="calibrate">
-      <h2>Calibrate your microphone.</h2>
+      {/* On a card, so the setup reads as one contained thing rather than a
+          column of loose text and controls on the bare page. */}
+      <div className="calcard">
+        <h2>Calibrate your microphone.</h2>
 
-      <div className="lede preamble" data-testid="setup-note">
-        <p>
-          The best way to use {APP_NAME} is by connecting your keyer&rsquo;s
-          sidetone directly to your computer. This prevents microphone issues
-          that make it difficult to process your keying. If a direct line in is
-          not possible, calibration is your next best option.
-        </p>
-        <p>
-          During calibration you will receive {DRILLS.length} prompts, separated
-          by a {REST_SEC} second pause. In order, you will send:
-        </p>
-        {/* Built from the drill list rather than retyped beside it, so the
-            promise on this screen and the sequence that follows cannot drift
-            apart — the count, the order and the length of the message are all
-            the same constants the recording runs on. */}
-        <ol className="drilllist" data-testid="drilllist">
-          {DRILLS.map((d) => (
-            <li key={d.key} data-step={d.key}>
-              {d.summary}
-              {d.note && <span className="hint"> {d.note}</span>}
-            </li>
-          ))}
-        </ol>
-      </div>
+        <div className="lede preamble" data-testid="setup-note">
+          <p>
+            The best way to use {APP_NAME} is by connecting your keyer&rsquo;s
+            sidetone directly to your computer. This prevents microphone issues
+            that make it difficult to process your keying.
+          </p>
+          <p>If a direct line in is not possible, calibration is your next best option.</p>
+          <p>
+            During calibration you will receive {DRILLS.length} prompts, separated
+            by a {REST_SEC} second pause. In order, you will send:
+          </p>
+          {/* Built from the drill list rather than retyped beside it, so the
+              promise on this screen and the sequence that follows cannot drift
+              apart — the count, the order and the length of the message are all
+              the same constants the recording runs on.
 
-      {props.current && (
-        <p className="hint" data-testid="keeps-current">
-          <b>Note:</b> Your previous calibration <b>{props.current.nickname}</b> will be retained.<br />
-          Running the wizard again creates a new
-          calibration and keeps the old ones.
-        </p>
-      )}
+              Not `drilllist`: that is the drill picker's scrolling box, and its
+              border and zero padding came along with the name. */}
+          <ol className="calsteps" data-testid="drilllist">
+            {DRILLS.map((d) => (
+              <li key={d.key} data-step={d.key}>
+                {d.summary}
+                {d.note && <span className="hint"> {d.note}</span>}
+              </li>
+            ))}
+          </ol>
+        </div>
 
-      <label className="field row">
-        <span className="fieldname">Keyer speed</span>
-        <input
-          type="number"
-          min={5}
-          max={40}
-          value={wpmText}
-          aria-label="Keyer speed in words per minute"
-          onChange={(e) => setWpmText(e.target.value)}
-        />
-      </label>
+        {/* The two things to set, side by side under one rule, each named
+            above its control. Stacked and centered they read as a column of
+            unrelated leftovers. */}
+        <div className="calsetup">
+          <label className="calfield">
+            <span className="fieldname">Keyer speed</span>
+            <span className="calinput">
+              <input
+                type="number"
+                min={5}
+                max={40}
+                value={wpmText}
+                aria-label="Keyer speed in words per minute"
+                onChange={(e) => setWpmText(e.target.value)}
+              />
+              <span className="unit">wpm</span>
+            </span>
+          </label>
 
-      <DevicePicker
-        label="Microphone"
-        devices={rec.devices}
-        value={props.deviceId}
-        onChange={props.onDeviceChange}
-      />
+          {/* Named even with one input, so you know what you are about to
+              calibrate. A choice only where there is one. */}
+          {rec.devices.length > 0 && (
+            <div className="calfield calmic">
+              <span className="fieldname">Microphone</span>
+              {rec.devices.length > 1 ? (
+                <DevicePicker
+                  devices={rec.devices}
+                  value={props.deviceId}
+                  onChange={props.onDeviceChange}
+                />
+              ) : (
+                <span className="micname">{rec.devices[0]!.label}</span>
+              )}
+            </div>
+          )}
+        </div>
 
-      <div className="rowbuttons">
-        <button className="big" onClick={() => void start()}>
-          <RecDot /> Start calibrating
-        </button>
-        <button onClick={props.onClose}>Back</button>
+        {props.current && (
+          <p className="hint calkeeps" data-testid="keeps-current">
+            Your calibration <b>{props.current.nickname}</b> is kept. This one
+            is saved beside it.
+          </p>
+        )}
+
+        {/* The way on at the right and the way back at the left, the order
+            every dialog puts them in. */}
+        <div className="calfoot">
+          <button onClick={props.onClose}>Back</button>
+          <button className="primary" onClick={() => void start()}>
+            <RecDot /> Start calibrating
+          </button>
+        </div>
       </div>
     </div>
   );

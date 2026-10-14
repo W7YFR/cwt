@@ -12,6 +12,11 @@ nothing to the site. The next release carries them.
 - The start screen leads with **Start practicing**, and Enter presses it. Under it are the microphone and its calibration; recording and the intended message are on the practice screen only.
 - A returning visit skips the start screen and opens on the practice screen.
 - Before the browser allows the microphone, the record button reads **Allow microphone**.
+- The calibration setup sits on a card, with left-aligned text. **Keyer speed** and **Microphone** sit side by side, and the microphone is named even when there is only one.
+
+### Fixed
+
+- The list of calibration prompts no longer runs into its border.
 
 ### Development
 

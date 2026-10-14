@@ -1621,16 +1621,83 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
    and centering the items makes the order hard to follow. */
 .calibrate .preamble { display: flex; flex-direction: column; gap: 12px; }
 .calibrate .preamble p { margin: 0; }
-.calibrate .drilllist {
+/* A list you read down, so its own left edge, inset from the box it is in. */
+.calibrate .calsteps {
   margin: 0;
-  padding-left: 22px;
+  padding: 12px 18px 12px 38px;
   text-align: left;
   align-self: center;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
 }
-.calibrate .drilllist .hint { display: block; }
+.calibrate .calsteps .hint { display: block; }
+
+/* The setup, held on one card. The wizard's later steps stay on the bare
+   page: they are read from across a desk, and a frame would only crowd them. */
+.calibrate .calcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
+  padding: 28px 32px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+/* Read, not glanced at: a left edge to come back to at every line. */
+.calibrate .calcard { align-items: stretch; text-align: left; }
+.calibrate .calcard .lede { max-width: none; }
+.calibrate .calcard .calsteps { align-self: stretch; }
+
+/* The settings, under a rule that ends the reading. */
+.calibrate .calsetup {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px 32px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.calibrate .calfield { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+/* Named the way the practice screen names its controls. */
+.calibrate .calfield .fieldname {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+.calibrate .calinput { display: flex; align-items: center; gap: 6px; }
+.calibrate .calinput input { width: 5em; text-align: center; }
+.calibrate .calinput .unit { font-size: 13px; color: var(--ink-dim); }
+.calibrate .calmic select { width: 100%; }
+/* As tall as the picker it stands in for, so the two fields line up. */
+.calibrate .calmic .micname {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calibrate .calkeeps { margin: 0; }
+.calibrate .calfoot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 480px) {
+  .calibrate .calcard { padding: 22px 18px; }
+  .calibrate .calsetup { grid-template-columns: 1fr; }
+}
 .calibrate .banner { border: 1px solid var(--line); border-radius: 8px; max-width: 52ch; }
 
 .calibrate .prompt {
