@@ -16,13 +16,15 @@ nothing to the site. The next release carries them.
 - The calibration result sits on a card too, with left-aligned text. A failed calibration says **Let’s try that again…**, its explanation is one paragraph, and the verdict under **Your setup** names the speed it judges, such as **At 25 wpm**.
 - A successful calibration says **Success!**, and a short tail is rated **Excellent**. The explanation under it no longer contradicts the correction it found.
 - **Configuration** sits on a card like the calibration screens, with **Done** at the bottom. A switch shows one part at a time: **User**, **Drills** or **Calibration**.
+- On the practice screen, the header, the chart settings, the speeds and message, and the scores sit on panels like the rest of the app.
 - Under **Calibration recordings**, a recording saved as a calibration shows that calibration's name, and **Save** puts the name at the front of the file.
 
 ### Fixed
 
 - The list of calibration prompts no longer runs into its border.
+- Opening the settings no longer shifts the page sideways when a scrollbar appears.
 - Clicking the charts on a calibration result plays the target or your recording.
-- A calibration result has a play button for every drill, named, rather than **Other keying**. A drill with nothing in it is greyed out, and its tooltip says it was not captured.
+- A calibration result has a play button for every drill, named, rather than **Other keying**. A drill with nothing in it is grayed out, and its tooltip says it was not captured.
 
 ### Development
 

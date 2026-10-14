@@ -687,10 +687,12 @@ const showDownloads = () => tickSetting("show-downloads");
        a few pixels high. */
     const outer = band.getBoundingClientRect();
     const inner = scores.getBoundingClientRect();
-    // Against the interior: the rule under the band is part of its border box
-    // and would count as a pixel of space that is not space.
-    const rule = parseFloat(getComputedStyle(band).borderBottomWidth) || 0;
-    expect(inner.top - outer.top).toBeCloseTo(outer.bottom - rule - inner.bottom, 0);
+    // Against the interior: the band's borders are part of its border box and
+    // would count as space that is not space.
+    const style = getComputedStyle(band);
+    const top = parseFloat(style.borderTopWidth) || 0;
+    const bottom = parseFloat(style.borderBottomWidth) || 0;
+    expect(inner.top - outer.top - top).toBeCloseTo(outer.bottom - bottom - inner.bottom, 0);
   });
 
   it("reaches the corner button where the eye finds it, last in the header", async () => {
@@ -1172,7 +1174,10 @@ const showDownloads = () => tickSetting("show-downloads");
 
     const box = mark.getBoundingClientRect();
     expect(Math.round(box.top)).toBe(14);
-    expect(Math.round(box.left)).toBe(20);
+    /* From the page's own edge, not the window's: the scrollbar gutter is kept
+       on both sides, so where scrollbars take room the page starts inside it. */
+    const page = container.querySelector<HTMLElement>(".app")!.getBoundingClientRect();
+    expect(Math.round(box.left - page.left)).toBe(20);
     // Fitted to a row height, like the drawing in the review header.
     expect(Math.round(box.height)).toBe(26);
 
