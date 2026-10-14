@@ -12,7 +12,9 @@ import { SPACING_KINDS, reviewTake } from "@/timing";
 import { buildJsonReport } from "@/io/report";
 
 const { take, settings } = longElements();
-const all = reviewTake(take, settings);
+// The full grade, asked for: spacing only is the default.
+const full = { ...settings, ignoreConstruction: false };
+const all = reviewTake(take, full);
 const spacing = reviewTake(take, { ...settings, ignoreConstruction: true });
 const SPACING: readonly string[] = SPACING_KINDS;
 
@@ -45,6 +47,6 @@ describe("the score with character construction ignored", () => {
   it("says so in the JSON report", () => {
     const on = buildJsonReport(spacing, { ...settings, ignoreConstruction: true });
     expect(on.review.ignore_character_construction).toBe(true);
-    expect(buildJsonReport(all, settings).review.ignore_character_construction).toBe(false);
+    expect(buildJsonReport(all, full).review.ignore_character_construction).toBe(false);
   });
 });

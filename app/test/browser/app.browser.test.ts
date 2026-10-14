@@ -910,6 +910,45 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
   });
 
+  it("opens a first visit at the chosen defaults", async () => {
+    await mount();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
+    });
+    const q = <T extends Element>(sel: string) => container.querySelector<T>(sel)!;
+    const box = (id: string) => q<HTMLInputElement>(`#${id}`);
+    expect(Number(box("wpm").value), "character speed").toBe(25);
+    expect(Number(box("farns").value), "overall speed").toBe(25);
+    expect(Number(box("tol").value), "tolerance").toBe(30);
+    expect(Number(box("times").value), "times").toBe(1);
+    expect(Number(box("gain").value), "listening level").toBe(0);
+    expect(Number(box("repeat-pause").value), "repeat pause").toBe(5);
+    expect(Number(box("break-sec").value), "break length").toBe(3);
+    expect(Number(box("pace-lead").value), "delay start").toBe(3);
+    const on = {
+      loop: false,
+      "ignore-construction": true,
+      "collapse-rests": true,
+      "char-markers": false,
+      "run-scores": true,
+      "caption-all": false,
+      "show-chart-controls": true,
+      "show-downloads": false,
+      "show-hints": true,
+      "advanced-grading": true,
+      "plain-follow": true,
+      "plain-grading": true,
+      "zen-progress": true,
+      "zen-grading": false,
+      "pace-absolute": true,
+    };
+    for (const [id, want] of Object.entries(on)) expect(box(id).checked, id).toBe(want);
+    const pressed = [...container.querySelectorAll("[data-testid='mode'] button")].find(
+      (b) => b.getAttribute("aria-pressed") === "true",
+    );
+    expect(pressed?.textContent, "mode").toBe("Plain");
+  });
+
   it("holds the settings still as the window is resized", async () => {
     /* A section is a fixed width: resizing changes how many fit on a line,
        and nothing else. The microphone and the calibration share one line at

@@ -430,15 +430,15 @@ describe("controls", () => {
     expect(chart.querySelectorAll("input[type='checkbox']")).toHaveLength(4);
   });
 
-  it("offers grading spacing only, off to start", async () => {
+  it("offers grading spacing only, on to start", async () => {
     const user = userEvent.setup();
     const seen: Partial<ReviewSettings>[] = [];
     const { container } = renderView({ open: true, onChange: (p) => seen.push(p) });
     const box = screen.getByLabelText(/^spacing only$/i) as HTMLInputElement;
-    expect(box.checked).toBe(false);
+    expect(box.checked).toBe(true);
     expect(container.querySelector("[data-panel='grading']")).toContainElement(box);
     await user.click(box);
-    expect(seen.at(-1)).toEqual({ ignoreConstruction: true });
+    expect(seen.at(-1)).toEqual({ ignoreConstruction: false });
   });
 
 
@@ -526,24 +526,26 @@ describe("controls", () => {
     for (const label of [/live progress/i, /^clock axis$/i, /delay start/i]) {
       expect(screen.getByLabelText(label), String(label)).toBeEnabled();
     }
+    // On to start.
+    expect((screen.getByLabelText(/live progress/i) as HTMLInputElement).checked).toBe(true);
     await user.click(screen.getByLabelText(/live progress/i));
-    expect(onChange).toHaveBeenCalledWith({ zenProgress: true });
+    expect(onChange).toHaveBeenCalledWith({ zenProgress: false });
     const box = screen.getByLabelText(/delay start/i) as HTMLInputElement;
     await user.clear(box);
     await user.type(box, "5");
     expect(onChange).toHaveBeenLastCalledWith({ paceLeadSec: 5 });
   });
 
-  it("offers live grading in Plain mode, off to start and always live", async () => {
+  it("offers live grading in Plain mode, on to start and always live", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { container } = renderView({ onChange, open: true });
     const box = container.querySelector<HTMLInputElement>("#plain-grading")!;
     expect(container.querySelector("[data-panel='plain']")).toContainElement(box);
-    expect(box.checked).toBe(false);
+    expect(box.checked).toBe(true);
     expect(box).toBeEnabled();
     await user.click(box);
-    expect(onChange).toHaveBeenCalledWith({ plainGrading: true });
+    expect(onChange).toHaveBeenCalledWith({ plainGrading: false });
   });
 
   it("bars live grading until live progress is on", async () => {
@@ -639,7 +641,7 @@ describe("controls", () => {
     rerender(view({ times: 1 }, onChange));
     expect(document.querySelector("[data-panel='target']")).toContainElement(box());
     expect(box()).toBeEnabled();
-    expect(box().value).toBe("0");
+    expect(box().value, "five seconds to start").toBe("5");
     await user.clear(box());
     await user.type(box(), "4");
     expect(onChange).toHaveBeenLastCalledWith({ repeatPauseSec: 4 });

@@ -226,8 +226,8 @@ export function useTake(): TakeState {
   const loaded = runs[selected] ?? runs[runs.length - 1] ?? null;
   const [settings, setSettingsRaw] = useState<ReviewSettings>(() =>
     restorePrefs({
-      charWpm: 20,
-      farnsworthWpm: 20,
+      charWpm: 25,
+      farnsworthWpm: 25,
       tolerance: 0.3,
       expected: "",
       times: 1,
@@ -245,7 +245,9 @@ export function useTake(): TakeState {
          the tables are the answer to "why" — which is the next question after
          a score you did not like. */
       advancedGrading: true,
-      ignoreConstruction: false,
+      /* On: most people practicing will be on a keyer, which forms each
+         character itself, so its dits and dahs are not theirs to grade. */
+      ignoreConstruction: true,
       showDownloads: false,
       showHints: true,
       showChartControls: true,
@@ -255,8 +257,8 @@ export function useTake(): TakeState {
       captionAll: false,
       zenMode: false,
       plainFollow: true,
-      plainGrading: false,
-      zenProgress: false,
+      plainGrading: true,
+      zenProgress: true,
       zenGrading: false,
       runSort: "oldest",
       gainDb: 0,

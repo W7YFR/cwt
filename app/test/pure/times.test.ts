@@ -51,6 +51,8 @@ describe("a take sent more than once", () => {
       ...defaultSettings(take),
       expected: "CQ DE W7YFR",
       times,
+      // Passes joined by a word gap, which is what no repeat pause gives.
+      repeatPauseSec: 0,
     };
     return { settings, review: reviewTake(take, settings) };
   };

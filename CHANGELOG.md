@@ -20,6 +20,7 @@ nothing to the site. The next release carries them.
 - **Microphone**, **Calibration**, **Listening level** and **Loop** are in **Audio**, under **Settings**.
 - **Ignore character construction** is now **Spacing only**, and **Clock axis while pacing** is now **Clock axis**.
 - The track that plays always shows its stop button on the chart.
+- A first visit starts at 25 wpm, with a **Repeat pause** of 5 s, and with **Spacing only**, Zen's **Live progress** and Plain's **Live grading** on.
 
 ### Removed
 
