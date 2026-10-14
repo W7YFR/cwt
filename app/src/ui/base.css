@@ -494,7 +494,12 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
      was resized, and only the number of columns should change. */
   grid-template-columns: repeat(auto-fill, 180px);
   align-items: start;
-  gap: 16px 32px;
+  /* 20 between columns: six of them, Audio's two and one for each of the
+     other four sections, then fit one row in 1180px. Inside a panel, with its
+     margin, border and padding, that fits a window no wider than the one a
+     full-bleed band needed at 32. The columns stay 180: Break length and its
+     box need nearly all of one. */
+  gap: 16px 20px;
 }
 /* The recording modes, a row of their own under the rest, laid out on the
    same columns so their sections line up with the ones above. */
@@ -503,7 +508,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   display: grid;
   grid-template-columns: repeat(auto-fill, 180px);
   align-items: start;
-  gap: 16px 32px;
+  gap: 16px 20px;
 }
 /* Each mode's name, under the group's: the same caption, a step quieter. */
 .viewpanel .modesrow .uplabel { color: var(--ink-faint); }
@@ -515,7 +520,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    wide as its longest option, and a long microphone name pushed the
    calibration onto a line of its own. */
 .viewpanel [data-panel="audio"] .panelgroups { column-gap: 12px; }
-.viewpanel [data-panel="audio"] select { width: 150px; text-overflow: ellipsis; }
+.viewpanel [data-panel="audio"] select { width: 140px; text-overflow: ellipsis; }
 /* Out of the flow while empty, so it takes no gap. Not hidden: a live region
    that is not rendered does not announce what is written into it. */
 .viewpanel [data-panel="audio"] .hint:empty { position: absolute; }
