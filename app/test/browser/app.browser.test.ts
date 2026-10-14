@@ -886,17 +886,15 @@ const showDownloads = () => tickSetting("show-downloads");
     await served();
     await mount();
 
-    const open = () =>
-      act(async () => {
-        container.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click();
-      });
-    const zen = () => container.querySelector<HTMLInputElement>("#zen-mode")!;
+    const zen = () =>
+      [...container.querySelectorAll<HTMLButtonElement>("[data-testid='mode'] button")].find(
+        (b) => b.textContent === "Zen",
+      )!;
 
-    await open();
     await act(async () => {
       zen().click();
     });
-    expect(zen().checked).toBe(true);
+    expect(zen().getAttribute("aria-pressed")).toBe("true");
 
     // Past the settings debounce, so the setting has been written.
     await act(async () => {
@@ -909,8 +907,179 @@ const showDownloads = () => tickSetting("show-downloads");
     root = null;
     container.innerHTML = "";
     await mount();
-    await open();
-    expect(zen().checked, "the next visit starts on").toBe(true);
+    expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
+  });
+
+  it("opens a first visit at the chosen defaults", async () => {
+    await mount();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
+    });
+    const q = <T extends Element>(sel: string) => container.querySelector<T>(sel)!;
+    const box = (id: string) => q<HTMLInputElement>(`#${id}`);
+    expect(Number(box("wpm").value), "character speed").toBe(25);
+    expect(Number(box("farns").value), "overall speed").toBe(25);
+    expect(Number(box("tol").value), "tolerance").toBe(30);
+    expect(Number(box("times").value), "times").toBe(1);
+    expect(Number(box("gain").value), "listening level").toBe(0);
+    expect(Number(box("repeat-pause").value), "repeat pause").toBe(5);
+    expect(Number(box("break-sec").value), "break length").toBe(3);
+    expect(Number(box("pace-lead").value), "delay start").toBe(3);
+    const on = {
+      loop: false,
+      "ignore-construction": true,
+      "collapse-rests": true,
+      "char-markers": false,
+      "run-scores": true,
+      "caption-all": false,
+      "show-chart-controls": true,
+      "show-downloads": false,
+      "show-hints": true,
+      "advanced-grading": true,
+      "plain-follow": true,
+      "plain-grading": true,
+      "zen-progress": true,
+      "zen-grading": false,
+      "pace-absolute": true,
+    };
+    for (const [id, want] of Object.entries(on)) expect(box(id).checked, id).toBe(want);
+    const pressed = [...container.querySelectorAll("[data-testid='mode'] button")].find(
+      (b) => b.getAttribute("aria-pressed") === "true",
+    );
+    expect(pressed?.textContent, "mode").toBe("Plain");
+  });
+
+  it("holds the settings still as the window is resized", async () => {
+    /* A section is a fixed width: resizing changes how many fit on a line,
+       and nothing else. The microphone and the calibration share one line at
+       every width with room for two columns. */
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    try {
+      localStorage.setItem("cwt:prefs", JSON.stringify({ settingsOpen: true }));
+      await served();
+      await mount();
+      const measure = () => {
+        const widths = [...container.querySelectorAll<HTMLElement>(".viewpanel [data-panel]")]
+          .filter((e) => e.dataset.panel !== "modes")
+          .map((e) => Math.round(e.getBoundingClientRect().width));
+        const mid = (sel: string) => {
+          const b = container.querySelector(sel)!.getBoundingClientRect();
+          return b.top + b.height / 2;
+        };
+        return { widths, apart: Math.abs(mid("#input-device") - mid("#calibration")) };
+      };
+      const seen = [];
+      for (const width of [1400, 1000, 700]) {
+        await act(async () => {
+          await page.viewport(width, 900);
+        });
+        seen.push(measure());
+      }
+      for (const m of seen) {
+        expect(m.widths, "every section the same size").toEqual(seen[0]!.widths);
+        expect(m.apart, "microphone and calibration on one line").toBeLessThan(3);
+      }
+    } finally {
+      await act(async () => {
+        await page.viewport(w, h);
+      });
+    }
+  });
+
+  it("keeps the settings open, or closed, across a reload", async () => {
+    const open = () => container.querySelector(".chartsettings")!.getAttribute("data-open");
+    const toggle = () =>
+      act(async () => {
+        container.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click();
+      });
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
+    await served();
+    await mount();
+    expect(open()).toBe("false");
+    await toggle();
+    expect(open()).toBe("true");
+    await reload();
+    expect(open(), "still open").toBe("true");
+    await toggle();
+    await reload();
+    expect(open(), "still closed").toBe("false");
+  });
+
+  it("keeps the zoom it was left at across a reload", async () => {
+    const zoom = () => container.querySelector<HTMLInputElement>("#zoom")!;
+    const setZoom = async (v: number) => {
+      await act(async () => {
+        const input = zoom();
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, String(v));
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      // Past the settings debounce, so it has been written.
+      await act(async () => {
+        await new Promise((res) => setTimeout(res, 600));
+      });
+    };
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
+
+    // A recorded session.
+    await served();
+    await mount();
+    const fittedTo = Number(zoom().value);
+    const chosen = fittedTo > 30 ? 20 : 40;
+    await setZoom(chosen);
+    expect(Number(zoom().value)).toBe(chosen);
+    await reload();
+    expect(Number(zoom().value), "the session's zoom").toBe(chosen);
+
+    // And the practice screen with nothing recorded in it.
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".brandmark")!.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
+    });
+    const other = chosen === 20 ? 35 : 25;
+    await setZoom(other);
+    await reload();
+    expect(Number(zoom().value), "the practice screen's zoom").toBe(other);
+  });
+
+  it("comes back to practice after a reload, with nothing recorded yet", async () => {
+    /* A reload is not a decision to leave. With nothing recorded there is no
+       session to restore, but the screen you were on still is. */
+    localStorage.setItem("cwt:prefs", JSON.stringify({ expected: "CQ DE W7YFR" }));
+    await mount();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
+    });
+    expect(container.querySelector("[data-testid='scores']")).not.toBeNull();
+
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
+    await reload();
+    expect(container.querySelector("[data-testid='practice']"), "not the landing screen").toBeNull();
+    expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank")).toBe("true");
+    expect(container.querySelector<HTMLInputElement>("#expected")!.value).toBe("CQ DE W7YFR");
+
+    // Leaving for the landing screen is a decision, and a reload keeps it.
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".brandmark")!.click();
+    });
+    await reload();
+    expect(container.querySelector("[data-testid='practice']")).not.toBeNull();
   });
 
   it("puts the repeat count beside the message, not under it", async () => {
@@ -1103,13 +1272,20 @@ const showDownloads = () => tickSetting("show-downloads");
     }
 
     // The header's own row, where the controls are smaller but the rule is the
-    // same one.
-    const bar = [...container.querySelectorAll<HTMLElement>(".recordbar > *")].map((el) => {
-      const r = el.getBoundingClientRect();
-      return r.top + r.height / 2;
-    });
+    // same one. Per wrapped line, as above: the bar wraps on a narrow window.
+    const bar = [...container.querySelectorAll<HTMLElement>(".recordbar > *")];
     expect(bar.length).toBeGreaterThan(1);
-    expect(Math.max(...bar) - Math.min(...bar)).toBeLessThanOrEqual(1);
+    const barLines = new Map<number, number[]>();
+    for (const el of bar) {
+      const r = el.getBoundingClientRect();
+      const mids = barLines.get(Math.round(r.top / 20)) ?? [];
+      mids.push(r.top + r.height / 2);
+      barLines.set(Math.round(r.top / 20), mids);
+    }
+    for (const [line, mids] of barLines) {
+      const spread = Math.max(...mids) - Math.min(...mids);
+      expect(spread, `record bar line ${line} spread ${spread.toFixed(1)}px`).toBeLessThanOrEqual(1);
+    }
   });
 
   it("gives a banner a band of its own height, not of its words", async () => {
@@ -1269,14 +1445,12 @@ const showDownloads = () => tickSetting("show-downloads");
         [...container.querySelectorAll("button")].find((b) =>
           re.test(`${b.getAttribute("aria-label") ?? ""} ${b.textContent ?? ""}`),
         )!;
-      expect(named(/your sending/i).disabled, "play yours").toBe(true);
       expect(named(/your audio/i).disabled, "download yours").toBe(true);
       expect(named(/json report/i).disabled, "json").toBe(true);
       // And nothing left to clear.
       expect(container.querySelector("[data-testid='clear-take']")).toBeNull();
 
-      // What still works is everything about the target.
-      expect(named(/target$/i).disabled, "play target").toBe(false);
+      // What still works is recording again.
       expect(named(/record another/i).disabled, "record").toBe(false);
       // And opening a file, which is exactly when it is allowed: a cleared
       // session has no speed of its own for a recording to contradict.

@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useState } from "react";
-import { IconCog, IconPlay, IconStop } from "./Icons";
+import { IconCog } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
@@ -28,28 +28,39 @@ import {
   CAPTION_ALL_HELP,
   CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
-  FLASH_CARD_HELP,
   RUN_SCORES_HELP,
   SHOW_CHART_CONTROLS_HELP,
   SHOW_DOWNLOADS_HELP,
   SHOW_HINTS_HELP,
   SHOW_RUNS_HELP,
   RUN_SORT_HELP,
-  WORD_PREVIEW_HELP,
   GAIN_HELP,
   PACE_ABSOLUTE_HELP,
-  PACE_CURSOR_HELP,
   TIMES_FILE_HELP,
   TIMES_HELP,
-  ZEN_MODE_HELP,
-  ZEN_PACING_HELP,
   ZEN_PROGRESS_HELP,
   ZEN_GRADING_HELP,
+  LOOP_HELP,
+  PLAIN_FOLLOW_HELP,
+  PLAIN_GRADING_HELP,
   PACE_LEAD_HELP,
   BREAK_HELP,
   REPEAT_PAUSE_HELP,
   ZOOM_HELP,
+  CAL_FILE,
+  CAL_HELP,
+  CAL_NONE,
+  CAL_REREADING,
+  MIC_HELP,
+  NEEDS_LIVE_PROGRESS,
+  NEEDS_RUNS,
+  NEEDS_RUNS_SHOWN,
+  ONE_INPUT,
+  barredTitle,
 } from "./copy";
+import type { InputDevice } from "@/capture/mic";
+import { profilesFor, type Profile } from "@/io/profiles";
+import { CalibrateButton } from "./Record";
 
 /** The range of both speed sliders. */
 export const SPEED_MIN = 5;
@@ -70,29 +81,23 @@ import {
   PACE_LEAD_MAX_SEC,
   PACE_LEAD_MIN_SEC,
 } from "@/render/geometry";
-import { fmtGain, fmtPpu, fmtSeconds, fmtTolerance, fmtWpm } from "./format";
+import { fmtGain, fmtPpu, fmtTolerance, fmtWpm } from "./format";
 import { RUN_SORTS, recentCount, type RunSort } from "./runOrder";
 import { useUpperField } from "./useUpperField";
 
 export interface ControlsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
-  playing: "you" | "tgt" | null;
-  /** False when there is no recording to play — see `blankTake`. */
-  canPlayYou: boolean;
-  clock: number | null;
   /** This session was opened from a file rather than keyed. A file holds
    *  whatever it holds, so how many passes you are about to send is not a
    *  question about it. */
   fromFile: boolean;
-  onPlayYou(): void;
-  onPlayTarget(): void;
-  onStop(): void;
-  /** Repeat what a play control starts, each time it reaches its end. */
-  loop?: boolean;
-  onLoop?(): void;
 }
 
+/** The row over the chart: what you send, at what speed, judged how closely.
+ *
+ * Only the settings changed from take to take. Everything set once and left
+ * alone is in the settings panel, and playback is on the chart itself. */
 export function Controls(props: ControlsProps): React.ReactElement {
   const { settings: s, onChange } = props;
   const expected = useUpperField(
@@ -101,47 +106,6 @@ export function Controls(props: ControlsProps): React.ReactElement {
 
   return (
     <section className="controls">
-      <div className="group transport">
-        {/* Captioned like every other group. Without one it was the only thing
-            on the row with nothing above it, and it had to be dropped onto the
-            control band by hand to line up with the rest. */}
-        <span className="caption">Audio</span>
-        {/* The controls in a row of their own inside the group, so the caption
-            can sit above them. The group is a column of two bands like every
-            other; what makes this one different is that its control band holds
-            four things rather than one. */}
-        <div className="transportrow">
-          {/* The icon lives in its own fixed-width span so swapping play/stop
-              cannot change the button's width and shift the row. */}
-          <button
-            className="play"
-            onClick={props.onPlayYou}
-            disabled={!props.canPlayYou}
-            aria-pressed={props.playing === "you"}
-          >
-            <i className="ico">{props.playing === "you" ? <IconStop /> : <IconPlay />}</i>
-            Your sending
-          </button>
-          <button
-            className="play alt"
-            onClick={props.onPlayTarget}
-            aria-pressed={props.playing === "tgt"}
-          >
-            <i className="ico">{props.playing === "tgt" ? <IconStop /> : <IconPlay />}</i>
-            Target
-          </button>
-          <button onClick={props.onStop} disabled={!props.playing} aria-label="Stop">
-            <IconStop />
-          </button>
-          {props.onLoop && (
-            <button className="loop" onClick={props.onLoop} aria-pressed={props.loop ?? false}>
-              Loop
-            </button>
-          )}
-          <span className="clock">{fmtSeconds(props.clock ?? 0)}</span>
-        </div>
-      </div>
-
       <div className="group">
         <label htmlFor="wpm">
           Character speed <output id="wpm-out">{fmtWpm(s.charWpm)}</output>
@@ -190,21 +154,6 @@ export function Controls(props: ControlsProps): React.ReactElement {
         />
       </div>
 
-      <div className="group">
-        <label htmlFor="gain" title={GAIN_HELP}>
-          Listening level <output id="gain-out">{fmtGain(s.gainDb)}</output>
-        </label>
-        <input
-          type="range"
-          id="gain"
-          min={-6}
-          max={42}
-          step={1}
-          value={s.gainDb}
-          onChange={(e) => onChange({ gainDb: Number(e.target.value) })}
-        />
-      </div>
-
       {/* The message and how many of it, on one line. A wrapper, because the
           message group claims a whole row by itself — it is the one control
           here whose useful width has no upper bound — so the two share a line
@@ -216,12 +165,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
           {/* Says what the box is FOR, which is the thing worth knowing when it
               is empty: with nothing here there is no source of truth, so the
               grade falls back to the decoder's own reading of you and the
-              accuracy figure is a meaningless 100%. It belongs in the
-              placeholder rather than beside the label — it is only on screen
-              while the box is empty, which is exactly when a placeholder is, and
-              text that appears and disappears next to a label has to wrap
-              somewhere the label does not. Inside the box it has a whole row to
-              itself and clips instead of reflowing the row above it. */}
+              accuracy figure is a meaningless 100%. */}
           {/* The clear button sits inside the box's right edge rather than
               beside it: this group is the one that absorbs the row's slack, and
               a button next to the field would take the room back from the only
@@ -268,10 +212,6 @@ export function Controls(props: ControlsProps): React.ReactElement {
           </div>
         </div>
 
-        {/* Barred rather than hidden for a file. Gone, the row reflows and the
-            message box grows the moment a file is opened, which reads as the
-            page having changed its mind about something. Barred, it says what
-            it is: a question that does not apply to this take. */}
         <div className="group">
           <NumberField
             id="times"
@@ -287,7 +227,6 @@ export function Controls(props: ControlsProps): React.ReactElement {
           />
         </div>
       </div>
-
     </section>
   );
 }
@@ -368,8 +307,7 @@ export interface ChartSettingsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
   /** How many attempts are in the session. With one there is nothing to
-   *  order, and a control for arranging a single row is a control for
-   *  nothing. */
+   *  order or compare, and the settings for that are barred. */
   runs: number;
 }
 
@@ -377,20 +315,65 @@ export interface ViewControlsProps extends ChartSettingsProps {
   onFit(): void;
 }
 
+/** A select with its caption above it, barred in place when it cannot apply. */
+function SelectGroup({
+  id,
+  label,
+  help,
+  barred,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  help?: string;
+  barred?: string | null;
+  value: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onChange(value: string): void;
+}): React.ReactElement {
+  const title = help === undefined && !barred ? undefined : barredTitle(barred ?? null, help ?? "");
+  return (
+    <div className="group" data-disabled={Boolean(barred)} title={title}>
+      <label htmlFor={id}>{label}</label>
+      <select
+        id={id}
+        value={value}
+        disabled={Boolean(barred)}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+const VIEWS = [
+  { value: "per-char", label: "Per character" },
+  { value: "absolute", label: "Absolute time" },
+  { value: "overlay", label: "Overlay" },
+] as const;
+
+const SHOW_RUNS = [
+  { value: "all", label: "All runs" },
+  { value: "last5", label: "Last 5 runs" },
+  { value: "last3", label: "Last 3 runs" },
+  { value: "last", label: "Last run" },
+] as const;
+
 /** How the chart is drawn, next to the chart.
  *
  * Separated from the controls above because they answer a different question.
- * Everything up there changes the grade; nothing down here does — the axis,
- * the zoom and the rest policy change what is on screen and leave every number
- * exactly where it was. Mixed into one row of nine controls, the two kinds
- * were indistinguishable, and a zoom slider sitting beside a tolerance slider
- * implies they are the same sort of thing. */
+ * Everything up there changes the grade; nothing down here does. */
 export function ViewControls(props: ViewControlsProps): React.ReactElement | null {
   const { settings: s, onChange } = props;
   /* Gone entirely rather than emptied, so the chart moves up into the room the
-     row was taking. A section that renders nothing still holds its own margins,
-     and a strip of blank page above a chart reads as something that failed to
-     load. */
+     row was taking. Taking the row away is what Chart controls is for. */
   if (!s.showChartControls) return null;
   /* How many rows the chart is actually drawing — the session, capped by
      whatever window Show has in force. What Sort is about. */
@@ -398,96 +381,59 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
   const drawn = want === null ? props.runs : Math.min(want, props.runs);
   return (
     <section className="viewcontrols">
-        {/* Only where there is an order to choose. One row has exactly one
-            arrangement, whether that is a session with one attempt in it or a
-            session showing its last — and a control whose every setting draws
-            the same picture is furniture. */}
-        {drawn > 1 && (
-          <div className="group">
-            <label htmlFor="run-sort" title={RUN_SORT_HELP}>
-              Sort
-            </label>
-            <select
-              id="run-sort"
-              value={s.runSort}
-              onChange={(e) => onChange({ runSort: e.target.value as RunSort })}
-            >
-              {RUN_SORTS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+      <SelectGroup
+        id="run-sort"
+        label="Sort"
+        help={RUN_SORT_HELP}
+        barred={drawn > 1 ? null : props.runs > 1 ? NEEDS_RUNS_SHOWN : NEEDS_RUNS}
+        value={s.runSort}
+        options={RUN_SORTS}
+        onChange={(v) => onChange({ runSort: v as RunSort })}
+      />
 
-        <div className="group">
-          <label htmlFor="view">View</label>
-          <select
-            id="view"
-            value={s.view}
-            onChange={(e) => onChange({ view: e.target.value as ViewMode })}
+      <SelectGroup
+        id="view"
+        label="View"
+        value={s.view}
+        options={VIEWS}
+        onChange={(v) => onChange({ view: v as ViewMode })}
+      />
+
+      <SelectGroup
+        id="show-runs"
+        label="Show"
+        help={SHOW_RUNS_HELP}
+        barred={props.runs > 1 ? null : NEEDS_RUNS}
+        value={s.showRuns}
+        options={SHOW_RUNS}
+        onChange={(v) => onChange({ showRuns: v as ReviewSettings["showRuns"] })}
+      />
+
+      <div className="group">
+        <label htmlFor="zoom" title={ZOOM_HELP}>
+          Zoom <output id="zoom-out">{fmtPpu(s.ppu)}</output>
+        </label>
+        {/* The button is a sibling of the label, not inside it: a label may not
+            contain another labelable element. */}
+        <div className="sliderow">
+          <input
+            type="range"
+            id="zoom"
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            step={1}
+            value={s.ppu}
+            onChange={(e) => onChange({ ppu: Number(e.target.value) })}
+          />
+          <button
+            id="zoom-fit"
+            onClick={props.onFit}
+            title="Zoom so the session fills the width — what the chart does when it opens"
           >
-            <option value="per-char">Per character</option>
-            <option value="absolute">Absolute time</option>
-            <option value="overlay">Overlay</option>
-          </select>
+            Fit
+          </button>
         </div>
-
-        {/* Next to the axis, because it is the same kind of question: not what
-            is graded, but what is on screen to read. Only with a stack — with
-            one attempt every answer here is the same row.
-
-            All three offered whenever it shows, short sessions included: "the
-            last five" of three attempts is those three, which is what it says
-            it is. Dropping an option once a session is short enough for two of
-            them to agree would move the others under the pointer. */}
-        {props.runs > 1 && (
-          <div className="group">
-            <label htmlFor="show-runs" title={SHOW_RUNS_HELP}>
-              Show
-            </label>
-            <select
-              id="show-runs"
-              value={s.showRuns}
-              onChange={(e) =>
-                onChange({ showRuns: e.target.value as ReviewSettings["showRuns"] })
-              }
-            >
-              <option value="all">All runs</option>
-              <option value="last5">Last 5 runs</option>
-              <option value="last3">Last 3 runs</option>
-              <option value="last">Last run</option>
-            </select>
-          </div>
-        )}
-
-        <div className="group">
-          <label htmlFor="zoom" title={ZOOM_HELP}>
-            Zoom <output id="zoom-out">{fmtPpu(s.ppu)}</output>
-          </label>
-          {/* The button is a sibling of the label, not inside it: a label may not
-              contain another labelable element. */}
-          <div className="sliderow">
-            <input
-              type="range"
-              id="zoom"
-              min={ZOOM_MIN}
-              max={ZOOM_MAX}
-              step={1}
-              value={s.ppu}
-              onChange={(e) => onChange({ ppu: Number(e.target.value) })}
-            />
-            <button
-              id="zoom-fit"
-              onClick={props.onFit}
-              title="Zoom so the session fills the width — what the chart does when it opens"
-            >
-              Fit
-            </button>
-          </div>
-        </div>
-
+      </div>
     </section>
   );
 }
@@ -511,8 +457,8 @@ export function ChartSettingsButton({
       data-testid="panel-toggle"
       aria-pressed={open}
       aria-controls="view-panel"
-      aria-label="Chart settings"
-      title="Chart settings"
+      aria-label="Settings"
+      title="Settings"
       onClick={onToggle}
     >
       <IconCog />
@@ -520,323 +466,390 @@ export function ChartSettingsButton({
   );
 }
 
-/** Everything the rows have no space for, in a band under the header.
+/** One checkbox, barred in place when another setting rules it out.
  *
- * Three groups, named: how the chart is drawn, what else is on the page, and
- * what runs while you send. Without the names it is one heap of a dozen
- * checkboxes, and half of them do nothing to the chart in front of you. */
-export function ChartSettingsPanel(props: ChartSettingsProps): React.ReactElement {
+ * A barred setting keeps its place and its value, dimmed, with the reason
+ * first in its tooltip. Hidden, the settings around it moved every time
+ * another one changed, and there was no way to find out it existed. */
+function Check({
+  id,
+  label,
+  help,
+  checked,
+  barred = null,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  help: string;
+  checked: boolean;
+  barred?: string | null;
+  onChange(checked: boolean): void;
+}): React.ReactElement {
+  return (
+    <div className="group">
+      <label className="check" title={barredTitle(barred, help)}>
+        <input
+          type="checkbox"
+          id={id}
+          checked={checked}
+          disabled={barred !== null}
+          onChange={(e) => onChange(e.target.checked)}
+        />{" "}
+        {label}
+      </label>
+    </div>
+  );
+}
+
+/** The input and its correction: what the Audio group sets. Absent where
+ *  there is no recorder to set them for. */
+export interface AudioSetup {
+  devices: readonly InputDevice[];
+  deviceId: string | undefined;
+  onDeviceChange(id: string | undefined): void;
+  profiles: readonly Profile[];
+  profileId: string | undefined;
+  onProfileChange(id: string | undefined): void;
+  /** False for a file, which is read exactly as recorded. */
+  appliesToTake: boolean;
+  /** The session is being re-read under a new calibration. */
+  rereading: boolean;
+  onCalibrate?: (() => void) | undefined;
+}
+
+export interface SettingsPanelProps extends ChartSettingsProps {
+  audio?: AudioSetup;
+  /** Replay what plays each time it reaches its end. Not a saved setting: it
+   *  is the transport's, and L toggles it too. */
+  loop?: boolean;
+  onLoop?(): void;
+}
+
+/** Every setting the control row has no room for, in a band under the header.
+ *
+ * Grouped by the question each answers: what you hear, what you send, how it
+ * is graded, the two ways to record, how the chart is drawn, and what else is
+ * on the page. A setting that another one rules out stays in its place,
+ * dimmed, with the reason in its tooltip. */
+export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElement {
   const { settings: s, onChange } = props;
   return (
-        <div className="viewpanel" id="view-panel">
-          <div className="panelrow" data-panel="display">
-            <span className="uplabel">Chart display</span>
-            <div className="panelgroups">
-              <div className="group">
-                <label className="check" title={COLLAPSE_RESTS_HELP}>
-                  <input
-                    type="checkbox"
-                    checked={s.collapseRests}
-                    onChange={(e) => onChange({ collapseRests: e.target.checked })}
-                  />{" "}
-                  Collapse rests
-                </label>
-              </div>
-
-              <div className="group">
-                <label className="check" title={CHAR_MARKERS_HELP}>
-                  <input
-                    type="checkbox"
-                    id="char-markers"
-                    checked={s.charMarkers}
-                    onChange={(e) => onChange({ charMarkers: e.target.checked })}
-                  />{" "}
-                  Marks only
-                </label>
-              </div>
-
-              {/* Both only with a stack. With one attempt on screen the scores
-                  would repeat the band under the chart, and there is no "every
-                  row" to caption. */}
-              {props.runs > 1 && (
-                <>
-                  <div className="group">
-                    <label className="check" title={RUN_SCORES_HELP}>
-                      <input
-                        type="checkbox"
-                        id="run-scores"
-                        checked={s.runScores}
-                        onChange={(e) => onChange({ runScores: e.target.checked })}
-                      />{" "}
-                      Scores
-                    </label>
-                  </div>
-
-                  <div className="group">
-                    <label className="check" title={CAPTION_ALL_HELP}>
-                      <input
-                        type="checkbox"
-                        id="caption-all"
-                        checked={s.captionAll}
-                        onChange={(e) => onChange({ captionAll: e.target.checked })}
-                      />{" "}
-                      Decode all
-                    </label>
-                  </div>
-                </>
-              )}
-            </div>
+    <div className="viewpanel" id="view-panel">
+      <Section name="audio" title="Audio">
+        {/* Two lines: where the sound comes from, then how it plays back. */}
+        {props.audio && (
+          <div className="panelgroups">
+            <AudioGroups audio={props.audio} />
           </div>
-
-          <div className="panelrow" data-panel="grading">
-            <span className="uplabel">Grading</span>
-            <div className="panelgroups">
-              <div className="group">
-                <label className="check" title={IGNORE_CONSTRUCTION_HELP}>
-                  <input
-                    type="checkbox"
-                    id="ignore-construction"
-                    checked={s.ignoreConstruction}
-                    onChange={(e) => onChange({ ignoreConstruction: e.target.checked })}
-                  />{" "}
-                  Ignore character construction
-                </label>
-              </div>
-            </div>
+        )}
+        <div className="panelgroups">
+          <div className="group">
+            <label htmlFor="gain" title={GAIN_HELP}>
+              Listening level <output id="gain-out">{fmtGain(s.gainDb)}</output>
+            </label>
+            <input
+              type="range"
+              id="gain"
+              min={-6}
+              max={42}
+              step={1}
+              value={s.gainDb}
+              onChange={(e) => onChange({ gainDb: Number(e.target.value) })}
+            />
           </div>
+          {props.onLoop && (
+            <Check
+              id="loop"
+              label="Loop"
+              help={LOOP_HELP}
+              checked={props.loop ?? false}
+              onChange={() => props.onLoop?.()}
+            />
+          )}
+        </div>
+      </Section>
 
-          <div className="panelrow" data-panel="practice">
-            <span className="uplabel">Practice aids</span>
-            <div className="panelgroups">
-              {/* First, because it is the one that turns the others off. */}
-              <div className="group">
-                <label className="check" title={ZEN_MODE_HELP}>
-                  <input
-                    type="checkbox"
-                    id="zen-mode"
-                    checked={s.zenMode}
-                    /* Turning it on clears the paced aids rather than merely
-                       overriding them. A checkbox left ticked while something
-                       else quietly ignores it is a setting that lies about
-                       what will happen when you press record. */
-                    onChange={(e) =>
-                      onChange(
-                        e.target.checked
-                          ? { zenMode: true, paceCursor: false, flashCard: false }
-                          : { zenMode: false },
-                      )
-                    }
-                  />{" "}
-                  Zen mode
-                </label>
-              </div>
-
-              {/* Only with Zen mode on. Progress on a sheet that is not
-                  shown is a setting for nothing. */}
-              {s.zenMode && (
-                <div className="group">
-                  <label className="check" title={ZEN_PROGRESS_HELP}>
-                    <input
-                      type="checkbox"
-                      id="zen-progress"
-                      checked={s.zenProgress}
-                      onChange={(e) => onChange({ zenProgress: e.target.checked })}
-                    />{" "}
-                    Live progress
-                  </label>
-                </div>
-              )}
-
-              {/* Only with Live progress on: grading reads the same live
-                  decode. */}
-              {s.zenMode && s.zenProgress && (
-                <div className="group">
-                  <label className="check" title={ZEN_GRADING_HELP}>
-                    <input
-                      type="checkbox"
-                      id="zen-grading"
-                      checked={s.zenGrading}
-                      onChange={(e) => onChange({ zenGrading: e.target.checked })}
-                    />{" "}
-                    Live grading
-                  </label>
-                </div>
-              )}
-
-              <div className="group">
-                <label className="check" title={s.zenMode ? ZEN_PACING_HELP : PACE_CURSOR_HELP}>
-                  <input
-                    type="checkbox"
-                    id="pace-cursor"
-                    checked={s.paceCursor}
-                    disabled={s.zenMode}
-                    onChange={(e) => onChange({ paceCursor: e.target.checked })}
-                  />{" "}
-                  Pacing cursor
-                </label>
-              </div>
-
-              {/* Only with the cursor on. An axis swapped for a cursor that
-                  is not running is a setting for nothing. */}
-              {s.paceCursor && (
-                <div className="group">
-                  <label className="check" title={PACE_ABSOLUTE_HELP}>
-                    <input
-                      type="checkbox"
-                      id="pace-absolute"
-                      checked={s.paceAbsolute}
-                      onChange={(e) => onChange({ paceAbsolute: e.target.checked })}
-                    />{" "}
-                    Clock axis while pacing
-                  </label>
-                </div>
-              )}
-
-              {/* Barred by Zen mode for the same reason the cursor is: it
-                  runs on the same count-in and stops the take at the end of
-                  the message, which is pacing however it is drawn. */}
-              <div className="group">
-                <label className="check" title={s.zenMode ? ZEN_PACING_HELP : FLASH_CARD_HELP}>
-                  <input
-                    type="checkbox"
-                    id="flash-card"
-                    checked={s.flashCard}
-                    disabled={s.zenMode}
-                    onChange={(e) => onChange({ flashCard: e.target.checked })}
-                  />{" "}
-                  Flash card
-                </label>
-              </div>
-
-              {/* Only with the card up: a word preview under a card that is
-                  not there is a setting for nothing. */}
-              {s.flashCard && (
-                <div className="group">
-                  <label className="check" title={WORD_PREVIEW_HELP}>
-                    <input
-                      type="checkbox"
-                      id="word-preview"
-                      checked={s.wordPreview}
-                      onChange={(e) => onChange({ wordPreview: e.target.checked })}
-                    />{" "}
-                    Word preview
-                  </label>
-                </div>
-              )}
-            </div>
+      <Section name="target" title="Target">
+        <div className="panelgroups">
+          <div className="group">
+            <NumberField
+              id="repeat-pause"
+              name="Repeat pause"
+              unit="s"
+              spoken="seconds"
+              help={REPEAT_PAUSE_HELP}
+              value={s.repeatPauseSec}
+              min={REPEAT_PAUSE_MIN_SEC}
+              max={REPEAT_PAUSE_MAX_SEC}
+              step={1}
+              onChange={(v) => onChange({ repeatPauseSec: v })}
+            />
           </div>
-
-          <div className="panelrow" data-panel="timing">
-            <span className="uplabel">Timing</span>
-            <div className="panelgroups">
-              {/* Only with the cursor on. A count-in for a cursor that is not
-                  running is a setting for nothing. */}
-              {s.paceCursor && (
-                <div className="group">
-                  <NumberField
-                    id="pace-lead"
-                    name="Delay start"
-                    unit="s"
-                    spoken="seconds"
-                    help={PACE_LEAD_HELP}
-                    value={s.paceLeadSec}
-                    min={PACE_LEAD_MIN_SEC}
-                    max={PACE_LEAD_MAX_SEC}
-                    step={1}
-                    onChange={(v) => onChange({ paceLeadSec: v })}
-                  />
-                </div>
-              )}
-
-              <div className="group">
-                <NumberField
-                  id="break-sec"
-                  name="Break length"
-                  unit="s"
-                  spoken="seconds"
-                  help={BREAK_HELP}
-                  value={s.breakSec}
-                  min={BREAK_MIN_SEC}
-                  max={BREAK_MAX_SEC}
-                  step={1}
-                  onChange={(v) => onChange({ breakSec: v })}
-                />
-              </div>
-
-              <div className="group">
-                <NumberField
-                  id="repeat-pause"
-                  name="Repeat pause"
-                  unit="s"
-                  spoken="seconds"
-                  help={REPEAT_PAUSE_HELP}
-                  value={s.repeatPauseSec}
-                  min={REPEAT_PAUSE_MIN_SEC}
-                  max={REPEAT_PAUSE_MAX_SEC}
-                  step={1}
-                  onChange={(v) => onChange({ repeatPauseSec: v })}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Not the chart: these two put a whole block on the page or take it
-              away, which is a different kind of decision from how the marks
-              above are drawn. Grouped by that rather than by what they happen
-              to contain — a row of buttons and three tables have nothing else
-              in common. */}
-          <div className="panelrow" data-panel="extras">
-            <span className="uplabel">Also show</span>
-            <div className="panelgroups">
-              <div className="group">
-                <label className="check" title={SHOW_CHART_CONTROLS_HELP}>
-                  <input
-                    type="checkbox"
-                    id="show-chart-controls"
-                    checked={s.showChartControls}
-                    onChange={(e) => onChange({ showChartControls: e.target.checked })}
-                  />{" "}
-                  Chart controls
-                </label>
-              </div>
-
-              <div className="group">
-                <label className="check" title={SHOW_DOWNLOADS_HELP}>
-                  <input
-                    type="checkbox"
-                    id="show-downloads"
-                    checked={s.showDownloads}
-                    onChange={(e) => onChange({ showDownloads: e.target.checked })}
-                  />{" "}
-                  Downloads
-                </label>
-              </div>
-
-              <div className="group">
-                <label className="check" title={SHOW_HINTS_HELP}>
-                  <input
-                    type="checkbox"
-                    id="show-hints"
-                    checked={s.showHints}
-                    onChange={(e) => onChange({ showHints: e.target.checked })}
-                  />{" "}
-                  Hints
-                </label>
-              </div>
-
-              <div className="group">
-                <label className="check" title={ADVANCED_GRADING_HELP}>
-                  <input
-                    type="checkbox"
-                    id="advanced-grading"
-                    checked={s.advancedGrading}
-                    onChange={(e) => onChange({ advancedGrading: e.target.checked })}
-                  />{" "}
-                  Advanced grading
-                </label>
-              </div>
-            </div>
+          <div className="group">
+            <NumberField
+              id="break-sec"
+              name="Break length"
+              unit="s"
+              spoken="seconds"
+              help={BREAK_HELP}
+              value={s.breakSec}
+              min={BREAK_MIN_SEC}
+              max={BREAK_MAX_SEC}
+              step={1}
+              onChange={(v) => onChange({ breakSec: v })}
+            />
           </div>
         </div>
+      </Section>
+
+      <Section name="grading" title="Grading">
+        <div className="panelgroups">
+          <Check
+            id="ignore-construction"
+            label="Spacing only"
+            help={IGNORE_CONSTRUCTION_HELP}
+            checked={s.ignoreConstruction}
+            onChange={(v) => onChange({ ignoreConstruction: v })}
+          />
+        </div>
+      </Section>
+
+      <Section name="display" title="Chart">
+        <div className="panelgroups">
+          <Check
+            id="collapse-rests"
+            label="Collapse rests"
+            help={COLLAPSE_RESTS_HELP}
+            checked={s.collapseRests}
+            onChange={(v) => onChange({ collapseRests: v })}
+          />
+          <Check
+            id="char-markers"
+            label="Marks only"
+            help={CHAR_MARKERS_HELP}
+            checked={s.charMarkers}
+            onChange={(v) => onChange({ charMarkers: v })}
+          />
+          <Check
+            id="run-scores"
+            label="Scores"
+            help={RUN_SCORES_HELP}
+            checked={s.runScores}
+            onChange={(v) => onChange({ runScores: v })}
+          />
+          <Check
+            id="caption-all"
+            label="Decode all"
+            help={CAPTION_ALL_HELP}
+            checked={s.captionAll}
+            onChange={(v) => onChange({ captionAll: v })}
+          />
+        </div>
+      </Section>
+
+      {/* Not the chart: these put a whole block on the page or take it away,
+          which is a different kind of decision from how the marks above are
+          drawn. */}
+      <Section name="extras" title="Page">
+        <div className="panelgroups">
+          <Check
+            id="show-chart-controls"
+            label="Chart controls"
+            help={SHOW_CHART_CONTROLS_HELP}
+            checked={s.showChartControls}
+            onChange={(v) => onChange({ showChartControls: v })}
+          />
+          <Check
+            id="show-downloads"
+            label="Downloads"
+            help={SHOW_DOWNLOADS_HELP}
+            checked={s.showDownloads}
+            onChange={(v) => onChange({ showDownloads: v })}
+          />
+          <Check
+            id="show-hints"
+            label="Hints"
+            help={SHOW_HINTS_HELP}
+            checked={s.showHints}
+            onChange={(v) => onChange({ showHints: v })}
+          />
+          <Check
+            id="advanced-grading"
+            label="Advanced grading"
+            help={ADVANCED_GRADING_HELP}
+            checked={s.advancedGrading}
+            onChange={(v) => onChange({ advancedGrading: v })}
+          />
+        </div>
+      </Section>
+
+      {/* The options of the three ways to record, on a row of their own: they
+          are the settings changed from one sitting to the next, and the rest
+          are set once. Which mode records is picked beside the record button;
+          these are set ahead of it, so they stay live whichever is picked. */}
+      <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">
+        <span className="uplabel" id="panel-modes">
+          Recording modes
+        </span>
+        <div className="modesrow">
+          <Section name="plain" title="Plain">
+            <div className="aid">
+              <Check
+                id="plain-follow"
+                label="Follow"
+                help={PLAIN_FOLLOW_HELP}
+                checked={s.plainFollow}
+                onChange={(v) => onChange({ plainFollow: v })}
+              />
+              <Check
+                id="plain-grading"
+                label="Live grading"
+                help={PLAIN_GRADING_HELP}
+                checked={s.plainGrading}
+                onChange={(v) => onChange({ plainGrading: v })}
+              />
+            </div>
+          </Section>
+
+          <Section name="zen" title="Zen">
+            <div className="aid">
+              <Check
+                id="zen-progress"
+                label="Live progress"
+                help={ZEN_PROGRESS_HELP}
+                checked={s.zenProgress}
+                onChange={(v) => onChange({ zenProgress: v })}
+              />
+              <Check
+                id="zen-grading"
+                label="Live grading"
+                help={ZEN_GRADING_HELP}
+                checked={s.zenGrading}
+                barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
+                onChange={(v) => onChange({ zenGrading: v })}
+              />
+            </div>
+          </Section>
+
+          <Section name="pacing" title="Pacing">
+            <div className="aid">
+              <Check
+                id="pace-absolute"
+                label="Clock axis"
+                help={PACE_ABSOLUTE_HELP}
+                checked={s.paceAbsolute}
+                onChange={(v) => onChange({ paceAbsolute: v })}
+              />
+              <div className="group">
+                <NumberField
+                  id="pace-lead"
+                  name="Delay start"
+                  unit="s"
+                  spoken="seconds"
+                  help={PACE_LEAD_HELP}
+                  value={s.paceLeadSec}
+                  min={PACE_LEAD_MIN_SEC}
+                  max={PACE_LEAD_MAX_SEC}
+                  step={1}
+                  onChange={(v) => onChange({ paceLeadSec: v })}
+                />
+              </div>
+            </div>
+          </Section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One named section of the panel. A group to assistive tech, named by its
+ *  heading, so a checkbox called "Enabled" says what it enables. */
+function Section({
+  name,
+  title,
+  children,
+}: {
+  name: string;
+  title: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const id = `panel-${name}`;
+  return (
+    <div className="panelrow" data-panel={name} role="group" aria-labelledby={id}>
+      <span className="uplabel" id={id}>
+        {title}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** The microphone and its calibration, each barred in place when there is
+ *  nothing to choose. */
+function AudioGroups({ audio }: { audio: AudioSetup }): React.ReactElement {
+  const oneInput = audio.devices.length <= 1 ? ONE_INPUT : null;
+  const choices = profilesFor([...audio.profiles], audio.deviceId, audio.profileId);
+  const active = audio.profiles.find((p) => p.id === audio.profileId) ?? null;
+  const calBarred = !audio.appliesToTake
+    ? CAL_FILE
+    : audio.rereading
+      ? CAL_REREADING
+      : choices.length === 0
+        ? CAL_NONE
+        : null;
+  return (
+    <>
+      <div className="group" data-disabled={oneInput !== null} title={barredTitle(oneInput, MIC_HELP)}>
+        <label htmlFor="input-device">Microphone</label>
+        <select
+          id="input-device"
+          value={audio.deviceId ?? ""}
+          disabled={oneInput !== null}
+          onChange={(e) => audio.onDeviceChange(e.target.value || undefined)}
+        >
+          <option value="">Default input</option>
+          {/* Keyed by position as well as by id: before the browser hands
+              over the identifiers, several inputs share an empty one. */}
+          {audio.devices.map((d, i) => (
+            <option key={`${d.deviceId}:${i}`} value={d.deviceId}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div
+        className="group"
+        data-testid="calpick"
+        data-disabled={calBarred !== null}
+        title={barredTitle(calBarred, CAL_HELP)}
+      >
+        <label htmlFor="calibration">Calibration</label>
+        <div className="sliderow">
+          <select
+            id="calibration"
+            value={audio.appliesToTake ? (audio.profileId ?? "") : ""}
+            disabled={calBarred !== null}
+            onChange={(e) => audio.onProfileChange(e.target.value || undefined)}
+          >
+            <option value="">No calibration</option>
+            {choices.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
+              </option>
+            ))}
+          </select>
+          {audio.onCalibrate && (
+            <CalibrateButton active={active} applied={audio.appliesToTake} onClick={audio.onCalibrate} />
+          )}
+          {/* Only while it is happening: re-reading takes long enough to need
+              saying. Not hidden while empty, so it is announced when filled. */}
+          <span className="hint" aria-live="polite">
+            {audio.rereading ? "re-reading the session…" : ""}
+          </span>
+        </div>
+      </div>
+    </>
   );
 }

@@ -54,8 +54,9 @@ export const BREAK_MIN_SEC = 1;
 export const BREAK_MAX_SEC = 30;
 
 /** Extra time the ideal timeline holds between passes, at each REPEAT. At
- *  zero a REPEAT is a word gap, and the sender's gap there is graded. */
-export const REPEAT_PAUSE_DEFAULT_SEC = 0;
+ *  zero a REPEAT is a word gap, and the sender's gap there is graded. Five
+ *  seconds to start: time to breathe between passes, and not graded. */
+export const REPEAT_PAUSE_DEFAULT_SEC = 5;
 export const REPEAT_PAUSE_MIN_SEC = 0;
 export const REPEAT_PAUSE_MAX_SEC = 30;
 

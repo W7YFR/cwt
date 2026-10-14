@@ -351,84 +351,6 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    chart and the numbers under it read as one thing. */
 .score.runname b { color: var(--you); }
 
-/* The next character, in type you can read without looking at it.
- *
- * A band of its own above the chart rather than a corner of it: at speed the
- * chart is small, moving type in exactly the place you cannot look, and the
- * point of this is that a glance is enough. */
-/* Three rows: what is coming, then the character, then the time to it. Side by
-   side the letter and the countdown competed for the same glance; stacked, the
-   letter is what you see and the number is what you check. */
-.flashcard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  margin: 20px auto 10px;
-  padding: 10px 20px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  min-height: 150px;
-  min-width: 150px;
-  box-sizing: border-box;
-}
-.fcletter {
-  font-family: var(--mono);
-  font-size: 54px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--ink);
-  min-width: 2ch;
-  text-align: center;
-}
-.fcclock {
-  font-family: var(--mono);
-  font-size: 22px;
-  font-variant-numeric: tabular-nums;
-  color: var(--you);
-  min-width: 5ch;
-  text-align: center;
-}
-.fclabel {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--ink-dim);
-}
-/* The word being sent, spelled out under the timing.
-   Letter-spaced so the letters read as separate things to be sent rather than
-   as a word to be read — and a fixed width per letter keeps the row from
-   shifting sideways as each one turns. */
-.fcword {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1px;
-  max-width: 18ch;
-  font-family: var(--mono);
-  font-size: 15px;
-  line-height: 1.2;
-  color: var(--ink-dim);
-}
-.fcword span {
-  width: 1.1ch;
-  text-align: center;
-  transition: color 90ms linear;
-}
-@media (prefers-reduced-motion: reduce) {
-  .fcword span { transition: none; }
-}
-/* Passed. Green rather than dimmed, because what it marks is the one thing on
-   the card that is already true. */
-.fcword span.done { color: var(--ok); font-weight: 700; }
-
-/* Nothing here lights up. The card showed the next character AND strobed on
-   the beat; the strobe is gone, because a bright flash a few times a second is
-   a real hazard for anyone photosensitive and a reference you glance at does
-   not need one. Reading what comes next is what the card is for. */
-
 /* The chart's own controls, in a strip above it. Not styled as the panel the
    grading controls are: they belong to the picture, not to the numbers. */
 .viewcontrols {
@@ -540,13 +462,53 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    it there — it cannot share a line with anything, whatever the window is
    doing, so opening it never rearranges the row above. */
 .viewpanel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  /* Columns, so a panel that is opened rarely and read whole fills the width
+     rather than stacking down the left. As many as fit, each wide enough for
+     its longest label — and a fixed width, not a share of the row: a column
+     that stretched with the window moved every setting in it as the window
+     was resized, and only the number of columns should change. */
+  grid-template-columns: repeat(auto-fill, 180px);
+  align-items: start;
+  gap: 16px 32px;
 }
-/* Two rows, each named. Without the names this is one heap of eleven
-   checkboxes again — what makes it readable is that half of them do nothing
-   to the chart in front of you and say so. */
+/* The recording modes, a row of their own under the rest, laid out on the
+   same columns so their sections line up with the ones above. */
+.viewpanel .modes { grid-column: 1 / -1; }
+.viewpanel .modesrow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 180px);
+  align-items: start;
+  gap: 16px 32px;
+}
+/* Each mode's name, under the group's: the same caption, a step quieter. */
+.viewpanel .modesrow .uplabel { color: var(--ink-faint); }
+/* Two lines that each want room across: where the sound comes from, and how
+   it plays back. */
+.viewpanel [data-panel="audio"] { grid-column: span 2; }
+/* Closer than the other lines, so the microphone and the calibration share
+   one line in two columns. Fixed widths for the two selects: a select is as
+   wide as its longest option, and a long microphone name pushed the
+   calibration onto a line of its own. */
+.viewpanel [data-panel="audio"] .panelgroups { column-gap: 12px; }
+.viewpanel [data-panel="audio"] select { width: 150px; text-overflow: ellipsis; }
+/* Out of the flow while empty, so it takes no gap. Not hidden: a live region
+   that is not rendered does not announce what is written into it. */
+.viewpanel [data-panel="audio"] .hint:empty { position: absolute; }
+/* Too narrow for two columns: one, the width of the window, and Audio's two
+   lines wrap inside it. */
+@media (max-width: 440px) {
+  .viewpanel, .viewpanel .modesrow { grid-template-columns: 1fr; }
+  .viewpanel [data-panel="audio"] { grid-column: auto; }
+}
+/* Every other section is a column of its settings. */
+.viewpanel .panelrow:not([data-panel="audio"]) .panelgroups {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+/* Each section named. Without the names this is one heap of checkboxes, and
+   the name is what says which question a setting answers. */
 .viewpanel .panelrow { display: flex; flex-direction: column; gap: 4px; }
 .viewpanel .uplabel {
   font-size: 11px;
@@ -566,6 +528,13 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    the floor turned the space between them into a function of how long each
    label happened to be. */
 .viewpanel .group { min-width: 0; }
+/* A section's settings as one column. */
+.viewpanel .aid { display: flex; flex-direction: column; gap: 2px; }
+/* Checkboxes in a column, closer than the control band's full height. */
+.viewpanel .panelrow:not([data-panel="audio"]) .group > label.check { min-height: 24px; }
+/* A section on more than one line, such as Audio: the lines apart by the
+   same gap a line of groups keeps within itself. */
+.viewpanel .panelgroups + .panelgroups { margin-top: 8px; }
 
 
 /* ---- controls ---------------------------------------------------------- */
@@ -676,6 +645,13 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    and whether a title is inherited off one is not a thing to depend on — a
    control that is barred for a reason has to be able to give the reason. */
 .group label.field[data-disabled="true"] input { pointer-events: none; }
+/* A select barred in place, dimmed with its caption, for the same reason.
+   The group carries the tooltip, so the select must not take the pointer.
+   Only the caption and the select: a button beside them, such as Calibrate,
+   is often the way out of the bar and stays live. */
+.group[data-disabled="true"] > label,
+.group[data-disabled="true"] select { opacity: .45; cursor: default; }
+.group[data-disabled="true"] select { pointer-events: none; }
 /* A label beside its box rather than above it, in a row of captions above
    theirs. It is a caption all the same, so it is set like one — without this
    it inherits the wizard's larger body size and reads as a different kind of
@@ -957,6 +933,9 @@ canvas.resizing { cursor: ew-resize; }
   color: var(--ink-dim);
   font-weight: 600;
 }
+/* What to do with an empty session, in the blue of your sending: it is about
+   the recording you are about to make. */
+.note.blank { color: var(--you); }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th, td {
   text-align: right;
@@ -2309,4 +2288,27 @@ button.cal { font-size: 11px; padding: 3px 8px; }
   color: var(--ink);
   font: 12px/1 var(--mono);
   box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+}
+
+/* ---- recording mode ------------------------------------------------------ */
+
+/* Plain, Paced, Zen: three buttons joined into one control, the one in force
+   pressed. Joined, they read as one choice rather than three actions. */
+.modeswitch { display: inline-flex; }
+/* Joined by sharing borders, not by overlapping: each keeps its own box. */
+.modeswitch button { border-radius: 0; }
+.modeswitch button + button { border-left-width: 0; }
+.modeswitch button:first-child { border-radius: 6px 0 0 6px; }
+.modeswitch button:last-child { border-radius: 0 6px 6px 0; }
+.modeswitch button[aria-pressed="true"] {
+  background: var(--you);
+  border-color: var(--you);
+  color: var(--bg);
+}
+/* A joined button has no left border of its own: its neighbour's right border
+   is that edge. So a hovered or pressed one draws the edge as a shadow over
+   it, or that one side would stay the neighbour's color. */
+.modeswitch button + button:hover:not(:disabled),
+.modeswitch button + button[aria-pressed="true"] {
+  box-shadow: -1px 0 0 var(--you);
 }

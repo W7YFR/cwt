@@ -11,13 +11,15 @@ import { useMemo, useRef } from "react";
 import { ACCEPTED } from "@/capture/file";
 import type { InputDevice } from "@/capture/mic";
 import { loadDrills, type Drill } from "@/drills";
-import { profilesFor, type Profile } from "@/io/profiles";
+import type { Profile } from "@/io/profiles";
 import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
 import { IconCog, IconRecord, IconUpload } from "./Icons";
 import { MicDebug } from "./MicDebug";
 import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import type { RecorderHandle } from "./useRecorder";
+import { RECORD_MODES, type RecordMode } from "./mode";
+import { MODE_HELP } from "./copy";
 
 /** The dot on every button that starts a recording.
  *
@@ -110,7 +112,7 @@ export function DevicePicker({
  * only setup control a take opened from a file has. Written once so the two
  * cannot drift into being two differently-worded buttons for one act.
  */
-function CalibrateButton({
+export function CalibrateButton({
   active,
   applied,
   onClick,
@@ -157,20 +159,9 @@ export function LevelMeter({ level }: { level: number }): React.ReactElement {
 
 export interface RecordBarProps {
   rec: RecorderHandle;
-  deviceId: string | undefined;
-  onDeviceChange(id: string | undefined): void;
-  /** Saved calibrations, and which one is in use. */
-  profiles: readonly Profile[];
-  profileId: string | undefined;
-  onProfileChange(id: string | undefined): void;
-  /** Whether changing it re-reads the recording on screen.
-   *
-   * True for a microphone take, false for an opened file — a file came from
-   * somewhere else and is never corrected, so the picker would be claiming an
-   * effect it is not allowed to have. */
+  /** True for a microphone take, false for an opened file. A file is read
+   *  exactly as recorded, and the bar says so beside its name. */
   appliesToTake: boolean;
-  /** True while the recording is being read again. */
-  rereading: boolean;
   /** Seconds left of the pacing cursor's lead-in; 0 once it is running, null
    *  when there is no cursor. */
   leadLeft: number | null;
@@ -190,9 +181,10 @@ export interface RecordBarProps {
   onFile?: ((file: File) => void) | undefined;
   /** False once the session has something in it — see the title below. */
   canOpenFile?: boolean | undefined;
-  /** Into the calibration wizard. Beside the picker, because the picker is
-   *  where you find out you have nothing to pick. */
-  onCalibrate?: (() => void) | undefined;
+  /** How the next take records, beside the button that starts it. The
+   *  options of each mode are in Settings. */
+  mode?: RecordMode | undefined;
+  onMode?: ((mode: RecordMode) => void) | undefined;
   /** What the recording is called, for a take that came from a file.
    *
    * Here rather than beside the bar in the review, because it is half of one
@@ -202,35 +194,21 @@ export interface RecordBarProps {
    * for a microphone take, which has no name worth the room — "microphone" is
    * the same word every time and is already implied by having just recorded. */
   source?: string | undefined;
-  /** The configuration panel is open.
-   *
-   * What is behind it is the setup: which microphone, and what to correct it
-   * by. You cannot reach this screen without having already answered the
-   * first, and the answer holds for as long as you are plugged into the same
-   * thing — so on the row you are actually working in, a microphone picker is
-   * a control you will use once and read past every time after. */
-  configuring?: boolean;
 }
 
 /** Record another, without leaving the review. */
 export function RecordBar({
   rec,
-  deviceId,
-  onDeviceChange,
-  profiles,
-  profileId,
-  onProfileChange,
   appliesToTake,
-  rereading,
   leadLeft,
   onClear,
   onNewSession,
   onDrill,
   onFile,
   canOpenFile = true,
-  onCalibrate,
+  mode,
+  onMode,
   source,
-  configuring = false,
 }: RecordBarProps): React.ReactElement {
   const fileInput = useRef<HTMLInputElement>(null);
   // Read on mount: the configuration page, where the details and the custom
@@ -275,10 +253,6 @@ export function RecordBar({
       </div>
     );
   }
-
-  const active = profiles.find((p) => p.id === profileId) ?? null;
-  /** The calibrations this recording could be read under. */
-  const choices = profilesFor(profiles, deviceId, profileId);
 
   return (
     <>
@@ -361,6 +335,7 @@ export function RecordBar({
           </button>
         )}
         {onDrill && <DrillPicker drills={drills} onPick={onDrill} floating />}
+        {mode && onMode && <ModeSwitch mode={mode} onMode={onMode} />}
         {onClear && (
           <button
             onClick={onClear}
@@ -369,70 +344,6 @@ export function RecordBar({
           >
             Clear
           </button>
-        )}
-        {configuring && (
-          <>
-            <DevicePicker devices={rec.devices} value={deviceId} onChange={onDeviceChange} />
-            {/* A file is read exactly as recorded, so there is no calibration
-                picker here for the way in to hang off — and it was hanging off
-                it, which meant opening a file quietly took away the only way
-                to measure a microphone from this screen. Calibrating is about
-                the input, not about the take in front of you: what is behind
-                the settings button is which microphone and what to correct it
-                by, and both halves of that should be here whichever way the
-                recording arrived. */}
-            {!appliesToTake && onCalibrate && (
-              <CalibrateButton active={active} applied={false} onClick={onCalibrate} />
-            )}
-          </>
-        )}
-        {appliesToTake && (
-          /* A picker rather than a label, because the audio is right here and
-             reading it again under a different calibration is the same
-             computation that ran when it was recorded. Holding the recordings
-             fixed and changing only the correction is the cleanest comparison
-             available anywhere in the app — the room, the placement and the fist
-             cannot vary, because it is the same audio either way.
-
-             No status dot beside it: what that reported is already in the select
-             itself, in words, and a warning color on "No calibration" calls an
-             ordinary state a problem — it is the state every session starts in,
-             and the right one for a path with nothing in it. */
-          <span className={`calpick ${active ? "ok" : "none"}`} data-testid="calpick">
-            {/* Only where there is a choice to make. One option is not a
-                decision, and a select offering "No calibration" and nothing else
-                is a control whose every state is the state it is already in. */}
-            {choices.length > 0 && (
-              <select
-                aria-label="Calibration"
-                value={profileId ?? ""}
-                disabled={rereading}
-                onChange={(e) => onProfileChange(e.target.value || undefined)}
-              >
-                <option value="">No calibration</option>
-                {choices.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nickname} — {(p.releaseOffsetSec * 1000).toFixed(1)} ms, {p.verdict}
-                  </option>
-                ))}
-              </select>
-            )}
-            {/* The way out of an empty list. Calibrating is reached from the
-                landing screen and from the configuration screen, neither of
-                which is where you are standing when the picker in front of you
-                says there is nothing to apply. */}
-            {configuring && onCalibrate && (
-              <CalibrateButton active={active} applied onClick={onCalibrate} />
-            )}
-            {/* Only while it is happening. Changing the calibration re-reads the
-                recording on screen, which takes long enough to need saying —
-                but a line that is on show the whole time to explain a control
-                nobody has touched yet is a caption, and this row already has as
-                many as it can carry. */}
-            <span className="hint" aria-live="polite">
-              {rereading ? "re-reading the session…" : ""}
-            </span>
-          </span>
         )}
       </div>
 
@@ -460,5 +371,31 @@ export function RecordBar({
         </div>
       )}
     </>
+  );
+}
+
+/** Plain, Paced or Zen: one choice, so one control. A row of pressed and
+ *  unpressed buttons rather than a select, because the choice is made often
+ *  and all three should be in view. */
+function ModeSwitch({
+  mode,
+  onMode,
+}: {
+  mode: RecordMode;
+  onMode(mode: RecordMode): void;
+}): React.ReactElement {
+  return (
+    <div className="modeswitch" role="group" aria-label="Recording mode" data-testid="mode">
+      {RECORD_MODES.map((m) => (
+        <button
+          key={m.value}
+          aria-pressed={mode === m.value}
+          title={MODE_HELP[m.value]}
+          onClick={() => onMode(m.value)}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
   );
 }

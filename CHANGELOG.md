@@ -7,6 +7,34 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.7.0 — 2026-10-14
+
+### Added
+
+- **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records. They replace the **Zen mode** and **Pacing cursor** checkboxes.
+- In **Plain** mode, the take stops itself a second or so after the last character, and a message wider than the chart slides the next word into view as you begin a word's last letter. **Follow**, under **Recording modes** › **Plain**, turns both off.
+- **Live grading**, under **Recording modes** › **Plain**, puts a dot under each target character on the chart as you key it. The dot turns blue if you sent the character right and red if not.
+
+### Changed
+
+- **Settings** groups its settings in sections: **Audio**, **Target**, **Grading**, **Chart** and **Page**, and **Plain**, **Zen** and **Pacing** under **Recording modes**.
+- A setting that another setting rules out stays in place, dimmed, and its tooltip says why.
+- **Microphone**, **Calibration**, **Listening level** and **Loop** are in **Audio**, under **Settings**.
+- **Ignore character construction** is now **Spacing only**, and **Clock axis while pacing** is now **Clock axis**.
+- The track that plays always shows its stop button on the chart.
+- A first visit starts at 25 wpm, with a **Repeat pause** of 5 s, and with **Spacing only**, Zen's **Live progress** and Plain's **Live grading** on.
+
+### Removed
+
+- The **Your sending** and **Target** buttons, the stop button above the chart and the playback clock. Play and stop a track from the chart, or press space or T.
+- The flash card and **Word preview**.
+
+### Fixed
+
+- A reload on the practice screen stays there, even before anything is recorded.
+- A reload keeps the chart's zoom.
+- A reload keeps **Settings** open if it was open.
+
 ## v1.6.0 — 2026-10-13
 
 ### Added

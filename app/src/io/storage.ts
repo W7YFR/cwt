@@ -370,6 +370,12 @@ export interface Prefs {
    * them, not a second copy of them. Which also means a take outlives the
    * session it was recorded in, and a history view can still find it. */
   session?: { ids: string[]; selected: number };
+  /** The practice screen was open with nothing recorded in it, so a reload
+   *  opens it again rather than the landing screen. A session, when there is
+   *  one, comes back instead. */
+  practicing?: boolean;
+  /** The settings panel was open, so a reload opens it again. */
+  settingsOpen?: boolean;
   /** Calibration's speed, from saves that hold no `charWpm`. Read by
    *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
@@ -380,6 +386,9 @@ export interface Prefs {
   farnsworthWpm?: number;
   expected?: string;
   view?: string;
+  /** The chart's zoom, so a reload of a screen with nothing recorded in it
+   *  keeps it. A session keeps its own, with its takes. */
+  ppu?: number;
   times?: number;
   collapseRests?: boolean;
   paceCursor?: boolean;
@@ -396,9 +405,9 @@ export interface Prefs {
   showChartControls?: boolean;
   showRuns?: "all" | "last5" | "last3" | "last";
   captionAll?: boolean;
-  flashCard?: boolean;
-  wordPreview?: boolean;
   zenMode?: boolean;
+  plainFollow?: boolean;
+  plainGrading?: boolean;
   zenProgress?: boolean;
   zenGrading?: boolean;
   runSort?: string;
@@ -527,6 +536,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   profileId: isStr,
   currentId: isStr,
   session: isSession,
+  practicing: isBool,
+  settingsOpen: isBool,
   keyerWpm: isNum,
   gainDb: isNum,
   tolerance: isNum,
@@ -534,6 +545,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   farnsworthWpm: isNum,
   expected: isStr,
   view: isStr,
+  ppu: isNum,
   times: isNum,
   collapseRests: isBool,
   paceCursor: isBool,
@@ -550,9 +562,9 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   showChartControls: isBool,
   showRuns: oneOf("all", "last5", "last3", "last"),
   captionAll: isBool,
-  flashCard: isBool,
-  wordPreview: isBool,
   zenMode: isBool,
+  plainFollow: isBool,
+  plainGrading: isBool,
   zenProgress: isBool,
   zenGrading: isBool,
   runSort: isStr,
@@ -705,6 +717,28 @@ export async function recallSession(): Promise<StoredTake[]> {
 /** Which attempt of the remembered session was being read. */
 export function recallSelected(): number {
   return loadPrefs().session?.selected ?? 0;
+}
+
+/** Say whether the practice screen is open with nothing recorded in it, so a
+ *  reload can come back to it. */
+export function rememberPracticing(on: boolean): void {
+  const next = { ...loadPrefs() };
+  if (on) next.practicing = true;
+  else delete next.practicing;
+  savePrefs(next);
+}
+
+/** Say whether the settings panel is open, so a reload can open it again. */
+export function rememberSettingsOpen(open: boolean): void {
+  const next = { ...loadPrefs() };
+  if (open) next.settingsOpen = true;
+  else delete next.settingsOpen;
+  savePrefs(next);
+}
+
+/** Whether the practice screen was open with nothing recorded in it. */
+export function recallPracticing(): boolean {
+  return loadPrefs().practicing === true;
 }
 
 /** Stop coming back to the current take.

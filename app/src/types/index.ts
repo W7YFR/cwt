@@ -387,6 +387,14 @@ export interface ReviewSettings {
    *
    * Saved with the other aids, so a reload keeps it. */
   zenMode: boolean;
+  /** In Plain mode, slide the next word to the left edge of the chart as the
+   *  last letter of a word begins. Off, the chart does not scroll while you
+   *  record. */
+  plainFollow: boolean;
+  /** In Plain mode, a dot under each target character on the chart as it is
+   *  keyed: blue once read back right, red if wrong. Zen mode's Live grading,
+   *  on the chart. */
+  plainGrading: boolean;
   /** In Zen mode, color each character of the message as it starts to be
    *  keyed.
    *
@@ -397,11 +405,6 @@ export interface ReviewSettings {
    *  blue or red once the character has been read back, by whether it was
    *  sent right. */
   zenGrading: boolean;
-  /** Show the next character to send, large, with a countdown to it. */
-  flashCard: boolean;
-  /** Spell the word being sent under the card, greening each letter as it
-   *  passes. The card alone says nothing about where a word ends. */
-  wordPreview: boolean;
   /** What order the attempts in a session are drawn in. Changes where a row
    *  sits and nothing else — not what it is called, and not what is graded. */
   runSort: RunSort;

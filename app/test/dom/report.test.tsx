@@ -12,7 +12,8 @@ import { slotIndexAtTime } from "@/render/focus";
 import { caseNamed, reviewFrom, CLEAN, SLOPPY } from "../fixture";
 
 describe("the report", () => {
-  const { review, settings } = reviewFrom(caseNamed(SLOPPY));
+  // The full grade, so the classes inside a character are in the table.
+  const { review, settings } = reviewFrom(caseNamed(SLOPPY), { ignoreConstruction: false });
 
   it("lists every graded class with its measured and target figures", () => {
     render(

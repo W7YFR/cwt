@@ -10,7 +10,7 @@
  * (a click).
  */
 
-import type { Block, Review, ReviewSettings } from "@/types";
+import type { Block, Char, Review, ReviewSettings } from "@/types";
 import {
   DRAG_SLOP,
   GUTTER,
@@ -44,6 +44,7 @@ import {
   trackBands,
   type GutterName,
   type Lane,
+  type LiveMark,
   type Scene,
   type Viewport,
 } from "./scene";
@@ -146,6 +147,30 @@ export interface Chart {
    * moment you are meant to act on is always in the same place. */
   setFollow(mode: "clamped" | "centered"): void;
   scrollTo(x: number): void;
+  /** Glide the view so the moment `t` sits just inside the left edge,
+   *  without drawing anything there: for following the sending when nothing
+   *  on screen marks it.
+   *
+   *  Only when the content is wider than the view: a message that fits is
+   *  left alone. When it does not, past the end of the content if it has to
+   *  be, so the last word moves to the edge like every other: a word that
+   *  stayed put because the rest fit read as the follow having stopped. Never
+   *  before the start. */
+  reveal(t: number, side: "you" | "tgt"): void;
+  /** `reveal(t0)`, but only when the span from `t0` to `t1` is not all in
+   *  view: for a character keyed in a word wider than the view, whose later
+   *  letters run off its right edge. */
+  keepInView(t0: number, t1: number, side: "you" | "tgt"): void;
+  /** Stop following: give up any scroll past the end that `reveal` took, so
+   *  the view is back in its frame. */
+  endReveal(): void;
+  /** Mark the target's characters as a running take reaches them: `reached`
+   *  of `chars` begun, and a verdict on each of the first `graded.length`.
+   *  `chars` are the target's own, as the chart draws them. Null clears the
+   *  marks. */
+  setLiveMarks(
+    live: { chars: readonly Char[]; reached: number; graded: readonly boolean[] } | null,
+  ): void;
   /** Where the view currently sits, in content pixels.
    *
    * Read-only and purely diagnostic: the scroll is owned here because it moves
@@ -164,6 +189,14 @@ export interface Chart {
 /** Where a running playhead is held across the track, as a fraction of its
  *  width. Left of center: what is coming matters more than what has gone. */
 const PLAYHEAD_HOLD = 0.4;
+
+/** How far in from the left edge `reveal` lands a moment, as a fraction of
+ *  the track's width: enough that it does not sit on the edge. */
+const REVEAL_INSET = 0.1;
+
+/** How long `reveal` takes to slide: long enough to see where the content
+ *  went, short enough not to be waited for. */
+const GLIDE_MS = 160;
 
 /** Marks and gaps behave differently on a click — see `onClick`. */
 function isGap(kind: Block["kind"]): boolean {
@@ -228,6 +261,15 @@ export function createChart(
   let destroyed = false;
   let leadSec = 0;
   let follow: "clamped" | "centered" = "clamped";
+  /** The frame of a running `reveal`, so a new one can take over from it. */
+  let glide = 0;
+  /** How far past the end `reveal` has taken the view, in content pixels. */
+  let overscroll = 0;
+  /** The target characters a running take has reached. */
+  let liveMarks: Map<Char, LiveMark> | null = null;
+  /** Where a running glide is headed, so a check made during it is made
+   *  against where the view will be. */
+  let heading: number | null = null;
 
   function viewport(): Viewport {
     const viewW = Math.max(host.clientWidth, GUTTER + 40);
@@ -253,7 +295,9 @@ export function createChart(
     // content has to sit off to the right of the middle, and at the end it has
     // to keep going past it.
     if (follow === "centered") return;
-    scrollX = Math.min(Math.max(scrollX, 0), v.maxScroll);
+    // `reveal` may take the view past the end, and keeps it there until
+    // `endReveal` gives it back.
+    scrollX = Math.min(Math.max(scrollX, 0), v.maxScroll + overscroll);
   }
 
   function scene(v: Viewport): Scene | null {
@@ -283,6 +327,7 @@ export function createChart(
       focus: input.focus,
       playhead,
       range: timesOf(pending ?? input.range ?? null),
+      liveMarks,
       driftMax,
       leadSec,
       charMarkers: input.settings.charMarkers,
@@ -928,6 +973,78 @@ export function createChart(
     },
 
     scrollTo: (x: number) => doScrollTo(x, false),
+
+    reveal(t, side) {
+      if (!layout) return;
+      const v = viewport();
+      // The whole message is on screen: nothing to follow.
+      if (!v.maxScroll) return;
+      const to = Math.max(timeToX(layout, t, side) - v.trackW * REVEAL_INSET, 0);
+      cancelAnimationFrame(glide);
+      const from = scrollX;
+      // Room past the end for the whole glide, and then for where it lands.
+      const past = (x: number) => Math.max(0, x - v.maxScroll);
+      overscroll = Math.max(past(from), past(to));
+      if (Math.abs(to - from) < 0.5) return;
+      const land = () => {
+        heading = null;
+        overscroll = past(to);
+        scrollX = to;
+        paint();
+      };
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        land();
+        return;
+      }
+      const start = performance.now();
+      heading = to;
+      const step = (now: number) => {
+        const k = Math.min(1, (now - start) / GLIDE_MS);
+        if (k >= 1) {
+          land();
+          return;
+        }
+        scrollX = from + (to - from) * (1 - (1 - k) ** 3);
+        paint();
+        glide = requestAnimationFrame(step);
+      };
+      glide = requestAnimationFrame(step);
+    },
+
+    keepInView(t0, t1, side) {
+      if (!layout) return;
+      const v = viewport();
+      const at = heading ?? scrollX;
+      const x0 = timeToX(layout, t0, side);
+      const x1 = timeToX(layout, t1, side);
+      if (x0 >= at && x1 <= at + v.trackW) return;
+      this.reveal(t0, side);
+    },
+
+    setLiveMarks(live) {
+      if (!live) {
+        if (!liveMarks) return;
+        liveMarks = null;
+        paint();
+        return;
+      }
+      const next = new Map<Char, LiveMark>();
+      for (let i = 0; i < live.reached && i < live.chars.length; i++) {
+        const verdict = live.graded[i];
+        next.set(live.chars[i]!, verdict === undefined ? "pending" : verdict ? "right" : "wrong");
+      }
+      liveMarks = next;
+      paint();
+    },
+
+    endReveal() {
+      cancelAnimationFrame(glide);
+      heading = null;
+      if (overscroll === 0) return;
+      overscroll = 0;
+      paint();
+    },
+
     scrollAt: () => scrollX,
 
     refreshTheme() {
@@ -1024,6 +1141,7 @@ export function createChart(
 
     destroy() {
       destroyed = true;
+      cancelAnimationFrame(glide);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);

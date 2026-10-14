@@ -18,6 +18,8 @@ import { defaultSettings, TIMES_MAX, TIMES_MIN } from "@/timing";
 import { PACE_LEAD_MAX_SEC } from "@/render/geometry";
 import { BREAK_MAX_SEC } from "@/timing/timeline";
 import type { ReviewSettings } from "@/types";
+import type { Profile } from "@/io/profiles";
+import type { AudioSetup } from "@/ui/Controls";
 import { caseNamed, SLOPPY } from "../fixture";
 import { takeFrom } from "../fixture";
 
@@ -49,13 +51,7 @@ function Harness({
           return next;
         })
       }
-      playing={null}
-      canPlayYou
       fromFile={fromFile === true}
-      clock={null}
-      onPlayYou={() => {}}
-      onPlayTarget={() => {}}
-      onStop={() => {}}
     />
   );
 }
@@ -155,7 +151,7 @@ describe("controls", () => {
     // and the intended-message field absorbs the slack, so a reading that
     // gains a digit drags the row and wraps the caption beside it. Dragging a
     // slider made that twitch once; zooming with the wheel made it constant.
-    const READOUTS = ["wpm-out", "farns-out", "tol-out", "gain-out"];
+    const READOUTS = ["wpm-out", "farns-out", "tol-out"];
     const widthsFor = (container: HTMLElement) =>
       READOUTS.map((id) => container.querySelector(`#${id}`)!.textContent!.length);
 
@@ -302,7 +298,7 @@ describe("controls", () => {
       expect(container.querySelector(always), always).not.toBeNull();
     }
     expect(screen.queryByLabelText(/collapse rests/i)).toBeNull();
-    expect(screen.queryByLabelText(/pacing cursor/i)).toBeNull();
+    expect(screen.queryByLabelText(/^clock axis$/i)).toBeNull();
 
     const cog = screen.getByTestId("panel-toggle");
     expect(cog.getAttribute("aria-pressed")).toBe("false");
@@ -311,35 +307,53 @@ describe("controls", () => {
     // Both bands at once: what is drawn, and what runs while you send.
     expect(cog.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByLabelText(/collapse rests/i)).toBeTruthy();
-    expect(screen.getByLabelText(/pacing cursor/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^clock axis$/i)).toBeTruthy();
     // And the axis never went anywhere.
     expect(container.querySelector("#view")).not.toBeNull();
 
     // The cog is the way back out as well as the way in.
     await user.click(cog);
     expect(screen.queryByLabelText(/collapse rests/i)).toBeNull();
-    expect(screen.queryByLabelText(/pacing cursor/i)).toBeNull();
+    expect(screen.queryByLabelText(/^clock axis$/i)).toBeNull();
   });
 
-  it("names the two halves, because half of them do nothing to the chart", async () => {
-    /* Eleven checkboxes in one heap is what this replaced. The pacing cursor
-       and the flash card change nothing about the chart in front of you —
-       they run while you send — and the row they sit under says so. */
+  it("groups each setting by the question it answers", async () => {
     const user = userEvent.setup();
     const { container } = renderView({ runs: 3 });
     await user.click(screen.getByTestId("panel-toggle"));
 
-    const display = container.querySelector("[data-panel='display']")!;
-    const practice = container.querySelector("[data-panel='practice']")!;
-    const timing = container.querySelector("[data-panel='timing']")!;
-    expect(timing).toContainElement(screen.getByLabelText("Break length in seconds"));
-    expect(display).toContainElement(screen.getByLabelText(/collapse rests/i));
-    expect(display).toContainElement(screen.getByLabelText(/^scores$/i));
-    expect(practice).toContainElement(screen.getByLabelText(/pacing cursor/i));
-    expect(practice).toContainElement(screen.getByLabelText(/flash card/i));
-    for (const row of [display, practice, timing]) {
-      expect(row.querySelector(".uplabel")!.textContent).not.toBe("");
+    const row = (name: string) => container.querySelector(`[data-panel='${name}']`)!;
+    expect(row("target")).toContainElement(screen.getByLabelText("Break length in seconds"));
+    expect(row("target")).toContainElement(screen.getByLabelText("Repeat pause in seconds"));
+    expect(row("grading")).toContainElement(screen.getByLabelText(/^spacing only$/i));
+    // The three ways to record, together in a group of their own.
+    for (const mode of ["plain", "zen", "pacing"]) {
+      expect(row("modes"), mode).toContainElement(row(mode) as HTMLElement);
     }
+    expect(screen.getByRole("group", { name: "Recording modes" })).toBe(row("modes"));
+    expect(row("plain").querySelector(".uplabel")!.textContent).toBe("Plain");
+    expect(row("zen").querySelector(".uplabel")!.textContent).toBe("Zen");
+    expect(row("plain")).toContainElement(screen.getByLabelText(/^follow$/i));
+    expect(row("zen")).toContainElement(screen.getByLabelText(/live progress/i));
+    expect(row("pacing")).toContainElement(screen.getByLabelText(/^clock axis$/i));
+    expect(row("pacing")).toContainElement(screen.getByLabelText("Delay start in seconds"));
+    expect(row("display")).toContainElement(screen.getByLabelText(/collapse rests/i));
+    expect(row("display")).toContainElement(screen.getByLabelText(/^scores$/i));
+    expect(row("audio")).toContainElement(container.querySelector<HTMLElement>("#gain"));
+    expect(row("extras")).toContainElement(screen.getByLabelText(/advanced grading/i));
+    for (const name of ["audio", "target", "grading", "plain", "zen", "pacing", "display", "extras"]) {
+      expect(row(name).querySelector(".uplabel")!.textContent, name).not.toBe("");
+    }
+  });
+
+  it("pads the listening level to a constant width", () => {
+    const width = (gainDb: number) => {
+      const r = renderView({ open: true, over: { gainDb } });
+      const n = r.container.querySelector("#gain-out")!.textContent!.length;
+      r.unmount();
+      return n;
+    };
+    expect(width(0)).toBe(width(42));
   });
 
   it("offers what to draw on a stack only when there is a stack", async () => {
@@ -361,24 +375,27 @@ describe("controls", () => {
     expect(seen).toEqual([{ runScores: false }, { captionAll: true }]);
   });
 
-  it("offers an order only where there is more than one row to order", () => {
-    /* One row has exactly one arrangement. That is a session with one attempt
-       in it, and — the case this is really about — a session drawing only its
-       last: Show has already answered what is on screen, and a Sort that
-       redraws the same picture whatever it is set to is furniture. */
-    const { unmount } = renderView({ runs: 3 });
-    expect(screen.getByLabelText(/^sort$/i)).toBeInTheDocument();
-    unmount();
+  it("bars Sort where there is only one row to order, and says why", () => {
+    /* One row has exactly one arrangement: a session with one attempt, or a
+       session drawing only its last. Sort stays in place, barred. */
+    const sort = () => screen.getByLabelText(/^sort$/i) as HTMLSelectElement;
+    const why = () => sort().closest(".group")!.getAttribute("title") ?? "";
+
+    const one = renderView({ runs: 1 });
+    expect(sort()).toBeDisabled();
+    expect(why()).toMatch(/more than one run/i);
+    expect(screen.getByLabelText(/^show$/i)).toBeDisabled();
+    one.unmount();
 
     const shrunk = renderView({ runs: 3, over: { showRuns: "last" } });
-    expect(screen.queryByLabelText(/^sort$/i)).toBeNull();
-    // And Show stays, or there would be no way back out of it.
-    expect(screen.getByLabelText(/^show$/i)).toBeInTheDocument();
+    expect(sort()).toBeDisabled();
+    expect(why()).toMatch(/more than one run on the chart/i);
+    // And Show stays live, or there would be no way back out of it.
+    expect(screen.getByLabelText(/^show$/i)).toBeEnabled();
     shrunk.unmount();
 
-    // A window wider than one row still has an order to choose.
     renderView({ runs: 3, over: { showRuns: "last3" } });
-    expect(screen.getByLabelText(/^sort$/i)).toBeInTheDocument();
+    expect(sort()).toBeEnabled();
   });
 
   it("puts whole blocks of the page on their own switches", async () => {
@@ -413,73 +430,34 @@ describe("controls", () => {
     expect(chart.querySelectorAll("input[type='checkbox']")).toHaveLength(4);
   });
 
-  it("offers ignoring character construction under grading, off to start", async () => {
+  it("offers grading spacing only, on to start", async () => {
     const user = userEvent.setup();
     const seen: Partial<ReviewSettings>[] = [];
     const { container } = renderView({ open: true, onChange: (p) => seen.push(p) });
-    const box = screen.getByLabelText(/ignore character construction/i) as HTMLInputElement;
-    expect(box.checked).toBe(false);
+    const box = screen.getByLabelText(/^spacing only$/i) as HTMLInputElement;
+    expect(box.checked).toBe(true);
     expect(container.querySelector("[data-panel='grading']")).toContainElement(box);
     await user.click(box);
-    expect(seen.at(-1)).toEqual({ ignoreConstruction: true });
+    expect(seen.at(-1)).toEqual({ ignoreConstruction: false });
   });
 
-  it("disables stop when nothing is playing and enables it when something is", () => {
-    const take = takeFrom(caseNamed(SLOPPY));
-    const base = defaultSettings(take);
-    const common = {
-      settings: base,
-      onChange: () => {},
-      canPlayYou: true,
-      fromFile: false,
-      clock: null,
-      onPlayYou: () => {},
-      onPlayTarget: () => {},
-      onStop: () => {},
-    };
-    const { rerender } = render(<Controls {...common} playing={null} />);
-    expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
-    rerender(<Controls {...common} playing="you" />);
-    expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
-  });
 
-  it("swaps only the icon when playback starts, so the row cannot shift", () => {
+  it("leaves playback to the chart", () => {
     const take = takeFrom(caseNamed(SLOPPY));
-    const common = {
-      settings: defaultSettings(take),
-      onChange: () => {},
-      canPlayYou: true,
-      fromFile: false,
-      clock: null,
-      onPlayYou: () => {},
-      onPlayTarget: () => {},
-      onStop: () => {},
-    };
-    const { rerender } = render(<Controls {...common} playing={null} />);
-    const button = screen.getByRole("button", { name: /Your sending/ });
-    /* The icon by name rather than by what it draws: these are SVGs now, so
-       there is no text to read, and `data-icon` says which one is there
-       without pinning the drawing itself. */
-    const icon = () => button.querySelector(".ico [data-icon]")!.getAttribute("data-icon");
-    expect(icon()).toBe("play");
-    rerender(<Controls {...common} playing="you" />);
-    expect(icon()).toBe("stop");
-    // The words either side of the icon are unchanged, which is what keeps the
-    // button's width — and everything to its right — from moving.
-    expect(button.textContent).toContain("Your sending");
+    render(<Controls settings={defaultSettings(take)} onChange={() => {}} fromFile={false} />);
+    expect(screen.queryByRole("button", { name: /your sending/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^target$/i })).toBeNull();
+    // Stop is on the chart, and Loop and the listening level are in Audio.
+    expect(screen.queryByRole("button", { name: /stop/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /loop/i })).toBeNull();
+    expect(screen.queryByLabelText(/listening level/i)).toBeNull();
   });
 
   it("says what an empty intended message means, inside the box", () => {
     const take = takeFrom(caseNamed(SLOPPY));
     const common = {
       onChange: () => {},
-      playing: null,
-      canPlayYou: true,
       fromFile: false,
-      clock: null,
-      onPlayYou: () => {},
-      onPlayTarget: () => {},
-      onStop: () => {},
     } as const;
     const base = defaultSettings(take);
     const { rerender } = render(
@@ -537,116 +515,81 @@ describe("controls", () => {
     expect(onChange).toHaveBeenCalledWith({ charMarkers: true });
   });
 
-  it("makes zen mode and the paced aids exclusive, both ways", async () => {
-    /* One puts a beat in front of you, the other takes the page away. Turning
-       zen on CLEARS the other two rather than quietly outranking them: a box
-       left ticked while something else ignores it is a setting that lies about
-       what pressing record will do. */
+
+  it("offers the mode options whichever mode is picked", async () => {
+    /* Set ahead of time: the options of Zen mode and of pacing stay live in
+       every mode, so they can be ready before the mode is picked. */
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { rerender } = renderView({ onChange, open: true });
-
-    rerender(view({ paceCursor: true, flashCard: true }, onChange));
-    await user.click(screen.getByLabelText(/zen mode/i));
-    expect(onChange).toHaveBeenCalledWith({
-      zenMode: true,
-      paceCursor: false,
-      flashCard: false,
-    });
-
-    // And with it on, neither can be turned back on behind its back.
-    rerender(view({ zenMode: true }, onChange));
-    for (const aid of [/pacing cursor/i, /flash card/i]) {
-      expect(screen.getByLabelText(aid)).toBeDisabled();
+    rerender(view({ zenMode: false, paceCursor: false }, onChange));
+    for (const label of [/live progress/i, /^clock axis$/i, /delay start/i]) {
+      expect(screen.getByLabelText(label), String(label)).toBeEnabled();
     }
-
-    // Turning it off gives them back, and takes nothing else with it.
-    onChange.mockClear();
-    await user.click(screen.getByLabelText(/zen mode/i));
-    expect(onChange).toHaveBeenCalledWith({ zenMode: false });
-    rerender(view({ zenMode: false }, onChange));
-    expect(screen.getByLabelText(/pacing cursor/i)).toBeEnabled();
-  });
-
-  it("offers live progress only with zen mode on", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const { rerender } = renderView({ onChange, open: true });
-    expect(screen.queryByLabelText(/live progress/i)).toBeNull();
-
-    rerender(view({ zenMode: true }, onChange));
-    const box = screen.getByLabelText(/live progress/i) as HTMLInputElement;
-    expect(box.checked).toBe(false);
-    await user.click(box);
-    expect(onChange).toHaveBeenCalledWith({ zenProgress: true });
-  });
-
-  it("offers live grading only with live progress on", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const { rerender } = renderView({ onChange, open: true });
-    rerender(view({ zenMode: true, zenProgress: false }, onChange));
-    expect(screen.queryByLabelText(/live grading/i)).toBeNull();
-
-    rerender(view({ zenMode: true, zenProgress: true }, onChange));
-    await user.click(screen.getByLabelText(/live grading/i));
-    expect(onChange).toHaveBeenCalledWith({ zenGrading: true });
-  });
-
-  it("offers nothing that makes the card flash", async () => {
-    /* The card used to strobe on the beat, with a dial for how far ahead. A
-       bright flash several times a second is a hazard for anyone
-       photosensitive, and the card reads fine without one. */
-    const onChange = vi.fn();
-    const { rerender } = renderView({ onChange, open: true });
-    rerender(view({ flashCard: true }, onChange));
-    for (const gone of [/flash cue/i, /flash lead/i]) {
-      expect(screen.queryByLabelText(gone), String(gone)).toBeNull();
-    }
-  });
-
-  it("offers the word preview only with a card to put it under", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const { rerender } = renderView({ onChange, open: true });
-    expect(screen.queryByLabelText(/word preview/i)).toBeNull();
-
-    rerender(view({ flashCard: true }, onChange));
-    await user.click(screen.getByLabelText(/word preview/i));
-    expect(onChange).toHaveBeenCalledWith({ wordPreview: true });
-  });
-
-  it("offers the pacing cursor, off unless asked for", async () => {
-    /* A practice aid rather than a way of reading the chart, so it is opt-in —
-       and it sits with the other things that run while you send rather than
-       with the things that change what is drawn or what is graded. */
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    renderView({ onChange, open: true });
-    const box = screen.getByLabelText(/pacing cursor/i) as HTMLInputElement;
-    expect(box.checked).toBe(false);
-
-    await user.click(box);
-    expect(onChange).toHaveBeenCalledWith({ paceCursor: true });
-  });
-
-  it("asks how long the count-in should be, only once there is one", async () => {
-    /* A count-in for a cursor that is not running is a setting for nothing,
-       and one more control in a row that is already busy. */
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const { rerender } = renderView({ onChange, open: true });
-    expect(screen.queryByLabelText(/delay start/i)).toBeNull();
-
-    rerender(view({ paceCursor: true }, onChange));
+    // On to start.
+    expect((screen.getByLabelText(/live progress/i) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByLabelText(/live progress/i));
+    expect(onChange).toHaveBeenCalledWith({ zenProgress: false });
     const box = screen.getByLabelText(/delay start/i) as HTMLInputElement;
-    expect(document.querySelector("[data-panel='timing']")).toContainElement(box);
-    expect(box.value).toBe(String(defaults().paceLeadSec));
-
     await user.clear(box);
     await user.type(box, "5");
     expect(onChange).toHaveBeenLastCalledWith({ paceLeadSec: 5 });
   });
+
+  it("offers live grading in Plain mode, on to start and always live", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { container } = renderView({ onChange, open: true });
+    const box = container.querySelector<HTMLInputElement>("#plain-grading")!;
+    expect(container.querySelector("[data-panel='plain']")).toContainElement(box);
+    expect(box.checked).toBe(true);
+    expect(box).toBeEnabled();
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledWith({ plainGrading: false });
+  });
+
+  it("bars live grading until live progress is on", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderView({ onChange, open: true });
+    rerender(view({ zenMode: true, zenProgress: false }, onChange));
+    // Zen's: Plain has one of its own, below.
+    const box = () => document.querySelector<HTMLInputElement>("#zen-grading")!;
+    expect(box()).toBeDisabled();
+    expect(box().closest("label")!.getAttribute("title")).toMatch(/needs live progress/i);
+
+    rerender(view({ zenMode: true, zenProgress: true }, onChange));
+    expect(box()).toBeEnabled();
+    expect(box().closest("label")!.getAttribute("title")).not.toMatch(/needs live progress/i);
+    await user.click(box());
+    expect(onChange).toHaveBeenCalledWith({ zenGrading: true });
+  });
+
+  it("offers no flash card", () => {
+    renderView({ open: true });
+    expect(screen.queryByLabelText(/flash card/i)).toBeNull();
+    expect(screen.queryByLabelText(/word preview/i)).toBeNull();
+  });
+
+
+  it("follows the sending in Plain mode unless asked not to", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderView({ onChange, open: true });
+    const box = screen.getByLabelText(/^follow$/i) as HTMLInputElement;
+    expect(box.checked, "on to start").toBe(true);
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledWith({ plainFollow: false });
+  });
+
+  it("leaves the choice of mode to the record bar", () => {
+    /* Zen mode and the cursor are picked beside the record button. The panel
+       holds only their options. */
+    renderView({ open: true });
+    expect(document.querySelector("#zen-mode")).toBeNull();
+    expect(document.querySelector("#pace-cursor")).toBeNull();
+  });
+
 
   it("does not fight the caret while the count-in is being typed", async () => {
     /* The trap every number box here has fallen into: emptying "3" to type "5"
@@ -690,15 +633,17 @@ describe("controls", () => {
     expect(onChange).toHaveBeenLastCalledWith({ breakSec: BREAK_MAX_SEC });
   });
 
-  it("asks for a repeat pause, whatever the number of passes", async () => {
+  it("always offers the repeat pause", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    renderView({ onChange, open: true });
-    const box = screen.getByLabelText("Repeat pause in seconds") as HTMLInputElement;
-    expect(document.querySelector("[data-panel='timing']")).toContainElement(box);
-    expect(box.value).toBe("0");
-    await user.clear(box);
-    await user.type(box, "4");
+    const { rerender } = renderView({ onChange, open: true });
+    const box = () => screen.getByLabelText("Repeat pause in seconds") as HTMLInputElement;
+    rerender(view({ times: 1 }, onChange));
+    expect(document.querySelector("[data-panel='target']")).toContainElement(box());
+    expect(box()).toBeEnabled();
+    expect(box().value, "five seconds to start").toBe("5");
+    await user.clear(box());
+    await user.type(box(), "4");
     expect(onChange).toHaveBeenLastCalledWith({ repeatPauseSec: 4 });
   });
 
@@ -711,5 +656,100 @@ describe("controls", () => {
     );
     await user.click(screen.getByRole("button", { name: "Fit" }));
     expect(onFit).toHaveBeenCalledOnce();
+  });
+});
+
+describe("the Audio group", () => {
+  /** A saved calibration, so the picker has something to offer. */
+  const PROFILE: Profile = {
+    id: "p1",
+    nickname: "shack desk",
+    deviceId: undefined,
+    deviceLabel: undefined,
+    wpm: 20,
+    releaseOffsetSec: 0.003,
+    measuredOffsetSec: 0.003,
+    spreadSec: 0.0005,
+    elements: 90,
+    verdict: "good",
+    decaySec: 0.02,
+    maxWpm: 30,
+    recordedAt: "2026-09-01T10:00:00+00:00",
+  };
+  const TWO = [
+    { deviceId: "a", label: "one" },
+    { deviceId: "b", label: "two" },
+  ];
+
+  function panel(audio: Partial<AudioSetup> = {}, fromFile = false) {
+    return render(
+      <ChartSettingsPanel
+        settings={defaults()}
+        onChange={() => {}}
+        runs={1}
+        audio={{
+          devices: TWO,
+          deviceId: undefined,
+          onDeviceChange: () => {},
+          profiles: [],
+          profileId: undefined,
+          onProfileChange: () => {},
+          appliesToTake: !fromFile,
+          rereading: false,
+          onCalibrate: () => {},
+          ...audio,
+        }}
+      />,
+    );
+  }
+  const picker = () => screen.getByLabelText(/^calibration$/i) as HTMLSelectElement;
+  const why = (el: HTMLElement) => el.closest(".group")!.getAttribute("title") ?? "";
+
+  it("bars the microphone when there is only one input", () => {
+    const one = panel({ devices: [{ deviceId: "a", label: "one" }] });
+    const mic = screen.getByLabelText(/^microphone$/i);
+    expect(mic).toBeDisabled();
+    expect(why(mic)).toMatch(/only input/i);
+    one.unmount();
+
+    panel();
+    expect(screen.getByLabelText(/^microphone$/i)).toBeEnabled();
+  });
+
+  it("bars the calibration picker when there is none to pick, and keeps Calibrate live", async () => {
+    const onCalibrate = vi.fn();
+    const none = panel({ onCalibrate });
+    expect(picker()).toBeDisabled();
+    expect(why(picker())).toMatch(/no calibration is saved/i);
+    // The way out of the bar is beside it, and works.
+    const button = screen.getByTestId("calibrate");
+    expect(screen.getByTestId("calpick")).toContainElement(button);
+    expect(button).toBeEnabled();
+    button.click();
+    expect(onCalibrate).toHaveBeenCalled();
+    none.unmount();
+
+    panel({ profiles: [PROFILE] });
+    expect(picker()).toBeEnabled();
+  });
+
+  it("bars the calibration for a file, and does not claim one is in use", () => {
+    panel({ profiles: [PROFILE], profileId: "p1" }, true);
+    expect(picker()).toBeDisabled();
+    expect(why(picker())).toMatch(/opened from disk/i);
+    const title = screen.getByTestId("calibrate").getAttribute("title")!;
+    expect(title).not.toMatch(/in use/i);
+    expect(title).toMatch(PROFILE.nickname);
+  });
+
+  it("says a microphone take's calibration is in use", () => {
+    panel({ profiles: [PROFILE], profileId: "p1" });
+    expect(screen.getByTestId("calibrate").getAttribute("title")).toMatch(/in use/i);
+  });
+
+  it("bars the picker while the session is re-read", () => {
+    panel({ profiles: [PROFILE], profileId: "p1", rereading: true });
+    expect(picker()).toBeDisabled();
+    expect(why(picker())).toMatch(/re-reading/i);
   });
 });

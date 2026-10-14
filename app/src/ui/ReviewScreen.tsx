@@ -28,15 +28,17 @@ import {
   ViewControls,
   fitSpeed,
 } from "./Controls";
-import { FlashCard } from "./FlashCard";
 import { ZenMode } from "./ZenMode";
-import { beatsFor, pacedEnd, pacedStart, recordLimit, wordsFor, type Word } from "./pacing";
+import { pacedEnd, pacedStart, recordLimit } from "./pacing";
+import { modeOf, modePatch } from "./mode";
+import { FollowSending } from "./FollowSending";
 import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
+import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
 import { reviewTake } from "@/timing";
 import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
@@ -45,6 +47,9 @@ import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
 
 export interface ReviewScreenProps {
+  /** The session was brought back by a reload. Its zoom is the one it was
+   *  left at, so the chart keeps it rather than fitting on opening. */
+  restored?: boolean;
   loaded: LoadedTake;
   review: Review;
   /** Every attempt in this session, oldest first, all against one target. */
@@ -156,11 +161,8 @@ function saveBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-/** One array, so "no preview" is a stable prop and not a fresh identity on
- *  every render — the card's effect restarts whenever `words` changes. */
-const EMPTY_WORDS: readonly Word[] = [];
-
 export function ReviewScreen({
+  restored = false,
   loaded,
   review,
   stack,
@@ -187,10 +189,14 @@ export function ReviewScreen({
      while the dialog is up: a key that starts a recording behind an open
      dialog answers a question nobody asked. */
   const [starting, setStarting] = useState(false);
-  /* Whether the chart settings are on show. Not a setting itself: it is where
-     you are looking rather than anything about the chart, and it has no
-     business outliving the page or riding along in a saved report. */
-  const [chartSettings, setChartSettings] = useState(false);
+  /* Whether the settings are on show. Not a setting itself, and never in a
+     saved report: it is where you are looking. But a reload is not a choice
+     to look elsewhere, so it is remembered for the next page load. */
+  const [chartSettings, setChartSettingsRaw] = useState(() => loadPrefs().settingsOpen === true);
+  const setChartSettings = useCallback((open: boolean) => {
+    setChartSettingsRaw(open);
+    rememberSettingsOpen(open);
+  }, []);
   const headerRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
   /* Where the page was when opening the settings scrolled it, or null when
@@ -219,10 +225,9 @@ export function ReviewScreen({
     const back = returnTo.current;
     returnTo.current = null;
     if (back !== null) scrollPage(scroller, back);
-  }, [chartSettings]);
+  }, [chartSettings, setChartSettings]);
 
   const [playing, setPlaying] = useState<PlaySide | null>(null);
-  const [clock, setClock] = useState<number | null>(null);
   const [status, setStatus] = useState("");
   // The playhead moves every frame. Routing it through state would re-render
   // the whole screen sixty times a second; the chart takes it directly.
@@ -242,12 +247,10 @@ export function ReviewScreen({
     playerRef.current = createPlayer({
       onProgress: (t, side) => {
         setPlayhead({ t, side });
-        setClock(t);
       },
       onEnded: (reason) => {
         setPlaying(null);
         setPlayhead(null);
-        setClock(null);
         const side = looping.current;
         if (reason === "done" && loopRef.current && side) restart.current(side);
       },
@@ -426,14 +429,11 @@ export function ReviewScreen({
     const recorder = rec.recorder;
     const chart = handle.chart;
     const lead = settings.paceLeadSec;
-    /* Either aid arms the count-in: they are two readings of one schedule, and
-       making the card depend on the cursor would have turned two toggles into
-       three. Only the cursor touches the chart. */
-    /* Zen mode bars both, and says so here as well as in the panel: the
-       checkboxes are cleared when it is turned on, but a stored preference
-       from before it existed would otherwise arm a count-in behind a sheet
-       that has no beat on it. */
-    const paced = !settings.zenMode && (settings.paceCursor || settings.flashCard);
+    /* Zen mode bars the cursor, and says so here as well as in the panel: the
+       checkbox is cleared when it is turned on, but a stored preference from
+       before it existed would otherwise arm a count-in behind a sheet that has
+       no beat on it. */
+    const paced = !settings.zenMode && settings.paceCursor;
     if (!recorder || !paced || !chart) {
       setLeadLeft(null);
       handle.chart?.setFollow("clamped");
@@ -446,14 +446,11 @@ export function ReviewScreen({
        earlier clamps to it — so without this the cursor would have nowhere to
        come in from and would simply appear on the beat, which is a count-in
        you cannot count along with. */
-    if (settings.paceCursor) {
-      chart.setLead(lead);
-      /* Locked to the middle while pacing. The card above holds your eye
-         there, so the mark you are about to make has to be in the same place
-         every time — which means the content moves and the cursor does not,
-         from before the first character to after the last. */
-      chart.setFollow("centered");
-    }
+    chart.setLead(lead);
+    /* Locked to the middle while pacing, so the mark you are about to make is
+       in the same place every time — the content moves and the cursor does
+       not, from before the first character to after the last. */
+    chart.setFollow("centered");
 
     /* Where the schedule runs out: a moment after the target's last element,
        not after its last character's start. */
@@ -465,7 +462,7 @@ export function ReviewScreen({
     const tick = () => {
       const into = recorder.elapsed();
       // Reaches the first character exactly as the lead-in runs out.
-      if (settings.paceCursor) chart.setPlayhead({ t: paceFrom - lead + into, side: "tgt" });
+      chart.setPlayhead({ t: paceFrom - lead + into, side: "tgt" });
       const left = into >= lead ? 0 : Math.max(1, Math.ceil(lead - into));
       if (left !== shownLead) {
         shownLead = left;
@@ -504,31 +501,14 @@ export function ReviewScreen({
     paceFrom,
     rec.recorder,
     review.ideal,
-    settings.flashCard,
     settings.paceCursor,
     settings.paceLeadSec,
     settings.zenMode,
   ]);
 
-  /* When each character should be keyed, on the recorder's own clock.
-   *
-   * The cursor reaches the first character exactly as the count-in runs out,
-   * so every later one is that moment plus however far into the target it
-   * falls. Derived once per message rather than per frame — the schedule does
-   * not change while a recording runs. */
-  const beats = useMemo(
-    () => beatsFor(review.ideal, settings.paceLeadSec),
-    [review.ideal, settings.paceLeadSec],
-  );
-
-  /* The words behind the preview. Derived from the target rather than from
-     `settings.expected`, so the split is the timeline's own — the same gaps
-     the chart highlights by, not a second opinion from splitting a string. */
-  const words = useMemo(() => wordsFor(review.ideal), [review.ideal]);
-
-  /* Handed as a getter rather than as a number: the card reads the clock on
-     its own frames and writes straight to the DOM, so nothing here re-renders
-     ten times a second to move one digit. */
+  /* Handed as a getter rather than as a number: the Zen sheet reads the clock
+     on its own frames and writes straight to the DOM, so nothing here
+     re-renders ten times a second to move one digit. */
   const liveClock = useMemo(() => {
     const recorder = rec.recorder;
     return recorder ? () => recorder.elapsed() : null;
@@ -735,7 +715,6 @@ export function ReviewScreen({
      layout, because the fit is measured off the real content — a short session
      stranded in a third of the chart is the one thing a timing chart has no use
      for, and empty pixels tell you nothing. */
-  const fitted = useRef<string | null>(null);
   /* What the fit is about: the attempts on the chart, not the one being read.
      Keyed on the selected take it re-fitted on every click of a run name —
      each attempt is a slightly different length, so each got a slightly
@@ -745,6 +724,10 @@ export function ReviewScreen({
      change, and re-fitting on a tolerance slider would undo the zoom you just
      set by hand. */
   const stackId = stack.map((r) => r.take.id).join(" ");
+  /* Already fitted, when a reload brought this session back: the zoom it was
+     left at is the one to keep. Anything that changes the runs after that
+     fits as usual. */
+  const fitted = useRef<string | null>(restored ? stackId : null);
   useEffect(() => {
     // Recording into the session, or starting a new one, still gets the fit a
     // first attempt gets — that changes which takes are on the chart.
@@ -818,19 +801,7 @@ export function ReviewScreen({
         </h1>
         <RecordBar
           rec={rec}
-          deviceId={deviceId}
-          onDeviceChange={onDeviceChange}
-          profiles={profiles}
-          profileId={profileId}
-          onProfileChange={chooseProfile}
-          onCalibrate={onCalibrate}
-          /* The setup goes behind the settings button, like everything else
-             that is not the loop: which microphone, and what to correct it by.
-             Both are answered once and then left alone, and both sat in the
-             header being rare. */
-          configuring={chartSettings}
           appliesToTake={loaded.take.source === MIC_SOURCE}
-          rereading={rereading}
           leadLeft={leadLeft}
           onClear={blank ? undefined : onClear}
           onFile={onFile}
@@ -838,6 +809,8 @@ export function ReviewScreen({
              starts a session gets to set one — so a file can begin a session
              but never join one. */
           canOpenFile={blank}
+          mode={modeOf(settings)}
+          onMode={(m) => onChange(modePatch(m))}
           onNewSession={() => setStarting(true)}
           onDrill={(d) =>
             onNewSession({
@@ -883,6 +856,22 @@ export function ReviewScreen({
             settings={settings}
             runs={stack.length}
             onChange={onChange}
+            loop={loop}
+            onLoop={() => setLoop((on) => !on)}
+            /* The setup goes behind the settings button, like everything else
+               that is not the loop: which microphone, what to correct it by,
+               and how loud to play it back. */
+            audio={{
+              devices: rec.devices,
+              deviceId,
+              onDeviceChange,
+              profiles,
+              profileId,
+              onProfileChange: chooseProfile,
+              appliesToTake: loaded.take.source === MIC_SOURCE,
+              rereading,
+              onCalibrate,
+            }}
           />
         </div>
       </section>
@@ -890,15 +879,7 @@ export function ReviewScreen({
       <Controls
         settings={settings}
         onChange={onChange}
-        playing={playing}
-        clock={clock}
-        canPlayYou={!blank}
         fromFile={loaded.take.source !== MIC_SOURCE}
-        onPlayYou={() => playTrack("you")}
-        onPlayTarget={() => playTrack("tgt")}
-        loop={loop}
-        onLoop={() => setLoop((on) => !on)}
-        onStop={stop}
       />
 
       {/* A band of its own rather than a line of the header. In the header the
@@ -982,6 +963,24 @@ export function ReviewScreen({
 
       {/* Over everything, while the take runs. The record bar it covers is
           reproduced inside it, keys and all. */}
+      {/* Plain mode: the chart follows what is being sent, and marks it with
+          Live grading on. Zen mode covers the chart, and Paced mode moves it
+          on the clock. */}
+      {rec.recorder &&
+        modeOf(settings) === "plain" &&
+        (settings.plainFollow || settings.plainGrading) && (
+        <FollowSending
+          recorder={rec.recorder}
+          charWpm={settings.charWpm}
+          farnsworthWpm={settings.farnsworthWpm}
+          ideal={incoming.ideal}
+          handle={handle}
+          follow={settings.plainFollow}
+          grade={settings.plainGrading}
+          onFinish={() => void rec.finish()}
+        />
+      )}
+
       {settings.zenMode && recording && liveClock && (
         <ZenMode
           message={settings.expected}
@@ -1005,17 +1004,10 @@ export function ReviewScreen({
         />
       )}
 
-      {/* Barred by Zen mode for the same reason the count-in is, and for one
-          more: this sheet is over it, so it would be a card nobody can see. */}
-      {settings.flashCard && !settings.zenMode && (
-        <FlashCard
-          beats={beats}
-          elapsed={liveClock}
-          words={settings.wordPreview ? words : EMPTY_WORDS}
-        />
-      )}
-
-      <section className="canvas-wrap">
+      {/* Which track is playing, for whatever reads the page rather than the
+          canvas: the chart draws its stop button, and a drawing says nothing
+          to a test or a screen reader. */}
+      <section className="canvas-wrap" data-playing={playing ?? ""}>
         {/* Right above the thing they affect. None of these changes a number
             on the page — they change what is on screen. */}
         <ViewControls

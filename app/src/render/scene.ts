@@ -203,6 +203,28 @@ export interface Scene {
   range?: PlayRange | null;
   /** Filled in by draw(), read by the gutter: the drift axis bound. */
   driftMax?: number;
+  /** While a Plain take runs with Live grading on: a dot under each target
+   *  character begun, as Zen mode draws under its message. */
+  liveMarks?: ReadonlyMap<Char, LiveMark> | null;
+}
+
+/** A target character's state in a take that is running: begun, or read back
+ *  right or wrong. */
+export type LiveMark = "pending" | "right" | "wrong";
+
+/** A dot under a target character's name, centered on it. Text color until
+ *  the character is read back, then blue if right and red if wrong — Zen
+ *  mode's colors, so the two read the same. */
+function drawLiveMark(ctx: Ctx2D, scene: Scene, ch: Char, start: number): void {
+  const mark = scene.liveMarks?.get(ch);
+  if (!mark) return;
+  const C = scene.palette;
+  const r = 2.5;
+  const x = start + ctx.measureText(ch.char).width / 2;
+  const y = tgtCapY(scene) + 8;
+  ctx.fillStyle = mark === "right" ? C.you : mark === "wrong" ? C.bad : C.ink;
+  roundRect(ctx, x - r, y - r, 2 * r, 2 * r, r);
+  ctx.fill();
 }
 
 function roundRect(
@@ -504,6 +526,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
       ctx.fillStyle = C.ink;
       ctx.font = `600 12px ${C.mono}`;
       caption(ctx, ideal.char, bx, tgtCapY(scene));
+      drawLiveMark(ctx, scene, ideal, bx);
     }
 
     // Where the character starts, when the gaps arriving here disagree about
@@ -606,6 +629,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       ctx.fillStyle = C["ink-dim"];
       ctx.font = `600 11px ${C.mono}`;
       caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
+      drawLiveMark(ctx, scene, slot.ideal, it.ix);
     }
   }
 
@@ -1263,11 +1287,16 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
           [scene.rows.drift + 7, "DRIFT", C["ink-dim"], null],
         ];
   /* The play button takes the place of the name and scores of the track in
-     hand. Text around it would peek out past its edges. */
-  let button: { name: GutterName; color: string } | null = null;
+     hand. Text around it would peek out past its edges. The track playing
+     has one too, hovered or not: it is the only way to stop it from the
+     chart, and a way to stop that appears only under the pointer is one you
+     have to go looking for while the sound runs. */
+  const sounding: GutterName | null =
+    scene.playing === "tgt" ? "tgt" : scene.playing === "you" ? (scene.selected ?? null) : null;
+  const buttons: Array<{ name: GutterName; color: string }> = [];
   for (const [y, label, color, name] of rows) {
-    if (name !== null && name === scene.picking && scene.pickingInHand) {
-      button = { name, color };
+    if (name !== null && ((name === scene.picking && scene.pickingInHand) || name === sounding)) {
+      buttons.push({ name, color });
       continue;
     }
     ctx.fillStyle = color;
@@ -1279,7 +1308,7 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
     for (const [r, lane] of scene.runs.entries()) {
       // Nothing was keyed into it, so every figure would be a reading off an
       // empty recording — the same reason the band below dashes them.
-      if (lane.blank || button?.name === r) continue;
+      if (lane.blank || buttons.some((b) => b.name === r)) continue;
       const top = scene.rows.runs[r]!.row;
       ctx.fillStyle = C[scoreBand(lane.analysis.withinTolFrac, CONSISTENT_BANDS)];
       ctx.fillText(`${Math.round(lane.analysis.withinTolFrac * 100)}%`, 4, top + 20);
@@ -1307,10 +1336,9 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
     scene.rows.drift + 20,
   );
 
-  if (button) {
+  for (const button of buttons) {
     const top = button.name === "tgt" ? scene.rows.tgt : scene.rows.runs[button.name]!.row;
-    const playing = scene.playing === (button.name === "tgt" ? "tgt" : "you");
-    drawPlayButton(ctx, top + ROW_H / 2, button.color, C.panel, playing);
+    drawPlayButton(ctx, top + ROW_H / 2, button.color, C.panel, button.name === sounding);
   }
 }
 

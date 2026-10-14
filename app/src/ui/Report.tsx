@@ -66,7 +66,7 @@ export function Report({
         <div className="card">
           <h2>Nothing recorded yet</h2>
           <p
-            className="note empty"
+            className="note blank"
             data-testid="report-blank"
             data-target={String(hasTarget)}
           >
@@ -76,9 +76,9 @@ export function Report({
                     the one part of the report that shows whether or not the
                     grading tables are switched on, so it cannot point at
                     something that may not be there. */}
-                The target above is what you are about to send. Hear it with{" "}
-                <b>Target</b>, set the speeds and the tolerance you want to be
-                held to, then record.
+                The target above is what you are about to send. Hear it from
+                the chart, set the speeds and the tolerance you want to be held
+                to, then record.
               </>
             ) : (
               <>

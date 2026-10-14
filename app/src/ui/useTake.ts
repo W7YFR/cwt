@@ -25,6 +25,7 @@ import {
 import { profileForSource, type Profile } from "@/io/profiles";
 import {
   forgetCurrentTake,
+  rememberPracticing,
   loadPrefs,
   loadSpeed,
   rememberSettings,
@@ -150,13 +151,14 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     showChartControls: p.showChartControls ?? base.showChartControls,
     showRuns: p.showRuns ?? base.showRuns,
     captionAll: p.captionAll ?? base.captionAll,
-    flashCard: p.flashCard ?? base.flashCard,
-    wordPreview: p.wordPreview ?? base.wordPreview,
     zenMode: p.zenMode ?? base.zenMode,
+    plainFollow: p.plainFollow ?? base.plainFollow,
+    plainGrading: p.plainGrading ?? base.plainGrading,
     zenProgress: p.zenProgress ?? base.zenProgress,
     zenGrading: p.zenGrading ?? base.zenGrading,
     runSort: (p.runSort as ReviewSettings["runSort"]) ?? base.runSort,
     view: (p.view as ReviewSettings["view"]) ?? base.view,
+    ppu: p.ppu ?? base.ppu,
   };
 }
 
@@ -183,10 +185,10 @@ function personal(prev: ReviewSettings) {
     showRuns: prev.showRuns,
     captionAll: prev.captionAll,
     zenMode: prev.zenMode,
+    plainFollow: prev.plainFollow,
+    plainGrading: prev.plainGrading,
     zenProgress: prev.zenProgress,
     zenGrading: prev.zenGrading,
-    flashCard: prev.flashCard,
-    wordPreview: prev.wordPreview,
     runSort: prev.runSort,
     view: prev.view,
   } satisfies Partial<ReviewSettings>;
@@ -224,8 +226,8 @@ export function useTake(): TakeState {
   const loaded = runs[selected] ?? runs[runs.length - 1] ?? null;
   const [settings, setSettingsRaw] = useState<ReviewSettings>(() =>
     restorePrefs({
-      charWpm: 20,
-      farnsworthWpm: 20,
+      charWpm: 25,
+      farnsworthWpm: 25,
       tolerance: 0.3,
       expected: "",
       times: 1,
@@ -243,7 +245,9 @@ export function useTake(): TakeState {
          the tables are the answer to "why" — which is the next question after
          a score you did not like. */
       advancedGrading: true,
-      ignoreConstruction: false,
+      /* On: most people practicing will be on a keyer, which forms each
+         character itself, so its dits and dahs are not theirs to grade. */
+      ignoreConstruction: true,
       showDownloads: false,
       showHints: true,
       showChartControls: true,
@@ -252,10 +256,10 @@ export function useTake(): TakeState {
          it are the thing being compared. */
       captionAll: false,
       zenMode: false,
-      zenProgress: false,
+      plainFollow: true,
+      plainGrading: true,
+      zenProgress: true,
       zenGrading: false,
-      flashCard: false,
-      wordPreview: false,
       runSort: "oldest",
       gainDb: 0,
       view: "per-char",
@@ -335,13 +339,14 @@ export function useTake(): TakeState {
         showChartControls: next.showChartControls,
         showRuns: next.showRuns,
         captionAll: next.captionAll,
-        flashCard: next.flashCard,
-        wordPreview: next.wordPreview,
         zenMode: next.zenMode,
+        plainFollow: next.plainFollow,
+        plainGrading: next.plainGrading,
         zenProgress: next.zenProgress,
         zenGrading: next.zenGrading,
         runSort: next.runSort,
         view: next.view,
+        ppu: next.ppu,
       });
       // The rest of the settings belong to the take, so they ride along with
       // it rather than becoming preferences for every future recording.
@@ -576,10 +581,11 @@ export function useTake(): TakeState {
     takeIdRef.current = null;
     settingsRef.current = s;
     setSettingsRaw(s);
-    /* Deliberately not remembered. There is nothing in it to come back to, and
-       a reload should land on the landing screen rather than on an empty
-       review somebody has to work out how to leave. */
+    /* No take to come back to, since there is nothing in it. But the screen
+       is: a reload while practicing opens practice again, not the landing
+       screen. */
     forgetCurrentTake();
+    rememberPracticing(true);
   }, []);
 
   const clear = useCallback(() => {
@@ -591,6 +597,7 @@ export function useTake(): TakeState {
     // away — but a reload should now land on the landing screen, because that
     // is where this click put you.
     forgetCurrentTake();
+    rememberPracticing(false);
   }, []);
 
   /* Every attempt, graded against the same target at the same settings.
