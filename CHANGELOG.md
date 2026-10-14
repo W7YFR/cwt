@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.8.0 — 2026-10-14
+
 ### Changed
 
 - The start screen leads with **Start practicing**, and Enter presses it, with the microphone, its calibration and **or open a recording** under it. Recording and the intended message are on the practice screen only.
