@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.7.0 — 2026-10-14
+
 ### Added
 
 - **Plain**, **Paced** and **Zen**, beside the record button, pick how the next take records. They replace the **Zen mode** and **Pacing cursor** checkboxes.
