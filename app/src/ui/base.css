@@ -933,6 +933,9 @@ canvas.resizing { cursor: ew-resize; }
   color: var(--ink-dim);
   font-weight: 600;
 }
+/* What to do with an empty session, in the blue of your sending: it is about
+   the recording you are about to make. */
+.note.blank { color: var(--you); }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th, td {
   text-align: right;
