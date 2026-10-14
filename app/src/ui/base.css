@@ -1148,6 +1148,68 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   max-width: 320px;
 }
 
+/* ---- a panel ------------------------------------------------------------- */
+
+/* One card holding a whole screen's content: a title, sections under rules,
+   and the way out at the foot. The calibration setup and result use it, and
+   so does Configuration. Left-aligned, because it is read rather than glanced
+   at, and a left edge is what the eye comes back to at every line. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
+  padding: 28px 32px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: left;
+}
+.panel > h2 { margin: 0; font-size: 20px; }
+/* A switch between a panel's halves: sized to its words, not stretched. */
+.panel > .modeswitch { align-self: flex-start; }
+/* Wide enough for a chart, or for three fields on a row. */
+.panel.wide { max-width: 960px; }
+/* A section: under a rule, captioned the way the practice screen captions
+   its controls. */
+.panelsec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.panelsec > .uplabel,
+.panelsec > h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+/* A labeled control in a panel: the name above it, small and uppercase. */
+.panelfield { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.panelfield .fieldname {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-dim);
+}
+/* The way on at the right, the other way at the left. */
+.panelfoot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 480px) {
+  .panel { padding: 22px 18px; }
+}
+
 /* ---- a dialog over the page ---------------------------------------------- */
 
 /* Dimmed rather than blacked out: what the dialog is about is the thing behind
@@ -1636,41 +1698,19 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
 }
 .calibrate .calsteps .hint { display: block; }
 
-/* The setup, held on one card. The wizard's later steps stay on the bare
-   page: they are read from across a desk, and a frame would only crowd them. */
-.calibrate .calcard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  max-width: 600px;
-  box-sizing: border-box;
-  padding: 28px 32px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-/* Read, not glanced at: a left edge to come back to at every line. */
-.calibrate .calcard { align-items: stretch; text-align: left; }
-.calibrate .calcard .lede { max-width: none; }
-.calibrate .calcard .calsteps { align-self: stretch; }
+/* The wizard's setup and result are panels — see "a panel" below. Its steps
+   in between stay on the bare page: they are read from across a desk, and a
+   frame would only crowd them. */
+.calibrate .panel .lede,
+.calibrate .panel .advice { max-width: none; }
+.calibrate .panel .appname { color: var(--you); }
+.calibrate .panel .calsteps { align-self: stretch; }
 
-/* The settings, under a rule that ends the reading. */
+/* The two settings side by side, under the rule a section has. */
 .calibrate .calsetup {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 16px 32px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
-.calibrate .calfield { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-/* Named the way the practice screen names its controls. */
-.calibrate .calfield .fieldname {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--ink-dim);
 }
 .calibrate .calinput { display: flex; align-items: center; gap: 6px; }
 .calibrate .calinput input { width: 5em; text-align: center; }
@@ -1686,16 +1726,8 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
   white-space: nowrap;
 }
 .calibrate .calkeeps { margin: 0; }
-.calibrate .calfoot {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
 
 @media (max-width: 480px) {
-  .calibrate .calcard { padding: 22px 18px; }
   .calibrate .calsetup { grid-template-columns: 1fr; }
 }
 .calibrate .banner { border: 1px solid var(--line); border-radius: 8px; max-width: 52ch; }
@@ -1782,38 +1814,26 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
  * carried those three across a headline, a verdict word, a paragraph at the
  * bottom and a choice of buttons, which is four places to look before knowing
  * whether the thing worked. */
-.calibrate .outcome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  max-width: 56ch;
-  padding: 16px 20px;
-  border: 1px solid var(--line);
-  /* The tone reads off the top edge rather than off the text: a whole block of
-     colored words is harder to read than black ones, and a rule above the
-     headline is visible before the headline has been. */
-  border-top: 3px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-}
-.calibrate .outcome[data-tone="ok"] { border-top-color: var(--ok); }
-.calibrate .outcome[data-tone="warn"] { border-top-color: var(--warn); }
-.calibrate .outcome[data-tone="bad"] { border-top-color: var(--bad); }
+/* The answer, at the top of the result card. Its tone reads off the card's
+   top edge rather than off the text: a whole block of colored words is harder
+   to read than plain ones, and a rule above the headline is seen before the
+   headline is. */
+.calibrate .outcome { display: flex; flex-direction: column; gap: 8px; }
+.panel[data-tone="ok"] { border-top: 3px solid var(--ok); }
+.panel[data-tone="warn"] { border-top: 3px solid var(--warn); }
+.panel[data-tone="bad"] { border-top: 3px solid var(--bad); }
 /* The claim, set as the sentence the headline is short for. Full-strength ink
    against the advice below it, which is the next thing to do rather than the
    finding itself. */
-.calibrate .outcome .meaning {
-  margin: 0;
-  color: var(--ink);
-  line-height: 1.6;
-}
-.calibrate .outcome .advice { margin: 0; }
+.calibrate .outcome .explain { margin: 0; line-height: 1.6; color: var(--ink-dim); }
+/* One colour for the whole paragraph: the headline above is the white. */
+.calibrate .outcome .explain .advice { color: inherit; }
+/* A drill with nothing in it. Still pointed at, so the reason shows. */
+.calibrate .sections button[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 
 .calibrate .readout {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 10px 26px;
   margin: 0;
 }
@@ -1826,16 +1846,8 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
 }
 .calibrate .readout dd { margin: 0; font-size: 15px; }
 
-/* The caption over the setup figures. Same treatment the other groups on this
-   screen get, so "what your setup does" and "what I heard" read as two shelves
-   of the same cabinet. */
-.calibrate > .uplabel {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--ink-dim);
-  margin-bottom: -6px;
-}
+.calibrate .panelsec .panelfield input[type="text"] { width: 100%; max-width: 420px; text-align: left; }
+
 
 .verdict.clean, .verdict.good { color: var(--ok); }
 .verdict.marginal { color: var(--warn); }
@@ -1846,31 +1858,10 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
    part of a calibration somebody can check with their own eyes. */
 /* Hearing each drill back. Worth having on a refusal above all: "the drills
    disagree" becomes obvious the moment the dah drill plays somebody's dits. */
-.calibrate .sections {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.calibrate .sections .uplabel {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--ink-dim);
-}
+.calibrate .sections .rowbuttons { justify-content: flex-start; }
 .calibrate .sections .ico { margin-right: 6px; font-style: normal; }
 
-.calibrate .readback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 18px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  max-width: 46ch;
-}
+.calibrate .readback { gap: 4px; }
 .calibrate .readback strong {
   font-family: var(--mono);
   font-size: clamp(16px, 2.6vw, 22px);
@@ -1945,19 +1936,17 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 26px;
+  align-items: center;
   padding: 28px 20px;
-  max-width: 780px;
-  margin: 0 auto;
   width: 100%;
+  box-sizing: border-box;
 }
-.setshead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.settings h2 { margin: 0; font-size: 20px; }
-.settings h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-dim); }
-.settings h4 { margin: 0 0 10px; font-size: 13px; color: var(--ink); }
+/* Three fields to a row, which is all the user details want. */
+.settings .panel { max-width: 780px; gap: 22px; }
 .settings .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
-.calsection { display: flex; flex-direction: column; gap: 20px; }
-.calsection > h3 { margin-bottom: -10px; }
+/* Rows sit a shade darker than the panel they are on, the way the calibration
+   steps do, or they vanish into it. */
+.panel .callist li { background: var(--bg); }
 .userfields {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1982,16 +1971,14 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
   border: 0;
   min-width: 0;
 }
-/* The section heading's type one step down, so a group reads as part of the
-   section and not as one more field. */
+/* A group within the section: a plain subheading, so it reads as neither
+   one more section caption nor one more field name. */
 .usergroup legend {
   padding: 0;
   margin: 6px 0 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--ink-dim);
+  color: var(--ink);
 }
 .callist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .callist li {
@@ -2011,8 +1998,7 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
 button.danger { border-color: var(--bad); color: var(--bad); }
 
 /* Custom drills: the text box, its help panel, and the saved list. */
-.drillsettings { display: flex; flex-direction: column; gap: 10px; }
-.drillsettings h3, .drillsettings .lede { margin-bottom: 0; }
+.drillsettings .lede { margin-bottom: 0; }
 .drillsettings .fieldrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .drillsettings .fieldrow label {
   font-size: 11px;
@@ -2075,6 +2061,9 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 /* Overriding the measurement. Below the preview, because a slider whose
    effect you cannot see is guesswork with extra steps. */
 .advanced { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.panel .advanced { align-items: flex-start; }
+.panel .advanced .advbody { align-items: flex-start; max-width: none; }
+.panel .advanced .sliderow { justify-content: flex-start; }
 .advanced .advbody {
   display: flex;
   flex-direction: column;

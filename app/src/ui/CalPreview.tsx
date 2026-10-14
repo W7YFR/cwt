@@ -18,8 +18,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { analyzeClip } from "@/io/take";
 import type { Profile } from "@/io/profiles";
 import type { CalibrationRun } from "@/io/calibration";
+import { createPlayer, type PlaySide, type Player } from "@/audio/player";
+import { encodeWavBuffer } from "@/audio/wav";
 import { defaultSettings, reviewTake } from "@/timing";
-import type { AudioClip, Review, ReviewSettings } from "@/types";
+import type { AudioClip, Review, ReviewSettings, Take } from "@/types";
+import { PLAY_PAD } from "@/render/geometry";
 import { ChartView, type ChartHandle } from "./Chart";
 
 export interface CalPreviewProps {
@@ -81,6 +84,11 @@ interface Variant {
    *  most legible number on the screen: one of these two is closer to the
    *  speed the keyer was set to, and that is what the calibration is for. */
   readonly charWpm: number;
+  /** The take behind the chart, for the target's tone and level. */
+  readonly take: Take;
+  /** The message as recorded. The same audio under both charts: a
+   *  calibration changes how it is read, not what it sounds like. */
+  readonly audio: AudioClip;
 }
 
 function build(
@@ -126,6 +134,8 @@ function build(
         review: reviewTake(take, settings),
         settings,
         charWpm: take.measured.charWpm,
+        take,
+        audio: part,
       };
     } catch {
       // Nothing readable in this section. The rest of the result still stands.
@@ -147,6 +157,11 @@ function One({
   handle,
   onZoom,
   onScroll,
+  playing,
+  heard,
+  playhead,
+  onPlay,
+  onHeard,
 }: {
   variant: Variant;
   wpm: number;
@@ -154,6 +169,13 @@ function One({
   handle: ChartHandle;
   onZoom(ppu: number): void;
   onScroll(x: number): void;
+  /** The track of this chart that is playing, if any. */
+  playing: PlaySide | null;
+  heard: PlaySide;
+  playhead: { t: number; side: PlaySide } | null;
+  /** Play a track: a span of it, or the whole of it as a toggle. */
+  onPlay(side: PlaySide, from?: number, to?: number): void;
+  onHeard(side: PlaySide): void;
 }): React.ReactElement {
   return (
     <div
@@ -178,10 +200,17 @@ function One({
         review={variant.review}
         settings={{ ...variant.settings, ppu }}
         focus={null}
-        playhead={null}
+        playing={playing}
+        heard={heard}
+        playhead={playhead}
         handle={handle}
         onZoom={onZoom}
         onScroll={onScroll}
+        onPlayChar={(side, from, to) => onPlay(side, from, to)}
+        onPlayTrack={(side) => onPlay(side)}
+        onSelectTarget={() => onHeard("tgt")}
+        onSelectRun={() => onHeard("you")}
+        onSeek={(at) => onPlay(heard, Math.max(at[heard] - PLAY_PAD, 0))}
       />
     </div>
   );
@@ -206,6 +235,56 @@ export function CalPreview(props: CalPreviewProps): React.ReactElement | null {
    * the same point of the screen — which is the alignment somebody comparing
    * them is actually using. Matching by time would drift them apart by exactly
    * the correction being examined. */
+  /* Playback, shared by both charts. One player, because two charts of the
+     same recording talking over each other is noise; which chart and which
+     track it is playing is what each chart is told. */
+  const playerRef = useRef<Player | null>(null);
+  const [playing, setPlaying] = useState<{ key: string; side: PlaySide } | null>(null);
+  const [playhead, setPlayhead] = useState<{ key: string; t: number; side: PlaySide } | null>(
+    null,
+  );
+  const [heard, setHeard] = useState<PlaySide>("you");
+  const playingKey = useRef<string | null>(null);
+  useEffect(() => () => playerRef.current?.destroy(), []);
+  const bytes = useMemo(
+    () => (variants[0] ? encodeWavBuffer(variants[0].audio.samples, variants[0].audio.rate) : null),
+    [variants],
+  );
+
+  const play = (v: Variant, side: PlaySide, from?: number, to?: number): void => {
+    const player = (playerRef.current ??= createPlayer({
+      onProgress: (t, s) => {
+        if (playingKey.current) setPlayhead({ key: playingKey.current, t, side: s });
+      },
+      onEnded: () => {
+        playingKey.current = null;
+        setPlaying(null);
+        setPlayhead(null);
+      },
+    }));
+    setHeard(side);
+    // The name in the gutter, or a second press: a toggle.
+    if (from === undefined && playing?.key === v.key && playing.side === side) {
+      player.stop();
+      return;
+    }
+    playingKey.current = v.key;
+    setPlaying({ key: v.key, side });
+    if (side === "you") {
+      if (bytes) void player.playBuffer(bytes, from ?? 0, to);
+      return;
+    }
+    const t = v.take;
+    player.playTarget(v.review.ideal, {
+      peak: Math.min(t.peak || 0.5, 1),
+      padSec: t.padSec,
+      voice: { toneHz: t.toneHz || 600, filterQ: 3 },
+      // The whole target starts in its lead-in, before zero.
+      from: from ?? -t.padSec,
+      ...(to !== undefined ? { to } : {}),
+    });
+  };
+
   const handles = useRef<Record<string, ChartHandle>>({});
   const scrollX = useRef(0);
   const [ppu, setPpu] = useState<number | null>(null);
@@ -264,13 +343,28 @@ export function CalPreview(props: CalPreviewProps): React.ReactElement | null {
           handle={handleFor(v.key)}
           onZoom={setPpu}
           onScroll={(x) => relay(v.key, x)}
+          playing={playing?.key === v.key ? playing.side : null}
+          heard={heard}
+          playhead={
+            playhead?.key === v.key ? { t: playhead.t, side: playhead.side } : null
+          }
+          onPlay={(side, from, to) => play(v, side, from, to)}
+          onHeard={setHeard}
         />
       ))}
-      <p className="hint">
-        Both are measured against {props.wpm} wpm — the speed you said the keyer
-        was set to.<br />Watch the gaps: the correction is fitted to the marks, so
-        only the gaps are an independent test of it.
-      </p>
+      {/* "Both" only where there are two: a recording with no correction
+          has one chart, and the gaps advice is about the second. */}
+      {variants.length > 1 ? (
+        <p className="hint">
+          Both are measured against {props.wpm} wpm — the speed you said the keyer
+          was set to.<br />Watch the gaps: the correction is fitted to the marks, so
+          only the gaps are an independent test of it.
+        </p>
+      ) : (
+        <p className="hint">
+          Measured against {props.wpm} wpm — the speed you said the keyer was set to.
+        </p>
+      )}
     </div>
   );
 }

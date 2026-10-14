@@ -17,8 +17,14 @@ import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { DATA_DIR } from "../oracle-fs";
 import { normalizePeak, readWav } from "../wav";
-import { DRILLS, analyzeCalibration, playablesOf } from "@/io/calibration";
-import { correctsNothing, drillsAgree } from "@/dsp";
+import {
+  DRILLS,
+  analyzeCalibration,
+  drillWindows,
+  playablesOf,
+  type CalibrationRun,
+} from "@/io/calibration";
+import { correctsNothing, drillsAgree, type Section, type SectionKind } from "@/dsp";
 import {
   PROBE,
   assessSetup,
@@ -105,34 +111,6 @@ describe.skipIf(!HAVE)("a calibration recording", () => {
       expect(run().sections.filter((s) => s.kind !== "silence")).toHaveLength(5);
     });
 
-    it("hands back every keyed stretch, named by what it was taken to be", () => {
-      /* So a refusal can be listened to. "The two drills disagree by 31 ms"
-         is a fact about numbers; hearing the dah drill play back somebody's
-         dits is the same fact in a form anyone can act on.
-
-         Named from the splitter's own view of the recording rather than from
-         the schedule the wizard asked for, because when those two differ the
-         splitter's view is the one that explains the answer. */
-      const parts = playablesOf(run());
-      expect(parts.map((p) => p.label)).toEqual([
-        "Held dits",
-        "Held dahs",
-        "Other keying",
-        "Single dits",
-        "Your message",
-      ]);
-      // Real windows into the recording, in order, none of them empty.
-      let last = -1;
-      for (const p of parts) {
-        expect(p.toSec).toBeGreaterThan(p.fromSec);
-        expect(p.fromSec).toBeGreaterThan(last);
-        last = p.fromSec;
-      }
-      // Silence is left out: there is nothing in it to check.
-      expect(parts).toHaveLength(
-        run().sections.filter((x) => x.kind !== "silence").length,
-      );
-    });
 
     it("reads the closing message back, through the profile it just measured", () => {
       /* The last drill asks the operator to send something. Asking for it and
@@ -337,5 +315,62 @@ describe.skipIf(!HAVE)("a calibration recording", () => {
       expect(quality.releases).toBeGreaterThanOrEqual(3);
       expect(quality.verdict).toBe(full.quality.verdict);
     });
+  });
+});
+
+describe("the drills, to hear back", () => {
+  /* One per drill, from the wizard's timeline, whatever the splitter found.
+     A held dah drill whose tail fills every gap arrives as one long tone,
+     which is not a stretch of elements — and is exactly the drill worth
+     hearing. */
+  const section = (kind: SectionKind, startSec: number, durationSec: number): Section => ({
+    kind,
+    from: 0,
+    to: 0,
+    startSec,
+    durationSec,
+    marks: [],
+    medianMarkSec: NaN,
+    medianGapSec: NaN,
+  });
+  const at = (key: string) => drillWindows().find((w) => w.drill.key === key)!;
+  const over = (kind: SectionKind, key: string) =>
+    section(kind, at(key).fromSec, at(key).toSec - at(key).fromSec);
+  const end = drillWindows().at(-1)!.toSec;
+  const runOf = (sections: Section[]) => ({ sections }) as unknown as CalibrationRun;
+
+  it("offers every drill, in order, named", () => {
+    const parts = playablesOf(runOf([]), end);
+    expect(parts.map((p) => p.label)).toEqual([
+      "Held dits",
+      "Held dahs",
+      "Single dits",
+      "Your message",
+    ]);
+    expect(parts.map((p) => p.key)).toEqual(DRILLS.map((d) => d.key));
+  });
+
+  it("says which drills nothing was heard in", () => {
+    // The dah drill lost: the splitter found nothing there.
+    const parts = playablesOf(
+      runOf([over("mixed", "dits"), over("isolated", "isolated"), over("mixed", "message")]),
+      end,
+    );
+    expect(parts.map((p) => p.captured)).toEqual([true, false, true, true]);
+  });
+
+  it("plays each drill's own stretch, and a little either side", () => {
+    for (const p of playablesOf(runOf([]), end)) {
+      const w = at(p.key);
+      expect(p.fromSec).toBeLessThanOrEqual(w.fromSec);
+      expect(p.toSec).toBeGreaterThanOrEqual(w.toSec);
+      expect(p.toSec - p.fromSec).toBeLessThan(w.toSec - w.fromSec + 2);
+    }
+  });
+
+  it("counts a drill past the end of a recording stopped early as not captured", () => {
+    const stoppedAt = at("message").fromSec - 1;
+    const parts = playablesOf(runOf([over("mixed", "message")]), stoppedAt);
+    expect(parts.find((p) => p.key === "message")!.captured).toBe(false);
   });
 });

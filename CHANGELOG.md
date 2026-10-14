@@ -13,10 +13,16 @@ nothing to the site. The next release carries them.
 - A returning visit skips the start screen and opens on the practice screen.
 - Before the browser allows the microphone, the record button reads **Allow microphone**.
 - The calibration setup sits on a card, with left-aligned text. **Keyer speed** and **Microphone** sit side by side, and the microphone is named even when there is only one.
+- The calibration result sits on a card too, with left-aligned text. A failed calibration says **Let’s try that again…**, its explanation is one paragraph, and the verdict under **Your setup** names the speed it judges, such as **At 25 wpm**.
+- A successful calibration says **Success!**, and a short tail is rated **Excellent**. The explanation under it no longer contradicts the correction it found.
+- **Configuration** sits on a card like the calibration screens, with **Done** at the bottom. A switch shows one part at a time: **User**, **Drills** or **Calibration**.
+- Under **Calibration recordings**, a recording saved as a calibration shows that calibration's name, and **Save** puts the name at the front of the file.
 
 ### Fixed
 
 - The list of calibration prompts no longer runs into its border.
+- Clicking the charts on a calibration result plays the target or your recording.
+- A calibration result has a play button for every drill, named, rather than **Other keying**. A drill with nothing in it is greyed out, and its tooltip says it was not captured.
 
 ### Development
 

@@ -41,9 +41,8 @@ export interface ChartProps {
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
   range?: CharRange | null;
-  /* Optional: a chart can be shown purely to be looked at. The calibration
-     preview is one — it has no transport of its own, so a click that seeks
-     nothing would be a control that lies. */
+  /* Optional: a chart can be shown purely to be looked at, and a click that
+     seeks nothing would be a control that lies. */
   onPlayChar?: ChartCallbacks["onPlayChar"];
   onSeek?: ChartCallbacks["onSeek"];
   /** Given, a drag on the ruler picks out a range. */

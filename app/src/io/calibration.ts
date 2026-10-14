@@ -206,50 +206,66 @@ export interface Readback {
   readonly charWpm: number;
 }
 
-/** One stretch of the recording, named by what it was taken to be.
+/** One drill of the recording, to hear it back.
  *
- * The sections as the splitter found them, not as the wizard asked for them,
- * and that is the point: when a calibration comes back wrong the most useful
- * thing available is hearing what it thought each drill was. A refusal that
- * says "the drills disagree" becomes obvious the moment the dah drill plays
- * back somebody's dits. */
+ * One per drill, cut from the wizard's own timeline rather than from what the
+ * splitter found. The timeline is fixed, so every drill has a place in the
+ * recording whatever came back; the splitter, on exactly the recordings worth
+ * listening to, can lose one — a held dah drill whose tail fills every gap
+ * arrives as one long tone and is not a stretch of elements at all. */
 export interface Playable {
   readonly key: string;
   readonly label: string;
   readonly fromSec: number;
   readonly toSec: number;
+  /** Whether any keying was heard while this drill ran. */
+  readonly captured: boolean;
 }
 
-/** The keyed parts of a calibration recording, in order, each named.
- *
- * Silence is left out — there is nothing to hear in it, and the pauses are the
- * one part of the recording nobody needs to check. */
-export function playablesOf(run: CalibrationRun): Playable[] {
-  const { dits, dahs } = pairDrills(run.sections);
-  const mixed = run.sections.filter((s) => s.kind === "mixed");
-  const message = mixed.length > 0 ? mixed[mixed.length - 1] : null;
+/** What each drill is called on its play button. */
+const PLAY_LABEL: Readonly<Record<string, string>> = {
+  dits: "Held dits",
+  dahs: "Held dahs",
+  isolated: "Single dits",
+  message: "Your message",
+};
 
-  const named = (s: Section): { key: string; label: string } => {
-    if (s === dits) return { key: "dits", label: "Held dits" };
-    if (s === dahs) return { key: "dahs", label: "Held dahs" };
-    if (s.kind === "isolated") return { key: "isolated", label: "Single dits" };
-    if (s === message) return { key: "message", label: "Your message" };
-    // Something the splitter found that no measurement asked for. Worth
-    // hearing precisely because it was not expected.
-    return { key: "other", label: "Other keying" };
-  };
+/** How far past a drill's own window its playback reaches, either side. A
+ *  late start and a tail both land in the rest beside it. */
+const PLAY_MARGIN_SEC = 0.5;
 
-  return run.sections
-    .filter((s) => s.kind !== "silence")
-    .map((s, i) => {
-      const { key, label } = named(s);
-      return {
-        key: `${key}-${i}`,
-        label,
-        fromSec: s.startSec,
-        toSec: s.startSec + s.durationSec,
-      };
-    });
+/** Where each drill falls in a recording made by the wizard, in seconds from
+ *  its start: a rest, then the drill, in turn. */
+export function drillWindows(
+  drills: readonly Drill[] = DRILLS,
+): { drill: Drill; fromSec: number; toSec: number }[] {
+  let t = 0;
+  return drills.map((drill) => {
+    t += REST_SEC;
+    const w = { drill, fromSec: t, toSec: t + drill.seconds };
+    t += drill.seconds;
+    return w;
+  });
+}
+
+/** Every drill of a recording `durationSec` long, in order. */
+export function playablesOf(run: CalibrationRun, durationSec: number): Playable[] {
+  const keyed = run.sections.filter((s) => s.kind !== "silence");
+  return drillWindows().map(({ drill, fromSec, toSec }) => {
+    const from = Math.max(0, fromSec - PLAY_MARGIN_SEC);
+    const to = Math.min(durationSec, toSec + PLAY_MARGIN_SEC);
+    const heard = keyed.some(
+      (s) => Math.min(toSec, s.startSec + s.durationSec) > Math.max(fromSec, s.startSec),
+    );
+    return {
+      key: drill.key,
+      label: PLAY_LABEL[drill.key] ?? drill.summary,
+      fromSec: from,
+      toSec: to,
+      // A recording stopped early ends before the last drill does.
+      captured: heard && to > from,
+    };
+  });
 }
 
 /** Which part of the recording the setup verdict should be measured from.

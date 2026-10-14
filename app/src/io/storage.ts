@@ -379,6 +379,8 @@ export interface Prefs {
   landingSeen?: number;
   /** The settings panel was open, so a reload opens it again. */
   settingsOpen?: boolean;
+  /** Which half of Configuration was on show. */
+  configTab?: string;
   /** Calibration's speed, from saves that hold no `charWpm`. Read by
    *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
@@ -542,6 +544,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   practicing: isBool,
   landingSeen: isNum,
   settingsOpen: isBool,
+  configTab: isStr,
   keyerWpm: isNum,
   gainDb: isNum,
   tolerance: isNum,
