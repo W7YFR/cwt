@@ -28,6 +28,7 @@ import {
   analyzeCalibration,
   cueCount,
   playablesOf,
+  setupIsFine,
   type Drill,
   type CalibrationRun,
 } from "@/io/calibration";
@@ -158,6 +159,9 @@ export interface CalibrateProps {
   onConfigure(): void;
   /** Injected so a test does not have to mock the clock. */
   now?(): Date;
+  /** Dev only: open straight on the result for this recording, keyed at
+   *  this speed. Nothing is kept. See ui/calExample.ts. */
+  example?: { clip: AudioClip; wpm: number } | undefined;
 }
 
 /** The wizard, with the one way to the configuration screen beside it.
@@ -251,6 +255,17 @@ function Wizard(props: CalibrateProps): React.ReactElement {
   /* The id of the attempt just recorded, so saving a profile can point back at
      the audio it came from. */
   const attempt = useRef<string | null>(null);
+
+  // Dev only, once: the example recording, analyzed as a take would be.
+  const example = props.example;
+  useEffect(() => {
+    if (!example) return;
+    setWpmText(String(example.wpm));
+    setClip(example.clip);
+    const forAnalysis = normalized(example.clip);
+    setRun(analyzeCalibration(forAnalysis.samples, forAnalysis.rate, example.wpm));
+    setStage("result");
+  }, [example]);
 
   const rec = useRecorder({ deviceId: props.deviceId, onClip, onError });
 
@@ -893,7 +908,10 @@ function Result(props: ResultProps): React.ReactElement {
           )
         : outcome === "clean"
           ? "Your elements are arriving the length they were sent, so there is nothing to take back off."
-          : `The two drills landed ${ms(run.calibration!.spreadSec)} apart, so there is no single number to take from them.`;
+          : /* The recording's fault, not the setup's, and when the setup is fine that
+               has to come first — or the amber headline and a green
+               "Excellent" below it read as two answers to one question. */
+            `${setupIsFine(run.quality) ? "Your setup looks fine, but the" : "The"} held dits and held dahs came out ${ms(run.calibration!.spreadSec)} apart, so there is no single correction to take from them.`;
 
   return (
     <div className="calibrate result">
@@ -1015,6 +1033,9 @@ function Result(props: ResultProps): React.ReactElement {
               run={run}
               expected={props.expected}
               wpm={props.wpm}
+              /* The calibrated chart only beside a calibration on offer. Shown
+                 with nothing to save, it previews something you cannot have. */
+              withCalibration={canSave}
             />
           </section>
         )}

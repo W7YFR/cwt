@@ -87,6 +87,7 @@ function mount(expected: string, offsetSec = 0.008) {
         run: runOver(c.samples, offsetSec),
         expected,
         wpm: 15,
+        withCalibration: true,
       }),
     );
   });
@@ -232,7 +233,28 @@ describe("the calibration preview", () => {
     const run = { ...runOver(c.samples, 0), usable: false, calibration: null };
     root = createRoot(container);
     act(() => {
-      root!.render(createElement(CalPreview, { clip: c, run, expected: TEXT, wpm: 15 }));
+      root!.render(
+        createElement(CalPreview, { clip: c, run, expected: TEXT, wpm: 15, withCalibration: true }),
+      );
+    });
+    expect(container.querySelectorAll("[data-testid='calchart']")).toHaveLength(1);
+  });
+
+  it("shows one chart when the calibration is not on offer", () => {
+    // A usable measurement that will not be saved — nothing to correct, or
+    // drills that disagree. Previewing it would show something you cannot have.
+    const c = clip();
+    root = createRoot(container);
+    act(() => {
+      root!.render(
+        createElement(CalPreview, {
+          clip: c,
+          run: runOver(c.samples, 0.008),
+          expected: TEXT,
+          wpm: 15,
+          withCalibration: false,
+        }),
+      );
     });
     expect(container.querySelectorAll("[data-testid='calchart']")).toHaveLength(1);
   });

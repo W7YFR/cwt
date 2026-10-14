@@ -51,6 +51,9 @@ export interface CalPreviewProps {
    * correction hands them back what it took off the marks is an honest test,
    * and it is the one worth watching on these two charts. */
   wpm: number;
+  /** Whether to draw the second chart, read through the calibration just
+   *  measured. Only when that calibration can be saved. */
+  withCalibration: boolean;
 }
 
 /** The profile the measurement would be saved as, before it has a name.
@@ -96,6 +99,7 @@ function build(
   run: CalibrationRun,
   expected: string,
   wpm: number,
+  withCalibration: boolean,
 ): Variant[] {
   const mixed = run.sections.filter((s) => s.kind === "mixed");
   const message = mixed.length > 0 ? mixed[mixed.length - 1] : null;
@@ -107,7 +111,7 @@ function build(
     peak: clip.peak,
   };
   const text = expected.trim();
-  const profile = provisional(run);
+  const profile = withCalibration ? provisional(run) : null;
 
   const one = (key: Variant["key"], label: string, p: Profile | null) => {
     try {
@@ -218,8 +222,8 @@ function One({
 
 export function CalPreview(props: CalPreviewProps): React.ReactElement | null {
   const variants = useMemo(
-    () => build(props.clip, props.run, props.expected, props.wpm),
-    [props.clip, props.expected, props.run, props.wpm],
+    () => build(props.clip, props.run, props.expected, props.wpm, props.withCalibration),
+    [props.clip, props.expected, props.run, props.wpm, props.withCalibration],
   );
 
   /* The two charts move as one.

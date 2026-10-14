@@ -740,9 +740,10 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
-  it("puts Advanced beside the cog while settings are open", async () => {
+  it("keeps Configuration beside the cog, open or closed", async () => {
     /* Grouped with the cog in the flow: the two never split, and the row
-       takes the width left of them rather than running underneath. */
+       takes the width left of them rather than running underneath. Always
+       there, so the way to Configuration is not hidden behind the cog. */
     const [w, h] = [window.innerWidth, window.innerHeight];
     await page.viewport(1600, 900);
     try {
@@ -752,15 +753,20 @@ const showDownloads = () => tickSetting("show-downloads");
       const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
       const row = container.querySelector<HTMLElement>("header .recordbar")!;
       const first = () => row.querySelector("button")!.getBoundingClientRect();
-      expect(advanced(), "hidden while settings are closed").toBeNull();
+      const beside = () => {
+        const a = advanced()!.getBoundingClientRect();
+        const c = cog.getBoundingClientRect();
+        expect(c.left - a.right, "just left of the cog").toBeCloseTo(8, 0);
+        expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
+      };
+      expect(advanced(), "there while settings are closed").not.toBeNull();
+      expect(advanced()!.getAttribute("aria-label")).toBe("Configuration");
+      beside();
       const before = first();
 
       await act(async () => cog.click());
       const controls = [...container.querySelectorAll<HTMLElement>("header button, header select")];
-      const a = advanced()!.getBoundingClientRect();
-      const c = cog.getBoundingClientRect();
-      expect(c.left - a.right, "just left of the cog").toBeCloseTo(8, 0);
-      expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
+      beside();
       expect(first().top, "the row stays where it was").toBeCloseTo(before.top, 0);
       expect(first().left).toBeCloseTo(before.left, 0);
 

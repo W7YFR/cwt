@@ -69,6 +69,25 @@ export function App(): React.ReactElement {
   const [slowBoot, setSlowBoot] = useState(false);
   const [opening, setOpening] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
+  /* Dev only: `?calexample` lists real calibrations, one for each outcome,
+     and `?calexample=success` (or clean, noisy, failed) opens one. Imported
+     dynamically inside the DEV check, so a build leaves the module out. */
+  const [calExample, setCalExample] = useState<{ clip: AudioClip; wpm: number } | undefined>();
+  const [devScreen, setDevScreen] = useState<React.ReactElement | null>(null);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const name = new URLSearchParams(window.location.search).get("calexample");
+    if (name === null) return;
+    void import("./calExample").then(async (m) => {
+      if (!m.isCalExample(name)) {
+        setDevScreen(<m.CalExamplePicker />);
+        return;
+      }
+      const clip = await m.loadCalExample(name);
+      setCalExample({ clip, wpm: m.EXAMPLE_WPM });
+      setCalibrating(true);
+    });
+  }, []);
   const [configuring, setConfiguring] = useState(false);
 
   /* Which calibration is being applied, held here because it changes what the
@@ -343,7 +362,7 @@ export function App(): React.ReactElement {
         </p>
       )}
 
-      {opening ? (
+      {devScreen ?? (opening ? (
         <div className="busy" role="status">
           measuring your sending…
         </div>
@@ -370,6 +389,7 @@ export function App(): React.ReactElement {
       ) : calibrating ? (
         <Calibrate
           current={profile}
+          example={calExample}
           deviceId={deviceId}
           onConfigure={() => {
             setError(null);
@@ -381,6 +401,7 @@ export function App(): React.ReactElement {
             setProfiles(loadProfiles());
             setProfileId(saved.id);
             setCalibrating(false);
+            setCalExample(undefined);
             take.adoptSavedSpeed();
           }}
           /* Both ways out, because the speed is stated when the wizard starts
@@ -389,6 +410,7 @@ export function App(): React.ReactElement {
              that follows is at that speed either way. */
           onClose={() => {
             setCalibrating(false);
+            setCalExample(undefined);
             take.adoptSavedSpeed();
           }}
         />
@@ -469,7 +491,7 @@ export function App(): React.ReactElement {
             setCalibrating(true);
           }}
         />
-      )}
+      ))}
 
       <Footer />
     </div>

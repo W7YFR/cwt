@@ -222,6 +222,11 @@ export interface Playable {
   readonly captured: boolean;
 }
 
+/** A setup whose tail is short enough not to matter. */
+export function setupIsFine(q: SetupQuality): boolean {
+  return q.verdict === "clean" || q.verdict === "good";
+}
+
 /** What each drill is called on its play button. */
 const PLAY_LABEL: Readonly<Record<string, string>> = {
   dits: "Held dits",
@@ -448,8 +453,11 @@ export function analyzeCalibration(
        about it. What the drills found is the headline's business. */
     advice: nothing && !agreed
       ? "Record it again, holding each paddle down for the whole drill and " +
-        "leaving the keyer's speed alone between the two. " +
-        setupAdvice(quality)
+        "leaving the keyer's speed alone between the two." +
+        /* A setup that is fine is said so in the headline's sentence, and
+           its figures are on screen; praising it again here, after "record it
+           again", read as the screen contradicting itself. */
+        (setupIsFine(quality) ? "" : " " + setupAdvice(quality))
       : setupAdvice(quality),
     readback: readbackOf(samples, rate, sections, calibration),
   };
