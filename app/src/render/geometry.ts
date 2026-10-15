@@ -23,9 +23,12 @@ export const PAD_X = 8;
  * was written across the character it was about. */
 export const LABEL_H = 30;
 
-/** Advance of one character-caption glyph at 12px, rounded up from the 0.6em
- *  that monospace faces use. The layout has no canvas to measure text with. */
-export const CAPTION_GLYPH_W = 7.5;
+/** Font size of a character's caption, in every view. */
+export const CAPTION_PX = 16;
+
+/** Advance of one character-caption glyph: the 0.6em monospace faces use,
+ *  rounded up. The layout has no canvas to measure text with. */
+export const CAPTION_GLYPH_W = CAPTION_PX * 0.625;
 
 /** Where the text sits inside a caption band, from the edge nearest the row it
  *  belongs to. The target's band is above its row and yours is below, so both
@@ -33,7 +36,7 @@ export const CAPTION_GLYPH_W = 7.5;
  *  chart the way the rows do. */
 export const CAP_CHAR = 10;
 /** And the note under it, from the same edge. */
-export const CAP_NOTE = 22;
+export const CAP_NOTE = 23;
 
 /** Air above a row's grade strip, separating it from whatever is above.
  *

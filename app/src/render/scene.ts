@@ -14,6 +14,7 @@ import type { Analysis, Block, Char, Slot, ViewMode } from "@/types";
 import {
   CAP_CHAR,
   CAP_NOTE,
+  CAPTION_PX,
   CLOCK_MARKER_MIN_W,
   DRIFT_H,
   GRADE_H,
@@ -525,7 +526,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
        because any glyph there reads as a character. */
     if (ideal) {
       ctx.fillStyle = C.ink;
-      ctx.font = `600 12px ${C.mono}`;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, ideal.char, bx, tgtCapY(scene));
       drawLiveMark(ctx, scene, ideal, bx);
     }
@@ -569,7 +570,7 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
     if (row.label !== null) {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C.ink;
-      ctx.font = `600 12px ${C.mono}`;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, cap.text, bx, row.label + CAP_CHAR);
 
       // A word-boundary error is a fault in what was sent, so it is called out
@@ -627,8 +628,8 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
          because there was one caption band and it belonged to the decode —
          but on a wall clock the two rows' characters sit at different x, and
          that offset IS the drift. Naming both is what makes it readable. */
-      ctx.fillStyle = C["ink-dim"];
-      ctx.font = `600 11px ${C.mono}`;
+      ctx.fillStyle = C.ink;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       drawLiveMark(ctx, scene, slot.ideal, it.ix);
     }
@@ -667,8 +668,8 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       // put it in, and writing it anyway would land it on somebody else's row.
       if (row.label === null) continue;
       const cap = sentCaption(slot, blank);
-      ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
-      ctx.font = `600 11px ${C.mono}`;
+      ctx.fillStyle = cap.bad ? C.bad : C.ink;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, cap.text, it.x, row.label + CAP_CHAR);
     }
   });
@@ -714,8 +715,8 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
       const iw = ((slot.ideal.t1 - slot.ideal.t0) / u) * ppu;
       if (visible(it.ix, iw, scene)) {
         band(slot.ideal, it.ix, C.tgt, 0.55);
-        ctx.fillStyle = C["ink-dim"];
-        ctx.font = `600 11px ${C.mono}`;
+        ctx.fillStyle = C.ink;
+        ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
         caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       }
     }

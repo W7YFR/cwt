@@ -10,12 +10,13 @@ nothing to the site. The next release carries them.
 ### Changed
 
 - Hovering a track's name on the chart shows its play button, for any track, and the button lights under the pointer. Only the button plays, and on another run it picks that run up and plays it in one click.
-- While a take records, everything but **Stop and review**, **Restart** and **Cancel** is locked. How the chart is drawn can still change.
+- While a take records, the controls, scores, tables, settings and header buttons are locked. **Stop and review**, **Restart** and **Cancel** stay.
+- The characters on the chart are labeled in larger, white text in every view.
 
 ### Fixed
 
 - With a button focused, space presses the button instead of playing the selection.
-- Nothing on the page plays audio while a take records.
+- Play buttons no longer play audio over a take that is recording.
 - Dropping a run while audio plays no longer leaves the audio and the cursor running on the next run.
 - While pacing, a rest in the message sits right after the text before it, and the cursor slows through it instead of jumping past an empty stretch.
 
