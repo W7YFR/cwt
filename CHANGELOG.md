@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.8.1 — 2026-10-15
+
 ### Changed
 
 - Hovering a track's name on the chart shows its play button, for any track, and the button lights under the pointer. Only the button plays, and on another run it picks that run up and plays it in one click.
