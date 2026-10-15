@@ -39,6 +39,7 @@ import {
   type CharRange,
 } from "./layout";
 import {
+  PLAY_BUTTON_R,
   draw,
   scrollbarThumb,
   trackBands,
@@ -66,9 +67,12 @@ export interface ChartCallbacks {
    * about the attempt it was about. What it picks up is the track: the ruler
    * seeks into the target from here, and the name lights to say so. */
   onSelectTarget?: () => void;
-  /** A name in the gutter was clicked while its track was already the one in
-   *  hand. Play it, or stop it if it is already running. */
+  /** The play button of the track in hand was clicked. Play it, or stop it
+   *  if it is already running. */
   onPlayTrack?: (side: "you" | "tgt") => void;
+  /** The play button of a run not in hand was clicked: pick it up and play
+   *  it. Without this, the chart picks it up and asks for yours to play. */
+  onPlayRun?: (run: number) => void;
   /** The ruler was clicked: seek and play from here.
    *
    * Both tracks' times for that point, because one ruler runs over two of
@@ -126,6 +130,9 @@ export interface ChartInput {
   focus: Focus | null;
   /** The stretch of the ruler picked out to play. */
   range?: CharRange | null;
+  /** A take is running. Nothing on the chart plays or picks a track up; it
+   *  can still be scrolled and zoomed. */
+  locked?: boolean;
 }
 
 export interface Chart {
@@ -230,6 +237,8 @@ export function createChart(
   let selected = 0;
   /** The name in the gutter under the pointer, for its highlight. */
   let picking: GutterName | null = null;
+  /** The pointer is on `picking`'s play button itself, not just its row. */
+  let onButton = false;
   /** The row the pointer is anywhere over, for its tint. */
   let hoverRow: GutterName | null = null;
 
@@ -306,7 +315,7 @@ export function createChart(
       runs: lanes,
       selected,
       picking,
-      pickingInHand: picking !== null && inHand(picking),
+      onButton,
       playing: input.playing ?? null,
       hoverRow,
       ...(input.heard ? { heard: input.heard } : {}),
@@ -670,6 +679,7 @@ export function createChart(
        purely to be looked at — the calibration preview is one — and a cell
        that changes the cursor but answers no click is a control that lies. */
     if (!callbacks.onPlayTrack && !callbacks.onSelectRun) return null;
+    if (input?.locked) return null;
     return rowAt(p);
   }
 
@@ -694,6 +704,20 @@ export function createChart(
       if (row && p.y >= row.grade && p.y < row.bottom) return r;
     }
     return null;
+  }
+
+  /** Whether the point is on the play button a row's name gives way to:
+   *  exactly the disc drawn, so what plays is what is seen to. */
+  function onPlayButton(p: { x: number; y: number }, name: GutterName): boolean {
+    const top = name === "tgt" ? rows.tgt : rows.runs[name]?.row;
+    if (top === undefined) return false;
+    return Math.hypot(p.x - GUTTER / 2, p.y - (top + ROW_H / 2)) <= PLAY_BUTTON_R;
+  }
+
+  /** Whether the row has anything to play. A run with nothing recorded has
+   *  no button. */
+  function playable(name: GutterName): boolean {
+    return name === "tgt" || lanes[name]?.blank !== true;
   }
 
   function inHand(name: GutterName): boolean {
@@ -756,9 +780,11 @@ export function createChart(
     const band = rowAt(p);
     const h = hitAt(p);
     const b = h ? h.block : null;
-    // One repaint for however many of the three moved, rather than one each.
-    if (over !== picking || band !== hoverRow || b !== hover) {
+    const button = over !== null && playable(over) && onPlayButton(p, over);
+    // One repaint for however many of them moved, rather than one each.
+    if (over !== picking || button !== onButton || band !== hoverRow || b !== hover) {
       picking = over;
+      onButton = button;
       hoverRow = band;
       hover = b;
       paint();
@@ -771,6 +797,7 @@ export function createChart(
     callbacks.onHover?.(null, ev.clientX, ev.clientY);
     if (picking !== null || hoverRow !== null || hover) {
       picking = null;
+      onButton = false;
       hoverRow = null;
       hover = null;
       paint();
@@ -783,21 +810,34 @@ export function createChart(
       suppressClick = false;
       return;
     }
-    if (!layout) return;
+    if (!layout || input?.locked) return;
     const p = localPos(ev);
 
-    /* The gutter picks a track up, and plays the one already in hand. Picking up first rather than playing straight away: the report
-       below the chart, the scores and the caption band all follow the
-       selection, so a click on another attempt has to move them there before
-       anything comes out of the speakers — playing a recording while the
-       numbers on screen describe a different one is worse than one more
-       click. Once it IS the one on screen, there is nothing left to move and
-       the click is free to do the obvious thing. */
+    /* The gutter picks a track up, and its play button plays it. Hovering a
+       name shows the button, so the button is the one place a click plays;
+       the rest of the name only picks the track up. On a run not in hand the
+       button does both, since the report, the scores and the caption band all
+       move to it on the same click.
+
+       A finger has no hover, so it never sees a button it has not already
+       got: there a tap on the name in hand plays it, as it always has. */
     const named = gutterNameAt(p);
     if (named !== null) {
-      if (inHand(named)) callbacks.onPlayTrack?.(named === "tgt" ? "tgt" : "you");
-      else if (named === "tgt") callbacks.onSelectTarget?.();
-      else callbacks.onSelectRun?.(lanes[named]!.ordinal);
+      const touch = (ev as PointerEvent).pointerType === "touch";
+      const play = playable(named) && (touch ? inHand(named) : onPlayButton(p, named));
+      const held = inHand(named);
+      if (named === "tgt") {
+        if (!held) callbacks.onSelectTarget?.();
+        if (play) callbacks.onPlayTrack?.("tgt");
+        return;
+      }
+      const run = lanes[named]!.ordinal;
+      if (play && held) callbacks.onPlayTrack?.("you");
+      else if (play && callbacks.onPlayRun) callbacks.onPlayRun(run);
+      else if (play) {
+        callbacks.onSelectRun?.(run);
+        callbacks.onPlayTrack?.("you");
+      } else if (!held) callbacks.onSelectRun?.(run);
       return;
     }
 

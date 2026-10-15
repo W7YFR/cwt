@@ -9,7 +9,7 @@
  * would make everything else stutter.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { IconDownload, IconUser } from "./Icons";
 import { createPlayer, type PlaySide, type Player } from "@/audio/player";
 import { encodeWav } from "@/audio/wav";
@@ -148,6 +148,17 @@ function scrollPage(scroller: Element, top: number): void {
     else root.style.overflowAnchor = "";
   };
   requestAnimationFrame(step);
+}
+
+/** Controls that space activates. With one of these focused, space presses it
+ *  and the transport leaves the key alone. */
+const SPACE_OWNERS =
+  'button, a[href], summary, [contenteditable=""], [contenteditable="true"], ' +
+  '[role="button"], [role="checkbox"], [role="switch"], [role="radio"], ' +
+  '[role="menuitem"], [role="tab"], [role="option"]';
+
+function ownsSpace(el: HTMLElement | null): boolean {
+  return el !== null && el instanceof Element && el.matches(SPACE_OWNERS);
 }
 
 function saveBlob(blob: Blob, filename: string): void {
@@ -541,8 +552,13 @@ export function ReviewScreen({
   // the target's to play.
   const rangeTrack: PlaySide = times ? rangeSide(heard, times) : heard;
 
+  /* Nothing plays during a take. Through a loopback device it would be
+     recorded; through speakers it would be graded as your sending. Every
+     path to the speakers comes through these two, so the rule is kept here
+     rather than at each button. */
   const playYou = useCallback(
     async (from?: number, to?: number) => {
+      if (recording) return;
       setHeard("you");
       looping.current = null;
       if (playing === "you" && from === undefined) {
@@ -553,7 +569,7 @@ export function ReviewScreen({
       setPlaying("you");
       await player.playBuffer(bytes, from, to);
     },
-    [audioBytes, player, playing],
+    [audioBytes, player, playing, recording],
   );
 
   const targetOptions = useMemo(
@@ -567,6 +583,7 @@ export function ReviewScreen({
 
   const playTarget = useCallback(
     (from?: number, to?: number) => {
+      if (recording) return;
       setHeard("tgt");
       looping.current = null;
       if (playing === "tgt" && from === undefined) {
@@ -580,7 +597,7 @@ export function ReviewScreen({
         ...(to !== undefined ? { to } : {}),
       });
     },
-    [player, playing, review.ideal, targetOptions],
+    [player, playing, recording, review.ideal, targetOptions],
   );
 
 
@@ -668,12 +685,15 @@ export function ReviewScreen({
     [playTarget, playYou, review.slots],
   );
 
-  // Keyboard transport. Skipped while a control has focus, or space would
-  // toggle the checkbox you just tabbed to instead of starting playback.
+  // Keyboard transport. Skipped while a field has focus, and space is left to
+  // a focused control, or space would play the selection instead of pressing
+  // the button you just tabbed to.
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      const tag = (ev.target as HTMLElement | null)?.tagName;
+      const target = ev.target as HTMLElement | null;
+      const tag = target?.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+      if (ev.code === "Space" && ownsSpace(target)) return;
       // Space starts playback, and playback during a take would be recorded
       // straight back in through a loopback device. The recorder owns the
       // keyboard while it is running.
@@ -724,6 +744,23 @@ export function ReviewScreen({
      change, and re-fitting on a tolerance slider would undo the zoom you just
      set by hand. */
   const stackId = stack.map((r) => r.take.id).join(" ");
+
+  /* A run leaving the session ends playback, whichever run was playing. The
+     rows close up under the playhead, so it would carry on over the run that
+     moved into its place, out of audio that belongs to neither. Dropping,
+     clearing and a new session all come through here. */
+  const lastStack = useRef(stackId);
+  // Before paint, so the cursor is never drawn over the run that moved up.
+  useLayoutEffect(() => {
+    const was = lastStack.current.split(" ");
+    lastStack.current = stackId;
+    const now = new Set(stackId.split(" "));
+    if (!was.some((id) => id !== "" && !now.has(id))) return;
+    player.stop();
+    // Said here too, for a track that never got as far as sounding.
+    setPlaying(null);
+    setPlayhead(null);
+  }, [player, stackId]);
   /* Already fitted, when a reload brought this session back: the zoom it was
      left at is the one to keep. Anything that changes the runs after that
      fits as usual. */
@@ -788,6 +825,8 @@ export function ReviewScreen({
           <button
             className="brandmark"
             onClick={onBack}
+            // Leaving mid-take would drop the recording on the floor.
+            disabled={recording}
             title={`Back to the ${APP_NAME} start screen`}
             // The drawing is decoration; the name is what this control is
             // called, and it has to survive being unreadable at this size.
@@ -832,7 +871,7 @@ export function ReviewScreen({
             the first line: they never split, and the rest of the row takes
             the width left of them. Configuration comes first, so the cog stays
             the last stop. */}
-        <div className="cornergroup">
+        <div className="cornergroup" inert={recording} data-locked={recording}>
           <button
             className="iconbtn cornerbtn"
             data-testid="advanced"
@@ -855,7 +894,7 @@ export function ReviewScreen({
           the tab order and off the accessibility tree together, which two
           attributes doing half each would eventually disagree about. */}
       <section className="chartsettings" data-open={String(chartSettings)} ref={panelRef}>
-        <div inert={!chartSettings}>
+        <div inert={!chartSettings || recording} data-locked={recording}>
           <ChartSettingsPanel
             settings={settings}
             runs={stack.length}
@@ -880,17 +919,24 @@ export function ReviewScreen({
         </div>
       </section>
 
+      {/* Locked while a take runs, with the scores, the report, the settings
+          panel and the header's corner. What is sent, how fast and against
+          what is fixed when the take starts, and a setting changed mid-take
+          would grade it against something it was not sent to. Stop, Restart
+          and Cancel stay, in the record bar. How the chart is drawn is left
+          alone: it changes nothing about the take. */}
       <Controls
         settings={settings}
         onChange={onChange}
         fromFile={loaded.take.source !== MIC_SOURCE}
+        locked={recording}
       />
 
       {/* A band of its own rather than a line of the header. In the header the
           figures were vertically off-center — the row above them sets the
           padding and they got whatever was left — and they are the one thing
           on this screen read at a glance. */}
-      <section className="scoresrow">
+      <section className="scoresrow" inert={recording} data-locked={recording}>
         <Scores
           review={review}
           settings={settings}
@@ -1032,6 +1078,11 @@ export function ReviewScreen({
           onSelectRun={selectRun}
           onSelectTarget={selectTarget}
           onPlayTrack={playTrack}
+          onPlayRun={(at) => {
+            selectRun(at);
+            setPlayQueued(true);
+          }}
+          locked={recording}
           heard={heard}
           playing={playing}
           settings={settings}
@@ -1074,7 +1125,7 @@ export function ReviewScreen({
               <p className="legend howto">
                 click a character to hear it, a gap to hear it between what it
                 separates &nbsp;·&nbsp; click a track&rsquo;s name to pick it up,
-                again to play it &nbsp;·&nbsp; click the ruler to seek, drag it to
+                its play button to play it &nbsp;·&nbsp; click the ruler to seek, drag it to
                 pick a range to play &nbsp;·&nbsp; Esc stops playback, then clears the
                 range &nbsp;·&nbsp; L loops &nbsp;·&nbsp; N and P play the next and previous track &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
@@ -1099,6 +1150,7 @@ export function ReviewScreen({
       {(blank || settings.advancedGrading) && (
         <Report
           review={review}
+          locked={recording}
           tolerance={settings.tolerance}
           showHints={settings.showHints}
           onPlayDeviation={playDeviation}

@@ -7,6 +7,17 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- Hovering a track's name on the chart shows its play button, for any track, and the button lights under the pointer. Only the button plays, and on another run it picks that run up and plays it in one click.
+- While a take records, everything but **Stop and review**, **Restart** and **Cancel** is locked. How the chart is drawn can still change.
+
+### Fixed
+
+- With a button focused, space presses the button instead of playing the selection.
+- Nothing on the page plays audio while a take records.
+- Dropping a run while audio plays no longer leaves the audio and the cursor running on the next run.
+
 ## v1.8.0 — 2026-10-14
 
 ### Changed

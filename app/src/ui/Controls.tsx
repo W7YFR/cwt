@@ -92,6 +92,8 @@ export interface ControlsProps {
    *  whatever it holds, so how many passes you are about to send is not a
    *  question about it. */
   fromFile: boolean;
+  /** A take is running, so nothing here can change. */
+  locked?: boolean;
 }
 
 /** The row over the chart: what you send, at what speed, judged how closely.
@@ -105,7 +107,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
   );
 
   return (
-    <section className="controls">
+    <section className="controls" inert={props.locked === true} data-locked={props.locked === true}>
       <div className="group">
         <label htmlFor="wpm">
           Character speed <output id="wpm-out">{fmtWpm(s.charWpm)}</output>
