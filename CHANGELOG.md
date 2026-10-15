@@ -17,6 +17,7 @@ nothing to the site. The next release carries them.
 - With a button focused, space presses the button instead of playing the selection.
 - Nothing on the page plays audio while a take records.
 - Dropping a run while audio plays no longer leaves the audio and the cursor running on the next run.
+- While pacing, a rest in the message sits right after the text before it, and the cursor slows through it instead of jumping past an empty stretch.
 
 ## v1.8.0 — 2026-10-14
 

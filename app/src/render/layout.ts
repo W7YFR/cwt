@@ -419,6 +419,16 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       offYou = toX(slot.actual.t0, origin) - anchor;
       if (slot.ideal) offTgt = toX(slot.ideal.t0, 0) - anchor;
       breaks.push(i);
+    } else if (!slot.actual && slot.ideal && isRest(slot.ideal.leadGap)) {
+      /* Nothing sent here yet — a take still being paced, or one that stopped
+         short — so the target's own rest is the one to fold. Left unfolded,
+         its gap is drawn at the folded width right before the next character
+         with the rest of its seconds empty in front of it, and a cursor
+         crossing it leaps the empty stretch in one frame. Folded, the axis
+         stays continuous and the cursor slows through the rest instead. */
+      const anchor = Math.max(endYou, endTgt) + REST_W;
+      offTgt = toX(slot.ideal.t0, 0) - anchor;
+      breaks.push(i);
     }
     const x = slot.actual ? toX(slot.actual.t0, origin) - offYou : null;
     const ix = slot.ideal ? toX(slot.ideal.t0, 0) - offTgt : null;
