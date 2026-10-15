@@ -37,6 +37,8 @@ export interface ChartProps {
   heard?: "you" | "tgt";
   /** The track playing, if any. */
   playing?: "you" | "tgt" | null;
+  /** A take is running: nothing on the chart plays or picks a track up. */
+  locked?: boolean;
   settings: ReviewSettings;
   focus: Focus | null;
   playhead: { t: number; side: "you" | "tgt" } | null;
@@ -51,6 +53,7 @@ export interface ChartProps {
   onSelectRun?: ChartCallbacks["onSelectRun"];
   onSelectTarget?: ChartCallbacks["onSelectTarget"];
   onPlayTrack?: ChartCallbacks["onPlayTrack"];
+  onPlayRun?: ChartCallbacks["onPlayRun"];
   onZoom?: ChartCallbacks["onZoom"];
   /** The view moved. Used to keep more than one chart in step. */
   onScroll?: ChartCallbacks["onScroll"];
@@ -138,6 +141,8 @@ export function ChartView({
   onSelectRun,
   onSelectTarget,
   onPlayTrack,
+  onPlayRun,
+  locked,
   onZoom,
   onScroll,
   handle,
@@ -153,6 +158,7 @@ export function ChartView({
   const cb = useRef({
     onPlayChar,
     onPlayTrack,
+    onPlayRun,
     onSeek,
     onRange,
     onPlayRange,
@@ -164,6 +170,7 @@ export function ChartView({
   cb.current = {
     onPlayChar,
     onPlayTrack,
+    onPlayRun,
     onSeek,
     onRange,
     onPlayRange,
@@ -195,6 +202,14 @@ export function ChartView({
       onSelectRun: (...a) => cb.current.onSelectRun?.(...a),
       onSelectTarget: (...a) => cb.current.onSelectTarget?.(...a),
       onPlayTrack: (...a) => cb.current.onPlayTrack?.(...a),
+      // Without its own handler, the chart picks the run up and plays yours.
+      onPlayRun: (run) => {
+        if (cb.current.onPlayRun) cb.current.onPlayRun(run);
+        else {
+          cb.current.onSelectRun?.(run);
+          cb.current.onPlayTrack?.("you");
+        }
+      },
       onZoom: (...a) => cb.current.onZoom?.(...a),
       onScroll: (...a) => cb.current.onScroll?.(...a),
       onHover: (hit, x, y) => {
@@ -235,8 +250,9 @@ export function ChartView({
       ...(heard ? { heard } : {}),
       playing: playing ?? null,
       range: range ?? null,
+      locked: locked === true,
     });
-  }, [review, stack, order, selected, firstRun, heard, playing, settings, focus, range]);
+  }, [review, stack, order, selected, firstRun, heard, playing, locked, settings, focus, range]);
 
   useEffect(() => {
     chartRef.current?.setPlayhead(playhead);

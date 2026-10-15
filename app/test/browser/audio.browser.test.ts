@@ -98,6 +98,24 @@ describe("live playback", () => {
       player.destroy();
     }
   });
+
+  /* A recording is decoded before it plays. A stop that lands during the
+     decode has to hold once the decode finishes, or a dropped run's audio
+     starts after it was stopped. */
+  it("plays nothing when stopped while a recording is still decoding", async () => {
+    const ended = vi.fn();
+    const player = createPlayer({ onEnded: ended });
+    try {
+      const bytes = await encodeWav(new Float32Array(8000), 8000).arrayBuffer();
+      const started = player.playBuffer(bytes, 0);
+      player.stop();
+      expect(ended).toHaveBeenLastCalledWith("stopped");
+      await started;
+      expect(player.playing()).toBeNull();
+    } finally {
+      player.destroy();
+    }
+  });
 });
 
 describe("rendering the target offline", () => {

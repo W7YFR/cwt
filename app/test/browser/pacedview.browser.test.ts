@@ -16,6 +16,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import { act, createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ReviewScreen } from "@/ui/ReviewScreen";
@@ -421,3 +422,43 @@ describe("picking a run out of the stack", () => {
   });
 });
 
+describe("while a take runs", () => {
+  const locked = (sel: string) => host.querySelector(sel)!.hasAttribute("inert");
+  const BANDS = [".controls", ".scoresrow", ".report", ".cornergroup"];
+
+  it("locks everything but Stop, Restart and Cancel, and unlocks after", async () => {
+    mount({});
+    for (const sel of BANDS) expect(locked(sel), `${sel} before`).toBe(false);
+    await record();
+
+    for (const sel of BANDS) expect(locked(sel), sel).toBe(true);
+    expect(host.querySelector<HTMLButtonElement>(".brandmark")!.disabled).toBe(true);
+    for (const label of ["Stop and review", "Restart", "Cancel"]) {
+      const b = Array.from(host.querySelectorAll("button")).find((x) => x.textContent === label)!;
+      expect(b.disabled, label).toBe(false);
+      expect(b.closest("[inert]"), label).toBeNull();
+    }
+    // How the chart is drawn changes nothing about the take.
+    const view = host.querySelector(".viewcontrols");
+    if (view) expect(view.hasAttribute("inert")).toBe(false);
+
+    await stop();
+    for (const sel of BANDS) expect(locked(sel), `${sel} after`).toBe(false);
+    expect(host.querySelector<HTMLButtonElement>(".brandmark")!.disabled).toBe(false);
+  });
+
+  it("plays nothing from the chart", async () => {
+    mount({});
+    await record();
+    const canvas = host.querySelector("canvas")!;
+    const rows = rowsFor(1, 0);
+    // A real click on the target's play button, since a browser holds audio
+    // back until a gesture.
+    await act(async () => {
+      await userEvent.click(canvas, { position: { x: GUTTER / 2, y: rows.tgt + ROW_H / 2 } });
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(host.querySelector(".canvas-wrap")!.getAttribute("data-playing")).toBe("");
+    await stop();
+  });
+});

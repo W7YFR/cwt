@@ -44,9 +44,9 @@ const TARGET = "CQ DE W7YFR";
 /** The review screen driven the way App drives it: the selected index decides
  *  which attempt is loaded, which is what made picking a row re-fit. */
 function mount(over: Partial<ReviewSettings> = {}) {
-  const takes = [SLOPPY, CLEAN].map((name) => takeFrom(caseNamed(name)));
+  const initial = [SLOPPY, CLEAN].map((name) => takeFrom(caseNamed(name)));
   let latest: ReviewSettings = {
-    ...defaultSettings(takes[0]!),
+    ...defaultSettings(initial[0]!),
     expected: TARGET,
     view: "absolute",
     ...over,
@@ -56,6 +56,7 @@ function mount(over: Partial<ReviewSettings> = {}) {
   function Harness() {
     const [settings, setSettings] = useState<ReviewSettings>(latest);
     const [at, setAt] = useState(0);
+    const [takes, setTakes] = useState(initial);
     latest = settings;
     picked = at;
     const stack = takes.map((t) => reviewTake(t, settings));
@@ -70,7 +71,10 @@ function mount(over: Partial<ReviewSettings> = {}) {
       stack,
       selected: at,
       onSelectRun: setAt,
-      onDropRun: () => {},
+      onDropRun: (i) => {
+        setTakes((was) => was.filter((_, j) => j !== i));
+        setAt(0);
+      },
       settings,
       onChange: (patch) => setSettings((prev) => ({ ...prev, ...patch })),
       onAudio: () => {},
@@ -96,7 +100,7 @@ function mount(over: Partial<ReviewSettings> = {}) {
     }),
     ppu: () => latest.ppu,
     picked: () => picked,
-    runs: takes.length,
+    runs: initial.length,
     rows: () => {
       // One lane per attempt drawn, read off the height the chart sized itself
       // to rather than counted out of the markup — the rows are painted.
@@ -360,6 +364,78 @@ describe("N and P", () => {
       await new Promise((done) => setTimeout(done, 100));
     });
     expect(host.querySelector(".canvas-wrap")!.getAttribute("data-playing")).toBe("you");
+  });
+});
+
+describe("Space", () => {
+  const playing = () => host.querySelector(".canvas-wrap")!.getAttribute("data-playing");
+  const frames = () => new Promise((done) => setTimeout(done, 100));
+
+  it("presses a focused button and plays nothing", async () => {
+    mount();
+    const cog = host.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!;
+    let pressed = 0;
+    cog.addEventListener("click", () => pressed++);
+    cog.focus();
+    await act(async () => {
+      await userEvent.keyboard(" ");
+      await frames();
+    });
+    expect(pressed, "the button was pressed").toBe(1);
+    expect(playing(), "and nothing plays").toBe("");
+  });
+
+  it("still plays with nothing focused", async () => {
+    mount();
+    (document.activeElement as HTMLElement | null)?.blur();
+    await act(async () => {
+      await userEvent.keyboard(" ");
+      await frames();
+    });
+    expect(playing()).toBe("you");
+    await act(async () => {
+      await userEvent.keyboard("{Escape}");
+      await frames();
+    });
+  });
+});
+
+describe("a run's play button", () => {
+  it("picks the run up and plays it in one click", async () => {
+    const app = mount();
+    const canvas = host.querySelector("canvas")!;
+    const rows = rowsFor(2, 0);
+    // A real click, since a browser holds audio back until a gesture.
+    await act(async () => {
+      await userEvent.click(canvas, {
+        position: { x: GUTTER / 2, y: rows.runs[1]!.row + ROW_H / 2 },
+      });
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(app.picked()).toBe(1);
+    expect(host.querySelector(".canvas-wrap")!.getAttribute("data-playing")).toBe("you");
+    await act(async () => {
+      await userEvent.keyboard("{Escape}");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+  });
+});
+
+describe("dropping a run", () => {
+  it("stops playback and its cursor at once", async () => {
+    mount();
+    const playing = () => host.querySelector(".canvas-wrap")!.getAttribute("data-playing");
+    // A real key press, since a browser holds audio back until a gesture.
+    await act(async () => {
+      await userEvent.keyboard(" ");
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(playing()).toBe("you");
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>("[aria-label='Drop run 1']")!.click();
+      await new Promise((done) => setTimeout(done, 100));
+    });
+    expect(playing()).toBe("");
   });
 });
 

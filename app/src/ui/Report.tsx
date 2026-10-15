@@ -23,6 +23,8 @@ export interface ReportProps {
   showHints: boolean;
   onPlayDeviation(side: "you" | "tgt", idx: number, kind: Focus["kind"]): void;
   onFocus(focus: Focus | null): void;
+  /** A take is running, so nothing here plays. */
+  locked?: boolean;
 }
 
 /** A class name you can hover for what the class means. Marked with a dotted
@@ -47,6 +49,7 @@ export function Report({
   showHints,
   onPlayDeviation,
   onFocus,
+  locked,
 }: ReportProps): React.ReactElement {
   const g = review.analysis;
   const c = review.comparison;
@@ -62,7 +65,7 @@ export function Report({
        send" would be pointing at nothing. */
     const hasTarget = review.ideal.chars.length > 0;
     return (
-      <section className="report" data-testid="report">
+      <section className="report" data-testid="report" inert={locked === true} data-locked={locked === true}>
         <div className="card">
           <h2>Nothing recorded yet</h2>
           <p
@@ -95,7 +98,7 @@ export function Report({
   }
 
   return (
-    <section className="report" data-testid="report">
+    <section className="report" data-testid="report" inert={locked === true} data-locked={locked === true}>
       <div className="card">
         <h2>Element &amp; spacing</h2>
         <table>

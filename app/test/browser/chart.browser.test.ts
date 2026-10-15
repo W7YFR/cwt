@@ -824,6 +824,90 @@ describe("the chart in a browser", () => {
     expect(onSelectRun).not.toHaveBeenCalled();
   });
 
+  describe("a click in the gutter", () => {
+    /* Hovering a name shows its play button, and only the button plays. The
+       rest of the name picks the track up. A run not in hand plays from its
+       button in one click. */
+    const { review: other } = reviewFrom(caseNamed(SLOPPY), { expected: "CQ" });
+    const rows = rowsFor(2, 0);
+    let cb: Required<Pick<ChartCallbacks, "onSelectRun" | "onSelectTarget" | "onPlayTrack" | "onPlayRun" | "onPlayChar">>;
+
+    function setup(over: { locked?: boolean } = {}) {
+      chart.destroy();
+      cb = {
+        onSelectRun: vi.fn(),
+        onSelectTarget: vi.fn(),
+        onPlayTrack: vi.fn(),
+        onPlayRun: vi.fn(),
+        onPlayChar: vi.fn(),
+      };
+      chart = createChart(host, canvas, cb);
+      chart.update({ review, stack: [review, other], selected: 0, settings, focus: null, ...over });
+    }
+    const click = (x: number, y: number) => {
+      const box = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(
+        new MouseEvent("click", { clientX: box.left + x, clientY: box.top + y, bubbles: true }),
+      );
+    };
+    const button = (top: number) => click(GUTTER / 2, top + ROW_H / 2);
+    // Inside the row, clear of the button.
+    const name = (top: number) => click(4, top + 3);
+
+    it("plays a run not in hand from its button, in one click", () => {
+      setup();
+      button(rows.runs[1]!.row);
+      expect(cb.onPlayRun).toHaveBeenCalledWith(1);
+      expect(cb.onPlayTrack).not.toHaveBeenCalled();
+    });
+
+    it("picks a run up from its name without playing it", () => {
+      setup();
+      name(rows.runs[1]!.row);
+      expect(cb.onSelectRun).toHaveBeenCalledWith(1);
+      expect(cb.onPlayRun).not.toHaveBeenCalled();
+      expect(cb.onPlayTrack).not.toHaveBeenCalled();
+    });
+
+    it("plays the run in hand from its button, and not from its name", () => {
+      setup();
+      name(rows.runs[0]!.row);
+      expect(cb.onPlayTrack).not.toHaveBeenCalled();
+      expect(cb.onSelectRun).not.toHaveBeenCalled();
+      button(rows.runs[0]!.row);
+      expect(cb.onPlayTrack).toHaveBeenCalledWith("you");
+    });
+
+    it("picks the target up and plays it from its button", () => {
+      setup();
+      name(rows.tgt);
+      expect(cb.onSelectTarget).toHaveBeenCalledTimes(1);
+      expect(cb.onPlayTrack).not.toHaveBeenCalled();
+      button(rows.tgt);
+      expect(cb.onSelectTarget).toHaveBeenCalledTimes(2);
+      expect(cb.onPlayTrack).toHaveBeenCalledWith("tgt");
+    });
+
+    it("does nothing while a take is running", () => {
+      const every = () => {
+        button(rows.runs[1]!.row);
+        name(rows.runs[1]!.row);
+        button(rows.tgt);
+        // A character on the run in hand.
+        click(GUTTER + 30, rows.runs[0]!.row + ROW_H / 2);
+      };
+      // The same clicks do something when no take is running.
+      setup();
+      every();
+      expect(cb.onPlayRun).toHaveBeenCalled();
+      expect(cb.onPlayChar).toHaveBeenCalled();
+
+      setup({ locked: true });
+      every();
+      for (const fn of Object.values(cb)) expect(fn).not.toHaveBeenCalled();
+    });
+  });
+
   it("seeks when the ruler is clicked", () => {
     const onSeek = vi.fn();
     chart.destroy();

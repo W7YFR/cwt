@@ -98,6 +98,12 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
     filter: BiquadFilterNode | null;
   } | null = null;
 
+  /* A recording is decoded before it plays, and a stop can land in between.
+     Each start takes a ticket; a stop or another start voids it, so a decode
+     that finishes after either plays nothing. */
+  let ticket = 0;
+  let starting = false;
+
   let decoded: AudioBuffer | null = null;
   let decodedFrom: ArrayBuffer | null = null;
 
@@ -112,6 +118,8 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
   const linGain = () => Math.pow(10, gainDb / 20);
 
   function teardown(): void {
+    ticket++;
+    starting = false;
     if (youNodes) {
       youNodes.src.onended = null;
       try {
@@ -145,7 +153,7 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
   }
 
   function finish(reason: "done" | "stopped"): void {
-    const was = mode;
+    const was = mode !== null || starting;
     teardown();
     if (was) callbacks.onEnded?.(reason);
   }
@@ -182,8 +190,12 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
   return {
     async playBuffer(data, from, to) {
       teardown();
+      const mine = ticket;
+      starting = true;
       try {
         const buf = await ensureBuffer(data);
+        if (mine !== ticket) return;
+        starting = false;
         const c = context();
         const src = c.createBufferSource();
         const level = c.createGain();
@@ -209,6 +221,8 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         stopAt = to === undefined ? null : to;
         raf = requestAnimationFrame(tick);
       } catch (e) {
+        if (mine !== ticket) return;
+        starting = false;
         callbacks.onError?.(
           `could not play the recording: ${e instanceof Error ? e.message : String(e)}`,
         );

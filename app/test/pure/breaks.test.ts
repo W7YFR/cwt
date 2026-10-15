@@ -14,6 +14,9 @@ import { BREAK_DEFAULT_SEC, idealTimeline } from "@/timing/timeline";
 import { compareText } from "@/timing/align";
 import { MIC_SOURCE, type Segment, type Take, type Timeline } from "@/types";
 import { caseNamed, takeFrom, SLOPPY } from "../fixture";
+import { blankTake } from "@/io/take";
+import { buildLayout, timeToX } from "@/render/layout";
+import { REST_W } from "@/render/geometry";
 
 const REF = targetTiming(20, 20);
 const gaps = (tl: Timeline) =>
@@ -155,5 +158,33 @@ describe("a take sent twice", () => {
   it("grades the gap between passes as a word gap with no repeat pause", () => {
     expect(review(0).comparison?.accuracy).toBe(1);
     expect(wordGapErrors(0)).toHaveLength(1);
+  });
+});
+
+describe("a rest on the chart before anything is sent", () => {
+  /* While a take is paced, the target is all there is. Its rest has to fold
+     the axis the way a sent rest does, or the cursor leaps across the
+     unfolded stretch in one frame. */
+  const take = blankTake({ expected: "K | K", expectedSource: "the test", charWpm: 20, farnsworthWpm: 20 });
+  const review = reviewTake(take, { ...defaultSettings(take), expected: "K | K" });
+  const layout = buildLayout(review, { view: "absolute", ppu: 12, durationSec: 0 });
+  const rest = review.ideal.blocks.find((b) => b.kind === "pause")!;
+
+  it("folds the target's rest to its drawn width", () => {
+    const x0 = timeToX(layout, rest.t0, "tgt");
+    const x1 = timeToX(layout, rest.t1, "tgt");
+    expect(x1 - x0).toBeCloseTo(REST_W, 6);
+  });
+
+  it("leaves no jump on the target's axis", () => {
+    // Over any stretch of the map, the cursor moves no faster than the
+    // ordinary scale: ppu pixels a unit.
+    const pxPerSec = 12 / review.ref.unitSec;
+    const map = layout.maps.tgt;
+    for (let i = 1; i < map.length; i++) {
+      const dt = map[i]![0] - map[i - 1]![0];
+      const dx = map[i]![1] - map[i - 1]![1];
+      expect(dx, `between ${map[i - 1]![0].toFixed(3)} s and ${map[i]![0].toFixed(3)} s`).toBeLessThanOrEqual(dt * pxPerSec + 1e-6);
+    }
   });
 });

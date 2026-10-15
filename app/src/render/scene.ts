@@ -14,6 +14,7 @@ import type { Analysis, Block, Char, Slot, ViewMode } from "@/types";
 import {
   CAP_CHAR,
   CAP_NOTE,
+  CAPTION_PX,
   CLOCK_MARKER_MIN_W,
   DRIFT_H,
   GRADE_H,
@@ -153,12 +154,13 @@ export interface Scene {
   /** Which of them is being read in detail: the one with a caption band, and
    *  the one the report below the chart is about. */
   selected: number;
-  /** The name in the gutter the pointer is over, if any. Lights it, because a
-   *  word you can click has to look different from a word you cannot. */
+  /** The name in the gutter the pointer is over, if any. A play button takes
+   *  its place, because a word you can click has to look different from a
+   *  word you cannot, and the button is where a click plays. */
   picking?: GutterName | null;
-  /** `picking` names the track already in hand, so a click on it plays. A
-   *  play button in place of the name says so. */
-  pickingInHand?: boolean;
+  /** The pointer is on that name's play button itself. Only the button
+   *  plays, so it lights to say a click there will. */
+  onButton?: boolean;
   /** The track playing, if any. Turns the play button into a stop button. */
   playing?: "you" | "tgt" | null;
   /** The row the pointer is anywhere over, for its tint. */
@@ -524,7 +526,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
        because any glyph there reads as a character. */
     if (ideal) {
       ctx.fillStyle = C.ink;
-      ctx.font = `600 12px ${C.mono}`;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, ideal.char, bx, tgtCapY(scene));
       drawLiveMark(ctx, scene, ideal, bx);
     }
@@ -568,7 +570,7 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
     if (row.label !== null) {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C.ink;
-      ctx.font = `600 12px ${C.mono}`;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, cap.text, bx, row.label + CAP_CHAR);
 
       // A word-boundary error is a fault in what was sent, so it is called out
@@ -626,8 +628,8 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
          because there was one caption band and it belonged to the decode —
          but on a wall clock the two rows' characters sit at different x, and
          that offset IS the drift. Naming both is what makes it readable. */
-      ctx.fillStyle = C["ink-dim"];
-      ctx.font = `600 11px ${C.mono}`;
+      ctx.fillStyle = C.ink;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       drawLiveMark(ctx, scene, slot.ideal, it.ix);
     }
@@ -666,8 +668,8 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       // put it in, and writing it anyway would land it on somebody else's row.
       if (row.label === null) continue;
       const cap = sentCaption(slot, blank);
-      ctx.fillStyle = cap.bad ? C.bad : C["ink-dim"];
-      ctx.font = `600 11px ${C.mono}`;
+      ctx.fillStyle = cap.bad ? C.bad : C.ink;
+      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
       caption(ctx, cap.text, it.x, row.label + CAP_CHAR);
     }
   });
@@ -713,8 +715,8 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
       const iw = ((slot.ideal.t1 - slot.ideal.t0) / u) * ppu;
       if (visible(it.ix, iw, scene)) {
         band(slot.ideal, it.ix, C.tgt, 0.55);
-        ctx.fillStyle = C["ink-dim"];
-        ctx.font = `600 11px ${C.mono}`;
+        ctx.fillStyle = C.ink;
+        ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
         caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       }
     }
@@ -1286,16 +1288,16 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
           ),
           [scene.rows.drift + 7, "DRIFT", C["ink-dim"], null],
         ];
-  /* The play button takes the place of the name and scores of the track in
-     hand. Text around it would peek out past its edges. The track playing
-     has one too, hovered or not: it is the only way to stop it from the
-     chart, and a way to stop that appears only under the pointer is one you
-     have to go looking for while the sound runs. */
+  /* The play button takes the place of the name and scores of the track
+     under the pointer, in hand or not. Text around it would peek out past its
+     edges. The track playing has one too, hovered or not: it is the only way
+     to stop it from the chart, and a way to stop that appears only under the
+     pointer is one you have to go looking for while the sound runs. */
   const sounding: GutterName | null =
     scene.playing === "tgt" ? "tgt" : scene.playing === "you" ? (scene.selected ?? null) : null;
   const buttons: Array<{ name: GutterName; color: string }> = [];
   for (const [y, label, color, name] of rows) {
-    if (name !== null && ((name === scene.picking && scene.pickingInHand) || name === sounding)) {
+    if (name !== null && (name === scene.picking || name === sounding)) {
       buttons.push({ name, color });
       continue;
     }
@@ -1338,7 +1340,14 @@ function drawGutter(ctx: Ctx2D, scene: Scene): void {
 
   for (const button of buttons) {
     const top = button.name === "tgt" ? scene.rows.tgt : scene.rows.runs[button.name]!.row;
-    drawPlayButton(ctx, top + ROW_H / 2, button.color, C.panel, button.name === sounding);
+    drawPlayButton(
+      ctx,
+      top + ROW_H / 2,
+      button.color,
+      C.panel,
+      button.name === sounding,
+      button.name === scene.picking && scene.onButton === true,
+    );
   }
 }
 
@@ -1354,9 +1363,19 @@ function drawPlayButton(
   color: string,
   ink: string,
   playing: boolean,
+  hot = false,
 ): void {
   const cx = GUTTER / 2;
   const r = PLAY_BUTTON_R;
+  /* Under the pointer: a halo round the disc, the same size disc inside it.
+     It lifts the button off the row without moving or growing anything. */
+  if (hot) {
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = color;
+    roundRect(ctx, cx - r - 2.25, y - r - 2.25, 2 * r + 4.5, 2 * r + 4.5, r + 2.25);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   ctx.fillStyle = color;
   roundRect(ctx, cx - r, y - r, 2 * r, 2 * r, r);
   ctx.fill();

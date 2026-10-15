@@ -1478,8 +1478,8 @@ describe("the play button in the gutter", () => {
   const play = (ctx: ReturnType<typeof recordingCtx>, y: number) => startsAt(ctx, cx - 3.5, y - 5);
   const stop = (ctx: ReturnType<typeof recordingCtx>, y: number) => startsAt(ctx, cx - 4 + 1.2, y - 4);
 
-  it("takes the place of the name of the track in hand, centered on its row", () => {
-    const ctx = drawn({ picking: 0, pickingInHand: true });
+  it("takes the place of the name under the pointer, centered on its row", () => {
+    const ctx = drawn({ picking: 0 });
     expect(ctx.texts()).not.toContain("RUN 1");
     expect(disc(ctx, runY)).toBe(true);
     expect(play(ctx, runY)).toBe(true);
@@ -1490,48 +1490,62 @@ describe("the play button in the gutter", () => {
       runs: [base.runs[0]!, { ...base.runs[0]!, ordinal: 1 }],
       rows: rowsFor(2, 0),
       picking: 0,
-      pickingInHand: true,
     };
     const scores = (ctx: ReturnType<typeof recordingCtx>) =>
       ctx.texts().filter((t) => t.endsWith("%")).length;
     const ctx = drawn(stacked);
     expect(ctx.texts()).toContain("RUN 2");
     // The other run's scores, and none for the one under the button.
-    const all = scores(drawn({ ...stacked, pickingInHand: false }));
+    const all = scores(drawn({ ...stacked, picking: null }));
     expect(all).toBeGreaterThan(0);
     expect(scores(ctx)).toBe(all / 2);
   });
 
-  it("is not there when the track is not in hand", () => {
-    const ctx = drawn({ picking: 0, pickingInHand: false });
+  it("shows on a name under the pointer that is not in hand", () => {
+    const ctx = drawn({ picking: 0, heard: "tgt" });
+    expect(ctx.texts()).not.toContain("RUN 1");
+    expect(play(ctx, runY)).toBe(true);
+  });
+
+  it("is not there without the pointer, while nothing plays", () => {
+    const ctx = drawn({ picking: null });
     expect(ctx.texts()).toContain("RUN 1");
     expect(disc(ctx, runY)).toBe(false);
   });
 
+  it("gets a halo with the pointer on the button itself, at the same size", () => {
+    const halo = (ctx: ReturnType<typeof recordingCtx>) => startsAt(ctx, cx, runY - PLAY_BUTTON_R - 2.25);
+    const near = drawn({ picking: 0, onButton: false });
+    const on = drawn({ picking: 0, onButton: true });
+    expect(halo(near), "only on the button").toBe(false);
+    expect(halo(on)).toBe(true);
+    expect(disc(on, runY), "the disc itself does not grow").toBe(true);
+  });
+
   it("is a stop button while that track plays", () => {
-    const ctx = drawn({ picking: 0, pickingInHand: true, playing: "you" });
+    const ctx = drawn({ picking: 0, playing: "you" });
     expect(play(ctx, runY)).toBe(false);
     expect(stop(ctx, runY)).toBe(true);
   });
 
   it("stays on the track that plays, without the pointer over it", () => {
-    const you = drawn({ picking: null, pickingInHand: false, playing: "you", selected: 0 });
+    const you = drawn({ picking: null, playing: "you", selected: 0 });
     expect(stop(you, runY)).toBe(true);
     expect(you.texts()).not.toContain("RUN 1");
 
-    const tgt = drawn({ picking: null, pickingInHand: false, playing: "tgt" });
+    const tgt = drawn({ picking: null, playing: "tgt" });
     expect(stop(tgt, tgtY)).toBe(true);
     expect(disc(tgt, runY)).toBe(false);
   });
 
   it("stays on the track that plays while another is under the pointer", () => {
-    const ctx = drawn({ picking: "tgt", pickingInHand: true, heard: "tgt", playing: "you", selected: 0 });
+    const ctx = drawn({ picking: "tgt", heard: "tgt", playing: "you", selected: 0 });
     expect(stop(ctx, runY)).toBe(true);
     expect(play(ctx, tgtY)).toBe(true);
   });
 
   it("is on the target's row when the target is in hand", () => {
-    const ctx = drawn({ picking: "tgt", pickingInHand: true, heard: "tgt" });
+    const ctx = drawn({ picking: "tgt", heard: "tgt" });
     expect(ctx.texts()).not.toContain("TGT");
     expect(ctx.texts()).toContain("RUN 1");
     expect(disc(ctx, tgtY)).toBe(true);
@@ -1541,7 +1555,6 @@ describe("the play button in the gutter", () => {
   it("is not offered on a row with nothing recorded", () => {
     const ctx = drawn({
       picking: 0,
-      pickingInHand: true,
       runs: base.runs.map((r) => ({ ...r, blank: true })),
     });
     expect(ctx.texts()).toContain("YOU");
