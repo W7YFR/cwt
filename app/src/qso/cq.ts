@@ -6,6 +6,7 @@
  * way an operator would:
  *
  *   - a CQ with no call it can read gets CALL?;
+ *   - its call with a question mark gets its call confirmed;
  *   - an over without its call gets its call again;
  *   - AGN or ? gets its last over again;
  *   - an exchange it cannot read gets PSE AGN;
@@ -15,11 +16,15 @@
  * exactly. Lenient copy also finds words run together, takes a call one
  * character off as the call, and knows your call from Configuration.
  *
+ * It thanks you for a report only when your over held one. What it says is
+ * worded in wording.ts, a little differently each time.
+ *
  * Pure. The page plays the replies and reads your overs.
  */
 
 import { UNKNOWN } from "@/morse";
 import { randomStation, type Rand, type Station } from "./station";
+import * as wording from "./wording";
 
 export type Stage = "cq" | "asking" | "called" | "exchanged" | "signing";
 
@@ -43,6 +48,15 @@ export interface Ear {
 
 export const STRICT: Ear = { lenient: false, saved: "" };
 
+/** Everything an answer depends on beyond the QSO and the over. */
+export interface Context {
+  readonly ear?: Ear;
+  /** Picks the wording. */
+  readonly rand?: Rand;
+  /** The station's local hour, for GM, GA or GE. */
+  readonly hour?: number;
+}
+
 export interface Turn {
   readonly qso: Qso;
   /** What the station sends, or null for nothing. */
@@ -60,6 +74,9 @@ const CALL_RE = /^(?:[A-Z0-9]?[A-Z])\d[A-Z]{1,4}(?:\/[A-Z0-9]{1,4})?$/;
 const RUN_DE_RE = /DE([A-Z0-9]?[A-Z]\d[A-Z]{1,3})/;
 
 const CLOSING = ["73", "<SK>", "SK", "CUL", "CUAGN", "GB"];
+
+/** A signal report: 599, 579, 5NN. */
+const REPORT_RE = /^[1-5][1-9N][1-9N]$/;
 
 /** Words that sit between a label and its value: NAME HR IS BOB. */
 const FILLER = new Set(["HR", "IS", "ES", "=", "<BT>"]);
@@ -151,6 +168,24 @@ class Over {
     return word === them || (this.ear.lenient && nearly(word, them));
   }
 
+  /** Whether it holds a report. */
+  hasReport(): boolean {
+    return this.words.some((w) => REPORT_RE.test(w));
+  }
+
+  /** Whether it asks if `call` is right: the call with a ? on it or right
+   *  after it, and no report. A HW? at the end of an exchange is not it. */
+  asksAbout(call: string): boolean {
+    if (this.hasReport()) return false;
+    const { words, ear } = this;
+    const i = words.findIndex((w) => {
+      const bare = w.endsWith("?") ? w.slice(0, -1) : w;
+      return bare === call || (ear.lenient && nearly(bare, call));
+    });
+    if (i >= 0) return words[i]!.endsWith("?") || words[i + 1] === "?";
+    return ear.lenient && this.joined.includes(`${call}?`);
+  }
+
   yourName(): string {
     const name = this.after(["NAME", "NM", "OP"]);
     return name && /^[A-Z]{2,}$/.test(name) ? name : "";
@@ -164,15 +199,6 @@ class Over {
   }
 }
 
-function exchange(q: Qso): string {
-  const { them, you, yourName: name } = q;
-  const to = name ? ` ${name}` : "";
-  return (
-    `${you} DE ${them.call} R TNX FER RPT${to} UR RST ${them.rst} ${them.rst} ` +
-    `NAME ${them.name} ${them.name} QTH ${them.qth} ${them.qth} HW? ${you} DE ${them.call} KN`
-  );
-}
-
 function say(qso: Qso, reply: string, stage: Stage = qso.stage): Turn {
   return { qso: { ...qso, stage, last: reply }, reply, ended: false };
 }
@@ -182,10 +208,12 @@ function end(qso: Qso, reply: string): Turn {
 }
 
 /** The station's answer to one over you sent. */
-export function answer(qso: Qso, heard: string, ear: Ear = STRICT): Turn {
+export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
+  const { ear = STRICT, rand = Math.random, hour = new Date().getHours() } = context;
   const over = new Over(heard, ear);
   const { them } = qso;
   const again = over.has("AGN") || over.words.some((w) => /^[A-Z]*\?$/.test(w));
+  const voice = (q: Qso): wording.Say => ({ them, you: q.you, name: q.yourName, rand, hour });
 
   switch (qso.stage) {
     case "cq":
@@ -193,38 +221,30 @@ export function answer(qso: Qso, heard: string, ear: Ear = STRICT): Turn {
       // Nobody answers an over that is not a CQ, until the station has asked.
       if (qso.stage === "cq" && !over.has("CQ")) return { qso, reply: null, ended: false };
       const you = over.yourCall(them.call);
-      if (!you) return say(qso, `CALL? DE ${them.call} K`, "asking");
-      return say({ ...qso, you }, `${you} DE ${them.call} ${them.call} K`, "called");
+      if (!you) return say(qso, wording.askCall(voice(qso)), "asking");
+      const next = { ...qso, you };
+      return say(next, wording.callBack(voice(next)), "called");
     }
 
     case "called": {
+      if (over.asksAbout(them.call)) return say(qso, wording.confirmCall(voice(qso)));
       if (over.has(them.call)) {
         const next = { ...qso, yourName: over.yourName() || qso.yourName };
-        return say(next, exchange(next), "exchanged");
+        return say(next, wording.exchange(voice(next), over.hasReport()), "exchanged");
       }
-      return say(qso, `DE ${them.call} ${them.call} K`);
+      return say(qso, wording.callAgain(voice(qso)));
     }
 
     case "exchanged": {
-      if (over.closing()) {
-        const to = qso.yourName ? ` ${qso.yourName}` : "";
-        return end(qso, `TU${to} 73 GL ${qso.you} DE ${them.call} <SK> E E`);
-      }
+      if (over.closing()) return end(qso, wording.signOff(voice(qso)));
       if (again) return say(qso, qso.last);
       // Not kept as the last over: AGN after it still means the exchange.
-      if (over.garbled()) {
-        return { qso, reply: `PSE AGN ${qso.you} DE ${them.call} KN`, ended: false };
-      }
-      const to = qso.yourName ? ` ${qso.yourName}` : "";
-      return say(
-        qso,
-        `R R FB${to} TNX FER QSO HPE CUAGN 73 ${qso.you} DE ${them.call} <SK>`,
-        "signing",
-      );
+      if (over.garbled()) return { qso, reply: wording.askAgain(voice(qso)), ended: false };
+      return say(qso, wording.signFirst(voice(qso)), "signing");
     }
 
     case "signing":
       if (again && !over.closing()) return say(qso, qso.last);
-      return end(qso, "E E");
+      return end(qso, wording.lastDits(voice(qso)));
   }
 }

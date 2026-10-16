@@ -143,7 +143,9 @@ export function QsoScreen({
     if (copy.turn === answered.current) return;
     answered.current = copy.turn;
     const heard = copy.text.trim();
-    const turn = answer(qso.current, heard, { lenient, saved: loadUser().callsign });
+    const turn = answer(qso.current, heard, {
+      ear: { lenient, saved: loadUser().callsign },
+    });
     const them = turn.qso.them;
     const sent: Line = { who: turn.qso.you || "You", text: heard, you: true };
 

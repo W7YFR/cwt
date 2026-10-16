@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
 import { LiveCopy, overEnded } from "@/timing/live";
-import { answer, isCall, nearly, newQso, wordsOf, type Ear, type Qso } from "@/qso/cq";
+import { answer, isCall, nearly, newQso, wordsOf, type Context, type Qso } from "@/qso/cq";
 import { randomStation } from "@/qso/station";
 
 /** A fixed sequence, so the station is the same every run. */
@@ -96,31 +96,64 @@ describe("reading an over", () => {
 
 describe("a QSO from your CQ", () => {
   const start = (): Qso => newQso(seeded());
+  /** Every pick the first wording, every part kept, in the evening. */
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  const LENIENT: Context = { ...FIRST, ear: { lenient: true, saved: "" } };
 
   it("runs to the end", () => {
     let q = start();
-    const them = q.them.call;
+    const { call: c, rst, name, qth } = q.them;
 
-    let t = answer(q, "CQ CQ DE W7YFR W7YFR K");
-    expect(t.reply).toBe(`W7YFR DE ${them} ${them} K`);
+    let t = answer(q, "CQ CQ DE W7YFR W7YFR K", FIRST);
+    expect(t.reply).toBe(`W7YFR DE ${c} ${c} K`);
     q = t.qso;
 
-    t = answer(q, `${them} DE W7YFR TNX FER CALL UR RST 579 579 NAME BOB BOB HW? ${them} DE W7YFR KN`);
-    expect(t.reply).toContain(`R TNX FER RPT BOB UR RST ${q.them.rst}`);
-    expect(t.reply).toContain(`NAME ${q.them.name} ${q.them.name}`);
-    expect(t.reply).toMatch(/KN$/);
+    t = answer(q, `${c} DE W7YFR TNX FER CALL UR RST 579 579 NAME BOB BOB HW? ${c} DE W7YFR KN`, FIRST);
+    const r = rst === "599" ? "5NN" : rst;
+    expect(t.reply).toBe(
+      `W7YFR DE ${c} R TNX FER RPT GE BOB <BT> UR RST ${r} ${r} NAME ${name} ${name} ` +
+        `QTH ${qth} ${qth} HW? W7YFR DE ${c} KN`,
+    );
     q = t.qso;
 
-    t = answer(q, `R TNX ${q.them.name} 73 ${them} DE W7YFR <SK>`);
+    t = answer(q, `R TNX ${name} 73 ${c} DE W7YFR <SK>`, FIRST);
     expect(t.ended).toBe(true);
-    expect(t.reply).toBe(`TU BOB 73 GL W7YFR DE ${them} <SK> E E`);
+    expect(t.reply).toBe(`TU BOB 73 GL W7YFR DE ${c} <SK> E E`);
+  });
+
+  it("thanks you for a report only when you sent one", () => {
+    const q = answer(start(), "CQ DE W7YFR K", FIRST).qso;
+    const c = q.them.call;
+    const without = answer(q, `${c} DE W7YFR K`, FIRST).reply!;
+    expect(without).not.toContain("RPT");
+    expect(without).toMatch(new RegExp(`^W7YFR DE ${c} R GE OM `));
+    expect(answer(q, `${c} DE W7YFR UR 5NN KN`, FIRST).reply).toContain("TNX FER RPT");
+  });
+
+  it("confirms its call when you ask about it", () => {
+    const q = answer(start(), "CQ DE W7YFR K", FIRST).qso;
+    const c = q.them.call;
+    for (const over of [`${c}? DE W7YFR K`, `${c} ? K`]) {
+      const t = answer(q, over, FIRST);
+      expect(t.reply).toBe(`R R DE ${c} ${c} K`);
+      expect(t.qso.stage).toBe("called");
+    }
+    // The over from the screenshot: AE4XS? keyed with its spacing broken.
+    const garbled = `K AEV<BT>S ${c.slice(0, 3)} ${c.slice(3)} ?`;
+    expect(answer(q, garbled, LENIENT).reply).toBe(`R R DE ${c} ${c} K`);
+  });
+
+  it("takes HW? at the end of your exchange as a question to it, not about its call", () => {
+    const q = answer(start(), "CQ DE W7YFR K", FIRST).qso;
+    const c = q.them.call;
+    expect(answer(q, `${c} DE W7YFR NAME BOB HW? KN`, FIRST).qso.stage).toBe("exchanged");
   });
 
   it("asks for the call of a CQ it cannot read, and takes it without CQ", () => {
     const q = start();
-    const t = answer(q, "CQ CQ DE K");
+    const t = answer(q, "CQ CQ DE K", FIRST);
     expect(t.reply).toBe(`CALL? DE ${q.them.call} K`);
-    const next = answer(t.qso, "DE W7YFR W7YFR K");
+    const next = answer(t.qso, "DE W7YFR W7YFR K", FIRST);
     expect(next.reply).toBe(`W7YFR DE ${q.them.call} ${q.them.call} K`);
   });
 
@@ -129,28 +162,17 @@ describe("a QSO from your CQ", () => {
   });
 
   it("answers the call you sent, as copied", () => {
-    const t = answer(start(), "CQ DE W7YFT K");
-    expect(t.qso.you).toBe("W7YFT");
+    expect(answer(start(), "CQ DE W7YFT K").qso.you).toBe("W7YFT");
   });
 
   it("sends its call again for as long as it takes", () => {
     let q = answer(start(), "CQ DE W7YFR K").qso;
     for (let i = 0; i < 5; i++) {
-      const t = answer(q, "QRZ? DE W7YFR K");
+      const t = answer(q, "QRZ? DE W7YFR K", FIRST);
       expect(t.reply).toBe(`DE ${q.them.call} ${q.them.call} K`);
       expect(t.ended).toBe(false);
       q = t.qso;
     }
-  });
-
-  it("asks again for an exchange it cannot read, and AGN still means the exchange", () => {
-    let q = answer(start(), "CQ DE W7YFR K").qso;
-    const ex = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB KN`);
-    q = ex.qso;
-    const t = answer(q, "\u25AF\u25AF \u25AF5 KN");
-    expect(t.reply).toBe(`PSE AGN W7YFR DE ${q.them.call} KN`);
-    expect(t.ended).toBe(false);
-    expect(answer(t.qso, "AGN? KN").reply).toBe(ex.reply);
   });
 
   it("sends its exchange again on AGN", () => {
@@ -160,32 +182,82 @@ describe("a QSO from your CQ", () => {
     expect(answer(q, "AGN? KN").reply).toBe(ex.reply);
   });
 
+  it("asks again for an exchange it cannot read, and AGN still means the exchange", () => {
+    let q = answer(start(), "CQ DE W7YFR K").qso;
+    const ex = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB KN`);
+    q = ex.qso;
+    const t = answer(q, "\u25AF\u25AF \u25AF5 KN", FIRST);
+    expect(t.reply).toBe(`PSE AGN W7YFR DE ${q.them.call} KN`);
+    expect(t.ended).toBe(false);
+    expect(answer(t.qso, "AGN? KN").reply).toBe(ex.reply);
+  });
+
   it("signs first when you keep going, and the QSO ends on your 73", () => {
     let q = answer(start(), "CQ DE W7YFR K").qso;
     q = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB KN`).qso;
-    const t = answer(q, "FB RIG HR IS K3 ES ANT IS DIPOLE KN");
+    const t = answer(q, "FB RIG HR IS K3 ES ANT IS DIPOLE KN", FIRST);
     expect(t.qso.stage).toBe("signing");
-    expect(t.reply).toMatch(/73 W7YFR DE \S+ <SK>$/);
-    const last = answer(t.qso, "TU 73 <SK>");
+    expect(t.reply).toBe(`R R FB BOB TNX FER QSO HPE CUAGN 73 W7YFR DE ${q.them.call} <SK>`);
+    const last = answer(t.qso, "TU 73 <SK>", FIRST);
     expect(last.ended).toBe(true);
     expect(last.reply).toBe("E E");
   });
 
+  it("greets you by the time of day", () => {
+    const q = answer(start(), "CQ DE W7YFR K").qso;
+    const over = `${q.them.call} DE W7YFR UR 599 NAME BOB KN`;
+    expect(answer(q, over, { ...FIRST, hour: 8 }).reply).toContain("GM BOB");
+    expect(answer(q, over, { ...FIRST, hour: 14 }).reply).toContain("GA BOB");
+    expect(answer(q, over, { ...FIRST, hour: 20 }).reply).toContain("GE BOB");
+  });
+
+  it("words its overs differently from one QSO to the next", () => {
+    const rand = seeded(3);
+    const callBacks = new Set<string>();
+    const exchanges = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      const q = answer(newQso(() => 0.5), "CQ DE W7YFR K", { rand }).qso;
+      callBacks.add(q.last);
+      const ex = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB KN`, { rand });
+      exchanges.add(ex.reply!);
+    }
+    expect(callBacks.size).toBeGreaterThanOrEqual(4);
+    expect(exchanges.size).toBeGreaterThanOrEqual(30);
+  });
+
+  it("keeps every over to characters it can key", () => {
+    const rand = seeded(5);
+    for (let i = 0; i < 40; i++) {
+      let q = answer(newQso(rand), "CQ DE W7YFR K", { rand }).qso;
+      const replies = [q.last];
+      let t = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB KN`, { rand });
+      replies.push(t.reply!);
+      q = t.qso;
+      t = answer(q, "FB KN", { rand });
+      replies.push(t.reply!);
+      t = answer(t.qso, "73 <SK>", { rand });
+      replies.push(t.reply!);
+      for (const r of replies) {
+        expect(r).not.toMatch(/ {2}|^ | $/);
+        expect(wordsOf(r).join(" ")).toBe(r);
+      }
+    }
+  });
+
   it("reads words run together and a call one off, when lenient", () => {
-    const ear: Ear = { lenient: true, saved: "" };
     const q = start();
     const them = q.them.call;
     expect(answer(q, "CQCQCQDEW7YFRW7YFRX K").reply).toBeNull();
-    const t = answer(q, "CQCQCQDEW7YFRW7YFRX K", ear);
+    const t = answer(q, "CQCQCQDEW7YFRW7YFRX K", LENIENT);
     expect(t.qso.you).toBe("W7YFR");
     // One character dropped from their call.
     const off = them.slice(0, -1);
     expect(answer(t.qso, `${off} DE W7YFR UR 599 KN`).qso.stage).toBe("called");
-    expect(answer(t.qso, `${off} DE W7YFR UR 599 KN`, ear).qso.stage).toBe("exchanged");
+    expect(answer(t.qso, `${off} DE W7YFR UR 599 KN`, LENIENT).qso.stage).toBe("exchanged");
   });
 
   it("knows your call from Configuration, when lenient", () => {
-    const t = answer(start(), "CQCQDEKK7XYZKK7XYZ K", { lenient: true, saved: "KK7XYZ" });
+    const t = answer(start(), "CQCQDEKK7XYZKK7XYZ K", { ear: { lenient: true, saved: "KK7XYZ" } });
     expect(t.qso.you).toBe("KK7XYZ");
   });
 

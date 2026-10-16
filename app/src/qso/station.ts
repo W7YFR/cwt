@@ -34,7 +34,7 @@ const RSTS = ["599", "589", "579", "569", "559"];
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-function pick<T>(rand: Rand, list: readonly T[]): T {
+export function pick<T>(rand: Rand, list: readonly T[]): T {
   return list[Math.floor(rand() * list.length)]!;
 }
 
