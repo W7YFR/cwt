@@ -5,7 +5,17 @@ import { describe, expect, it } from "vitest";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
 import { LiveCopy, overEnded } from "@/timing/live";
-import { answer, isCall, nearly, newQso, wordsOf, type Context, type Qso } from "@/qso/cq";
+import {
+  answer,
+  erased,
+  isCall,
+  isErrorSign,
+  nearly,
+  newQso,
+  wordsOf,
+  type Context,
+  type Qso,
+} from "@/qso/cq";
 import { randomStation } from "@/qso/station";
 
 /** A fixed sequence, so the station is the same every run. */
@@ -89,6 +99,19 @@ describe("reading an over", () => {
     for (const word of ["5NN", "599", "73", "CQ", "TNX", "K"]) expect(isCall(word)).toBe(false);
   });
 
+  it("knows the error sign, keyed cleanly or not", () => {
+    for (const w of ["<HH>", "EEE", "EEEEEEEE", "HH", "H5", "SSS", "5S"]) expect(isErrorSign(w)).toBe(true);
+    for (const w of ["E", "EE", "I", "S", "H", "5", "IS", "ES", "HE", "HI", "HIS", "SHE", "SEE"]) {
+      expect(isErrorSign(w)).toBe(false);
+    }
+  });
+
+  it("drops the word before each error sign", () => {
+    expect(erased(wordsOf("DE W7YR EEE W7YFR K"))).toEqual(["DE", "W7YFR", "K"]);
+    expect(erased(wordsOf("<HH> CQ"))).toEqual(["CQ"]);
+    expect(erased(wordsOf("TU 73 E E"))).toEqual(["TU", "73", "E", "E"]);
+  });
+
   it("splits a prosign keyed against a word", () => {
     expect(wordsOf("73<SK> ee")).toEqual(["73", "<SK>", "EE"]);
   });
@@ -159,6 +182,31 @@ describe("a QSO from your CQ", () => {
 
   it("does not answer an over that is not a CQ", () => {
     expect(answer(start(), "W7YFR K").reply).toBeNull();
+  });
+
+  it("takes your call as corrected with the error sign", () => {
+    // The CQ from the screenshot.
+    const t = answer(start(), "CQ W EEE POTA DE W7YR EEE W7YFR W7YFR K", FIRST);
+    expect(t.qso.you).toBe("W7YFR");
+  });
+
+  it("takes the call you sent most after DE", () => {
+    expect(answer(start(), "CQ DE W7YR W7YFR W7YFR K").qso.you).toBe("W7YFR");
+  });
+
+  it("takes a corrected call later in the QSO", () => {
+    const q = answer(start(), "CQ DE W7YR K", FIRST).qso;
+    const c = q.them.call;
+    expect(q.you).toBe("W7YR");
+    // The second over from the screenshot: DE keyed apart, so lenient only.
+    const over = `K ${c} N EE D E W7YFR W7YFR <BT> HWP ?`;
+    const strict = answer(q, over, FIRST);
+    expect(strict.qso.you).toBe("W7YR");
+    const t = answer(q, over, LENIENT);
+    expect(t.qso.you).toBe("W7YFR");
+    expect(t.reply).toMatch(new RegExp(`^W7YFR DE ${c} `));
+    // With DE keyed right, strict copy takes it too.
+    expect(answer(q, `${c} DE W7YFR W7YFR K`, FIRST).qso.you).toBe("W7YFR");
   });
 
   it("answers the call you sent, as copied", () => {

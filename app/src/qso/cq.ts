@@ -8,6 +8,7 @@
  *   - a CQ with no call it can read gets CALL?;
  *   - its call with a question mark gets its call confirmed;
  *   - an over without its call gets its call again;
+ *   - your call after DE replaces the one it copied before;
  *   - AGN or ? gets its last over again;
  *   - an exchange it cannot read gets PSE AGN;
  *   - an exchange with no 73 gets its own 73, and the QSO ends on yours.
@@ -71,7 +72,36 @@ const CALL_RE = /^(?:[A-Z0-9]?[A-Z])\d[A-Z]{1,4}(?:\/[A-Z0-9]{1,4})?$/;
 
 /** A call after DE in words run together. Three suffix letters at most, so
  *  the next word is not taken into the call. */
-const RUN_DE_RE = /DE([A-Z0-9]?[A-Z]\d[A-Z]{1,3})/;
+const RUN_DE_RE = /DE([A-Z0-9]?[A-Z]\d[A-Z]{1,3})/g;
+
+/** Words keyed with dits alone, which are not the error sign. */
+const DIT_WORDS = new Set(["HI", "HIS", "SHE"]);
+
+/** Dits in each character keyed with dits alone. */
+const DITS: Readonly<Record<string, number>> = { E: 1, I: 2, S: 3, H: 4, "5": 5 };
+
+/** Whether `word` is the error sign: <HH>, or a run of dits read as letters.
+ *  Eight dits keyed unevenly read as EEE, or as HH, or as 5 and S. Three E,
+ *  or six dits or more, counts. A word keyed with dits alone does not: HI,
+ *  HIS, SHE. */
+export function isErrorSign(word: string): boolean {
+  if (word === "<HH>" || /^E{3,}$/.test(word)) return true;
+  if (DIT_WORDS.has(word) || !/^[EISH5]+$/.test(word)) return false;
+  let dits = 0;
+  for (const ch of word) dits += DITS[ch]!;
+  return dits >= 6;
+}
+
+/** The words of an over with each error sign applied: the sign and the word
+ *  before it are gone. */
+export function erased(words: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const w of words) {
+    if (isErrorSign(w)) out.pop();
+    else out.push(w);
+  }
+  return out;
+}
 
 const CLOSING = ["73", "<SK>", "SK", "CUL", "CUAGN", "GB"];
 
@@ -121,7 +151,7 @@ class Over {
     heard: string,
     private readonly ear: Ear,
   ) {
-    this.words = wordsOf(heard);
+    this.words = erased(wordsOf(heard));
     this.joined = this.words.join("");
   }
 
@@ -152,16 +182,49 @@ class Over {
     return null;
   }
 
+  /** The calls sent after DE, each one as often as it was sent: DE W7YFR
+   *  W7YFR gives it twice. Run-together ones too, when lenient. */
+  private deCalls(them: string): string[] {
+    const { words } = this;
+    const out: string[] = [];
+    for (let i = 0; i < words.length; i++) {
+      if (words[i] !== "DE") continue;
+      for (let j = i + 1; j < words.length && isCall(words[j]!); j++) {
+        if (!this.isThem(words[j]!, them)) out.push(words[j]!);
+      }
+    }
+    if (out.length || !this.ear.lenient) return out;
+    for (const m of this.joined.matchAll(RUN_DE_RE)) {
+      if (!this.isThem(m[1]!, them)) out.push(m[1]!);
+    }
+    return out;
+  }
+
+  /** The call you sent after DE: the one sent most, and of those the last.
+   *  A call sent wrong and then sent again right comes out right. */
+  deCall(them: string): string | null {
+    const calls = this.deCalls(them);
+    let best: string | null = null;
+    let most = 0;
+    for (const c of calls) {
+      const n = calls.filter((x) => x === c).length;
+      if (n >= most) {
+        best = c;
+        most = n;
+      }
+    }
+    return best;
+  }
+
   /** The call you sent as your own, not `them`. */
   yourCall(them: string): string | null {
-    const de = this.after(["DE"]);
-    if (de && isCall(de) && !this.isThem(de, them)) return de;
+    const de = this.deCall(them);
+    if (de) return de;
     const word = this.words.find((w) => isCall(w) && !this.isThem(w, them));
     if (word) return word;
     if (!this.ear.lenient) return null;
     if (this.ear.saved && this.joined.includes(this.ear.saved)) return this.ear.saved;
-    const run = RUN_DE_RE.exec(this.joined)?.[1];
-    return run && !this.isThem(run, them) ? run : null;
+    return null;
   }
 
   private isThem(word: string, them: string): boolean {
@@ -213,6 +276,9 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   const over = new Over(heard, ear);
   const { them } = qso;
   const again = over.has("AGN") || over.words.some((w) => /^[A-Z]*\?$/.test(w));
+  // Your call after DE, once the station has one, replaces it.
+  const fixed = qso.stage === "cq" || qso.stage === "asking" ? null : over.deCall(them.call);
+  if (fixed) qso = { ...qso, you: fixed };
   const voice = (q: Qso): wording.Say => ({ them, you: q.you, name: q.yourName, rand, hour });
 
   switch (qso.stage) {
