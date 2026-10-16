@@ -420,6 +420,10 @@ export interface Prefs {
   user?: Partial<UserInfo>;
   /** Drills the user wrote, in the order they were saved. */
   customDrills?: CustomDrill[];
+  /** Which page is open: practice or QSO. Absent is practice. */
+  page?: "practice" | "qso";
+  /** How the QSO page reads your sending. Absent is lenient. */
+  qsoCopy?: "strict" | "lenient";
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -577,6 +581,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   runSort: isStr,
   user: isUser,
   customDrills: isCustomDrills,
+  page: oneOf("practice", "qso"),
+  qsoCopy: oneOf("strict", "lenient"),
 };
 
 export function loadPrefs(): Prefs {

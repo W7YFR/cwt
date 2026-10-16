@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- A **QSO** page, opened from the **Practice** and **QSO** switch in the header. Call CQ, and a made-up station answers. Your sending is copied live, the station replies in CW, and the QSO runs to 73. When it cannot copy you, the station asks again.
+- **Lenient** copy on the **QSO** page reads your sending at your own spacing and takes a call with one character wrong. **Strict** copy reads it at the set speed.
+
 ## v1.8.1 — 2026-10-15
 
 ### Changed

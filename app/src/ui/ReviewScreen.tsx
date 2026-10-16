@@ -36,6 +36,7 @@ import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
+import { PageSwitch, type Page } from "./PageSwitch";
 import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
@@ -96,6 +97,8 @@ export interface ReviewScreenProps {
     times: number;
   }): void;
   onBack(): void;
+  /** Open the other page. Absent, the header has no page switch. */
+  onPage?: ((page: Page) => void) | undefined;
 }
 
 /** How long the settings panel takes to roll open or shut; see `.chartsettings`. */
@@ -195,6 +198,7 @@ export function ReviewScreen({
   onFile,
   onNewSession,
   onBack,
+  onPage,
 }: ReviewScreenProps): React.ReactElement {
   /* Declared before the recorder because the recorder's R key is turned off
      while the dialog is up: a key that starts a recording behind an open
@@ -838,6 +842,7 @@ export function ReviewScreen({
             <Brandmark art={visitWordmark()} />
           </button>
         </h1>
+        {onPage && <PageSwitch page="practice" onPage={onPage} disabled={recording} />}
         <RecordBar
           rec={rec}
           appliesToTake={loaded.take.source === MIC_SOURCE}

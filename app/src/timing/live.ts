@@ -22,10 +22,11 @@
  * runs under Node against real recordings.
  */
 
-import type { Timing } from "@/types";
+import type { Segment, Timing } from "@/types";
 import { segmentsFrom } from "@/dsp";
 import { CHAR_TO_MORSE, SYMBOL_RE, canonicalChar } from "@/morse";
-import { buildTimeline } from "./timeline";
+import { estimateTiming } from "./estimate";
+import { buildTimeline, opensWord } from "./timeline";
 
 /** The rate the live decode works at, or the nearest above it that the
  *  capture rate divides down to. */
@@ -81,6 +82,8 @@ export interface Sent {
    *  keyed. Spaces are left out: where the words fall does not say how far
    *  through the message the sender is. */
   readonly symbols: string[];
+  /** The same characters as text, with a space where a word gap fell. */
+  readonly text: string;
   /** The elements of the character still being keyed, or null when the key
    *  has been up for a character gap. */
   readonly keying: string | null;
@@ -90,17 +93,39 @@ export interface Sent {
   readonly toneHz: number;
 }
 
+/** Marks keyed before the sender's own timing is measured. Fewer than this
+ *  is too little evidence for the gaps, and the set timing is used. */
+export const MEASURE_MIN_MARKS = 20;
+
+/** The sender's own timing, or `timing` while there is too little keying to
+ *  measure. */
+function measured(segments: readonly Segment[], timing: Timing): Timing {
+  let marks = 0;
+  for (const s of segments) if (s[0] === 1) marks++;
+  if (marks < MEASURE_MIN_MARKS) return timing;
+  try {
+    return estimateTiming(segments);
+  } catch {
+    return timing;
+  }
+}
+
 /** Decode what has been keyed so far.
  *
  * Give `toneHz` once it is known. Finding the tone is most of the cost of a
- * pass, and the tone does not move while one take runs. */
+ * pass, and the tone does not move while one take runs.
+ *
+ * With `measure`, the characters and words are read at the sender's own
+ * timing once there is enough keying to measure it, not at `timing`. The
+ * last character is still held for `timing`'s character gap. */
 export function sentSymbols(
   samples: Float32Array,
   rate: number,
   timing: Timing,
   toneHz?: number,
+  measure = false,
 ): Sent {
-  const none = { symbols: [], keying: null, quietSec: 0, toneHz: toneHz ?? 0 };
+  const none = { symbols: [], text: "", keying: null, quietSec: 0, toneHz: toneHz ?? 0 };
   if (samples.length === 0) return none;
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {
@@ -114,7 +139,7 @@ export function sentSymbols(
 
   const found = segmentsFrom(scaled, rate, toneHz !== undefined ? { toneHz } : {});
   const { segments } = found;
-  const { chars } = buildTimeline(segments, timing);
+  const { chars } = buildTimeline(segments, measure ? measured(segments, timing) : timing);
   const last = chars[chars.length - 1];
   if (!last) return { ...none, toneHz: found.toneHz };
 
@@ -122,8 +147,10 @@ export function sentSymbols(
   for (const s of segments) end += s[1];
   const quietSec = end - last.t1;
   const done = quietSec >= timing.elementCharSplit;
+  const kept = done ? chars : chars.slice(0, -1);
   return {
-    symbols: (done ? chars : chars.slice(0, -1)).map((c) => c.char),
+    symbols: kept.map((c) => c.char),
+    text: kept.map((c, i) => (i > 0 && opensWord(c) ? ` ${c.char}` : c.char)).join(""),
     keying: done ? null : last.pattern,
     quietSec,
     toneHz: found.toneHz,
@@ -275,5 +302,82 @@ export class LiveFollower {
       sent.keying === null &&
       sent.quietSec >= END_QUIET_DITS * this.timing.unitSec + END_QUIET_SEC;
     return { reached: Math.max(this.best, verdicts.length), graded: verdicts, done };
+  }
+}
+
+/** The words that hand the turn to the other station. A prosign keyed as two
+ *  letters, such as K N, counts too. */
+const TURN_WORDS = new Set(["K", "<KN>", "KN", "<BK>", "BK", "<SK>", "SK", "<AR>", "AR"]);
+
+/** A question hands the turn over too: ?, AGN?, HW?. A character misread
+ *  before a ?, as in 5?, does not. */
+const QUESTION_RE = /^[A-Z]*\?$/;
+
+/** How long the key must stay up to end an over that does not end with a
+ *  turn word. Never less than this many word gaps. */
+export const OVER_QUIET_SEC = 3;
+export const OVER_QUIET_WORD_GAPS = 3;
+
+/** Characters read before the tone is held. With no target there is nothing
+ *  to match, so a run of characters is the evidence. */
+const TONE_LOCK_CHARS = 3;
+
+export interface Copy {
+  /** What has been read so far, with spaces between words. */
+  readonly text: string;
+  /** The elements of the character still being keyed, or null. */
+  readonly keying: string | null;
+  /** The sender has handed the turn over. */
+  readonly over: boolean;
+}
+
+/** Whether an over has ended: a turn word and the same wait a take ends on,
+ *  or a long silence after anything at all. */
+export function overEnded(text: string, quietSec: number, timing: Timing): boolean {
+  const words = text.trim().split(/\s+/);
+  const last = words[words.length - 1] ?? "";
+  if (!last) return false;
+  const turn = TURN_WORDS.has(last) || QUESTION_RE.test(last);
+  const wait = turn
+    ? END_QUIET_DITS * timing.unitSec + END_QUIET_SEC
+    : Math.max(OVER_QUIET_SEC, OVER_QUIET_WORD_GAPS * (timing.wordGapSec || 7 * timing.unitSec));
+  return quietSec >= wait;
+}
+
+/** One over, copied from its first sample with no message to follow.
+ *
+ * The same passes as `LiveFollower`, but what comes back is the text itself,
+ * and the over ends when the sender hands the turn over. */
+export class LiveCopy {
+  private readonly audio: Decimator;
+  private readonly timing: Timing;
+  private readonly measure: boolean;
+  private toneHz: number | undefined;
+
+  /** With `measure`, the over is read at the sender's own timing. See
+   *  `sentSymbols`. */
+  constructor(rate: number, timing: Timing, measure = false) {
+    this.audio = new Decimator(rate);
+    this.timing = timing;
+    this.measure = measure;
+  }
+
+  push(samples: Float32Array): void {
+    this.audio.push(samples);
+  }
+
+  step(): Copy {
+    const sent = sentSymbols(
+      this.audio.samples(),
+      this.audio.rate,
+      this.timing,
+      this.toneHz,
+      this.measure,
+    );
+    if (this.toneHz === undefined && sent.symbols.length >= TONE_LOCK_CHARS) {
+      this.toneHz = sent.toneHz;
+    }
+    const over = sent.keying === null && overEnded(sent.text, sent.quietSec, this.timing);
+    return { text: sent.text, keying: sent.keying, over };
   }
 }

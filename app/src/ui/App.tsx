@@ -28,6 +28,8 @@ import { Calibrate } from "./Calibrate";
 import { LANDING_VERSION, Landing } from "./Landing";
 import { Settings } from "./Settings";
 import { ReviewScreen } from "./ReviewScreen";
+import { QsoScreen } from "./QsoScreen";
+import type { Page } from "./PageSwitch";
 import { useFileDrop } from "./useFileDrop";
 import { OPEN_FILE_CLOSED } from "./copy";
 import { useMicAccess } from "./useMicAccess";
@@ -89,6 +91,13 @@ export function App(): React.ReactElement {
     });
   }, []);
   const [configuring, setConfiguring] = useState(false);
+  /* Practice or QSO, kept across a reload. */
+  const [page, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
+  const setPage = useCallback((next: Page) => {
+    setPageRaw(next);
+    setError(null);
+    savePrefs({ ...loadPrefs(), page: next });
+  }, []);
 
   /* Which calibration is being applied, held here because it changes what the
      decoder does to every recording that follows. `null` is the default and a
@@ -197,7 +206,9 @@ export function App(): React.ReactElement {
         ? "settings"
         : calibrating
           ? "calibrate"
-          : take.loaded && take.review
+          : page === "qso"
+            ? "qso"
+            : take.loaded && take.review
             ? "review"
             : "landing";
 
@@ -414,8 +425,19 @@ export function App(): React.ReactElement {
             take.adoptSavedSpeed();
           }}
         />
+      ) : page === "qso" ? (
+        <QsoScreen
+          deviceId={deviceId}
+          onError={setError}
+          onConfigure={() => {
+            setError(null);
+            setConfiguring(true);
+          }}
+          onPage={setPage}
+        />
       ) : take.loaded && take.review ? (
         <ReviewScreen
+          onPage={setPage}
           restored={restored}
           loaded={take.loaded}
           review={take.review}
