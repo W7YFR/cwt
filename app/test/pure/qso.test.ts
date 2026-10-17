@@ -306,10 +306,14 @@ describe("a QSO from your CQ", () => {
     expect(answer(q, "CQCQCQDEW7YFRW7YFRX K").reply).toBeNull();
     const t = answer(q, "CQCQCQDEW7YFRW7YFRX K", LENIENT);
     expect(t.qso.you).toBe("W7YFR");
-    // One character dropped from their call.
+    // One character dropped from their call: strict copy does not see its
+    // call, and lenient copy sees it sent wrong. Either way it waits.
     const off = them.slice(0, -1);
-    expect(answer(t.qso, `${off} DE W7YFR UR 599 KN`).qso.stage).toBe("called");
-    expect(answer(t.qso, `${off} DE W7YFR UR 599 KN`, LENIENT).qso.stage).toBe("exchanged");
+    expect(answer(t.qso, `${off} DE W7YFR UR 599 KN`, FIRST).reply).toBe(`DE ${them} ${them} K`);
+    const fixed = answer(t.qso, `${off} DE W7YFR UR 599 KN`, LENIENT);
+    expect(fixed.reply).toBe(`MY CALL ${them} ${them} K`);
+    expect(fixed.qso.stage).toBe("called");
+    expect(answer(fixed.qso, `${them} DE W7YFR UR 599 KN`, LENIENT).qso.stage).toBe("exchanged");
   });
 
   it("knows your call from Configuration, when lenient", () => {
@@ -697,9 +701,8 @@ describe("a piece begun that did not come through", () => {
     const ctx: Context = { ...LENIENT, length: "pieces" };
     let q = answer(newQso(seeded()), "CQ DE W7YFR K", ctx).qso;
     const c = q.them.call;
-    // The over from the screenshot, with the station's call one character off.
-    const off = `${c.slice(0, 2)}X${c.slice(3)}`;
-    let t = answer(q, `K RR ${off} TU FER CALL <BT> UR RST IS 4 4 B 44 B K`, ctx);
+    // The over from the screenshot.
+    let t = answer(q, `K RR ${c} TU FER CALL <BT> UR RST IS 4 4 B 44 B K`, ctx);
     expect(t.reply).toBe(`W7YFR DE ${c} UR RST? KN`);
     expect(t.qso.stage).toBe("called");
     q = t.qso;
@@ -725,5 +728,32 @@ describe("a piece begun that did not come through", () => {
     let q = answer(newQso(seeded()), "CQ DE W7YFR K", FIRST).qso;
     q = answer(q, `${q.them.call} DE W7YFR UR RST 4B KN`, FIRST).qso;
     expect(answer(q, "XQZ JJV", FIRST).reply).toBe(`PSE AGN W7YFR DE ${q.them.call} KN`);
+  });
+});
+
+describe("its call sent wrong", () => {
+  const LENIENT: Context = { rand: () => 0, hour: 20, ear: { lenient: true, saved: "" } };
+
+  it("puts its call right before it goes on", () => {
+    // The QSO from the screenshot: K7SP sent for K7SJ.
+    const ctx: Context = { ...LENIENT, length: "pieces" };
+    const q = answer(newQso(seeded()), "CQ DE W7YFR W7YFR K", ctx).qso;
+    const c = q.them.call;
+    const wrong = `${c.slice(0, -1)}${c.endsWith("P") ? "Q" : "P"}`;
+    const t = answer(q, `K ${wrong} TU FER CALL UR 5NN 5NN K`, ctx);
+    expect(t.reply).toBe(`MY CALL ${c} ${c} K`);
+    expect(t.qso.stage).toBe("called");
+    expect(t.qso.got).toEqual(["report"]);
+    // The right call: it goes on, and your report already counts.
+    const next = answer(t.qso, `R ${c} DE W7YFR K`, ctx);
+    expect(next.qso.stage).toBe("pieces");
+    expect(next.reply).toContain("TNX FER RPT");
+  });
+
+  it("confirms the right call when you ask about the wrong one", () => {
+    const q = answer(newQso(seeded()), "CQ DE W7YFR K", LENIENT).qso;
+    const c = q.them.call;
+    const wrong = `${c.slice(0, -1)}${c.endsWith("P") ? "Q" : "P"}`;
+    expect(answer(q, `${wrong}?`, LENIENT).reply).toBe(`R R DE ${c} ${c} K`);
   });
 });

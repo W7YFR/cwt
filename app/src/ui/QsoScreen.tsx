@@ -385,6 +385,23 @@ export function QsoScreen({
     return theirText === "copy" ? line.mode : theirText;
   };
 
+  /** Whether you have the station's call in QSO `n`: the exact call in one
+   *  of your overs as copied, or in what you typed of one of its overs. */
+  const identified = (n: number, call: string): boolean =>
+    lines.some(
+      (l) =>
+        l.qso === n &&
+        (l.you ? l.text : l.typed).toUpperCase().replace(/\s+/g, "").includes(call),
+    );
+
+  /** Who sent a line. The station's call shows only once you have it, when
+   *  the over shows whole, or when the QSO is over. Until then, Station. */
+  const whoOf = (line: Line): string => {
+    if (line.you) return line.who;
+    if (closed.includes(line.qso) || theirModeOf(line) === "before") return line.who;
+    return identified(line.qso, line.who) ? line.who : "Station";
+  };
+
   /** What shows of one line of the log. */
   const textOf = (line: Line, at: number): React.ReactElement => {
     const over = closed.includes(line.qso);
@@ -399,7 +416,7 @@ export function QsoScreen({
         <input
           className="qsotype"
           data-testid="qso-type"
-          aria-label={`Your copy of ${line.who}`}
+          aria-label={`Your copy of ${whoOf(line)}`}
           value={line.typed}
           autoFocus
           spellCheck={false}
@@ -516,7 +533,7 @@ export function QsoScreen({
         <ol className="qsolog" data-testid="qso-log">
           {lines.map((line, i) => (
             <li key={i} className={line.you ? "you" : "them"}>
-              <span className="who">{line.who}</span>
+              <span className="who">{whoOf(line)}</span>
               {textOf(line, i)}
             </li>
           ))}

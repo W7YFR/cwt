@@ -7,7 +7,8 @@
  *
  *   - a CQ with no call it can read gets CALL?;
  *   - its call with a question mark gets its call confirmed;
- *   - an over without its call gets its call again;
+ *   - an over without its call gets its call again, and one with its call
+ *     sent wrong gets it put right. Only the exact call moves it on;
  *   - your call after DE replaces the one it copied before;
  *   - part of its call with a ?, as in N1?, gets its call. NAME?, QTH?, RST?
  *     and CALL? get that one thing. None of these moves the QSO on;
@@ -294,6 +295,12 @@ class Over {
     if (!this.ear.lenient) return false;
     if (this.joined.includes(word)) return true;
     return isCall(word) && this.words.some((w) => nearly(w, word));
+  }
+
+  /** Whether `word` was sent exactly: as a word or, when lenient, run into
+   *  others. A call one character off does not count. */
+  hasExactly(word: string): boolean {
+    return this.words.includes(word) || (this.ear.lenient && this.joined.includes(word));
   }
 
   /** Whether the over signs off. Run together, only 73 counts: SK or GB
@@ -606,8 +613,12 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
 
     case "called": {
       if (over.asksAbout(them.call)) return say(qso, wording.confirmCall(voice(qso)));
-      if (over.has(them.call) || qso.working) {
-        const heard = over.has(them.call);
+      // Its call one character off: it puts you right, and waits.
+      const heard = over.hasExactly(them.call);
+      if (!heard && !qso.working && over.has(them.call)) {
+        return say(qso, wording.correctCall(voice(qso)));
+      }
+      if (heard || qso.working) {
         qso = { ...qso, working: true };
         // AGN alone. With its call and more, the over is your exchange.
         if (again && !heard) return say(qso, qso.last);
@@ -615,7 +626,8 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
         if (!heard && !over.readable(them)) return say(qso, wording.askAgain(voice(qso)));
         const botched = over.botched().filter((p) => !qso.got.includes(p));
         if (botched.length) return say(qso, wording.askFor(voice(qso), botched));
-        const reply = wording.exchange(voice(qso), over.hasReport());
+        // Thanks for your report, sent in this over or one before it.
+        const reply = wording.exchange(voice(qso), qso.got.includes("report"));
         if (length === "pieces") return say({ ...qso, piece: 1 }, reply, "pieces");
         return say(qso, reply, "exchanged");
       }

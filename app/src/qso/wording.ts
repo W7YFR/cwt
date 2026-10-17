@@ -78,6 +78,12 @@ export function confirmCall(s: Say): string {
   return pick(s.rand, [`R R DE ${c} ${c} K`, `RR ${c} ${c} K`, `R ${s.you} DE ${c} ${c} K`]);
 }
 
+/** Its call put right, for an over that sent it wrong. */
+export function correctCall(s: Say): string {
+  const c = s.them.call;
+  return pick(s.rand, [`MY CALL ${c} ${c} K`, `${s.you} DE ${c} ${c} ${c} K`, `CALL IS ${c} ${c} K`]);
+}
+
 /** It asks for your call, for a CQ it could not read. */
 export function askCall(s: Say): string {
   const c = s.them.call;
