@@ -770,3 +770,31 @@ describe("HW ? with the ? keyed apart", () => {
     expect(t.reply).toMatch(/ NAME /);
   });
 });
+
+describe("your sign-off", () => {
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  const LENIENT: Context = { ...FIRST, ear: { lenient: true, saved: "" } };
+  /** A QSO with both exchanges done. */
+  const exchanged = (ctx: Context): Qso => {
+    const q = answer(newQso(seeded()), "CQ DE W7YFR K", ctx).qso;
+    return answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`, ctx).qso;
+  };
+
+  it("takes the words the station signs off with", () => {
+    for (const over of ["TNX FER QSO", "TNX FB QSO", "CU AGN", "CUL", "GL ES BCNU", "73", "TU <SK>"]) {
+      expect(answer(exchanged(FIRST), over, FIRST).ended, over).toBe(true);
+    }
+  });
+
+  it("does not take TU alone, or QSO alone", () => {
+    for (const over of ["TU", "FB QSL TU", "NICE QSO"]) {
+      expect(answer(exchanged(FIRST), over, FIRST).ended, over).toBe(false);
+    }
+  });
+
+  it("finds a sign-off run together, when lenient", () => {
+    expect(answer(exchanged(FIRST), "TNXFERQSO", FIRST).ended).toBe(false);
+    expect(answer(exchanged(LENIENT), "TNXFERQSO", LENIENT).ended).toBe(true);
+    expect(answer(exchanged(LENIENT), "HPECUAGN", LENIENT).ended).toBe(true);
+  });
+});

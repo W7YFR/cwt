@@ -170,7 +170,15 @@ export function erased(words: readonly string[]): string[] {
   return out;
 }
 
-const CLOSING = ["73", "<SK>", "SK", "CUL", "CUAGN", "GB"];
+/** Words that sign off. TU is not one: it opens TU FER CALL as well. */
+const CLOSING = ["73", "<SK>", "SK", "CUL", "CUAGN", "GB", "GL", "CU"];
+
+/** Pairs of words that sign off: TNX FER QSO, TNX FB QSO. */
+const CLOSING_PAIRS = ["FER QSO", "FB QSO", "TNX QSO", "FOR QSO"];
+
+/** What signs off inside words run together. Short ones such as SK or GL
+ *  turn up inside other words, so only these count. */
+const CLOSING_RUN = ["73", "CUAGN", "FERQSO", "FBQSO", "TNXQSO"];
 
 /** A signal report: 599, 579, 5NN. */
 const REPORT_RE = /^[1-5][1-9N][1-9N]$/;
@@ -315,10 +323,14 @@ class Over {
     return this.words.includes(word) || (this.ear.lenient && this.joined.includes(word));
   }
 
-  /** Whether the over signs off. Run together, only 73 counts: SK or GB
-   *  turn up inside other words. */
+  /** Whether the over signs off: 73, SK, CUL, GL, TNX FER QSO and the like.
+   *  The same words the station signs off with. */
   closing(): boolean {
-    return this.words.some((w) => CLOSING.includes(w)) || (this.ear.lenient && this.joined.includes("73"));
+    const { words } = this;
+    if (words.some((w) => CLOSING.includes(w))) return true;
+    const pairs = words.slice(1).map((w, i) => `${words[i]} ${w}`);
+    if (pairs.some((p) => CLOSING_PAIRS.includes(p))) return true;
+    return this.ear.lenient && CLOSING_RUN.some((w) => this.joined.includes(w));
   }
 
   /** The word after the first of `labels`, past any filler. */
