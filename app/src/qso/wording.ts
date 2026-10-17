@@ -178,6 +178,20 @@ export function answers(s: Say, asked: readonly Question[]): string {
   return words(...parts, pick(s.rand, ["K", "KN"]));
 }
 
+const LABEL: Readonly<Record<Piece, string>> = { report: "RST", name: "NAME", qth: "QTH" };
+
+/** It asks for the pieces of your exchange it gave and has not had back. */
+export function askFor(s: Say, missing: readonly Piece[]): string {
+  const c = s.them.call;
+  const labels = missing.map((p) => LABEL[p]);
+  const head = maybe(s.rand, `${s.you} DE ${c}`);
+  if (labels.length === 1) {
+    const l = labels[0]!;
+    return words(head, pick(s.rand, [`UR ${l}? KN`, `${l}? KN`, `PSE UR ${l}? KN`]));
+  }
+  return words(head, pick(s.rand, [`PSE UR ${labels.join(" ES ")}? KN`, `UR ${labels.join(" ")}? KN`]));
+}
+
 /** Its 73, sent first, when you went on without signing. */
 export function signFirst(s: Say): string {
   const c = s.them.call;

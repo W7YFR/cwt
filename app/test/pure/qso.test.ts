@@ -250,7 +250,7 @@ describe("a QSO from your CQ", () => {
 
   it("signs first when you keep going, and the QSO ends on your 73", () => {
     let q = answer(start(), "CQ DE W7YFR K").qso;
-    q = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB KN`).qso;
+    q = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`).qso;
     const t = answer(q, "FB RIG HR IS K3 ES ANT IS DIPOLE KN", FIRST);
     expect(t.qso.stage).toBe("signing");
     expect(t.reply).toBe(`R R FB BOB TNX FER QSO HPE CUAGN 73 W7YFR DE ${q.them.call} <SK>`);
@@ -464,10 +464,17 @@ describe("reply length", () => {
     expect(t.reply).toBe(`W7YFR DE ${c} R NAME ${name} ${name} KN`);
     q = t.qso;
 
-    // No piece of yours: straight to the next one.
+    // Your name is still owed: it asks for it, and does not move on.
     t = answer(q, "FB KN", ctx);
-    expect(t.reply).toBe(`W7YFR DE ${c} QTH ${qth} ${qth} HW? KN`);
-    expect(t.qso.stage).toBe("exchanged");
+    expect(t.reply).toBe(`W7YFR DE ${c} UR NAME? KN`);
+    expect(t.qso.piece).toBe(q.piece);
+    t = answer(t.qso, "NAME BOB BOB KN", ctx);
+    expect(t.reply).toBe(`W7YFR DE ${c} R QTH ${qth} ${qth} HW? KN`);
+    q = t.qso;
+
+    // Your QTH back settles the last piece, and it signs.
+    t = answer(q, "QTH SALEM OR KN", ctx);
+    expect(t.qso.stage).toBe("signing");
   });
 
   it("sends the same piece again on AGN, and takes your name in any piece", () => {
@@ -495,7 +502,7 @@ describe("questions about one thing", () => {
   /** A QSO where the station has sent its exchange. */
   const exchanged = (): Qso => {
     const q = answer(newQso(seeded()), "CQ DE W7YFR K", FIRST).qso;
-    return answer(q, `${q.them.call} DE W7YFR UR 599 KN`, FIRST).qso;
+    return answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`, FIRST).qso;
   };
 
   it("sends its call for part of it with a ?", () => {
@@ -554,5 +561,68 @@ describe("showing an over", () => {
     expect(g.right).toBe(4);
     expect(g.marks.filter((m) => m.ok === false).map((m) => m.text).join("")).toBe("BOB");
     expect(gradeCopy("NAME BOB", "").right).toBe(0);
+  });
+});
+
+describe("the station moves on only once the current part is settled", () => {
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  const LENIENT: Context = { ...FIRST, ear: { lenient: true, saved: "" } };
+  const called = (ctx: Context): Qso => answer(newQso(seeded()), "CQ DE W7YFR K", ctx).qso;
+
+  it("asks for your report before it moves past its own", () => {
+    // The QSO from the screenshot, piece by piece.
+    const ctx: Context = { ...LENIENT, length: "pieces" };
+    let q = called(ctx);
+    const c = q.them.call;
+    q = answer(q, `${c} DEW7YFR TU FER QH EEEQSO QEEEEEEE TU FERCALL`, ctx).qso;
+    expect(q.stage).toBe("pieces");
+    const t = answer(q, "KRR KRR", ctx);
+    expect(t.reply).toBe(`W7YFR DE ${c} UR RST? KN`);
+    expect(t.qso.piece).toBe(1);
+    expect(answer(t.qso, "R UR 579 579 KN", ctx).reply).toMatch(/ NAME /);
+  });
+
+  it("sends the current piece again for a question it cannot place", () => {
+    // The over from the second screenshot: a garbled NAME IS WHAT?.
+    const ctx: Context = { ...LENIENT, length: "pieces" };
+    let q = called(ctx);
+    q = answer(q, `${q.them.call} DE W7YFR UR 579 KN`, ctx).qso;
+    q = answer(q, "R UR 579 KN", ctx).qso;
+    expect(q.last).toMatch(/ NAME /);
+    expect(answer(q, "NA E ISWHAT?", ctx).reply).toBe(q.last);
+  });
+
+  it("asks for every piece it gave and did not get back, in full", () => {
+    let q = called(FIRST);
+    q = answer(q, `${q.them.call} DE W7YFR UR 599 KN`, FIRST).qso;
+    const t = answer(q, "FB TNX KN", FIRST);
+    expect(t.reply).toBe(`W7YFR DE ${q.them.call} PSE UR NAME ES QTH? KN`);
+    expect(t.qso.stage).toBe("exchanged");
+  });
+
+  it("asks you to send again an over it cannot read", () => {
+    let q = called(FIRST);
+    q = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`, FIRST).qso;
+    expect(answer(q, "XQZ JJV PTY", FIRST).reply).toBe(`PSE AGN W7YFR DE ${q.them.call} KN`);
+    // Your rig and the weather are an over it can read.
+    expect(answer(q, "RIG HR IS IC7300 ES ANT IS DIPOLE WX SUNNY", FIRST).qso.stage).toBe("signing");
+  });
+});
+
+describe("error runs", () => {
+  it("takes a run of dits as one error sign", () => {
+    expect(erased(wordsOf("NAME BOP EEE E E BOB"))).toEqual(["NAME", "BOB"]);
+    expect(erased(wordsOf("QTH SALEN I I I SALEM"))).toEqual(["QTH", "SALEM"]);
+  });
+
+  it("splits an error sign keyed against a word", () => {
+    expect(erased(wordsOf("TU FER QH EEEQSO"))).toEqual(["TU", "FER", "QSO"]);
+    expect(erased(wordsOf("QSO QEEEEEEE TU"))).toEqual(["QSO", "TU"]);
+  });
+
+  it("keeps a short run, and words of dits alone", () => {
+    expect(erased(wordsOf("73 <SK> E E"))).toEqual(["73", "<SK>", "E", "E"]);
+    expect(erased(wordsOf("NAME IS BOB ES QTH"))).toEqual(["NAME", "IS", "BOB", "ES", "QTH"]);
+    expect(erased(wordsOf("HI HI"))).toEqual(["HI", "HI"]);
   });
 });

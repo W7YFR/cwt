@@ -22,8 +22,13 @@
  * character off as the call, and knows your call from Configuration.
  *
  * Piece by piece, the exchange comes one item per over: report, name, QTH.
- * It moves on after any over from you, and starts with R, TNX or FB when
- * your over held a piece of your own exchange.
+ * It starts each with R, TNX or FB when your over held a piece of your own
+ * exchange or an acknowledgement.
+ *
+ * It moves on only once the current part is settled. Everything it sends,
+ * you send back: it asks for your report, name or QTH until it has each one
+ * it gave. An over it cannot read gets PSE AGN, and a question it cannot
+ * place gets the current part again.
  *
  * It thanks you for a report only when your over held one. What it says is
  * worded in wording.ts, a little differently each time.
@@ -51,6 +56,8 @@ export interface Qso {
   readonly speed: Speed;
   /** Piece by piece: the next piece of `PIECES` to send. */
   readonly piece: number;
+  /** The pieces of your exchange it has copied. */
+  readonly got: readonly wording.Piece[];
 }
 
 /** How the station reads your overs. */
@@ -107,14 +114,51 @@ export function isErrorSign(word: string): boolean {
   return dits >= 6;
 }
 
+/** Whether `word` is keyed with dits alone and could be part of a run of
+ *  them: E, EE, I, S, 5. Words such as HI are not. */
+function ditsOnly(word: string): boolean {
+  return /^[EISH5]+$/.test(word) && !DIT_WORDS.has(word);
+}
+
+function ditCount(word: string): number {
+  let dits = 0;
+  for (const ch of word) dits += DITS[ch] ?? 0;
+  return dits;
+}
+
+/** A word with the error sign keyed against it, as in EEEQSO or QEEEEEEE,
+ *  split into the word and the sign. */
+function unglue(word: string): string[] {
+  const m = /^(.*?)(E{3,})(.*)$/.exec(word);
+  if (!m || (!m[1] && !m[3])) return [word];
+  return [...(m[1] ? [m[1]] : []), m[2]!, ...(m[3] ? unglue(m[3]) : [])];
+}
+
 /** The words of an over with each error sign applied: the sign and the word
- *  before it are gone. */
+ *  before it are gone.
+ *
+ * A run of dits keyed unevenly reads as several words, as in EEE E E. The
+ * whole run is one sign when it adds up to six dits or holds a sign: it
+ * drops the one word before it. A short run, as the E E that ends a QSO,
+ * is kept. */
 export function erased(words: readonly string[]): string[] {
   const out: string[] = [];
-  for (const w of words) {
-    if (isErrorSign(w)) out.pop();
-    else out.push(w);
+  let run: string[] = [];
+  const flush = () => {
+    const sign = run.some(isErrorSign) || run.reduce((n, w) => n + ditCount(w), 0) >= 6;
+    if (sign) out.pop();
+    else out.push(...run);
+    run = [];
+  };
+  for (const w of words.flatMap(unglue)) {
+    if (w === "<HH>" || ditsOnly(w)) {
+      run.push(w);
+      continue;
+    }
+    flush();
+    out.push(w);
   }
+  flush();
   return out;
 }
 
@@ -140,6 +184,7 @@ export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED): Qso 
     last: "",
     speed,
     piece: 0,
+    got: [],
   };
 }
 
@@ -160,6 +205,23 @@ const ASKS_FOR: Readonly<Record<string, wording.Question>> = {
   RST: "report",
   RPT: "report",
 };
+
+/** Words the station knows, for telling an over it can read from one it
+ *  cannot. Calls, reports, numbers and its own name and QTH count too. */
+const KNOWN = new Set([
+  "R", "RR", "RRR", "QSL", "TU", "TNX", "TKS", "FER", "FOR", "UR", "RST", "RPT", "NAME",
+  "OP", "NM", "QTH", "HR", "IS", "ES", "AND", "FB", "OM", "YL", "GM", "GA", "GE", "GN", "HW",
+  "CPY", "K", "KN", "BK", "AR", "SK", "DE", "CQ", "73", "88", "OK", "SOLID", "ALL", "GUD",
+  "GD", "VY", "NICE", "RIG", "ANT", "PWR", "W", "WATTS", "DIPOLE", "VERT", "YAGI", "BEAM",
+  "LOOP", "WX", "TEMP", "SUNNY", "CLDY", "RAIN", "SNOW", "HOT", "COLD", "WARM", "AGE", "YRS",
+  "LIC", "HAM", "SINCE", "CALL", "QRZ", "QRS", "QRQ", "QSB", "QRM", "QRN", "QRP", "AGN", "PSE",
+  "SRI", "GL", "CUL", "CUAGN", "GB", "HPE", "NW", "MY", "THE", "A", "I", "IN", "AT", "ON",
+  "TO", "WID", "ABT", "OLD", "NEW", "KEY", "BUG", "PADDLE", "MNI", "DR", "SIG", "SIGS", "WKD",
+  "QSO", "FIRST", "TIME", "RETIRED", "WORK", "SO", "BUT", "NOT", "NO", "YES", "HI", "WATT",
+]);
+
+/** Questions that are part of an exchange, not about what was sent. */
+const NOT_QUESTIONS = new Set(["HW?", "CPY?"]);
 
 /** Words with a ? that are not part of a call. */
 const NOT_CALL = new Set(["AGN", "QRZ", "HW", "CPY", "QRS", "QRQ", "PSE", "UR", "SRI"]);
@@ -336,10 +398,66 @@ class Over {
     return out;
   }
 
-  /** Whether it holds a piece of your own exchange: a report, a name or a
-   *  QTH. */
-  holdsPiece(): boolean {
-    return this.hasReport() || this.yourName() !== "" || this.words.includes("QTH");
+  /** The pieces of your own exchange it holds: a report, a name, a QTH. */
+  pieces(): wording.Piece[] {
+    const out: wording.Piece[] = [];
+    if (this.hasReport()) out.push("report");
+    if (this.yourName()) out.push("name");
+    const at = this.words.indexOf("QTH");
+    if (at >= 0 && at < this.words.length - 1) out.push("qth");
+    return out;
+  }
+
+  /** Whether it acknowledges: R, QSL, TNX, FB, OK and the like. */
+  acknowledges(): boolean {
+    return this.words.some((w) => ["R", "RR", "RRR", "QSL", "TU", "TNX", "FB", "OK", "SOLID"].includes(w));
+  }
+
+  /** Whether it asks something the station cannot place: a word with a ?
+   *  that is none of AGN?, HW? or the questions it answers. */
+  puzzles(): boolean {
+    return this.words.some((w) => w.endsWith("?") && w !== "?" && !NOT_QUESTIONS.has(w));
+  }
+
+  /** Whether the station can read it: most of its words are words it knows.
+   *  The words after NAME, OP and QTH count, whatever they are. */
+  readable(them: Station): boolean {
+    const { words } = this;
+    if (words.length === 0) return false;
+    const theirs = new Set([...them.name.split(" "), ...them.qth.split(" ")]);
+    let known = 0;
+    let free = 0;
+    for (const w of words) {
+      const bare = w.replace(/\?+$/, "");
+      if (this.knows(bare) || theirs.has(bare)) known++;
+      else if (free > 0) known++;
+      // Filler, as the HR IS in NAME HR IS BOB, leaves the free words for
+      // what comes after it.
+      if (free > 0 && !FILLER.has(bare)) free--;
+      if (["NAME", "OP", "NM"].includes(bare)) free = 1;
+      else if (bare === "QTH") free = 3;
+    }
+    return known * 2 >= words.length;
+  }
+
+  /** Whether `word` is one the station knows. Lenient, words run together
+   *  count when they split into known words, or hold a call. */
+  private knows(word: string): boolean {
+    if (word.includes(UNKNOWN)) return false;
+    if (word === "" || KNOWN.has(word) || isCall(word) || REPORT_RE.test(word)) return true;
+    // Prosigns, and words with a digit: a rig, a power, a time.
+    if (/^<[A-Z]+>$/.test(word) || /\d/.test(word)) return true;
+    if (!this.ear.lenient) return false;
+    if (/[A-Z0-9]?[A-Z]\d[A-Z]{1,3}/.test(word)) return true;
+    // Split into known words, shortest pieces first.
+    const ok = new Array<boolean>(word.length + 1).fill(false);
+    ok[0] = true;
+    for (let i = 1; i <= word.length; i++) {
+      for (let j = Math.max(0, i - 7); j < i && !ok[i]; j++) {
+        if (ok[j] && KNOWN.has(word.slice(j, i))) ok[i] = true;
+      }
+    }
+    return ok[word.length]!;
   }
 
   /** Whether it holds a report. */
@@ -365,12 +483,12 @@ class Over {
     return name && /^[A-Z]{2,}$/.test(name) ? name : "";
   }
 
-  /** Nothing in it, or most of its words hold a character that read as
-   *  nothing. */
-  garbled(): boolean {
-    const bad = this.words.filter((w) => w.includes(UNKNOWN)).length;
-    return this.words.length === 0 || bad * 2 >= this.words.length;
-  }
+}
+
+/** The pieces of its exchange the station has sent so far. */
+function sentPieces(qso: Qso): readonly wording.Piece[] {
+  if (qso.stage === "pieces") return wording.PIECES.slice(0, qso.piece);
+  return qso.stage === "exchanged" ? wording.PIECES : [];
 }
 
 function say(qso: Qso, reply: string, stage: Stage = qso.stage): Turn {
@@ -422,9 +540,11 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   }
 
   if (qso.stage !== "cq" && qso.stage !== "asking") {
-    // Your name, whenever you send it.
+    // Your name, and each piece of your exchange, whenever you send them.
     const name = over.yourName();
     if (name) qso = { ...qso, yourName: name };
+    const got = over.pieces().filter((p) => !qso.got.includes(p));
+    if (got.length) qso = { ...qso, got: [...qso.got, ...got] };
     // A question about one thing gets that thing. Not kept as the last over,
     // so AGN after it still means the over before.
     const asked = over.questions(them.call);
@@ -452,21 +572,23 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
       return say(qso, wording.callAgain(voice(qso)));
     }
 
-    case "pieces": {
-      if (over.closing()) return end(qso, wording.signOff(voice(qso)));
-      if (again) return say(qso, qso.last);
-      if (over.garbled()) return { qso, reply: wording.askAgain(voice(qso)), ended: false };
-      const open = over.holdsPiece() ? wording.gotPiece(voice(qso)) : "";
-      const next = { ...qso, piece: qso.piece + 1 };
-      const done = next.piece >= wording.PIECES.length;
-      return say(next, wording.piece(voice(qso), qso.piece, open), done ? "exchanged" : "pieces");
-    }
-
+    case "pieces":
     case "exchanged": {
       if (over.closing()) return end(qso, wording.signOff(voice(qso)));
-      if (again) return say(qso, qso.last);
-      // Not kept as the last over: AGN after it still means the exchange.
-      if (over.garbled()) return { qso, reply: wording.askAgain(voice(qso)), ended: false };
+      // The current part again, for AGN or a question it cannot place.
+      if (again || over.puzzles()) return say(qso, qso.last);
+      // Neither of these is kept as the last over, so AGN after one still
+      // means the part it is on.
+      const hold = (reply: string): Turn => ({ qso, reply, ended: false });
+      if (!over.readable(them)) return hold(wording.askAgain(voice(qso)));
+      const missing = sentPieces(qso).filter((p) => !qso.got.includes(p));
+      if (missing.length) {
+        return hold(wording.askFor(voice(qso), qso.stage === "pieces" ? missing.slice(0, 1) : missing));
+      }
+      if (qso.stage === "pieces" && qso.piece < wording.PIECES.length) {
+        const open = over.pieces().length || over.acknowledges() ? wording.gotPiece(voice(qso)) : "";
+        return say({ ...qso, piece: qso.piece + 1 }, wording.piece(voice(qso), qso.piece, open));
+      }
       return say(qso, wording.signFirst(voice(qso)), "signing");
     }
 
