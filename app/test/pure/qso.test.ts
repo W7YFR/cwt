@@ -61,7 +61,7 @@ describe("copying an over", () => {
   });
 
   it("ends the over a moment after K", () => {
-    const readings = copyOf("CQ DE W7YFR K", 20, 2);
+    const readings = copyOf("CQ DE W7YFR K", 20, 3);
     expect(readings.at(-1)!.over).toBe(true);
     // Not before the K has been read.
     for (const r of readings) if (!r.text.endsWith(" K")) expect(r.over).toBe(false);
@@ -83,11 +83,17 @@ describe("copying an over", () => {
   it("takes KN, BK, SK and a question as the turn", () => {
     const timing = targetTiming(20);
     for (const end of ["<KN>", "KN", "<BK>", "<SK>", "AGN?", "?"]) {
-      expect(overEnded(`W7YFR DE K4ABC ${end}`, 1.5, timing)).toBe(true);
+      expect(overEnded(`W7YFR DE K4ABC ${end}`, 2.5, timing)).toBe(true);
     }
+    // A pause after a K in the middle of an over is not the end of it.
+    expect(overEnded("R R K", 1.5, timing)).toBe(false);
+    // A K alone, at the start of an over, waits twice as long.
+    expect(overEnded("K", 2.5, timing)).toBe(false);
+    expect(overEnded("K", 4, timing)).toBe(false);
+    expect(overEnded("K", 4.8, timing)).toBe(true);
     // A misread character before a ? is not a question.
-    expect(overEnded("K4ABC UR 5NN 5?", 1.5, timing)).toBe(false);
-    expect(overEnded("W7YFR DE AA7K", 1.5, timing)).toBe(false);
+    expect(overEnded("K4ABC UR 5NN 5?", 2.5, timing)).toBe(false);
+    expect(overEnded("W7YFR DE AA7K", 2.5, timing)).toBe(false);
     expect(overEnded("", 10, timing)).toBe(false);
   });
 });

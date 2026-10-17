@@ -316,6 +316,16 @@ const QUESTION_RE = /^[A-Z]*\?$/;
 /** How long the key must stay up to end an over that does not end with a
  *  turn word. Never less than this many word gaps. */
 export const OVER_QUIET_SEC = 3;
+
+/** How long the key must stay up after a turn word, beyond `END_QUIET_DITS`.
+ *  Longer than a take's end: a K can be an acknowledgement in the middle of
+ *  an over, and the sender may go on after a pause. */
+export const TURN_QUIET_SEC = 2;
+
+/** How many times longer the wait is when the turn word is all that has been
+ *  sent. A K at the start of an over is most often an acknowledgement, with
+ *  the rest of the over to come. */
+export const LONE_TURN_FACTOR = 2;
 export const OVER_QUIET_WORD_GAPS = 3;
 
 /** Characters read before the tone is held. With no target there is nothing
@@ -331,15 +341,16 @@ export interface Copy {
   readonly over: boolean;
 }
 
-/** Whether an over has ended: a turn word and the same wait a take ends on,
- *  or a long silence after anything at all. */
+/** Whether an over has ended: a turn word and `TURN_QUIET_SEC`, twice that
+ *  for a turn word alone, or a long silence after anything at all. */
 export function overEnded(text: string, quietSec: number, timing: Timing): boolean {
   const words = text.trim().split(/\s+/);
   const last = words[words.length - 1] ?? "";
   if (!last) return false;
   const turn = TURN_WORDS.has(last) || QUESTION_RE.test(last);
+  const lone = words.length === 1 ? LONE_TURN_FACTOR : 1;
   const wait = turn
-    ? END_QUIET_DITS * timing.unitSec + END_QUIET_SEC
+    ? (END_QUIET_DITS * timing.unitSec + TURN_QUIET_SEC) * lone
     : Math.max(OVER_QUIET_SEC, OVER_QUIET_WORD_GAPS * (timing.wordGapSec || 7 * timing.unitSec));
   return quietSec >= wait;
 }
