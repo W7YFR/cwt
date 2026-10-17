@@ -17,6 +17,7 @@ import {
   type Qso,
 } from "@/qso/cq";
 import { randomStation } from "@/qso/station";
+import { STEPS, faster, setTo, slower } from "@/qso/speed";
 
 /** A fixed sequence, so the station is the same every run. */
 function seeded(seed = 1): () => number {
@@ -325,5 +326,102 @@ describe("a QSO from your CQ", () => {
       expect(s.call).not.toBe("W7YFR");
       expect(isCall(s.call)).toBe(true);
     }
+  });
+});
+
+describe("QRS and QRQ steps", () => {
+  const at = (charWpm: number, farnsworthWpm: number) => ({ charWpm, farnsworthWpm });
+
+  it("steps the effective speed down and keeps the character speed", () => {
+    expect(slower(at(25, 16))).toEqual(at(25, 15));
+    expect(slower(at(25, 15))).toEqual(at(25, 14));
+    expect(slower(at(25, 10))).toEqual(at(25, 9));
+    expect(slower(at(25, 6))).toEqual(at(25, 6));
+  });
+
+  it("steps the effective speed up to the character speed", () => {
+    expect(faster(at(25, 16))).toEqual(at(25, 18));
+    expect(faster(at(25, 24))).toEqual(at(25, 25));
+  });
+
+  it("raises both when they are equal", () => {
+    expect(faster(at(25, 25))).toEqual(at(26, 26));
+    expect(faster(at(20, 20))).toEqual(at(22, 22));
+    expect(faster(at(28, 28))).toEqual(at(30, 30));
+    expect(faster(at(38, 38))).toEqual(at(40, 40));
+    expect(faster(at(40, 40))).toEqual(at(40, 40));
+  });
+
+  it("walks every step from the bottom to the top", () => {
+    let s = at(40, 6);
+    const seen = [s.farnsworthWpm];
+    while (s.farnsworthWpm < 40) {
+      s = faster(s);
+      seen.push(s.farnsworthWpm);
+    }
+    expect(seen).toEqual([...STEPS]);
+  });
+
+  it("sets the effective speed to a number asked for", () => {
+    expect(setTo(at(25, 16), 12)).toEqual(at(25, 12));
+    expect(setTo(at(25, 16), 30)).toEqual(at(30, 30));
+    expect(setTo(at(25, 16), 1)).toEqual(at(25, 5));
+  });
+});
+
+describe("QRS and QRQ in a QSO", () => {
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  /** A QSO the station has answered, at 25/16. */
+  const called = (): Qso =>
+    answer(newQso(seeded(), "", { charWpm: 25, farnsworthWpm: 16 }), "CQ DE W7YFR K", FIRST).qso;
+
+  it("sends its last over again, slower, on QRS", () => {
+    for (const over of ["QRS", "PSE QRS K", "QRS?", "QRS PSE KN"]) {
+      const q = called();
+      const t = answer(q, over, FIRST);
+      expect(t.reply).toBe(q.last);
+      expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 15 });
+      expect(t.qso.stage).toBe("called");
+    }
+  });
+
+  it("holds the new speed for the rest of the QSO", () => {
+    let q = answer(called(), "QRS K", FIRST).qso;
+    q = answer(q, `${q.them.call} DE W7YFR UR 599 KN`, FIRST).qso;
+    expect(q.stage).toBe("exchanged");
+    expect(q.speed).toEqual({ charWpm: 25, farnsworthWpm: 15 });
+  });
+
+  it("goes to the speed asked for with a number", () => {
+    const t = answer(called(), "QRS 10 K", FIRST);
+    expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 10 });
+    expect(answer(called(), "QRQ 20WPM K", FIRST).qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 20 });
+  });
+
+  it("sends its last over again, faster, on QRQ alone", () => {
+    const q = called();
+    const t = answer(q, "PSE QRQ K", FIRST);
+    expect(t.reply).toBe(q.last);
+    expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 18 });
+  });
+
+  it("answers the rest of an over with QRQ in it, faster", () => {
+    const q = called();
+    const t = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB QRQ? KN`, FIRST);
+    expect(t.qso.stage).toBe("exchanged");
+    expect(t.reply).not.toBe(q.last);
+    expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 18 });
+  });
+
+  it("does nothing with QRS before it has sent anything", () => {
+    const q = newQso(seeded());
+    expect(answer(q, "QRS K", FIRST).reply).toBeNull();
+  });
+
+  it("starts each new QSO at the speed it is given", () => {
+    expect(newQso(seeded(), "", { charWpm: 20, farnsworthWpm: 12 }).speed).toEqual({
+      charWpm: 20,
+      farnsworthWpm: 12,
+    });
   });
 });

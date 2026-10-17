@@ -10,7 +10,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
 import { loadPrefs, loadSpeed, loadUser, savePrefs } from "@/io/storage";
-import { answer, newQso, type Qso } from "@/qso/cq";
+import { DEFAULT_SPEED, answer, newQso, type Qso } from "@/qso/cq";
+import type { Speed } from "@/qso/speed";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconUser } from "./Icons";
@@ -21,8 +22,14 @@ import { useRecorder } from "./useRecorder";
 import { APP_NAME, Brandmark } from "./Wordmark";
 import { visitWordmark } from "./wordmarks";
 
-/** The speed with none saved: the practice page's own default. */
-const DEFAULT_WPM = 25;
+/** A speed as the app writes it: 25 wpm, or 25/16 wpm with Farnsworth. */
+function wpm(s: Speed): string {
+  return s.charWpm === s.farnsworthWpm ? `${s.charWpm} wpm` : `${s.charWpm}/${s.farnsworthWpm} wpm`;
+}
+
+function same(a: Speed, b: Speed): boolean {
+  return a.charWpm === b.charWpm && a.farnsworthWpm === b.farnsworthWpm;
+}
 
 /** How long the other station takes to start its reply, in seconds. */
 const REPLY_DELAY_SEC = [0.6, 1.4] as const;
@@ -71,14 +78,7 @@ export function QsoScreen({
   onConfigure,
   onPage,
 }: QsoScreenProps): React.ReactElement {
-  const speed = useMemo(
-    () => loadSpeed() ?? { charWpm: DEFAULT_WPM, farnsworthWpm: DEFAULT_WPM },
-    [],
-  );
-  const timing = useMemo(
-    () => targetTiming(speed.charWpm, speed.farnsworthWpm),
-    [speed],
-  );
+  const speed = useMemo(() => loadSpeed() ?? DEFAULT_SPEED, []);
 
   const [phase, setPhase] = useState<Phase>("listening");
   const [lines, setLines] = useState<Line[]>([]);
@@ -89,7 +89,9 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoCopy: mode });
   };
   const lenient = copyMode === "lenient";
-  const qso = useRef<Qso>(newQso(Math.random));
+  const qso = useRef<Qso>(newQso(Math.random, "", speed));
+  /** How fast the station sends, after QRS or QRQ. */
+  const [theirSpeed, setTheirSpeed] = useState<Speed>(speed);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const afterReply = useRef<() => void>(() => {});
   /** The last over answered. */
@@ -134,6 +136,8 @@ export function QsoScreen({
       timer.current = null;
       recorder?.restart();
       setPhase("listening");
+      // A new station starts at your speed.
+      if (!qso.current.last) setTheirSpeed(speed);
     }, AFTER_REPLY_MS);
   };
 
@@ -149,7 +153,8 @@ export function QsoScreen({
     const them = turn.qso.them;
     const sent: Line = { who: turn.qso.you || "You", text: heard, you: true };
 
-    qso.current = turn.ended ? newQso(Math.random, turn.qso.you) : turn.qso;
+    qso.current = turn.ended ? newQso(Math.random, turn.qso.you, speed) : turn.qso;
+    const at = turn.qso.speed;
     setLines((l) => [...l, sent]);
 
     if (turn.reply === null) {
@@ -167,7 +172,8 @@ export function QsoScreen({
         timer.current = null;
         setPhase("playing");
         setLines((l) => [...l, { who: them.call, text: reply, you: false }]);
-        player.playTarget(idealTimeline(reply, timing), {
+        setTheirSpeed(at);
+        player.playTarget(idealTimeline(reply, targetTiming(at.charWpm, at.farnsworthWpm)), {
           peak: 0.5,
           padSec: 0.1,
           voice: { toneHz: them.toneHz, filterQ: 3 },
@@ -175,7 +181,7 @@ export function QsoScreen({
       },
       (lo + Math.random() * (hi - lo)) * 1000,
     );
-  }, [copy.over, copy.text, copy.turn, phase, recorder, player, timing, lenient]);
+  }, [copy.over, copy.text, copy.turn, phase, recorder, player, speed, lenient]);
 
   useEffect(
     () => () => {
@@ -188,7 +194,8 @@ export function QsoScreen({
     player.wake();
     setLines([]);
     setNote("");
-    qso.current = newQso(Math.random);
+    qso.current = newQso(Math.random, "", speed);
+    setTheirSpeed(speed);
     answered.current = -1;
     void rec.start();
   };
@@ -260,10 +267,13 @@ export function QsoScreen({
             ))}
           </div>
           <span className="hint">
-            {speed.charWpm === speed.farnsworthWpm
-              ? `${speed.charWpm} wpm`
-              : `${speed.charWpm}/${speed.farnsworthWpm} wpm`}
-            , set on the practice page
+            {wpm(speed)}, set on the practice page
+            {!same(theirSpeed, speed) && (
+              <>
+                {" "}
+                · <span data-testid="qso-their-speed">the station sends at {wpm(theirSpeed)}</span>
+              </>
+            )}
           </span>
         </div>
 

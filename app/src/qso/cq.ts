@@ -9,6 +9,8 @@
  *   - its call with a question mark gets its call confirmed;
  *   - an over without its call gets its call again;
  *   - your call after DE replaces the one it copied before;
+ *   - QRS gets its last over again, slower, and QRQ makes it faster (see
+ *     speed.ts). The new speed holds until you ask again;
  *   - AGN or ? gets its last over again;
  *   - an exchange it cannot read gets PSE AGN;
  *   - an exchange with no 73 gets its own 73, and the QSO ends on yours.
@@ -24,6 +26,7 @@
  */
 
 import { UNKNOWN } from "@/morse";
+import { faster, setTo, slower, type Speed } from "./speed";
 import { randomStation, type Rand, type Station } from "./station";
 import * as wording from "./wording";
 
@@ -38,6 +41,8 @@ export interface Qso {
   readonly yourName: string;
   /** The station's last over, for AGN. */
   readonly last: string;
+  /** How fast the station sends. */
+  readonly speed: Speed;
 }
 
 /** How the station reads your overs. */
@@ -111,9 +116,24 @@ const REPORT_RE = /^[1-5][1-9N][1-9N]$/;
 /** Words that sit between a label and its value: NAME HR IS BOB. */
 const FILLER = new Set(["HR", "IS", "ES", "=", "<BT>"]);
 
-export function newQso(rand: Rand, not = ""): Qso {
-  return { stage: "cq", them: randomStation(rand, not), you: "", yourName: "", last: "" };
+/** The speed with none given: the practice page's own default. */
+export const DEFAULT_SPEED: Speed = { charWpm: 25, farnsworthWpm: 25 };
+
+/** A new QSO with a new station, never at the call `not`, sending at
+ *  `speed`: your speed. */
+export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED): Qso {
+  return { stage: "cq", them: randomStation(rand, not), you: "", yourName: "", last: "", speed };
 }
+
+/** A request to send slower or faster, with the effective speed asked for
+ *  when a number came with it. */
+interface SpeedAsk {
+  readonly slower: boolean;
+  readonly wpm?: number;
+}
+
+/** Words that may come with QRS or QRQ in an over that asks nothing else. */
+const ASK_WORDS = new Set(["QRS", "QRQ", "PSE", "DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "WPM"]);
 
 /** The words of an over. A prosign stands alone even when keyed against a
  *  word. */
@@ -231,6 +251,28 @@ class Over {
     return word === them || (this.ear.lenient && nearly(word, them));
   }
 
+  /** QRS or QRQ, as QRS, PSE QRS, QRS? or QRS 12. */
+  speedAsk(): SpeedAsk | null {
+    const { words } = this;
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i]!.replace(/\?$/, "");
+      if (w !== "QRS" && w !== "QRQ") continue;
+      const n = /^(\d{1,2})(?:WPM)?$/.exec(words[i + 1] ?? "")?.[1];
+      return n ? { slower: w === "QRS", wpm: Number(n) } : { slower: w === "QRS" };
+    }
+    if (!this.ear.lenient) return null;
+    if (this.joined.includes("QRS")) return { slower: true };
+    if (this.joined.includes("QRQ")) return { slower: false };
+    return null;
+  }
+
+  /** Whether it asks for a speed and nothing else. */
+  onlyAsks(): boolean {
+    return this.words.every(
+      (w) => ASK_WORDS.has(w.replace(/\?$/, "")) || w === "?" || isCall(w) || /^\d{1,2}$/.test(w),
+    );
+  }
+
   /** Whether it holds a report. */
   hasReport(): boolean {
     return this.words.some((w) => REPORT_RE.test(w));
@@ -279,6 +321,21 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   // Your call after DE, once the station has one, replaces it.
   const fixed = qso.stage === "cq" || qso.stage === "asking" ? null : over.deCall(them.call);
   if (fixed) qso = { ...qso, you: fixed };
+
+  // QRS or QRQ, once the station has sent something. QRS, or a request with
+  // nothing else in it, gets the last over again at the new speed. QRQ with
+  // more in the over is answered as usual, faster.
+  const ask = qso.last ? over.speedAsk() : null;
+  if (ask) {
+    const speed =
+      ask.wpm !== undefined
+        ? setTo(qso.speed, ask.wpm)
+        : ask.slower
+          ? slower(qso.speed)
+          : faster(qso.speed);
+    qso = { ...qso, speed };
+    if (ask.slower || over.onlyAsks()) return { qso, reply: qso.last, ended: false };
+  }
   const voice = (q: Qso): wording.Say => ({ them, you: q.you, name: q.yourName, rand, hour });
 
   switch (qso.stage) {

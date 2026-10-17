@@ -11,6 +11,7 @@ nothing to the site. The next release carries them.
 
 - A **QSO** page, opened from the **Practice** and **QSO** switch in the header. Call CQ, and a made-up station answers in CW and works you through to 73.
 - On the **QSO** page, the station words its overs differently each time. It asks again when it cannot copy you, and it takes your corrections, such as a call sent again after the error sign.
+- On the **QSO** page, QRS makes the station send its last over again, slower, and QRQ makes it send faster. QRS 12 or QRQ 20 asks for that effective speed.
 - **Lenient** copy on the **QSO** page reads your sending at your own spacing and takes a call with one character wrong. **Strict** copy reads it at the set speed.
 
 ## v1.8.1 — 2026-10-15
