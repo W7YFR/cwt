@@ -18,6 +18,7 @@ import {
 } from "@/qso/cq";
 import { randomStation } from "@/qso/station";
 import { STEPS, faster, setTo, slower } from "@/qso/speed";
+import { gradeCopy, revealed } from "@/qso/show";
 
 /** A fixed sequence, so the station is the same every run. */
 function seeded(seed = 1): () => number {
@@ -527,5 +528,31 @@ describe("questions about one thing", () => {
   it("takes HW? as part of an exchange, not a question", () => {
     const q = exchanged();
     expect(answer(q, "FB HW? KN", FIRST).qso.stage).toBe("signing");
+  });
+});
+
+describe("showing an over", () => {
+  it("reveals the characters sent so far, with the spaces between", () => {
+    const text = "W7YFR DE K4ABC <SK>";
+    expect(revealed(text, 0)).toBe("");
+    expect(revealed(text, 3)).toBe("W7Y");
+    expect(revealed(text, 5)).toBe("W7YFR");
+    expect(revealed(text, 6)).toBe("W7YFR D");
+    expect(revealed(text, 13)).toBe("W7YFR DE K4ABC <SK>");
+    expect(revealed(text, 99)).toBe(text);
+  });
+
+  it("grades a copy character by character", () => {
+    const g = gradeCopy("UR RST 579", "ur rst 589");
+    expect(g.total).toBe(8);
+    expect(g.right).toBe(7);
+    expect(g.marks.map((m) => (m.ok === null ? "_" : m.ok ? "+" : "x")).join("")).toBe("++_+++_+x+");
+  });
+
+  it("marks what you did not copy wrong", () => {
+    const g = gradeCopy("NAME BOB", "NAME");
+    expect(g.right).toBe(4);
+    expect(g.marks.filter((m) => m.ok === false).map((m) => m.text).join("")).toBe("BOB");
+    expect(gradeCopy("NAME BOB", "").right).toBe(0);
   });
 });

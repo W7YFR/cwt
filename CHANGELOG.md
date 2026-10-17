@@ -14,6 +14,7 @@ nothing to the site. The next release carries them.
 - On the **QSO** page, QRS makes the station send its last over again, slower, and QRQ makes it send faster. QRS 12 or QRQ 20 asks for that effective speed.
 - **Length** on the **QSO** page sets how much the station says: **Full**, **Short**, or **Piece by piece**, where its report, name and QTH come one per over.
 - On the **QSO** page, NAME?, QTH?, RST? or part of the station's call with a ?, such as N1?, gets just that one thing.
+- **Station text** and **Your text** on the **QSO** page set what shows of each over: **Whole**, **As sent**, **Blurred** or **Off**. With **Copy**, you type what you hear from the station, and your copy is graded when the QSO ends.
 - **Lenient** copy on the **QSO** page reads your sending at your own spacing and takes a call with one character wrong. **Strict** copy reads it at the set speed.
 
 ## v1.8.1 — 2026-10-15
