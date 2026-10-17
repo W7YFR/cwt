@@ -216,8 +216,19 @@ export function QsoScreen({
   const qsoNo = useRef(0);
   /** The QSOs that are over. Their overs all show. */
   const [closed, setClosed] = useState<readonly number[]>([]);
-  /** A QSO that closes once the reply now playing ends. */
+  /** A QSO that ends once the reply now playing ends. */
   const closing = useRef<number | null>(null);
+  /** A QSO that has ended with your copy not yet graded. It closes when you
+   *  start your next over, press Stop or ask for the grade. */
+  const [finished, setFinished] = useState<number | null>(null);
+  const finishedRef = useRef<number | null>(null);
+  finishedRef.current = finished;
+
+  /** End QSO `n`: everything in it shows, and your copy is graded. */
+  const close = useCallback((n: number) => {
+    setClosed((c) => (c.includes(n) ? c : [...c, n]));
+    setFinished((f) => (f === n ? null : f));
+  }, []);
   /** The station's over now playing, as a line, and how many of its
    *  characters have been sent. */
   const [playing, setPlaying] = useState<{ line: number; shown: number } | null>(null);
@@ -267,9 +278,9 @@ export function QsoScreen({
   useEffect(() => {
     if (recorder) return;
     quiet();
-    const n = qsoNo.current;
-    setClosed((c) => (c.includes(n) ? c : [...c, n]));
-  }, [recorder, quiet]);
+    close(qsoNo.current);
+    if (finishedRef.current !== null) close(finishedRef.current);
+  }, [recorder, quiet, close]);
 
   const source = useMemo(
     () => (recorder ? { recorder, ...speed } : null),
@@ -282,15 +293,31 @@ export function QsoScreen({
       timer.current = null;
       recorder?.restart();
       setPhase("listening");
+      // The last over has played: now the QSO is over. With copy to grade,
+      // it waits for you to finish typing.
       if (closing.current !== null) {
         const n = closing.current;
         closing.current = null;
-        setClosed((c) => [...c, n]);
+        if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
+          setFinished(n);
+          setNote("The QSO is over. Finish your copy, then call CQ for the next one.");
+        } else {
+          close(n);
+          setNote("The QSO is over. Call CQ for the next one.");
+        }
       }
       // A new station starts at your speed.
       if (!qso.current.last) setTheirSpeed(speed);
     }, AFTER_REPLY_MS);
   };
+
+  /* Your next over has begun: the copy of the QSO before is done. */
+  useEffect(() => {
+    if (finished === null || phase !== "listening" || copy.turn === answered.current) return;
+    if (!copy.text && !copy.keying) return;
+    close(finished);
+    setNote("");
+  }, [finished, phase, copy.turn, copy.text, copy.keying, close]);
 
   /* Your over is done: answer it. */
   useEffect(() => {
@@ -326,7 +353,7 @@ export function QsoScreen({
     if (turn.ended) closing.current = n;
 
     const reply = turn.reply;
-    setNote(turn.ended ? "The QSO is over. Call CQ for the next one." : "");
+    setNote("");
     setPhase("waiting");
     const [lo, hi] = REPLY_DELAY_SEC;
     timer.current = setTimeout(
@@ -367,6 +394,7 @@ export function QsoScreen({
     setPlaying(null);
     qsoNo.current = 0;
     closing.current = null;
+    setFinished(null);
     qso.current = newQso(Math.random, "", speed);
     setTheirSpeed(speed);
     answered.current = -1;
@@ -557,7 +585,26 @@ export function QsoScreen({
           )}
         </ol>
 
-        {note && <p className="hint qsonote">{note}</p>}
+        {note && (
+          <p className="hint qsonote">
+            {note}
+            {finished !== null && (
+              <>
+                {" "}
+                <button
+                  className="link"
+                  data-testid="qso-grade"
+                  onClick={() => {
+                    close(finished);
+                    setNote("The QSO is over. Call CQ for the next one.");
+                  }}
+                >
+                  Grade my copy
+                </button>
+              </>
+            )}
+          </p>
+        )}
 
         {recorder && (
           <p className="hint">r starts your over again · enter or esc stops</p>

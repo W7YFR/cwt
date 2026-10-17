@@ -757,3 +757,16 @@ describe("its call sent wrong", () => {
     expect(answer(q, `${wrong}?`, LENIENT).reply).toBe(`R R DE ${c} ${c} K`);
   });
 });
+
+describe("HW ? with the ? keyed apart", () => {
+  it("takes it as HW?, not AGN", () => {
+    // The over from the screenshot, after the station asked for a report.
+    const ctx: Context = { rand: () => 0, hour: 20, ear: { lenient: true, saved: "" }, length: "pieces" };
+    let q = answer(newQso(seeded()), "CQ DE W7YFR K", ctx).qso;
+    const c = q.them.call;
+    q = answer(q, `${c} DE W7YFR TU FER CALL OP IS ROB ROB K`, ctx).qso;
+    q = answer(q, "HI", ctx).qso;
+    const t = answer(q, `W3QD EEE ${c} UR RST IS 4 NN 4NN <BT> HW ? K`, ctx);
+    expect(t.reply).toMatch(/ NAME /);
+  });
+});

@@ -274,6 +274,18 @@ export function nearly(a: string, b: string): boolean {
   return a.length === b.length ? rest(a, b) : a.length < b.length ? short(a, b) : short(b, a);
 }
 
+/** HW ? and CPY ?, the ? keyed apart, put back together. A lone ? after
+ *  them is part of the question, not AGN. */
+function joinQuestions(words: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const w of words) {
+    const prev = out[out.length - 1];
+    if (w === "?" && (prev === "HW" || prev === "CPY")) out[out.length - 1] = `${prev}?`;
+    else out.push(w);
+  }
+  return out;
+}
+
 /** One over, as the station reads it. */
 class Over {
   readonly words: string[];
@@ -284,7 +296,7 @@ class Over {
     heard: string,
     private readonly ear: Ear,
   ) {
-    this.words = erased(wordsOf(heard));
+    this.words = joinQuestions(erased(wordsOf(heard)));
     this.joined = this.words.join("");
   }
 
