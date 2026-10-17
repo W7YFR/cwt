@@ -29,7 +29,8 @@
  * It moves on only once the current part is settled. Everything it sends,
  * you send back: it asks for your report, name or QTH until it has each one
  * it gave. An over it cannot read gets PSE AGN, and a question it cannot
- * place gets the current part again.
+ * place gets the current part again. A piece you began that did not come
+ * through, as UR RST and nothing it can read, gets asked for.
  *
  * It thanks you for a report only when your over held one. What it says is
  * worded in wording.ts, a little differently each time.
@@ -61,6 +62,9 @@ export interface Qso {
   readonly piece: number;
   /** The pieces of your exchange it has copied. */
   readonly got: readonly wording.Piece[];
+  /** You have sent its call back, so it is working you, even while it asks
+   *  for a piece again. */
+  readonly working: boolean;
 }
 
 /** How the station reads your overs. */
@@ -189,6 +193,7 @@ export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED): Qso 
     search: NO_SEARCH,
     piece: 0,
     got: [],
+    working: false,
   };
 }
 
@@ -222,6 +227,15 @@ const KNOWN = new Set([
   "SRI", "GL", "CUL", "CUAGN", "GB", "HPE", "NW", "MY", "THE", "A", "I", "IN", "AT", "ON",
   "TO", "WID", "ABT", "OLD", "NEW", "KEY", "BUG", "PADDLE", "MNI", "DR", "SIG", "SIGS", "WKD",
   "QSO", "FIRST", "TIME", "RETIRED", "WORK", "SO", "BUT", "NOT", "NO", "YES", "HI", "WATT",
+]);
+
+/** How many words after DE it looks for your call. */
+const DE_REACH = 4;
+
+/** Words that start the rest of an over, after the calls. */
+const DE_STOP = new Set([
+  "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "<BT>", "R", "RR", "TNX", "TU", "UR", "RST",
+  "NAME", "QTH", "GM", "GA", "GE", "FB",
 ]);
 
 /** Questions that are part of an exchange, not about what was sent. */
@@ -301,14 +315,18 @@ class Over {
   }
 
   /** The calls sent after DE, each one as often as it was sent: DE W7YFR
-   *  W7YFR gives it twice. Run-together ones too, when lenient. */
+   *  W7YFR gives it twice. A fragment left from a mistake, as the W in DE W
+   *  W7YFR W7YFR, is passed over. Run-together ones too, when lenient. */
   private deCalls(them: string): string[] {
     const { words } = this;
     const out: string[] = [];
     for (let i = 0; i < words.length; i++) {
       if (words[i] !== "DE") continue;
-      for (let j = i + 1; j < words.length && isCall(words[j]!); j++) {
-        if (!this.isThem(words[j]!, them)) out.push(words[j]!);
+      for (let j = i + 1; j < words.length && j <= i + DE_REACH; j++) {
+        const w = words[j]!;
+        if (isCall(w)) {
+          if (!this.isThem(w, them)) out.push(w);
+        } else if (DE_STOP.has(w)) break;
       }
     }
     if (out.length || !this.ear.lenient) return out;
@@ -407,9 +425,29 @@ class Over {
     const out: wording.Piece[] = [];
     if (this.hasReport()) out.push("report");
     if (this.yourName()) out.push("name");
-    const at = this.words.indexOf("QTH");
-    if (at >= 0 && at < this.words.length - 1) out.push("qth");
+    if (this.qth() === "sent") out.push("qth");
     return out;
+  }
+
+  /** The pieces you began but that did not come through: a label with
+   *  nothing it can read after it. UR RST 4 4 B is a report begun. */
+  botched(): wording.Piece[] {
+    const { words } = this;
+    const out: wording.Piece[] = [];
+    if (words.some((w) => w === "RST" || w === "RPT") && !this.hasReport()) out.push("report");
+    if (words.some((w) => ["NAME", "OP", "NM"].includes(w)) && !this.yourName()) out.push("name");
+    if (this.qth() === "botched") out.push("qth");
+    return out;
+  }
+
+  /** Whether a QTH came with it: sent, begun with nothing it can read
+   *  after it, or not at all. */
+  private qth(): "sent" | "botched" | "none" {
+    const at = this.words.indexOf("QTH");
+    if (at < 0) return "none";
+    const where = this.words[at + 1];
+    const empty = !where || where.includes(UNKNOWN) || ["K", "KN", "BK", "<KN>", "<BK>"].includes(where);
+    return empty ? "botched" : "sent";
   }
 
   /** Whether it acknowledges: R, QSL, TNX, FB, OK and the like. */
@@ -568,7 +606,15 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
 
     case "called": {
       if (over.asksAbout(them.call)) return say(qso, wording.confirmCall(voice(qso)));
-      if (over.has(them.call)) {
+      if (over.has(them.call) || qso.working) {
+        const heard = over.has(them.call);
+        qso = { ...qso, working: true };
+        // AGN alone. With its call and more, the over is your exchange.
+        if (again && !heard) return say(qso, qso.last);
+        // Sent without its call, it has to be an over it can read.
+        if (!heard && !over.readable(them)) return say(qso, wording.askAgain(voice(qso)));
+        const botched = over.botched().filter((p) => !qso.got.includes(p));
+        if (botched.length) return say(qso, wording.askFor(voice(qso), botched));
         const reply = wording.exchange(voice(qso), over.hasReport());
         if (length === "pieces") return say({ ...qso, piece: 1 }, reply, "pieces");
         return say(qso, reply, "exchanged");

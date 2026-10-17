@@ -682,3 +682,48 @@ describe("QRS and QRQ search for your speed", () => {
     expect(qrq(at(40, 40), NO_SEARCH).speed).toEqual(at(40, 40));
   });
 });
+
+describe("a piece begun that did not come through", () => {
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  const LENIENT: Context = { ...FIRST, ear: { lenient: true, saved: "" } };
+
+  it("takes your call past a fragment left by a mistake", () => {
+    // The CQ from the screenshot.
+    const t = answer(newQso(seeded()), "CQ CQ CQ DE W 7YU EIEEEEEEI W7YFR W7YFR K", LENIENT);
+    expect(t.qso.you).toBe("W7YFR");
+  });
+
+  it("asks for a report it cannot read, and waits for it", () => {
+    const ctx: Context = { ...LENIENT, length: "pieces" };
+    let q = answer(newQso(seeded()), "CQ DE W7YFR K", ctx).qso;
+    const c = q.them.call;
+    // The over from the screenshot, with the station's call one character off.
+    const off = `${c.slice(0, 2)}X${c.slice(3)}`;
+    let t = answer(q, `K RR ${off} TU FER CALL <BT> UR RST IS 4 4 B 44 B K`, ctx);
+    expect(t.reply).toBe(`W7YFR DE ${c} UR RST? KN`);
+    expect(t.qso.stage).toBe("called");
+    q = t.qso;
+
+    // The report again, without its call: now it goes on.
+    t = answer(q, "UR RST 579 579 K", ctx);
+    expect(t.qso.stage).toBe("pieces");
+    expect(t.reply).toContain("R TNX FER RPT");
+  });
+
+  it("asks for a name or a QTH begun and not finished", () => {
+    let q = answer(newQso(seeded()), "CQ DE W7YFR K", FIRST).qso;
+    const c = q.them.call;
+    expect(answer(q, `${c} DE W7YFR UR 579 NAME ▯▯ KN`, FIRST).reply).toBe(
+      `W7YFR DE ${c} UR NAME? KN`,
+    );
+    expect(answer(q, `${c} DE W7YFR UR 579 NAME BOB QTH KN`, FIRST).reply).toBe(
+      `W7YFR DE ${c} UR QTH? KN`,
+    );
+  });
+
+  it("asks you to send again an over it cannot read, while it waits", () => {
+    let q = answer(newQso(seeded()), "CQ DE W7YFR K", FIRST).qso;
+    q = answer(q, `${q.them.call} DE W7YFR UR RST 4B KN`, FIRST).qso;
+    expect(answer(q, "XQZ JJV", FIRST).reply).toBe(`PSE AGN W7YFR DE ${q.them.call} KN`);
+  });
+});
