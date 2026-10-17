@@ -11,8 +11,9 @@
  *   - your call after DE replaces the one it copied before;
  *   - part of its call with a ?, as in N1?, gets its call. NAME?, QTH?, RST?
  *     and CALL? get that one thing. None of these moves the QSO on;
- *   - QRS gets its last over again, slower, and QRQ makes it faster (see
- *     speed.ts). The new speed holds until you ask again;
+ *   - QRS gets its last over again, slower, and QRQ makes it faster. The two
+ *     search for your speed by halving (see speed.ts). The new speed holds
+ *     until you ask again;
  *   - AGN or ? gets its last over again;
  *   - an exchange it cannot read gets PSE AGN;
  *   - an exchange with no 73 gets its own 73, and the QSO ends on yours.
@@ -37,7 +38,7 @@
  */
 
 import { UNKNOWN } from "@/morse";
-import { faster, setTo, slower, type Speed } from "./speed";
+import { NO_SEARCH, qrq, qrs, setTo, type Search, type Speed } from "./speed";
 import { randomStation, type Rand, type Station } from "./station";
 import * as wording from "./wording";
 
@@ -54,6 +55,8 @@ export interface Qso {
   readonly last: string;
   /** How fast the station sends. */
   readonly speed: Speed;
+  /** What QRS and QRQ have told it of the speed you can copy. */
+  readonly search: Search;
   /** Piece by piece: the next piece of `PIECES` to send. */
   readonly piece: number;
   /** The pieces of your exchange it has copied. */
@@ -183,6 +186,7 @@ export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED): Qso 
     yourName: "",
     last: "",
     speed,
+    search: NO_SEARCH,
     piece: 0,
     got: [],
   };
@@ -529,13 +533,13 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   // more in the over is answered as usual, faster.
   const ask = qso.last ? over.speedAsk() : null;
   if (ask) {
-    const speed =
+    const moved =
       ask.wpm !== undefined
-        ? setTo(qso.speed, ask.wpm)
+        ? { speed: setTo(qso.speed, ask.wpm), search: NO_SEARCH }
         : ask.slower
-          ? slower(qso.speed)
-          : faster(qso.speed);
-    qso = { ...qso, speed };
+          ? qrs(qso.speed, qso.search)
+          : qrq(qso.speed, qso.search);
+    qso = { ...qso, ...moved };
     if (ask.slower || over.onlyAsks()) return { qso, reply: qso.last, ended: false };
   }
 

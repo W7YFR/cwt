@@ -17,7 +17,7 @@ import {
   type Qso,
 } from "@/qso/cq";
 import { randomStation } from "@/qso/station";
-import { STEPS, faster, setTo, slower } from "@/qso/speed";
+import { NO_SEARCH, STEPS, faster, qrq, qrs, setTo, slower, type Speed } from "@/qso/speed";
 import { gradeCopy, revealed } from "@/qso/show";
 
 /** A fixed sequence, so the station is the same every run. */
@@ -382,12 +382,23 @@ describe("QRS and QRQ in a QSO", () => {
   const called = (): Qso =>
     answer(newQso(seeded(), "", { charWpm: 25, farnsworthWpm: 16 }), "CQ DE W7YFR K", FIRST).qso;
 
+  it("searches for your speed across several requests", () => {
+    let q = called();
+    const speeds: number[] = [];
+    for (const over of ["QRS K", "QRQ K", "QRS K"]) {
+      q = answer(q, over, FIRST).qso;
+      speeds.push(q.speed.farnsworthWpm);
+    }
+    // 16, then halfway down to the bottom, back up, and down again.
+    expect(speeds).toEqual([10, 12, 10]);
+  });
+
   it("sends its last over again, slower, on QRS", () => {
     for (const over of ["QRS", "PSE QRS K", "QRS?", "QRS PSE KN"]) {
       const q = called();
       const t = answer(q, over, FIRST);
       expect(t.reply).toBe(q.last);
-      expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 15 });
+      expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 10 });
       expect(t.qso.stage).toBe("called");
     }
   });
@@ -396,7 +407,7 @@ describe("QRS and QRQ in a QSO", () => {
     let q = answer(called(), "QRS K", FIRST).qso;
     q = answer(q, `${q.them.call} DE W7YFR UR 599 KN`, FIRST).qso;
     expect(q.stage).toBe("exchanged");
-    expect(q.speed).toEqual({ charWpm: 25, farnsworthWpm: 15 });
+    expect(q.speed).toEqual({ charWpm: 25, farnsworthWpm: 10 });
   });
 
   it("goes to the speed asked for with a number", () => {
@@ -409,7 +420,7 @@ describe("QRS and QRQ in a QSO", () => {
     const q = called();
     const t = answer(q, "PSE QRQ K", FIRST);
     expect(t.reply).toBe(q.last);
-    expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 18 });
+    expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 20 });
   });
 
   it("answers the rest of an over with QRQ in it, faster", () => {
@@ -417,7 +428,7 @@ describe("QRS and QRQ in a QSO", () => {
     const t = answer(q, `${q.them.call} DE W7YFR UR 599 NAME BOB QRQ? KN`, FIRST);
     expect(t.qso.stage).toBe("exchanged");
     expect(t.reply).not.toBe(q.last);
-    expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 18 });
+    expect(t.qso.speed).toEqual({ charWpm: 25, farnsworthWpm: 20 });
   });
 
   it("does nothing with QRS before it has sent anything", () => {
@@ -624,5 +635,50 @@ describe("error runs", () => {
     expect(erased(wordsOf("73 <SK> E E"))).toEqual(["73", "<SK>", "E", "E"]);
     expect(erased(wordsOf("NAME IS BOB ES QTH"))).toEqual(["NAME", "IS", "BOB", "ES", "QTH"]);
     expect(erased(wordsOf("HI HI"))).toEqual(["HI", "HI"]);
+  });
+});
+
+describe("QRS and QRQ search for your speed", () => {
+  const at = (charWpm: number, farnsworthWpm: number): Speed => ({ charWpm, farnsworthWpm });
+  /** The effective speeds a run of requests lands on, from `start`. */
+  const walk = (start: Speed, asks: string): number[] => {
+    let speed = start;
+    let search = NO_SEARCH;
+    const out: number[] = [];
+    for (const ask of asks) {
+      ({ speed, search } = ask === "S" ? qrs(speed, search) : qrq(speed, search));
+      out.push(speed.farnsworthWpm);
+    }
+    return out;
+  };
+
+  it("drops halfway to the bottom on the first QRS", () => {
+    expect(walk(at(20, 20), "S")).toEqual([12]);
+    expect(walk(at(30, 30), "S")).toEqual([18]);
+    expect(walk(at(25, 16), "S")).toEqual([10]);
+  });
+
+  it("closes in from both sides", () => {
+    // From 20: too fast. 12: too slow. 15: too fast. 14 is all that is left.
+    expect(walk(at(20, 20), "SQSS")).toEqual([12, 15, 14, 12]);
+    expect(walk(at(30, 30), "SQQ")).toEqual([18, 24, 26]);
+  });
+
+  it("moves at least one step when nothing is left between", () => {
+    expect(walk(at(20, 15), "QS")).toEqual([18, 15]);
+    // 12 too slow, 14 too fast: no step between, so QRS goes one step down
+    // to 12 and forgets 12 was too slow. The next QRS searches below it.
+    expect(walk(at(20, 20), "SQSSS")).toEqual([12, 15, 14, 12, 8]);
+  });
+
+  it("goes up halfway to the character speed, then raises both", () => {
+    expect(walk(at(25, 16), "Q")).toEqual([20]);
+    expect(walk(at(25, 24), "QQ")).toEqual([25, 26]);
+    expect(qrq(at(25, 25), NO_SEARCH).speed).toEqual(at(26, 26));
+  });
+
+  it("stays at the bottom and top steps", () => {
+    expect(walk(at(20, 6), "S")).toEqual([6]);
+    expect(qrq(at(40, 40), NO_SEARCH).speed).toEqual(at(40, 40));
   });
 });
