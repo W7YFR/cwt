@@ -9,6 +9,8 @@
  *   - its call with a question mark gets its call confirmed;
  *   - an over without its call gets its call again;
  *   - your call after DE replaces the one it copied before;
+ *   - part of its call with a ?, as in N1?, gets its call. NAME?, QTH?, RST?
+ *     and CALL? get that one thing. None of these moves the QSO on;
  *   - QRS gets its last over again, slower, and QRQ makes it faster (see
  *     speed.ts). The new speed holds until you ask again;
  *   - AGN or ? gets its last over again;
@@ -18,6 +20,10 @@
  * Strict copy reads the words as they were spaced and needs each call sent
  * exactly. Lenient copy also finds words run together, takes a call one
  * character off as the call, and knows your call from Configuration.
+ *
+ * Piece by piece, the exchange comes one item per over: report, name, QTH.
+ * It moves on after any over from you, and starts with R, TNX or FB when
+ * your over held a piece of your own exchange.
  *
  * It thanks you for a report only when your over held one. What it says is
  * worded in wording.ts, a little differently each time.
@@ -30,7 +36,7 @@ import { faster, setTo, slower, type Speed } from "./speed";
 import { randomStation, type Rand, type Station } from "./station";
 import * as wording from "./wording";
 
-export type Stage = "cq" | "asking" | "called" | "exchanged" | "signing";
+export type Stage = "cq" | "asking" | "called" | "pieces" | "exchanged" | "signing";
 
 export interface Qso {
   readonly stage: Stage;
@@ -43,6 +49,8 @@ export interface Qso {
   readonly last: string;
   /** How fast the station sends. */
   readonly speed: Speed;
+  /** Piece by piece: the next piece of `PIECES` to send. */
+  readonly piece: number;
 }
 
 /** How the station reads your overs. */
@@ -61,6 +69,8 @@ export interface Context {
   readonly rand?: Rand;
   /** The station's local hour, for GM, GA or GE. */
   readonly hour?: number;
+  /** How much the station says in each over. */
+  readonly length?: wording.Length;
 }
 
 export interface Turn {
@@ -122,7 +132,15 @@ export const DEFAULT_SPEED: Speed = { charWpm: 25, farnsworthWpm: 25 };
 /** A new QSO with a new station, never at the call `not`, sending at
  *  `speed`: your speed. */
 export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED): Qso {
-  return { stage: "cq", them: randomStation(rand, not), you: "", yourName: "", last: "", speed };
+  return {
+    stage: "cq",
+    them: randomStation(rand, not),
+    you: "",
+    yourName: "",
+    last: "",
+    speed,
+    piece: 0,
+  };
 }
 
 /** A request to send slower or faster, with the effective speed asked for
@@ -131,6 +149,20 @@ interface SpeedAsk {
   readonly slower: boolean;
   readonly wpm?: number;
 }
+
+/** What a word before a ? asks for. */
+const ASKS_FOR: Readonly<Record<string, wording.Question>> = {
+  CALL: "call",
+  NAME: "name",
+  NM: "name",
+  OP: "name",
+  QTH: "qth",
+  RST: "report",
+  RPT: "report",
+};
+
+/** Words with a ? that are not part of a call. */
+const NOT_CALL = new Set(["AGN", "QRZ", "HW", "CPY", "QRS", "QRQ", "PSE", "UR", "SRI"]);
 
 /** Words that may come with QRS or QRQ in an over that asks nothing else. */
 const ASK_WORDS = new Set(["QRS", "QRQ", "PSE", "DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "WPM"]);
@@ -273,6 +305,43 @@ class Over {
     );
   }
 
+  /** What it asks about one thing: part of `call` with a ?, as in N1? or
+   *  N1 ?, or NAME?, QTH?, RST? or CALL?. Each once, in the order asked. The
+   *  whole call with a ? is not here: see `asksAbout`. */
+  questions(call: string): wording.Question[] {
+    const out: wording.Question[] = [];
+    const add = (q: wording.Question) => {
+      if (!out.includes(q)) out.push(q);
+    };
+    const partOfCall = (w: string) =>
+      w.length >= 2 &&
+      w !== call &&
+      !NOT_CALL.has(w) &&
+      !(w in ASKS_FOR) &&
+      (/\d/.test(w) || w.length >= 3) &&
+      call.includes(w);
+    const { words } = this;
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i]!;
+      if (w === "?") {
+        if (i > 0 && partOfCall(words[i - 1]!)) add("call");
+        continue;
+      }
+      if (!w.endsWith("?")) continue;
+      const bare = w.replace(/\?+$/, "");
+      const asked = ASKS_FOR[bare];
+      if (asked) add(asked);
+      else if (partOfCall(bare)) add("call");
+    }
+    return out;
+  }
+
+  /** Whether it holds a piece of your own exchange: a report, a name or a
+   *  QTH. */
+  holdsPiece(): boolean {
+    return this.hasReport() || this.yourName() !== "" || this.words.includes("QTH");
+  }
+
   /** Whether it holds a report. */
   hasReport(): boolean {
     return this.words.some((w) => REPORT_RE.test(w));
@@ -314,10 +383,25 @@ function end(qso: Qso, reply: string): Turn {
 
 /** The station's answer to one over you sent. */
 export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
-  const { ear = STRICT, rand = Math.random, hour = new Date().getHours() } = context;
+  const {
+    ear = STRICT,
+    rand = Math.random,
+    hour = new Date().getHours(),
+    length = "full",
+  } = context;
   const over = new Over(heard, ear);
   const { them } = qso;
-  const again = over.has("AGN") || over.words.some((w) => /^[A-Z]*\?$/.test(w));
+  // HW? asks how you copied, so it is not a request to send again.
+  const again = over.has("AGN") || over.words.some((w) => ["?", "AGN?", "QRZ?"].includes(w));
+  const voice = (q: Qso): wording.Say => ({
+    them,
+    you: q.you,
+    name: q.yourName,
+    rand,
+    hour,
+    length,
+  });
+
   // Your call after DE, once the station has one, replaces it.
   const fixed = qso.stage === "cq" || qso.stage === "asking" ? null : over.deCall(them.call);
   if (fixed) qso = { ...qso, you: fixed };
@@ -336,7 +420,16 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     qso = { ...qso, speed };
     if (ask.slower || over.onlyAsks()) return { qso, reply: qso.last, ended: false };
   }
-  const voice = (q: Qso): wording.Say => ({ them, you: q.you, name: q.yourName, rand, hour });
+
+  if (qso.stage !== "cq" && qso.stage !== "asking") {
+    // Your name, whenever you send it.
+    const name = over.yourName();
+    if (name) qso = { ...qso, yourName: name };
+    // A question about one thing gets that thing. Not kept as the last over,
+    // so AGN after it still means the over before.
+    const asked = over.questions(them.call);
+    if (asked.length) return { qso, reply: wording.answers(voice(qso), asked), ended: false };
+  }
 
   switch (qso.stage) {
     case "cq":
@@ -352,10 +445,21 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     case "called": {
       if (over.asksAbout(them.call)) return say(qso, wording.confirmCall(voice(qso)));
       if (over.has(them.call)) {
-        const next = { ...qso, yourName: over.yourName() || qso.yourName };
-        return say(next, wording.exchange(voice(next), over.hasReport()), "exchanged");
+        const reply = wording.exchange(voice(qso), over.hasReport());
+        if (length === "pieces") return say({ ...qso, piece: 1 }, reply, "pieces");
+        return say(qso, reply, "exchanged");
       }
       return say(qso, wording.callAgain(voice(qso)));
+    }
+
+    case "pieces": {
+      if (over.closing()) return end(qso, wording.signOff(voice(qso)));
+      if (again) return say(qso, qso.last);
+      if (over.garbled()) return { qso, reply: wording.askAgain(voice(qso)), ended: false };
+      const open = over.holdsPiece() ? wording.gotPiece(voice(qso)) : "";
+      const next = { ...qso, piece: qso.piece + 1 };
+      const done = next.piece >= wording.PIECES.length;
+      return say(next, wording.piece(voice(qso), qso.piece, open), done ? "exchanged" : "pieces");
     }
 
     case "exchanged": {

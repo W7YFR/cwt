@@ -4,9 +4,14 @@
  * station picks one at random each time, so two QSOs do not read the same.
  * With `rand` always 0, every pick is the first wording and every part that
  * may be left out is kept. The tests rely on that.
+ *
+ * How much it says follows the length: full, short, or piece by piece, where
+ * the exchange comes one item per over.
  */
 
 import { pick, type Rand, type Station } from "./station";
+
+export type Length = "full" | "short" | "pieces";
 
 /** What the station knows when it speaks. */
 export interface Say {
@@ -18,7 +23,12 @@ export interface Say {
   readonly rand: Rand;
   /** The station's local hour, 0 to 23, for GM, GA or GE. */
   readonly hour: number;
+  readonly length: Length;
 }
+
+/** The items of the exchange, in the order piece by piece sends them. */
+export const PIECES = ["report", "name", "qth"] as const;
+export type Piece = (typeof PIECES)[number];
 
 /** How often a part that may be left out is kept. */
 const KEEP = 0.6;
@@ -41,9 +51,12 @@ function to(s: Say): string {
   return s.name || "OM";
 }
 
+const short = (s: Say) => s.length === "short";
+
 /** The station's first over, answering your CQ. */
 export function callBack(s: Say): string {
   const c = s.them.call;
+  if (short(s)) return pick(s.rand, [`DE ${c} K`, `${c} ${c}`, `${c}`]);
   return pick(s.rand, [
     `${s.you} DE ${c} ${c} K`,
     `${s.you} DE ${c} ${c} AR`,
@@ -77,14 +90,16 @@ export function askAgain(s: Say): string {
   return pick(s.rand, [`PSE AGN ${s.you} DE ${c} KN`, `AGN PSE ${s.you} DE ${c} KN`, `PSE AGN KN`]);
 }
 
-/** Its report, with 599 sometimes sent as 5NN. */
+/** Its report, with 599 sometimes sent as 5NN. Twice, or once when short. */
 function report(s: Say): string {
   const r = s.them.rst === "599" && s.rand() < 0.3 ? "5NN" : s.them.rst;
+  if (short(s)) return pick(s.rand, [`UR ${r}`, `RST ${r}`, `UR RST ${r}`]);
   return pick(s.rand, [`UR RST ${r} ${r}`, `UR ${r} ${r}`, `RST ${r} ${r}`, `UR RST IS ${r} ${r}`]);
 }
 
 function nameOf(s: Say): string {
   const n = s.them.name;
+  if (short(s)) return pick(s.rand, [`NAME ${n}`, `OP ${n}`, `NAME HR ${n}`]);
   return pick(s.rand, [`NAME ${n} ${n}`, `NAME HR ${n} ${n}`, `OP ${n} ${n}`, `NAME IS ${n} ${n}`]);
 }
 
@@ -93,32 +108,83 @@ function qthOf(s: Say): string {
   const at = q.lastIndexOf(" ");
   const city = q.slice(0, at);
   const state = q.slice(at + 1);
+  if (short(s)) return pick(s.rand, [`QTH ${q}`, `QTH ${city}`, `QTH HR ${q}`]);
   return pick(s.rand, [`QTH ${q} ${q}`, `QTH ${city} ${city} ${state}`, `QTH HR ${q} ${q}`, `QTH IS ${q}`]);
 }
 
-/** Its exchange: report, name and QTH.
- *
- * `gotReport` says whether your over held a report. Only then does it thank
- * you for one. */
+const ITEM: Readonly<Record<Piece, (s: Say) => string>> = { report, name: nameOf, qth: qthOf };
+
+/** How it opens its exchange. `gotReport` says whether your over held a
+ *  report. Only then does it thank you for one. */
+function thanks(s: Say, gotReport: boolean): string {
+  return gotReport
+    ? pick(s.rand, ["R TNX FER RPT", "R R TNX FER RPT", "FB TNX FER RPT", "R TNX RPT"])
+    : pick(s.rand, ["R", "", "TNX"]);
+}
+
+/** Its exchange: report, name and QTH. In piece by piece, this is the first
+ *  piece alone: see `piece`. */
 export function exchange(s: Say, gotReport: boolean): string {
+  if (s.length === "pieces") return piece(s, 0, thanks(s, gotReport));
   const { rand } = s;
   const c = s.them.call;
-  const thanks = gotReport
-    ? pick(rand, ["R TNX FER RPT", "R R TNX FER RPT", "FB TNX FER RPT", "R TNX RPT"])
-    : pick(rand, ["R", "", "TNX"]);
+  const open = thanks(s, gotReport);
   const hello = maybe(rand, `${greeting(s.hour)} ${to(s)}`);
   const parts = [report(s), nameOf(s), qthOf(s)];
   if (rand() >= KEEP) parts.splice(1, 2, parts[2]!, parts[1]!);
+  if (short(s)) {
+    const ask = pick(rand, ["HW?", ""]);
+    return words(s.you, "DE", c, open, ...parts, ask, pick(rand, ["KN", "BK", "K"]));
+  }
   const bt = rand() < 0.3 ? "<BT>" : "";
   const ask = pick(rand, ["HW?", "HW CPY?", "SO HW?", ""]);
   const end = pick(rand, ["KN", "K", "BK"]);
-  return words(s.you, "DE", c, thanks, hello, bt, ...parts, ask, s.you, "DE", c, end);
+  return words(s.you, "DE", c, open, hello, bt, ...parts, ask, s.you, "DE", c, end);
+}
+
+/** One piece of the exchange, for piece by piece: piece `at` of `PIECES`.
+ *
+ * `open` starts it: the thanks for the first piece, or R, TNX or FB for a
+ * piece of yours that came with your last over. The first piece greets you
+ * and the last asks how you copied. */
+export function piece(s: Say, at: number, open: string): string {
+  const { rand } = s;
+  const c = s.them.call;
+  const first = at === 0;
+  const last = at === PIECES.length - 1;
+  const head = first || rand() < KEEP ? `${s.you} DE ${c}` : "";
+  const hello = first ? maybe(rand, `${greeting(s.hour)} ${to(s)}`) : "";
+  const ask = last ? pick(rand, ["HW?", "HW CPY?", "SO HW?"]) : "";
+  const end = pick(rand, ["KN", "BK", "K"]);
+  return words(head, open, hello, ITEM[PIECES[at]!](s), ask, end);
+}
+
+/** How it acknowledges a piece of yours: R, TNX or FB, with your name when
+ *  it has it. */
+export function gotPiece(s: Say): string {
+  return pick(s.rand, ["R", "TNX", `FB ${to(s)}`, "R R"]);
+}
+
+/** What it sends for a question about one thing. */
+export type Question = "call" | Piece;
+
+/** The answer to your questions, each one once, in the order asked. */
+export function answers(s: Say, asked: readonly Question[]): string {
+  const c = s.them.call;
+  const parts = asked.map((q) => {
+    if (q === "call") return pick(s.rand, [`${c} ${c}`, `DE ${c} ${c}`, `${c} ${c} ${c}`]);
+    return ITEM[q]({ ...s, length: "full" });
+  });
+  return words(...parts, pick(s.rand, ["K", "KN"]));
 }
 
 /** Its 73, sent first, when you went on without signing. */
 export function signFirst(s: Say): string {
   const c = s.them.call;
   const n = to(s);
+  if (short(s)) {
+    return pick(s.rand, [`TNX QSO 73 <SK>`, `R TU ${n} 73 GL <SK>`, `FB ${n} 73 <SK>`]);
+  }
   return words(
     pick(s.rand, [
       `R R FB ${n} TNX FER QSO HPE CUAGN 73`,
@@ -134,6 +200,7 @@ export function signFirst(s: Say): string {
 export function signOff(s: Say): string {
   const c = s.them.call;
   const n = to(s);
+  if (short(s)) return pick(s.rand, [`TU 73 E E`, `73 TU <SK> E E`, `TNX ${n} 73 <SK>`]);
   return pick(s.rand, [
     `TU ${n} 73 GL ${s.you} DE ${c} <SK> E E`,
     `R TNX FER QSO ${n} 73 ${s.you} DE ${c} <SK>`,

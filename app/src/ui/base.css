@@ -2328,6 +2328,9 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .you .text { color: var(--you); }
 .qsolog .live .keying { color: var(--ink-faint); }
 .qsonote { margin: 0; }
+.qsooptions { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.qsochoice { display: flex; align-items: center; gap: 8px; }
+.qsochoicelabel { color: var(--ink-dim); }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }

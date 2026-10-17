@@ -424,6 +424,8 @@ export interface Prefs {
   page?: "practice" | "qso";
   /** How the QSO page reads your sending. Absent is lenient. */
   qsoCopy?: "strict" | "lenient";
+  /** How much the QSO page's station says in each over. Absent is full. */
+  qsoLength?: "full" | "short" | "pieces";
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -583,6 +585,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   customDrills: isCustomDrills,
   page: oneOf("practice", "qso"),
   qsoCopy: oneOf("strict", "lenient"),
+  qsoLength: oneOf("full", "short", "pieces"),
 };
 
 export function loadPrefs(): Prefs {

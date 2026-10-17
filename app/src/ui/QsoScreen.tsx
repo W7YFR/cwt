@@ -12,6 +12,7 @@ import { createPlayer } from "@/audio/player";
 import { loadPrefs, loadSpeed, loadUser, savePrefs } from "@/io/storage";
 import { DEFAULT_SPEED, answer, newQso, type Qso } from "@/qso/cq";
 import type { Speed } from "@/qso/speed";
+import type { Length } from "@/qso/wording";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconUser } from "./Icons";
@@ -45,7 +46,52 @@ type Phase = "listening" | "waiting" | "playing";
 
 type CopyMode = "strict" | "lenient";
 
-const COPY_MODES: ReadonlyArray<{ value: CopyMode; label: string; help: string }> = [
+interface Option<T> {
+  readonly value: T;
+  readonly label: string;
+  readonly help: string;
+}
+
+const LENGTHS: ReadonlyArray<Option<Length>> = [
+  { value: "full", label: "Full", help: "Each item twice, the way it is sent on the air" },
+  { value: "short", label: "Short", help: "Each item once, with fewer words around it" },
+  { value: "pieces", label: "Piece by piece", help: "Report, then name, then QTH, one per over" },
+];
+
+/** A labeled switch between a few options. */
+function Choice<T extends string>({
+  label,
+  testId,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  testId: string;
+  options: ReadonlyArray<Option<T>>;
+  value: T;
+  onChange(value: T): void;
+}): React.ReactElement {
+  return (
+    <div className="qsochoice">
+      <span className="qsochoicelabel">{label}</span>
+      <div className="modeswitch" role="group" aria-label={label} data-testid={testId}>
+        {options.map((m) => (
+          <button
+            key={m.value}
+            aria-pressed={value === m.value}
+            title={m.help}
+            onClick={() => onChange(m.value)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const COPY_MODES: ReadonlyArray<Option<CopyMode>> = [
   {
     value: "lenient",
     label: "Lenient",
@@ -89,6 +135,11 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoCopy: mode });
   };
   const lenient = copyMode === "lenient";
+  const [length, setLengthRaw] = useState<Length>(() => loadPrefs().qsoLength ?? "full");
+  const setLength = (next: Length) => {
+    setLengthRaw(next);
+    savePrefs({ ...loadPrefs(), qsoLength: next });
+  };
   const qso = useRef<Qso>(newQso(Math.random, "", speed));
   /** How fast the station sends, after QRS or QRQ. */
   const [theirSpeed, setTheirSpeed] = useState<Speed>(speed);
@@ -149,6 +200,7 @@ export function QsoScreen({
     const heard = copy.text.trim();
     const turn = answer(qso.current, heard, {
       ear: { lenient, saved: loadUser().callsign },
+      length,
     });
     const them = turn.qso.them;
     const sent: Line = { who: turn.qso.you || "You", text: heard, you: true };
@@ -181,7 +233,7 @@ export function QsoScreen({
       },
       (lo + Math.random() * (hi - lo)) * 1000,
     );
-  }, [copy.over, copy.text, copy.turn, phase, recorder, player, speed, lenient]);
+  }, [copy.over, copy.text, copy.turn, phase, recorder, player, speed, lenient, length]);
 
   useEffect(
     () => () => {
@@ -254,18 +306,6 @@ export function QsoScreen({
               <LevelMeter level={rec.level} />
             </>
           )}
-          <div className="modeswitch" role="group" aria-label="Copy" data-testid="qso-copy">
-            {COPY_MODES.map((m) => (
-              <button
-                key={m.value}
-                aria-pressed={copyMode === m.value}
-                title={m.help}
-                onClick={() => setCopyMode(m.value)}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
           <span className="hint">
             {wpm(speed)}, set on the practice page
             {!same(theirSpeed, speed) && (
@@ -275,6 +315,23 @@ export function QsoScreen({
               </>
             )}
           </span>
+        </div>
+
+        <div className="qsooptions">
+          <Choice
+            label="Copy"
+            testId="qso-copy"
+            options={COPY_MODES}
+            value={copyMode}
+            onChange={setCopyMode}
+          />
+          <Choice
+            label="Length"
+            testId="qso-length"
+            options={LENGTHS}
+            value={length}
+            onChange={setLength}
+          />
         </div>
 
         <ol className="qsolog" data-testid="qso-log">

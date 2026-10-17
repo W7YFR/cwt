@@ -431,3 +431,101 @@ describe("QRS and QRQ in a QSO", () => {
     });
   });
 });
+
+describe("reply length", () => {
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  const start = (): Qso => newQso(seeded());
+
+  it("sends each item once, when short", () => {
+    const ctx: Context = { ...FIRST, length: "short" };
+    const q = answer(start(), "CQ DE W7YFR K", ctx).qso;
+    const { call: c, rst, name, qth } = q.them;
+    expect(q.last).toBe(`DE ${c} K`);
+    const r = rst === "599" ? "5NN" : rst;
+    expect(answer(q, `${c} DE W7YFR UR 599 KN`, ctx).reply).toBe(
+      `W7YFR DE ${c} R TNX FER RPT UR ${r} NAME ${name} QTH ${qth} HW? KN`,
+    );
+  });
+
+  it("sends report, name and QTH one per over, piece by piece", () => {
+    const ctx: Context = { ...FIRST, length: "pieces" };
+    let q = answer(start(), "CQ DE W7YFR K", ctx).qso;
+    const { call: c, rst, name, qth } = q.them;
+    const r = rst === "599" ? "5NN" : rst;
+
+    let t = answer(q, `${c} DE W7YFR UR 579 579 KN`, ctx);
+    expect(t.reply).toBe(`W7YFR DE ${c} R TNX FER RPT GE OM UR RST ${r} ${r} KN`);
+    expect(t.qso.stage).toBe("pieces");
+    q = t.qso;
+
+    // A piece of yours gets an R first.
+    t = answer(q, "R R UR 579 KN", ctx);
+    expect(t.reply).toBe(`W7YFR DE ${c} R NAME ${name} ${name} KN`);
+    q = t.qso;
+
+    // No piece of yours: straight to the next one.
+    t = answer(q, "FB KN", ctx);
+    expect(t.reply).toBe(`W7YFR DE ${c} QTH ${qth} ${qth} HW? KN`);
+    expect(t.qso.stage).toBe("exchanged");
+  });
+
+  it("sends the same piece again on AGN, and takes your name in any piece", () => {
+    const ctx: Context = { ...FIRST, length: "pieces" };
+    let q = answer(start(), "CQ DE W7YFR K", ctx).qso;
+    const c = q.them.call;
+    const first = answer(q, `${c} DE W7YFR UR 579 KN`, ctx);
+    q = first.qso;
+    expect(answer(q, "AGN KN", ctx).reply).toBe(first.reply);
+    const t = answer(q, "NAME BOB BOB KN", ctx);
+    expect(t.qso.yourName).toBe("BOB");
+    expect(t.reply).toMatch(/^W7YFR DE \S+ R NAME /);
+  });
+
+  it("signs off when you send 73 between pieces", () => {
+    const ctx: Context = { ...FIRST, length: "pieces" };
+    let q = answer(start(), "CQ DE W7YFR K", ctx).qso;
+    q = answer(q, `${q.them.call} DE W7YFR UR 579 KN`, ctx).qso;
+    expect(answer(q, "TNX 73 <SK>", ctx).ended).toBe(true);
+  });
+});
+
+describe("questions about one thing", () => {
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  /** A QSO where the station has sent its exchange. */
+  const exchanged = (): Qso => {
+    const q = answer(newQso(seeded()), "CQ DE W7YFR K", FIRST).qso;
+    return answer(q, `${q.them.call} DE W7YFR UR 599 KN`, FIRST).qso;
+  };
+
+  it("sends its call for part of it with a ?", () => {
+    const q = answer(newQso(seeded()), "CQ DE W7YFR K", FIRST).qso;
+    const c = q.them.call;
+    for (const over of [`${c.slice(0, 3)}?`, `${c.slice(0, 3)} ? K`, `${c.slice(-3)}? KN`]) {
+      const t = answer(q, over, FIRST);
+      expect(t.reply).toBe(`${c} ${c} K`);
+      expect(t.qso.stage).toBe("called");
+    }
+  });
+
+  it("sends just its name, QTH or report when asked", () => {
+    const q = exchanged();
+    const { name, qth, rst } = q.them;
+    expect(answer(q, "NAME? KN", FIRST).reply).toBe(`NAME ${name} ${name} K`);
+    expect(answer(q, "QTH? KN", FIRST).reply).toBe(`QTH ${qth} ${qth} K`);
+    const r = rst === "599" ? "5NN" : rst;
+    expect(answer(q, "RST? KN", FIRST).reply).toBe(`UR RST ${r} ${r} K`);
+    expect(answer(q, "NAME? QTH? KN", FIRST).reply).toBe(`NAME ${name} ${name} QTH ${qth} ${qth} K`);
+  });
+
+  it("does not move the QSO on, and AGN after it still means the over before", () => {
+    const q = exchanged();
+    const t = answer(q, "NAME? KN", FIRST);
+    expect(t.qso.stage).toBe("exchanged");
+    expect(answer(t.qso, "AGN KN", FIRST).reply).toBe(q.last);
+  });
+
+  it("takes HW? as part of an exchange, not a question", () => {
+    const q = exchanged();
+    expect(answer(q, "FB HW? KN", FIRST).qso.stage).toBe("signing");
+  });
+});
