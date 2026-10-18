@@ -18,7 +18,14 @@ import { loadPrefs, loadSpeed, loadUser, savePrefs, saveSpeed } from "@/io/stora
 import { DEFAULT_SPEED, answer, newQso, type Qso } from "@/qso/cq";
 import type { Speed } from "@/qso/speed";
 import type { Length } from "@/qso/wording";
-import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
+import {
+  gradeCopy,
+  revealed,
+  type LockedShows,
+  type Mark,
+  type TheirText,
+  type YourText,
+} from "@/qso/show";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconHelp, IconUser } from "./Icons";
@@ -56,6 +63,14 @@ const REPLY_DELAY_SEC = [0.6, 1.4] as const;
 /** How long after a reply ends before the microphone is copied again. The
  *  last of the reply can still be in the room. */
 const AFTER_REPLY_MS = 250;
+
+/** How long after the last key in a copy box the line that shows your
+ *  sending stays hidden. */
+const TYPING_QUIET_MS = 1200;
+
+/** An over that is one plain character, other than K, R or ?: noise, not
+ *  sending. A prosign alone, as <SK>, is meant. */
+const NOISE_RE = /^[^KR?<]$/;
 
 /** Characters you must have sent before the page takes it that you are
  *  sending, and locks or grades your copy. */
@@ -157,45 +172,60 @@ function keepKeys(ev: React.KeyboardEvent, lock: () => void): void {
   if (ev.key === "Enter") lock();
 }
 
-/** Your copy of an over, showing only what you got right. Each character
- *  you got right is in its place. Every other one is a dot, so nothing says
- *  which you missed or what they were. */
+/** Marked characters: a dot under each one `dot` picks, blue if right, red
+ *  if not. Spaces, gaps and the characters it does not pick have none. */
+function Marked({
+  marks,
+  dot,
+}: {
+  marks: readonly Mark[];
+  dot(ok: boolean): boolean;
+}): React.ReactElement {
+  return (
+    <>
+      {marks.map((m, i) => (
+        <span
+          key={i}
+          className={m.ok === null || !dot(m.ok) ? undefined : m.ok ? "cright" : "cwrong"}
+        >
+          {m.text}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** Your copy, with a blue dot under each character you got right. Nothing
+ *  else is marked, and the station's line is not shown, so nothing says what
+ *  you missed or what it was. */
 function RightOnly({ line }: { line: Line }): React.ReactElement {
   const grade = gradeCopy(line.text, line.typed);
   return (
     <span className="text rightonly" data-testid="qso-right-only">
-      {grade.marks.map((m, i) =>
-        m.ok === null ? (
-          <span key={i}>{m.text}</span>
-        ) : m.ok ? (
-          <span key={i} className="cright">
-            {m.text}
-          </span>
-        ) : (
-          <span key={i} className="unknown">
-            ·
-          </span>
-        ),
+      {line.typed.trim() ? (
+        <Marked marks={grade.yours} dot={(ok) => ok} />
+      ) : (
+        "(nothing copied)"
       )}
     </span>
   );
 }
 
-/** Your copy of an over, graded. */
+/** Your copy, graded: what you typed, blue under each character you got
+ *  right and red under each you got wrong, then what the station sent, red
+ *  under each character you missed, then the count. */
 function Graded({ line }: { line: Line }): React.ReactElement {
   const grade = gradeCopy(line.text, line.typed);
   return (
     <span className="text graded">
-      <span>
-        {grade.marks.map((m, i) => (
-          <span key={i} className={m.ok === null ? undefined : m.ok ? "cright" : "cwrong"}>
-            {m.text}
-          </span>
-        ))}
+      <span className="yourcopy" data-testid="qso-your-copy">
+        {line.typed.trim() ? <Marked marks={grade.yours} dot={() => true} /> : "(nothing copied)"}
+      </span>
+      <span className="sentcopy" data-testid="qso-sent-copy">
+        <Marked marks={grade.sent} dot={(ok) => !ok} />
       </span>
       <span className="copied">
-        You copied {line.typed.trim() ? line.typed.toUpperCase() : "nothing"} · {grade.right} of{" "}
-        {grade.total}
+        {grade.right} of {grade.total} copied
       </span>
     </span>
   );
@@ -382,6 +412,26 @@ export function QsoScreen({
     return profile ? calibrationOf(profile) : null;
   }, [profiles, profileId]);
   const copy = useLiveCopy(source, phase === "listening", lenient, calibration);
+  /* You are typing in a copy box. Nothing is dropped and nothing starts over:
+     what the decoder reads still counts, in case you are sending as well.
+     Only the line that shows your sending hides, so noise on the input does
+     not appear under the box as you type. */
+  const [typing, setTyping] = useState(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typed = () => {
+    setTyping(true);
+    if (typingTimer.current !== null) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      typingTimer.current = null;
+      setTyping(false);
+    }, TYPING_QUIET_MS);
+  };
+  useEffect(
+    () => () => {
+      if (typingTimer.current !== null) clearTimeout(typingTimer.current);
+    },
+    [],
+  );
 
   afterReply.current = () => {
     timer.current = setTimeout(() => {
@@ -439,6 +489,13 @@ export function QsoScreen({
     if (copy.turn === answered.current) return;
     answered.current = copy.turn;
     const heard = copy.text.trim();
+    // One character alone is noise on the line, a click or a bump of the key,
+    // not a turn. Not answered, and the turn starts over. K, R and ? alone
+    // are answers, so they still count.
+    if (NOISE_RE.test(heard)) {
+      recorder.restart();
+      return;
+    }
     const turn = answer(qso.current, heard, {
       ear: { lenient, saved: loadUser().callsign },
       length,
@@ -585,7 +642,10 @@ export function QsoScreen({
           autoFocus
           spellCheck={false}
           autoComplete="off"
-          onKeyDown={(ev) => keepKeys(ev, () => lock(at))}
+          onKeyDown={(ev) => {
+            typed();
+            keepKeys(ev, () => lock(at));
+          }}
           onChange={(ev) => setTyped(at, ev.target.value)}
         />
       );
@@ -833,6 +893,7 @@ export function QsoScreen({
               still the copy until the recording starts over. */}
           {recorder &&
             phase === "listening" &&
+            !typing &&
             copy.turn !== answered.current &&
             yourText !== "none" &&
             (copy.text || copy.keying) && (

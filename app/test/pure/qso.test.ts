@@ -566,18 +566,42 @@ describe("showing an over", () => {
     expect(revealed(text, 99)).toBe(text);
   });
 
-  it("grades a copy character by character", () => {
+  /** Marks as a string: + right, x wrong, _ unmarked. */
+  const pattern = (marks: readonly { ok: boolean | null }[]) =>
+    marks.map((m) => (m.ok === null ? "_" : m.ok ? "+" : "x")).join("");
+
+  it("grades a copy character by character, both ways", () => {
     const g = gradeCopy("UR RST 579", "ur rst 589");
     expect(g.total).toBe(8);
     expect(g.right).toBe(7);
-    expect(g.marks.map((m) => (m.ok === null ? "_" : m.ok ? "+" : "x")).join("")).toBe("++_+++_+x+");
+    expect(pattern(g.yours)).toBe("++_+++_+x+");
+    expect(pattern(g.sent)).toBe("++_+++_+x+");
   });
 
-  it("marks what you did not copy wrong", () => {
+  it("finds what you copied past a part you missed", () => {
+    // The station's line, and a copy with its middle left out.
+    const sent = "W7YFR DE N1AK GE OM UR RST IS 479 479 KN";
+    const g = gradeCopy(sent, "W7YFR DE N1AK ... 479 479 KN");
+    // Every character you typed is right, and the gap is not graded.
+    expect(pattern(g.yours)).toBe("+++++_++_++++_..._+++_+++_++".replace("...", "_"));
+    // What you left out is missed; the calls and the reports are copied.
+    const missed = g.sent.filter((m) => m.ok === false).map((m) => m.text).join("");
+    expect(missed).toBe("GEOMURRSTIS");
+    expect(g.right).toBe(g.total - missed.length);
+  });
+
+  it("finds what you copied past a mistake", () => {
+    const g = gradeCopy("NAME JIM QTH ATLANTA GA", "NAME JIN QTH ATLANTA GA");
+    expect(g.yours.filter((m) => m.ok === false).map((m) => m.text)).toEqual(["N"]);
+    expect(g.sent.filter((m) => m.ok === false).map((m) => m.text)).toEqual(["M"]);
+  });
+
+  it("marks what you did not copy missed, and nothing as yours", () => {
     const g = gradeCopy("NAME BOB", "NAME");
     expect(g.right).toBe(4);
-    expect(g.marks.filter((m) => m.ok === false).map((m) => m.text).join("")).toBe("BOB");
+    expect(g.sent.filter((m) => m.ok === false).map((m) => m.text).join("")).toBe("BOB");
     expect(gradeCopy("NAME BOB", "").right).toBe(0);
+    expect(gradeCopy("NAME BOB", "").yours).toEqual([]);
   });
 });
 

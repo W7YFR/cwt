@@ -2383,6 +2383,9 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .cright::after { background: var(--you); }
 .qsolog .cwrong::after { background: var(--bad); }
 .qsolog .copied { color: var(--ink-dim); font-size: 13px; }
+/* What you typed, in your blue, above what the station sent, in its own
+   color: the two read as yours and theirs. */
+.qsolog .graded .yourcopy, .qsolog .rightonly { color: var(--you); }
 .qsolog .locked { color: var(--ink-dim); }
 /* A choice in the header keeps each of its labels on one line, and on a
    phone its buttons close up so all five fit the header's width. */
@@ -2409,5 +2412,3 @@ header .modeswitch button { white-space: nowrap; }
 .viewpanel [data-panel="speed"] label { white-space: nowrap; }
 .viewpanel [data-panel="speed"] input[type="range"] { width: 180px; }
 
-/* A locked copy that shows only what you got right: the rest are dots. */
-.qsolog .rightonly .unknown { color: var(--ink-faint); }
