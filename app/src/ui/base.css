@@ -21,6 +21,10 @@
   --tgt: #8b95a7;
   --ok: #3fb950;
   --warn: #d29922;
+  /* A warning band is tinted with the dark theme's amber in both themes. The
+     light theme's --warn is darker, for text on white, and as a tint it reads
+     as brown. */
+  --warn-band: #d29922;
   --bad: #f4564a;
   --ghost: #4b5566;
   /* Rests are not graded, so they get a hue outside the green/amber/red scale
@@ -1622,8 +1626,22 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 /* Inside the wizard it is a notice in a column, not a band across a page. */
 .calibrate .banner { min-height: 0; display: block; }
 .banner.error { background: color-mix(in srgb, var(--bad) 14%, var(--panel)); color: var(--ink); }
-.banner.warn { background: color-mix(in srgb, var(--warn) 14%, var(--panel)); color: var(--ink); }
+.banner.warn { background: color-mix(in srgb, var(--warn-band) 40%, var(--panel)); color: var(--ink); }
+.banner.warn button.link,
+.banner.warn .unsetnotes button.link { color: inherit; }
+.banner.warn button.link:hover:not(:disabled) { color: inherit; opacity: 0.7; }
 .banner.info { background: var(--panel-2); color: var(--ink-dim); }
+/* Over the header, a banner is the top strip of the header's panel: in from
+   the sides by the same margin, with its text in line with the header's. With
+   no header under it, it closes the panel the way the header does. */
+.app > .banner {
+  margin: 0 20px;
+  border: 1px solid var(--line);
+  border-top: 0;
+}
+.app > .banner:not(:has(~ header)) { border-radius: 0 0 12px 12px; }
+.unsetnotes button.link { color: var(--you); padding: 0; font: inherit; vertical-align: baseline; }
+.unsetnotes button.link:hover { color: var(--ink); }
 
 /* Shown while a drag carrying files is anywhere over the window. Covers the
    page rather than marking a target on it, because the whole page is the

@@ -22,6 +22,7 @@ import {
   drillProblems,
   fillDrill,
   normalizeDrill,
+  notesToSlots,
   type Slot,
 } from "@/drills";
 import {
@@ -47,7 +48,13 @@ import {
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
-import { SLOT_NAMES, SlotMenu, slotValue, useInsertAtCursor } from "./SlotMenu";
+import {
+  SLOT_NAMES,
+  SlotMenu,
+  onPasteConverted,
+  slotValue,
+  useInsertAtCursor,
+} from "./SlotMenu";
 import { breakLines } from "@/morse";
 
 export interface SettingsProps {
@@ -56,6 +63,8 @@ export interface SettingsProps {
   /** The store changed — re-read it. */
   onProfilesChanged(): void;
   onClose(): void;
+  /** The tab to open at. Absent, the one last open. */
+  tab?: ConfigTab | undefined;
 }
 
 function saveBlob(blob: Blob, filename: string): void {
@@ -72,7 +81,7 @@ function saveBlob(blob: Blob, filename: string): void {
 const ms = (v: number) => `${(v * 1000).toFixed(1)} ms`;
 
 /** The three parts of Configuration, one on show at a time. */
-type ConfigTab = "user" | "drills" | "calibration";
+export type ConfigTab = "user" | "drills" | "calibration";
 const CONFIG_TABS: readonly { value: ConfigTab; label: string }[] = [
   { value: "user", label: "User" },
   { value: "drills", label: "Drills" },
@@ -108,7 +117,7 @@ export function Settings(props: SettingsProps): React.ReactElement {
   const [recordings, setRecordings] = useState<CalibrationSummary[]>([]);
   const [confirming, setConfirming] = useState<string | null>(null);
   // Remembered, so a reload with Configuration open comes back to the same half.
-  const [tab, setTabRaw] = useState<ConfigTab>(loadTab);
+  const [tab, setTabRaw] = useState<ConfigTab>(() => props.tab ?? loadTab());
   const setTab = (next: ConfigTab) => {
     setTabRaw(next);
     savePrefs({ ...loadPrefs(), configTab: next });
@@ -417,6 +426,8 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
   };
 
   const insert = (slot: Slot) => insertText(`{${slot}}`);
+  // A pasted note such as "(your call)" goes in as its slot.
+  const paste = onPasteConverted(notesToSlots, (t) => insertText(lowerSlots(t)));
 
   return (
     <section className="panelsec drillsettings">
@@ -454,6 +465,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
         value={text}
         placeholder={"CQ CQ DE {callsign} K\n{callsign} DE K7ABC K"}
         onChange={field.onChange}
+        onPaste={paste}
       />
       {problems.length > 0 && (
         <ul className="drillproblems" data-testid="drill-problems" role="alert">
@@ -490,6 +502,10 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
             A slot in braces takes a value from User when you pick the drill.
             Click a slot to add it at the cursor. A drill with an empty slot
             cannot be picked until you set that value.
+          </p>
+          <p>
+            Paste a QSO with notes such as <code>(your call)</code> or{" "}
+            <code>(your QTH)</code>, and each note goes in as its slot.
           </p>
           <table className="slottable">
             <thead>
