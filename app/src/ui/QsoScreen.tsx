@@ -12,7 +12,7 @@
  * everything hidden shows, and your copy is graded.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
 import {
   loadPrefs,
@@ -782,14 +782,17 @@ export function QsoScreen({
     [],
   );
 
-  /** Start is opening the microphone. The log is already cleared, and the
-   *  guide must not show for that moment. */
+  /* A new session clears the page only once the microphone is open, before
+     that render is painted: what was on the page, the guide or the last
+     session's log, stays until then, and the session's controls replace it
+     in one step. If the microphone does not open, nothing has changed. */
+  const freshOnStart = useRef(false);
+  /** The microphone is opening: the button says so at once, so the click
+   *  is seen to land while the page waits to swap. */
   const [starting, setStarting] = useState(false);
-  const start = () => {
-    player.wake();
-    setStarting(true);
+  const fresh = useRef<() => void>(() => {});
+  fresh.current = () => {
     setStopped(false);
-    replayOnStart.current = false;
     setLines([]);
     setNote("");
     setClosed([]);
@@ -800,17 +803,30 @@ export function QsoScreen({
     qso.current = newQso(Math.random, "", speed);
     setTheirSpeed(speed);
     answered.current = -1;
+  };
+  useLayoutEffect(() => {
+    if (!recorder || !freshOnStart.current) return;
+    freshOnStart.current = false;
+    fresh.current();
+  }, [recorder]);
+  const start = () => {
+    player.wake();
+    replayOnStart.current = false;
+    freshOnStart.current = true;
+    setStarting(true);
     void rec.start().finally(() => setStarting(false));
   };
 
   /** Go on with the QSO a reload brought back: the log and the QSO stay. */
   const resume = () => {
     player.wake();
+    freshOnStart.current = false;
+    setStarting(true);
     setStopped(false);
     setPlaying(null);
     answered.current = -1;
     replayOnStart.current = true;
-    void rec.start();
+    void rec.start().finally(() => setStarting(false));
   };
 
   /** End the session but not the QSO: Continue goes on with it. */
@@ -947,7 +963,7 @@ export function QsoScreen({
      running and nothing sent. It goes when the microphone opens, in the same
      step as Stop and the level meter, and comes back after a session that
      sent nothing. Behind the ? the rest of the time. */
-  const guideShown = !recorder && !starting && lines.length === 0;
+  const guideShown = !recorder && lines.length === 0;
 
   const status = !recorder
     ? open
@@ -1132,10 +1148,10 @@ export function QsoScreen({
             <button
               className="primary"
               data-testid={open ? "qso-continue" : "qso-start"}
-              disabled={rec.probing || rec.blocked || rec.busy}
+              disabled={rec.probing || rec.blocked || rec.busy || starting}
               onClick={open ? resume : start}
             >
-              <RecDot /> {open ? "Continue" : "Start"}
+              <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
             </button>
           ) : (
             <>
