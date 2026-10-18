@@ -80,6 +80,9 @@ const $$ = <T extends Element = HTMLElement>(sel: string) => [...host.querySelec
 const status = () => $(".qsostatus")?.textContent ?? "";
 const note = () => $(".qsonote")?.textContent ?? "";
 const theirs = () => $$(".qsolog li.them");
+/** Your turn to send: between QSOs it says to call CQ, during one it says
+ *  it is your turn. */
+const yourTurn = () => status() === "Call CQ to make a contact." || status() === "Your turn.";
 
 async function click(el: HTMLElement | null): Promise<void> {
   expect(el, "a control to click").not.toBeNull();
@@ -114,7 +117,7 @@ async function open(prefs: Prefs): Promise<void> {
     return !!b && !b.disabled;
   });
   await click($('[data-testid="qso-start"]'));
-  await until("the session to start", () => status().startsWith("Your turn"));
+  await until("the session to start", () => yourTurn());
   // A moment before the first over, as a person takes. Keyed the instant the
   // device opens, the first character can come out wrong under load.
   await wait(500);
@@ -146,7 +149,7 @@ async function send(text: string): Promise<HTMLElement> {
   const before = theirs().length;
   await mic.key(text);
   await until(`an answer to ${text}`, () => theirs().length > before);
-  await until("the turn to come back", () => status().startsWith("Your turn"));
+  await until("the turn to come back", () => yourTurn());
   return theirs()[theirs().length - 1]!;
 }
 
@@ -193,7 +196,7 @@ describe("a QSO from your CQ", () => {
     await until("the wait before the answer", () => status() === "Waiting for the other station.");
     await until("the answer", () => theirs().length === 1);
     expect(status()).toBe("The other station is sending.");
-    await until("the turn to come back", () => status().startsWith("Your turn"));
+    await until("the turn to come back", () => yourTurn());
     const answered = theirs()[0]!;
     const call = callIn(answered);
     // Your over, as copied. Not the first word: under load a character of it
@@ -210,7 +213,7 @@ describe("a QSO from your CQ", () => {
     await until("the last over to start", () => theirs().length > before);
     expect(status()).toBe("The other station is sending.");
     expect(note(), "no note while the last over plays").toBe("");
-    await until("the turn to come back", () => status().startsWith("Your turn"));
+    await until("the turn to come back", () => yourTurn());
     expect(note()).toBe("The QSO is over. Call CQ for the next one.");
   }, QSO_MS);
 
@@ -292,7 +295,7 @@ describe("your speed", () => {
 
     await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
     await click($('[data-testid="qso-start"]'));
-    await until("the session to start", () => status().startsWith("Your turn"));
+    await until("the session to start", () => yourTurn());
     expect(field("wpm").closest("[inert]"), "locked while it runs").not.toBeNull();
     expect(field("input-device").closest("[inert]"), "the microphone too").not.toBeNull();
     expect(field("calibration").closest("[inert]"), "and its calibration").not.toBeNull();
@@ -320,7 +323,7 @@ describe("copy mode options", () => {
     await until("the copy to lock", () => $('[data-testid="qso-locked"]') !== null);
     expect($('[data-testid="qso-locked"]')!.textContent).toBe("W7YFR DE");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
-    await until("the turn to come back", () => status().startsWith("Your turn"));
+    await until("the turn to come back", () => yourTurn());
   }, QSO_MS);
 
   it("locks it on Enter, and grades it at once when asked", async () => {
@@ -377,7 +380,7 @@ describe("copy mode options", () => {
     await until("the answer", () => theirs().length > before);
     expect($$('[data-testid="qso-type"]').length).toBeGreaterThan(0);
     expect($('[data-testid="qso-locked"]')).toBeNull();
-    await until("the turn to come back", () => status().startsWith("Your turn"));
+    await until("the turn to come back", () => yourTurn());
   }, QSO_MS);
 });
 
@@ -408,7 +411,7 @@ describe("the listening level", () => {
   });
 });
 
-describe("how a QSO goes", () => {
+describe("anatomy of a QSO", () => {
   it("is on the page until the first QSO, then behind the ?", async () => {
     mount({});
     const guide = () => $('[data-testid="qso-guide"]');
@@ -422,15 +425,73 @@ describe("how a QSO goes", () => {
 
     await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
     await click($('[data-testid="qso-start"]'));
-    await until("the session to start", () => status().startsWith("Your turn"));
+    await until("the session to start", () => yourTurn());
     expect(guide()).toBeNull();
 
     await click($('[data-testid="qso-help-open"]'));
-    expect($('[data-testid="qso-help"]')!.textContent).toContain("CQ CQ DE KD9XYZ K");
+    const help = $('[data-testid="qso-help"]')!;
+    expect(help.querySelector("#qsohelp-title")!.textContent).toBe("Anatomy of a QSO");
+    expect(help.textContent).toContain("CQ CQ DE KD9XYZ K");
     await act(async () => {
       await userEvent.keyboard("{Escape}");
     });
     expect($('[data-testid="qso-help"]')).toBeNull();
   });
+
+  it("changes the page in one step on Start", async () => {
+    mount({});
+    await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
+    /** Which parts are on the page. */
+    const parts = () =>
+      [
+        $('[data-testid="qso-guide"]') ? "guide" : "",
+        $('[data-testid="qso-help-open"]') ? "?" : "",
+        $('[data-testid="qso-stop"]') ? "stop" : "",
+      ]
+        .filter(Boolean)
+        .join("+");
+    const seen = [parts()];
+    await act(async () => {
+      $<HTMLButtonElement>('[data-testid="qso-start"]')!.click();
+    });
+    for (let t = 0; t < 2000 && seen[seen.length - 1] !== "?+stop"; t += 16) {
+      await wait(16);
+      const now = parts();
+      if (now !== seen[seen.length - 1]) seen.push(now);
+    }
+    // The guide, then the running session: never one without the other.
+    expect(seen).toEqual(["guide", "?+stop"]);
+    // The ? at the right end of its row.
+    const row = $(".qsocontrols")!.getBoundingClientRect();
+    const help = $('[data-testid="qso-help-open"]')!.getBoundingClientRect();
+    expect(Math.abs(row.right - help.right)).toBeLessThanOrEqual(1);
+  });
+
+  it("comes back after a session that sent nothing", async () => {
+    mount({});
+    await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
+    await click($('[data-testid="qso-start"]'));
+    await until("the session to start", () => yourTurn());
+    expect($('[data-testid="qso-guide"]')).toBeNull();
+    await click($('[data-testid="qso-stop"]'));
+    expect($('[data-testid="qso-guide"]')).not.toBeNull();
+    expect($('[data-testid="qso-help-open"]')).toBeNull();
+  });
 });
+
+describe("the session's own words", () => {
+  it("says to call CQ between QSOs, and that it is your turn during one", async () => {
+    await open({ qsoTheirText: "before" });
+    expect(status()).toBe("Call CQ to make a contact.");
+    // The keys, drawn as the practice page draws them.
+    expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual([
+      "R",
+      "Enter",
+      "Esc",
+    ]);
+    await send("CQ CQ DE W7YFR W7YFR K");
+    expect(status()).toBe("Your turn.");
+  }, QSO_MS);
+});
+
 

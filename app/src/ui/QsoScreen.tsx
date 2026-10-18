@@ -284,8 +284,6 @@ export function QsoScreen({
   };
   const [showSpeed, setShowSpeed] = useOnOff("qsoShowSpeed", false);
   const [helpOpen, setHelpOpen] = useState(false);
-  /** A QSO has been started on this page: the guide moves behind the ?. */
-  const [started, setStarted] = useState(false);
   const qso = useRef<Qso>(newQso(Math.random, "", speed));
   /** Which QSO of the session is running, counted from 0. */
   const qsoNo = useRef(0);
@@ -501,7 +499,6 @@ export function QsoScreen({
 
   const start = () => {
     player.wake();
-    setStarted(true);
     setLines([]);
     setNote("");
     setClosed([]);
@@ -587,10 +584,18 @@ export function QsoScreen({
     );
   };
 
+  /* The guide is on the page while there is nothing else to show: no session
+     running and nothing sent. It goes when the microphone opens, in the same
+     step as Stop and the level meter, and comes back after a session that
+     sent nothing. Behind the ? the rest of the time. */
+  const guideShown = !recorder && lines.length === 0;
+
   const status = !recorder
     ? "Press Start, then call CQ."
     : phase === "listening"
-      ? "Your turn. Hand it over with K."
+      ? qso.current.stage === "cq"
+        ? "Call CQ to make a contact."
+        : "Your turn."
       : phase === "waiting"
         ? "Waiting for the other station."
         : "The other station is sending.";
@@ -762,20 +767,6 @@ export function QsoScreen({
           {/* Your speed does two jobs: your sending is copied at it, and each
               new station answers at it. QRS and QRQ change the station's speed
               alone. */}
-          {/* The guide is on the page until the first QSO starts, and behind
-              this after it. */}
-          {started && (
-            <button
-              type="button"
-              className="iconbtn helpbtn"
-              data-testid="qso-help-open"
-              aria-label="How a QSO goes"
-              title="How a QSO goes"
-              onClick={() => setHelpOpen(true)}
-            >
-              <IconHelp />
-            </button>
-          )}
           {/* Only once QRS or QRQ has moved it: a station starts at your speed,
               and the guide says so. */}
           {!same(theirSpeed, speed) && (
@@ -783,9 +774,23 @@ export function QsoScreen({
               The station sends at {wpm(theirSpeed)}.
             </span>
           )}
+          {/* The guide, when it is not on the page: last in the row, at its
+              right end. */}
+          {!guideShown && (
+            <button
+              type="button"
+              className="iconbtn helpbtn qsohelpbtn"
+              data-testid="qso-help-open"
+              aria-label="Anatomy of a QSO"
+              title="Anatomy of a QSO"
+              onClick={() => setHelpOpen(true)}
+            >
+              <IconHelp />
+            </button>
+          )}
         </div>
 
-        {!started && (
+        {guideShown && (
           <div className="qsoguide prose" data-testid="qso-guide">
             <QsoGuide onSettings={() => setSettingsOpen(true)} />
           </div>
@@ -845,7 +850,9 @@ export function QsoScreen({
         )}
 
         {recorder && (
-          <p className="hint">r starts your over again · enter or esc stops</p>
+          <p className="legend keys" data-testid="qso-hotkeys">
+            <kbd>R</kbd> restart your turn &nbsp;·&nbsp; <kbd>Enter</kbd> or <kbd>Esc</kbd> stop
+          </p>
         )}
       </main>
     </>

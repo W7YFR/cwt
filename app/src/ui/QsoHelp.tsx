@@ -1,4 +1,4 @@
-/* How a QSO goes, shown by example.
+/* Anatomy of a QSO, shown by example.
  *
  * An example QSO, worked by the script itself (see qso/examples.ts), and a
  * short list of what to send when stuck. An example rather than rules: the
@@ -107,7 +107,7 @@ export function QsoHelp({
           if (e.key === "Escape") onClose();
         }}
       >
-        <h2 id="qsohelp-title">How a QSO goes</h2>
+        <h2 id="qsohelp-title">Anatomy of a QSO</h2>
         <div className="prose">
           <QsoGuide
             onSettings={() => {
