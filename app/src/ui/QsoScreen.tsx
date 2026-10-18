@@ -744,6 +744,10 @@ export function QsoScreen({
         heard,
         sentWpm: copy.sentWpm,
         seconds: Number((audio.length / recorder.rate).toFixed(2)),
+        // The same over at each step: recorded, read, sent to the decoder,
+        // dropped while the station played, and received by the decoder.
+        recorded: audio.length,
+        ...copy.flow,
         lenient,
         speed,
       });

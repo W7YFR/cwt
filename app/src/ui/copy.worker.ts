@@ -5,7 +5,7 @@
  * next one.
  */
 
-import { LiveCopy, type Copy } from "@/timing/live";
+import { LiveCopy, type Copy, type CopyStats } from "@/timing/live";
 import { targetTiming } from "@/timing/model";
 import type { Calibration } from "@/dsp";
 
@@ -31,6 +31,8 @@ export interface CopyAudio {
 
 export interface CopyRead extends Copy {
   readonly gen: number;
+  /** What the pass worked from, for the debug transcript. */
+  readonly stats: CopyStats | null;
 }
 
 /** The least time between the start of one pass and the next. */
@@ -53,7 +55,8 @@ function pass(): void {
   if (!copy || !fresh) return;
   fresh = false;
   lastPass = performance.now();
-  scope.postMessage({ gen, ...copy.step() });
+  const read = copy.step();
+  scope.postMessage({ gen, ...read, stats: copy.stats() });
 }
 
 scope.onmessage = (ev) => {
