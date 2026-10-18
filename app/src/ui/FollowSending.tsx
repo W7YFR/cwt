@@ -23,11 +23,14 @@ import type { Timeline } from "@/types";
 import { opensWord } from "@/timing/timeline";
 import type { ChartHandle } from "./Chart";
 import { useLiveProgress } from "./useLiveProgress";
+import type { Calibration } from "@/dsp";
 
 export interface FollowSendingProps {
   readonly recorder: Recorder;
   readonly charWpm: number;
   readonly farnsworthWpm: number;
+  /** The microphone path's correction, when one is chosen. */
+  readonly calibration?: Calibration | null | undefined;
   /** The target the chart draws, every pass included. */
   readonly ideal: Timeline;
   readonly handle: ChartHandle;
@@ -47,6 +50,7 @@ export function FollowSending({
   recorder,
   charWpm,
   farnsworthWpm,
+  calibration = null,
   ideal,
   handle,
   follow,
@@ -56,7 +60,7 @@ export function FollowSending({
   /* The characters the chart draws, so a count of them is an index into it. */
   const target = useMemo(() => ideal.chars.map((c) => c.char), [ideal]);
   const { reached, graded, done } = useLiveProgress(
-    { recorder, charWpm, farnsworthWpm },
+    { recorder, charWpm, farnsworthWpm, calibration },
     target,
   );
 

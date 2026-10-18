@@ -17,7 +17,7 @@ import { buildJsonReport } from "@/io/report";
 import { contextWindow, type Focus } from "@/render/focus";
 import { PACED_STOP_AFTER_SEC, PLAY_PAD } from "@/render/geometry";
 import { rangeSide, rangeTimes, type CharRange } from "@/render/layout";
-import type { Profile } from "@/io/profiles";
+import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
@@ -25,6 +25,7 @@ import {
   ChartSettingsButton,
   ChartSettingsPanel,
   Controls,
+  SettingsBand,
   ViewControls,
   fitSpeed,
 } from "./Controls";
@@ -36,6 +37,7 @@ import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { APP_NAME, Brandmark } from "./Wordmark";
+import { PageSwitch, type Page } from "./PageSwitch";
 import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
@@ -96,6 +98,8 @@ export interface ReviewScreenProps {
     times: number;
   }): void;
   onBack(): void;
+  /** Open the other page. Absent, the header has no page switch. */
+  onPage?: ((page: Page) => void) | undefined;
 }
 
 /** How long the settings panel takes to roll open or shut; see `.chartsettings`. */
@@ -195,6 +199,7 @@ export function ReviewScreen({
   onFile,
   onNewSession,
   onBack,
+  onPage,
 }: ReviewScreenProps): React.ReactElement {
   /* Declared before the recorder because the recorder's R key is turned off
      while the dialog is up: a key that starts a recording behind an open
@@ -309,6 +314,13 @@ export function ReviewScreen({
      A blank take rather than an empty list, so the row is there to be filled
      rather than appearing from nowhere when the take lands. */
   const recording = rec.recorder !== null;
+  /* The calibration a take being recorded is read through: the one chosen,
+     since a recording comes from the microphone. Live progress reads it the
+     same way, so what it colors is what the review will grade. */
+  const liveCalibration = useMemo(() => {
+    const profile = profileForSource(profiles.find((p) => p.id === profileId) ?? null, true);
+    return profile ? calibrationOf(profile) : null;
+  }, [profiles, profileId]);
   const incoming = useMemo(
     () =>
       reviewTake(
@@ -838,6 +850,7 @@ export function ReviewScreen({
             <Brandmark art={visitWordmark()} />
           </button>
         </h1>
+        {onPage && <PageSwitch page="practice" onPage={onPage} disabled={recording} />}
         <RecordBar
           rec={rec}
           appliesToTake={loaded.take.source === MIC_SOURCE}
@@ -888,36 +901,30 @@ export function ReviewScreen({
         </div>
       </header>
 
-      {/* Always in the tree, open or not: a band that is only rendered while
-          open has nothing to roll down FROM, and a closed one has to be
-          unreachable rather than merely invisible — `inert` takes it out of
-          the tab order and off the accessibility tree together, which two
-          attributes doing half each would eventually disagree about. */}
-      <section className="chartsettings" data-open={String(chartSettings)} ref={panelRef}>
-        <div inert={!chartSettings || recording} data-locked={recording}>
-          <ChartSettingsPanel
-            settings={settings}
-            runs={stack.length}
-            onChange={onChange}
-            loop={loop}
-            onLoop={() => setLoop((on) => !on)}
-            /* The setup goes behind the settings button, like everything else
-               that is not the loop: which microphone, what to correct it by,
-               and how loud to play it back. */
-            audio={{
-              devices: rec.devices,
-              deviceId,
-              onDeviceChange,
-              profiles,
-              profileId,
-              onProfileChange: chooseProfile,
-              appliesToTake: loaded.take.source === MIC_SOURCE,
-              rereading,
-              onCalibrate,
-            }}
-          />
-        </div>
-      </section>
+      {/* Always in the tree, open or not: see SettingsBand. */}
+      <SettingsBand open={chartSettings} locked={recording} bandRef={panelRef}>
+        <ChartSettingsPanel
+          settings={settings}
+          runs={stack.length}
+          onChange={onChange}
+          loop={loop}
+          onLoop={() => setLoop((on) => !on)}
+          /* The setup goes behind the settings button, like everything else
+             that is not the loop: which microphone, what to correct it by,
+             and how loud to play it back. */
+          audio={{
+            devices: rec.devices,
+            deviceId,
+            onDeviceChange,
+            profiles,
+            profileId,
+            onProfileChange: chooseProfile,
+            appliesToTake: loaded.take.source === MIC_SOURCE,
+            rereading,
+            onCalibrate,
+          }}
+        />
+      </SettingsBand>
 
       {/* Locked while a take runs, with the scores, the report, the settings
           panel and the header's corner. What is sent, how fast and against
@@ -1023,6 +1030,7 @@ export function ReviewScreen({
           recorder={rec.recorder}
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
+          calibration={liveCalibration}
           ideal={incoming.ideal}
           handle={handle}
           follow={settings.plainFollow}
@@ -1044,6 +1052,7 @@ export function ReviewScreen({
                   recorder: rec.recorder,
                   charWpm: settings.charWpm,
                   farnsworthWpm: settings.farnsworthWpm,
+                  calibration: liveCalibration,
                 }
               : null
           }

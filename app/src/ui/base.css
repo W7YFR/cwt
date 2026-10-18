@@ -171,6 +171,10 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   white-space: pre;
   font-family: var(--mono);
   line-height: 1;
+  /* Set here, not inherited. The practice page draws this inside a button,
+     where the browser resets letter spacing, and the QSO page inside a span,
+     where it inherited the heading's: the same drawing was wider there. */
+  letter-spacing: normal;
   font-size: calc(var(--brand-h, 26px) / var(--rows, 6));
 }
 
@@ -508,6 +512,15 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* The recording modes, a row of their own under the rest, laid out on the
    same columns so their sections line up with the ones above. */
 .viewpanel .modes { grid-column: 1 / -1; }
+/* A page's own settings, a row of their own under the shared ones, on the
+   same columns. */
+.viewpanel .pagerow {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 180px);
+  align-items: start;
+  gap: 16px 20px;
+}
 .viewpanel .modesrow {
   display: grid;
   grid-template-columns: repeat(auto-fill, 180px);
@@ -531,7 +544,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* Too narrow for two columns: one, the width of the window, and Audio's two
    lines wrap inside it. */
 @media (max-width: 440px) {
-  .viewpanel, .viewpanel .modesrow { grid-template-columns: 1fr; }
+  .viewpanel, .viewpanel .modesrow, .viewpanel .pagerow { grid-template-columns: 1fr; }
   .viewpanel [data-panel="audio"] { grid-column: auto; }
 }
 /* Every other section is a column of its settings. */
@@ -1412,38 +1425,39 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   border-left-color: var(--you);
 }
 
-/* A page to read rather than a form to fill in, so it is set as prose: a
+/* A page to read rather than a form to fill in, so it is set as prose (the
+   QSO page's help reads the same way, and shares these): a
    measure narrow enough to track along, headings that break it into the three
    questions somebody actually has, and room between paragraphs. */
 /* Left-aligned explicitly: the landing screen is a column of centered cards
    and this inherits from it, but centered prose has no edge to return to at
    the end of a line. */
-.soundpath {
+.soundpath, .qsohelp {
   width: min(620px, 100%);
   gap: 0;
   font-size: 13px;
   line-height: 1.6;
   text-align: left;
 }
-.soundpath h3 {
+.soundpath h3, .qsohelp h3 {
   margin: 20px 0 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--you);
 }
-.soundpath p { margin: 0 0 10px; color: var(--ink-dim); }
-.soundpath b { color: var(--ink); font-weight: 600; }
-.soundpath ul { margin: 0 0 10px; padding-left: 18px; color: var(--ink-dim); }
-.soundpath li { margin-bottom: 6px; }
+.soundpath p, .qsohelp p { margin: 0 0 10px; color: var(--ink-dim); }
+.soundpath b, .qsohelp b { color: var(--ink); font-weight: 600; }
+.soundpath ul, .qsohelp ul { margin: 0 0 10px; padding-left: 18px; color: var(--ink-dim); }
+.soundpath li, .qsohelp li { margin-bottom: 6px; }
 /* The title and the way out are fixed and the reading scrolls between them.
    This runs longer than a short window, and a way out you have to read to the
    end to reach is not a way out. */
-.soundpath { overflow: hidden; }
-.soundpath .prose { flex: 1; min-height: 0; overflow-y: auto; }
-.soundpath .confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.soundpath, .qsohelp { overflow: hidden; }
+.soundpath .prose, .qsohelp .prose { flex: 1; min-height: 0; overflow-y: auto; }
+.soundpath .confirm, .qsohelp .confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 /* Focus goes here on open so Escape has somewhere to land, and a ring around
    the whole sheet reads as an error rather than as a place to type. */
-.soundpath:focus { outline: none; }
+.soundpath:focus, .qsohelp:focus { outline: none; }
 
 /* ---- zen mode ------------------------------------------------------------ */
 
@@ -2305,3 +2319,135 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .modeswitch button + button[aria-pressed="true"] {
   box-shadow: -1px 0 0 var(--you);
 }
+
+/* The QSO page: the panel under the header, centered the way Configuration
+   is, with the conversation as a log. */
+/* Under the controls, at their width, as the chart is on the practice page. */
+.panel.qso { margin: 12px 20px; max-width: none; width: auto; }
+.qsostatus { margin: 0; font-size: 16px; }
+.qsocontrols { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.qsocontrols .meter { flex: 0 0 120px; }
+/* The ? at the right end of the row, where it stays put whatever is left of it. */
+.qsocontrols .qsohelpbtn { margin-left: auto; }
+.qsolog {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 15px;
+}
+.qsolog li { display: flex; gap: 12px; min-width: 0; }
+.qsolog .who { flex: 0 0 8ch; color: var(--ink-dim); }
+.qsolog .text { min-width: 0; overflow-wrap: anywhere; }
+.qsolog .you .text { color: var(--you); }
+.qsolog .live .keying { color: var(--ink-faint); }
+.qsonote { margin: 0; }
+/* The guide on the page, before the first QSO: read as the help reads. */
+.qsoguide { max-width: 72ch; font-size: 13px; line-height: 1.6; }
+.qsoguide p, .qsoguide ul { color: var(--ink-dim); }
+.qsoguide ul { padding-left: 18px; }
+.qsoguide h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
+/* The settings link in the guide: the theme's blue, inline in its sentence. */
+.qsoguide button.link,
+.qsohelp button.link { color: var(--you); padding: 0; font: inherit; vertical-align: baseline; }
+.qsoguide button.link:hover,
+.qsohelp button.link:hover { color: var(--ink); }
+/* How a QSO goes: the example, one line each, your side in your blue. */
+.qsoexample { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.qsoexample li { display: flex; gap: 12px; min-width: 0; }
+.qsoexample .who { flex: 0 0 5ch; color: var(--ink-dim); font-family: var(--mono); font-size: 13px; }
+.qsoexample .text { display: flex; flex-direction: column; min-width: 0; }
+.qsoexample code { font-family: var(--mono); overflow-wrap: anywhere; }
+.qsoexample .you code { color: var(--you); }
+.qsoexample .note { color: var(--ink-faint); font-size: 12px; }
+.qsosend code { font-family: var(--mono); }
+/* Blurred enough that only the number of characters can be told. Not
+   selectable, so a drag cannot read it either. */
+.qsolog .blurred { filter: blur(5px); user-select: none; }
+.qsolog .off { color: var(--ink-faint); font-style: italic; }
+.qsotype {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  text-transform: uppercase;
+}
+.qsolog .graded { display: flex; flex-direction: column; gap: 6px; }
+/* A graded copy keeps the text's own color, with a dot under each character,
+   as Zen mode's live grading has: blue if you copied it right, red if not.
+   Out of the flow and sized in em, so the dots move nothing. */
+.qsolog .cright, .qsolog .cwrong { position: relative; }
+.qsolog .cright::after, .qsolog .cwrong::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.3em;
+  width: 0.3em;
+  height: 0.3em;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+.qsolog .cright::after { background: var(--you); }
+.qsolog .cwrong::after { background: var(--bad); }
+.qsolog .copied { color: var(--ink-dim); font-size: 13px; }
+/* Your copy is of the station's line, so it is grey as a locked copy is,
+   not your blue: blue in this log is your own sending. The dots under it
+   say what is right. */
+.qsolog .graded .yourcopy, .qsolog .rightonly { color: var(--ink-dim); }
+/* Blanks keep their width: each stands for a character you left out. */
+.qsolog .rightonly { white-space: pre-wrap; }
+/* Your copy over the station's line, a column for each character, so each
+   typed character sits over the one it was graded against. A word's
+   columns stay on one line; a long line breaks between words, both rows
+   together. */
+.qsolog .aligned { display: flex; flex-wrap: wrap; column-gap: 1ch; row-gap: 10px; }
+.qsolog .cword { display: inline-flex; white-space: pre; }
+.qsolog .ccol { display: inline-flex; flex-direction: column; gap: 6px; }
+/* Every row one height, set here rather than by its text: a word you did
+   not copy has nothing over it, and an empty row as tall as its text left
+   that word lower than the rest. */
+.qsolog .ccol > span { display: block; height: 1.4em; line-height: 1.4em; }
+.qsolog .locked { color: var(--ink-dim); }
+/* A choice in the header keeps each of its labels on one line, and on a
+   phone its buttons close up so all five fit the header's width. */
+header .modeswitch button { white-space: nowrap; }
+@media (max-width: 440px) {
+  header .modeswitch button { padding-left: 9px; padding-right: 9px; }
+}
+/* The speed you sent a line at, after it, quiet. */
+.qsolog .lwpm { margin-left: auto; padding-left: 12px; color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
+/* Your speed in your blue, so whose speed is whose reads at a glance. */
+.qsolog .you .lwpm { color: var(--you); }
+@media (max-width: 700px) {
+  .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
+}
+
+/* The QSO page's settings, on columns a little wider than the practice
+   page's: Overall (Farnsworth) and its reading need the room, one over the
+   other with Character speed in the Speed column. */
+.viewpanel.qsopanel,
+.viewpanel.qsopanel .pagerow,
+.viewpanel.qsopanel .modesrow { grid-template-columns: repeat(auto-fill, 210px); }
+/* A choice with its options in view, the buttons small, so most fit one
+   column. The sections with the longest take two, where two fit: spanning
+   two of one column would add a second, past the panel's edge. */
+.viewpanel .choicegroup .modeswitch button { padding: 3px 9px; font-size: 12px; white-space: nowrap; }
+/* Closer on the smallest phones, so the longest row still fits. */
+@media (max-width: 400px) {
+  .viewpanel .choicegroup .modeswitch button { padding-left: 7px; padding-right: 7px; }
+}
+@media (min-width: 561px) {
+  .viewpanel.qsopanel [data-panel="qso"],
+  .viewpanel.qsopanel [data-panel="theirs"],
+  .viewpanel.qsopanel [data-panel="copy"] { grid-column: span 2; }
+}
+/* One column a little sooner than the practice page's: below this, two
+   columns do not fit beside a section that spans both. */
+@media (max-width: 560px) {
+  .viewpanel.qsopanel, .viewpanel.qsopanel .pagerow, .viewpanel.qsopanel .modesrow { grid-template-columns: 1fr; }
+}
+.viewpanel [data-panel="speed"] label { white-space: nowrap; }
+.viewpanel [data-panel="speed"] input[type="range"] { width: 180px; }
+

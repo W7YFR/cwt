@@ -48,6 +48,9 @@ export interface Player {
     options: ScheduleOptions & { voice?: TargetVoice },
   ): void;
   stop(): void;
+  /** Open the audio context now. A page that plays later, with no click
+   *  behind it, calls this from the click that starts it. */
+  wake(): void;
   /** Playback level in dB. Applied at playback only — never baked into the
    *  samples or into a download. */
   setGainDb(db: number): void;
@@ -282,6 +285,10 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
     },
 
     stop,
+
+    wake() {
+      context();
+    },
 
     setGainDb(db) {
       gainDb = db;

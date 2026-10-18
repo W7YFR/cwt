@@ -11,6 +11,7 @@
 
 import { LiveFollower, type Progress } from "@/timing/live";
 import { targetTiming } from "@/timing/model";
+import type { Calibration } from "@/dsp";
 
 /** Starts a take, or starts it over. Replies carry `gen`, so the page can drop
  *  a reply about the take before. */
@@ -21,6 +22,8 @@ export interface LiveStart {
   readonly target: readonly string[];
   readonly charWpm: number;
   readonly farnsworthWpm: number;
+  /** The microphone path's correction, when one is chosen. */
+  readonly calibration: Calibration | null;
 }
 
 /** Audio captured since the last of these. */
@@ -65,6 +68,7 @@ scope.onmessage = (ev) => {
       msg.rate,
       msg.target,
       targetTiming(msg.charWpm, msg.farnsworthWpm),
+      msg.calibration ?? undefined,
     );
     fresh = false;
     return;

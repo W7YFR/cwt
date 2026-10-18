@@ -22,10 +22,11 @@
  * runs under Node against real recordings.
  */
 
-import type { Timing } from "@/types";
-import { segmentsFrom } from "@/dsp";
+import type { Segment, Timing } from "@/types";
+import { segmentsFrom, type Calibration } from "@/dsp";
 import { CHAR_TO_MORSE, SYMBOL_RE, canonicalChar } from "@/morse";
-import { buildTimeline } from "./timeline";
+import { estimateTiming } from "./estimate";
+import { buildTimeline, opensWord } from "./timeline";
 
 /** The rate the live decode works at, or the nearest above it that the
  *  capture rate divides down to. */
@@ -81,6 +82,8 @@ export interface Sent {
    *  keyed. Spaces are left out: where the words fall does not say how far
    *  through the message the sender is. */
   readonly symbols: string[];
+  /** The same characters as text, with a space where a word gap fell. */
+  readonly text: string;
   /** The elements of the character still being keyed, or null when the key
    *  has been up for a character gap. */
   readonly keying: string | null;
@@ -88,19 +91,47 @@ export interface Sent {
   readonly quietSec: number;
   /** The tone this pass decoded at. */
   readonly toneHz: number;
+  /** The on and off runs the pass read, for measuring the sender. */
+  readonly segments: readonly Segment[];
+}
+
+/** Marks keyed before the sender's own timing is measured. Fewer than this
+ *  is too little evidence for the gaps, and the set timing is used. */
+export const MEASURE_MIN_MARKS = 20;
+
+/** The sender's own timing, or `timing` while there is too little keying to
+ *  measure. */
+function measured(segments: readonly Segment[], timing: Timing): Timing {
+  let marks = 0;
+  for (const s of segments) if (s[0] === 1) marks++;
+  if (marks < MEASURE_MIN_MARKS) return timing;
+  try {
+    return estimateTiming(segments);
+  } catch {
+    return timing;
+  }
 }
 
 /** Decode what has been keyed so far.
  *
  * Give `toneHz` once it is known. Finding the tone is most of the cost of a
- * pass, and the tone does not move while one take runs. */
+ * pass, and the tone does not move while one take runs.
+ *
+ * With `measure`, the characters and words are read at the sender's own
+ * timing once there is enough keying to measure it, not at `timing`. The
+ * last character is still held for `timing`'s character gap.
+ *
+ * With `calibration`, the edges are corrected for the microphone path, as a
+ * finished take is: see `segmentsFrom`. */
 export function sentSymbols(
   samples: Float32Array,
   rate: number,
   timing: Timing,
   toneHz?: number,
+  measure = false,
+  calibration?: Calibration,
 ): Sent {
-  const none = { symbols: [], keying: null, quietSec: 0, toneHz: toneHz ?? 0 };
+  const none = { symbols: [], text: "", keying: null, quietSec: 0, toneHz: toneHz ?? 0, segments: [] };
   if (samples.length === 0) return none;
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {
@@ -112,21 +143,27 @@ export function sentSymbols(
   const scaled = new Float32Array(samples.length);
   for (let i = 0; i < samples.length; i++) scaled[i] = samples[i]! / peak;
 
-  const found = segmentsFrom(scaled, rate, toneHz !== undefined ? { toneHz } : {});
+  const found = segmentsFrom(scaled, rate, {
+    ...(toneHz !== undefined ? { toneHz } : {}),
+    ...(calibration ? { calibration } : {}),
+  });
   const { segments } = found;
-  const { chars } = buildTimeline(segments, timing);
+  const { chars } = buildTimeline(segments, measure ? measured(segments, timing) : timing);
   const last = chars[chars.length - 1];
-  if (!last) return { ...none, toneHz: found.toneHz };
+  if (!last) return { ...none, toneHz: found.toneHz, segments };
 
   let end = 0;
   for (const s of segments) end += s[1];
   const quietSec = end - last.t1;
   const done = quietSec >= timing.elementCharSplit;
+  const kept = done ? chars : chars.slice(0, -1);
   return {
-    symbols: (done ? chars : chars.slice(0, -1)).map((c) => c.char),
+    symbols: kept.map((c) => c.char),
+    text: kept.map((c, i) => (i > 0 && opensWord(c) ? ` ${c.char}` : c.char)).join(""),
     keying: done ? null : last.pattern,
     quietSec,
     toneHz: found.toneHz,
+    segments,
   };
 }
 
@@ -248,12 +285,16 @@ export class LiveFollower {
   private best = 0;
   /** The Morse of the message's first character. */
   private readonly first: string;
+  private readonly calibration: Calibration | undefined;
 
-  constructor(rate: number, target: readonly string[], timing: Timing) {
+  /** With `calibration`, the take's edges are corrected for the microphone
+   *  path, as the review corrects them afterwards. */
+  constructor(rate: number, target: readonly string[], timing: Timing, calibration?: Calibration) {
     this.audio = new Decimator(rate);
     this.target = target;
     this.timing = timing;
     this.first = CHAR_TO_MORSE[target[0] ?? ""] ?? "";
+    this.calibration = calibration;
   }
 
   push(samples: Float32Array): void {
@@ -261,7 +302,14 @@ export class LiveFollower {
   }
 
   step(): Progress {
-    const sent = sentSymbols(this.audio.samples(), this.audio.rate, this.timing, this.toneHz);
+    const sent = sentSymbols(
+      this.audio.samples(),
+      this.audio.rate,
+      this.timing,
+      this.toneHz,
+      false,
+      this.calibration,
+    );
     const verdicts = graded(this.target, sent.symbols);
     const matches = verdicts.filter(Boolean).length;
     const at =
@@ -275,5 +323,123 @@ export class LiveFollower {
       sent.keying === null &&
       sent.quietSec >= END_QUIET_DITS * this.timing.unitSec + END_QUIET_SEC;
     return { reached: Math.max(this.best, verdicts.length), graded: verdicts, done };
+  }
+}
+
+/** The words that hand the turn to the other station. A prosign keyed as two
+ *  letters, such as K N, counts too. */
+const TURN_WORDS = new Set(["K", "<KN>", "KN", "<BK>", "BK", "<SK>", "SK", "<AR>", "AR"]);
+
+/** A question hands the turn over too: ?, AGN?, HW?. A character misread
+ *  before a ?, as in 5?, does not. */
+const QUESTION_RE = /^[A-Z]*\?$/;
+
+/** How long the key must stay up to end an over that does not end with a
+ *  turn word. Never less than this many word gaps. */
+export const OVER_QUIET_SEC = 3;
+
+/** How long the key must stay up after a turn word, beyond `END_QUIET_DITS`.
+ *  Longer than a take's end: a K can be an acknowledgement in the middle of
+ *  an over, and the sender may go on after a pause. */
+export const TURN_QUIET_SEC = 2;
+
+/** How many times longer the wait is when the turn word is all that has been
+ *  sent. A K at the start of an over is most often an acknowledgement, with
+ *  the rest of the over to come. */
+export const LONE_TURN_FACTOR = 2;
+export const OVER_QUIET_WORD_GAPS = 3;
+
+/** Characters read before the tone is held. With no target there is nothing
+ *  to match, so a run of characters is the evidence. */
+const TONE_LOCK_CHARS = 3;
+
+export interface Copy {
+  /** What has been read so far, with spaces between words. */
+  readonly text: string;
+  /** The elements of the character still being keyed, or null. */
+  readonly keying: string | null;
+  /** The sender has handed the turn over. */
+  readonly over: boolean;
+  /** The speeds the sender keyed the over at, once it is over and long
+   *  enough to measure. Null until then. */
+  readonly sentWpm: SentWpm | null;
+}
+
+export interface SentWpm {
+  readonly charWpm: number;
+  readonly farnsworthWpm: number;
+}
+
+/** Marks an over needs before its speed is measured. Fewer, as a lone K, say
+ *  too little about the spacing. */
+export const SPEED_MIN_MARKS = 12;
+
+/** The speeds `segments` were keyed at, or null with too few marks. */
+export function sentWpm(segments: readonly Segment[]): SentWpm | null {
+  let marks = 0;
+  for (const s of segments) if (s[0] === 1) marks++;
+  if (marks < SPEED_MIN_MARKS) return null;
+  try {
+    const t = estimateTiming(segments);
+    if (!(t.charWpm > 0) || !(t.farnsworthWpm > 0)) return null;
+    return { charWpm: t.charWpm, farnsworthWpm: Math.min(t.farnsworthWpm, t.charWpm) };
+  } catch {
+    return null;
+  }
+}
+
+/** Whether an over has ended: a turn word and `TURN_QUIET_SEC`, twice that
+ *  for a turn word alone, or a long silence after anything at all. */
+export function overEnded(text: string, quietSec: number, timing: Timing): boolean {
+  const words = text.trim().split(/\s+/);
+  const last = words[words.length - 1] ?? "";
+  if (!last) return false;
+  const turn = TURN_WORDS.has(last) || QUESTION_RE.test(last);
+  const lone = words.length === 1 ? LONE_TURN_FACTOR : 1;
+  const wait = turn
+    ? (END_QUIET_DITS * timing.unitSec + TURN_QUIET_SEC) * lone
+    : Math.max(OVER_QUIET_SEC, OVER_QUIET_WORD_GAPS * (timing.wordGapSec || 7 * timing.unitSec));
+  return quietSec >= wait;
+}
+
+/** One over, copied from its first sample with no message to follow.
+ *
+ * The same passes as `LiveFollower`, but what comes back is the text itself,
+ * and the over ends when the sender hands the turn over. */
+export class LiveCopy {
+  private readonly audio: Decimator;
+  private readonly timing: Timing;
+  private readonly measure: boolean;
+  private readonly calibration: Calibration | undefined;
+  private toneHz: number | undefined;
+
+  /** With `measure`, the over is read at the sender's own timing. With
+   *  `calibration`, its edges are corrected for the microphone path. See
+   *  `sentSymbols`. */
+  constructor(rate: number, timing: Timing, measure = false, calibration?: Calibration) {
+    this.audio = new Decimator(rate);
+    this.timing = timing;
+    this.measure = measure;
+    this.calibration = calibration;
+  }
+
+  push(samples: Float32Array): void {
+    this.audio.push(samples);
+  }
+
+  step(): Copy {
+    const sent = sentSymbols(
+      this.audio.samples(),
+      this.audio.rate,
+      this.timing,
+      this.toneHz,
+      this.measure,
+      this.calibration,
+    );
+    if (this.toneHz === undefined && sent.symbols.length >= TONE_LOCK_CHARS) {
+      this.toneHz = sent.toneHz;
+    }
+    const over = sent.keying === null && overEnded(sent.text, sent.quietSec, this.timing);
+    return { text: sent.text, keying: sent.keying, over, sentWpm: over ? sentWpm(sent.segments) : null };
   }
 }

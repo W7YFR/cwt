@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import type { Recorder } from "@/capture/mic";
+import type { Calibration } from "@/dsp";
 import type { Progress } from "@/timing/live";
 import type { LiveAudio, LiveReached, LiveStart } from "./live.worker";
 
@@ -20,6 +21,9 @@ export interface LiveSource {
   readonly recorder: Recorder;
   readonly charWpm: number;
   readonly farnsworthWpm: number;
+  /** The microphone path's correction, when one is chosen: the same one the
+   *  take is read through afterwards. */
+  readonly calibration?: Calibration | null | undefined;
 }
 
 const NONE: Progress = { reached: 0, graded: [], done: false };
@@ -36,6 +40,9 @@ export function useLiveProgress(
   const recorder = source?.recorder ?? null;
   const charWpm = source?.charWpm ?? 0;
   const farnsworthWpm = source?.farnsworthWpm ?? 0;
+  const calibration = source?.calibration ?? null;
+  // The effect depends on the correction, not on the object that holds it.
+  const calKey = calibration ? calibration.releaseOffsetSec : null;
   // The effect depends on the characters, not on the array that holds them.
   const key = target.join("\u0000");
 
@@ -70,6 +77,7 @@ export function useLiveProgress(
         target,
         charWpm,
         farnsworthWpm,
+        calibration,
       };
       worker.postMessage(start);
     };
@@ -105,7 +113,7 @@ export function useLiveProgress(
     };
     // `target` is read through `key`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder, charWpm, farnsworthWpm, key]);
+  }, [recorder, charWpm, farnsworthWpm, key, calKey]);
 
   return recorder ? progress : NONE;
 }
