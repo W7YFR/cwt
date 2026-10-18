@@ -2340,7 +2340,10 @@ button.cal { font-size: 11px; padding: 3px 8px; }
   text-transform: uppercase;
 }
 .qsolog .graded { display: flex; flex-direction: column; gap: 2px; }
-.qsolog .cright { color: var(--you); }
+/* Right in the green the rest of the app grades right in, not the blue: in
+   this log, blue is your own sending, and a graded station over in it read
+   as yours. */
+.qsolog .cright { color: var(--ok); }
 .qsolog .cwrong { color: var(--bad); text-decoration: underline; }
 .qsolog .copied { color: var(--ink-dim); font-size: 13px; }
 .qsolog .locked { color: var(--ink-dim); }

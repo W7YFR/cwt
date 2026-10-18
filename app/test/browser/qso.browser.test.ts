@@ -330,6 +330,7 @@ describe("copy mode options", () => {
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
     expect($(".qsolog .graded")?.textContent).toContain("You copied W7YFR DE");
     expect($('[data-testid="qso-stop"]'), "Enter did not stop the session").not.toBeNull();
+
   }, QSO_MS);
 
   it("shows only what you got right, when asked, and the rest as dots", async () => {
@@ -355,6 +356,16 @@ describe("copy mode options", () => {
     expect(shown!.querySelectorAll(".cwrong")).toHaveLength(0);
     expect(shown!.querySelectorAll(".unknown").length).toBeGreaterThan(0);
     expect($(".qsolog .copied"), "no count").toBeNull();
+    // Right is the theme's green, not the blue of your own lines.
+    const right = shown!.querySelector(".cright")!;
+    const probe = document.createElement("span");
+    probe.style.color = "var(--ok)";
+    host.append(probe);
+    expect(getComputedStyle(right).color).toBe(getComputedStyle(probe).color);
+    probe.remove();
+    expect(getComputedStyle(right).color).not.toBe(
+      getComputedStyle($(".qsolog li.you .text")!).color,
+    );
   }, QSO_MS);
 
   it("leaves your copy open while you send, with Lock off", async () => {
