@@ -21,7 +21,8 @@ import type { Length } from "@/qso/wording";
 import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconUser } from "./Icons";
+import { IconHelp, IconUser } from "./Icons";
+import { QsoGuide, QsoHelp } from "./QsoHelp";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
 import {
@@ -282,6 +283,9 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoLockedShows: next });
   };
   const [showSpeed, setShowSpeed] = useOnOff("qsoShowSpeed", false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  /** A QSO has been started on this page: the guide moves behind the ?. */
+  const [started, setStarted] = useState(false);
   const qso = useRef<Qso>(newQso(Math.random, "", speed));
   /** Which QSO of the session is running, counted from 0. */
   const qsoNo = useRef(0);
@@ -497,6 +501,7 @@ export function QsoScreen({
 
   const start = () => {
     player.wake();
+    setStarted(true);
     setLines([]);
     setNote("");
     setClosed([]);
@@ -599,21 +604,6 @@ export function QsoScreen({
           </span>
         </h1>
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
-        {/* The quick choice, where the practice page has Plain, Paced and Zen.
-            Its options are in the settings, under Station text modes. */}
-        <div
-          className="modeswitch"
-          role="group"
-          aria-label="Station text"
-          title={THEIR_TEXT_HELP}
-          data-testid="qso-their-text"
-        >
-          {THEIR_TEXTS.map((m) => (
-            <button key={m.value} aria-pressed={theirText === m.value} onClick={() => setTheirText(m.value)}>
-              {m.label}
-            </button>
-          ))}
-        </div>
         <div className="cornergroup">
           <button
             className="iconbtn cornerbtn"
@@ -704,6 +694,18 @@ export function QsoScreen({
               />
             </div>
           </Section>
+          <Section name="theirs" title="Station text">
+            <div className="panelgroups">
+              <SelectGroup
+                id="qso-their-text"
+                label="Shows"
+                help={THEIR_TEXT_HELP}
+                value={theirText}
+                options={THEIR_TEXTS}
+                onChange={(v) => setTheirText(v as TheirText)}
+              />
+            </div>
+          </Section>
           <Section name="yours" title="Your text">
             <div className="panelgroups">
               <SelectGroup
@@ -725,6 +727,10 @@ export function QsoScreen({
           </Section>
         </SettingsPanel>
       </SettingsBand>
+
+      {helpOpen && (
+        <QsoHelp onClose={() => setHelpOpen(false)} onSettings={() => setSettingsOpen(true)} />
+      )}
 
       <main className="panel qso" data-testid="qso">
         <p className="qsostatus" role="status" aria-live="polite">
@@ -756,12 +762,34 @@ export function QsoScreen({
           {/* Your speed does two jobs: your sending is copied at it, and each
               new station answers at it. QRS and QRQ change the station's speed
               alone. */}
-          <span className="hint" data-testid="qso-their-speed">
-            {same(theirSpeed, speed)
-              ? "The station answers at your speed."
-              : `The station sends at ${wpm(theirSpeed)}.`}
-          </span>
+          {/* The guide is on the page until the first QSO starts, and behind
+              this after it. */}
+          {started && (
+            <button
+              type="button"
+              className="iconbtn helpbtn"
+              data-testid="qso-help-open"
+              aria-label="How a QSO goes"
+              title="How a QSO goes"
+              onClick={() => setHelpOpen(true)}
+            >
+              <IconHelp />
+            </button>
+          )}
+          {/* Only once QRS or QRQ has moved it: a station starts at your speed,
+              and the guide says so. */}
+          {!same(theirSpeed, speed) && (
+            <span className="hint" data-testid="qso-their-speed">
+              The station sends at {wpm(theirSpeed)}.
+            </span>
+          )}
         </div>
+
+        {!started && (
+          <div className="qsoguide prose" data-testid="qso-guide">
+            <QsoGuide onSettings={() => setSettingsOpen(true)} />
+          </div>
+        )}
 
         <ol className="qsolog" data-testid="qso-log">
           {lines.map((line, i) => (

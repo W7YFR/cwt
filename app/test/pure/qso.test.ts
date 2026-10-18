@@ -20,6 +20,7 @@ import {
 import { randomStation } from "@/qso/station";
 import { NO_SEARCH, STEPS, faster, qrq, qrs, setTo, slower, type Speed } from "@/qso/speed";
 import { gradeCopy, revealed } from "@/qso/show";
+import { examples } from "@/qso/examples";
 
 /** A fixed sequence, so the station is the same every run. */
 function seeded(seed = 1): () => number {
@@ -852,3 +853,17 @@ describe("copying an over through a calibration", () => {
     for (let i = 0; i < plain.length; i++) expect(plain[i]! - fixed[i]!).toBeCloseTo(0.008, 3);
   });
 });
+
+describe("the help's example QSO", () => {
+  it("goes straight through to the station's 73, as the script answers it", () => {
+    const [ex] = examples();
+    const lines = ex!.lines;
+    expect(lines.map((l) => l.you)).toEqual([true, false, true, false, true, false]);
+    expect(lines[0]!.text).toBe("CQ CQ DE KD9XYZ K");
+    expect(lines[1]!.text).toBe("DE K4ABC K");
+    expect(lines[2]!.text).toBe("K4ABC DE KD9XYZ UR 579 NAME TOM QTH OMAHA NE K");
+    expect(lines[3]!.text).toBe("KD9XYZ DE K4ABC R TNX FER RPT UR 5NN NAME JIM QTH ATLANTA GA HW? KN");
+    expect(lines[5]!.text).toBe("TU 73 E E");
+  });
+});
+

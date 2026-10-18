@@ -86,12 +86,14 @@ async function click(el: HTMLElement | null): Promise<void> {
   await act(async () => el!.click());
 }
 
-/** Press the button labeled `label` in the switch `testId`. */
-async function pick(testId: string, label: string): Promise<void> {
-  const button = $$<HTMLButtonElement>(`[data-testid="${testId}"] button`).find(
-    (b) => b.textContent === label,
-  );
-  await click(button ?? null);
+/** Choose what shows of the station's overs, in the settings. */
+async function showTheirs(value: string): Promise<void> {
+  if ($('[data-testid="panel-toggle"]')?.getAttribute("aria-pressed") !== "true") {
+    await click($('[data-testid="panel-toggle"]'));
+  }
+  await act(async () => {
+    await userEvent.selectOptions($<HTMLSelectElement>("#qso-their-text")!, value);
+  });
 }
 
 /** Move the slider `id` to `value`, as a drag would. */
@@ -229,7 +231,7 @@ describe("copying the station", () => {
     const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
 
     // Copy on mid-QSO: the over already read gets no box.
-    await pick("qso-their-text", "Copy");
+    await showTheirs("copy");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
 
     await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
@@ -279,7 +281,7 @@ describe("your speed", () => {
     expect(field("wpm").value).toBe("20");
     expect(field("farns").value).toBe("15");
     expect($("#wpm-out")?.textContent).toContain("20");
-    expect($('[data-testid="qso-their-speed"]')?.textContent).toBe("The station answers at your speed.");
+    expect($('[data-testid="qso-their-speed"]'), "no speed line until QRS or QRQ").toBeNull();
 
     await slide("wpm", 30);
     expect(loadSpeed()).toEqual({ charWpm: 30, farnsworthWpm: 15 });
@@ -295,7 +297,7 @@ describe("your speed", () => {
     expect(field("input-device").closest("[inert]"), "the microphone too").not.toBeNull();
     expect(field("calibration").closest("[inert]"), "and its calibration").not.toBeNull();
     expect(field("qso-length").closest("[inert]"), "the rest can still change").toBeNull();
-    expect($('[data-testid="qso-their-text"]')!.closest("[inert]"), "and what shows").toBeNull();
+    expect(field("qso-their-text").closest("[inert]"), "and what shows").toBeNull();
   }, QSO_MS);
 });
 
@@ -338,7 +340,7 @@ describe("copy mode options", () => {
     // the CQ has wordings that do not.
     await open({ qsoTheirText: "before", qsoLockedShows: "right" });
     const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
-    await pick("qso-their-text", "Copy");
+    await showTheirs("copy");
     await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     await act(async () => {
@@ -405,3 +407,30 @@ describe("the listening level", () => {
     expect($("#gain-out")?.textContent).toContain("12");
   });
 });
+
+describe("how a QSO goes", () => {
+  it("is on the page until the first QSO, then behind the ?", async () => {
+    mount({});
+    const guide = () => $('[data-testid="qso-guide"]');
+    expect(guide()?.textContent).toContain("CQ CQ DE KD9XYZ K");
+    expect(guide()!.querySelectorAll(".qsoexample").length).toBe(1);
+    expect($('[data-testid="qso-help-open"]'), "no ? while the guide is on the page").toBeNull();
+
+    // Its settings link opens the settings.
+    await click($('[data-testid="qso-guide-settings"]'));
+    expect($('[data-testid="panel-toggle"]')!.getAttribute("aria-pressed")).toBe("true");
+
+    await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
+    await click($('[data-testid="qso-start"]'));
+    await until("the session to start", () => status().startsWith("Your turn"));
+    expect(guide()).toBeNull();
+
+    await click($('[data-testid="qso-help-open"]'));
+    expect($('[data-testid="qso-help"]')!.textContent).toContain("CQ CQ DE KD9XYZ K");
+    await act(async () => {
+      await userEvent.keyboard("{Escape}");
+    });
+    expect($('[data-testid="qso-help"]')).toBeNull();
+  });
+});
+

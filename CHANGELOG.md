@@ -9,19 +9,12 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- A **QSO** page, opened from the **Practice** and **QSO** switch in the header. Call CQ, and a made-up station answers in CW and works you through to 73.
-- On the **QSO** page, the station words its overs differently each time. It takes your corrections, such as a call sent again after the error sign, and puts you right when you send its call wrong.
-- On the **QSO** page, the station moves on only once it has your report, name and QTH back. It asks for what it is missing or could not read, and asks you to send again when it cannot read you.
-- On the **QSO** page, QRS makes the station send its last over again, slower, and QRQ makes it send faster. QRS 12 or QRQ 20 asks for that effective speed.
-- **Length** on the **QSO** page sets how much the station says: **Full**, **Short**, or **Piece by piece**, where its report, name and QTH come one per over.
-- On the **QSO** page, NAME?, QTH?, RST? or part of the station's call with a ?, such as N1?, gets just that one thing.
-- **Station text** and **Your text** on the **QSO** page set what shows of each over: **Whole**, **As sent**, **Blurred** or **Off**. With **Copy**, you type what you hear from the station, and your copy is graded after the QSO, when you call CQ again or press **Grade my copy**.
-- In **Copy**, your copy locks when you start sending or press Enter. **Once locked, show** sets what a locked copy shows before the QSO ends: **Nothing yet**, **The grade**, or **What I got right**.
-- **Speed on each line** on the **QSO** page shows the speed you sent each over at.
-- On the **QSO** page, the station's call stays out of the labels until you have copied it, unless **Station text** is **Whole**.
-- The **QSO** page has the practice page's layout: the station text choice in the header, and the speed sliders, the practice page's **Audio** settings and the rest under the settings button. Either page sets these for both, and each station answers at your speed until you send QRS or QRQ.
-- On the **QSO** page, the **Calibration** you choose corrects how your sending is copied, as it does for a recording.
-- **Lenient** copy on the **QSO** page reads your sending at your own spacing and takes a call with one character wrong. **Strict** copy reads it at the set speed.
+- A **QSO** page, opened from the **Practice** and **QSO** switch in the header. Call CQ, and a made-up station answers in CW and works you through report, name and QTH to 73. Two example QSOs show what to send.
+- The station words its overs differently each time, and goes on only once you have sent back each part. It asks again when it cannot copy you, answers NAME?, QTH?, RST? or part of its call with a ?, and takes a correction after the error sign.
+- QRS makes the station send its last over again, slower, and QRQ makes it send faster. QRS 12 or QRQ 20 asks for that speed.
+- **Station text** in the **QSO** page's settings sets what shows of the station's overs: **Whole**, **As sent**, **Blurred**, **Copy** or **Off**. With **Copy**, you type what you hear, and your copy is graded when the QSO ends, or when it locks if **Once locked, show** says so.
+- The **QSO** page's settings set **Length**, **Copy** (**Lenient** or **Strict**), what shows of your own overs, and **Speed on each line**. The speed sliders and the **Audio** settings, **Calibration** among them, are the practice page's, and either page sets them for both.
+- The station's call stays out of the log's labels until you have copied it.
 
 ### Changed
 

@@ -1412,38 +1412,39 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   border-left-color: var(--you);
 }
 
-/* A page to read rather than a form to fill in, so it is set as prose: a
+/* A page to read rather than a form to fill in, so it is set as prose (the
+   QSO page's help reads the same way, and shares these): a
    measure narrow enough to track along, headings that break it into the three
    questions somebody actually has, and room between paragraphs. */
 /* Left-aligned explicitly: the landing screen is a column of centered cards
    and this inherits from it, but centered prose has no edge to return to at
    the end of a line. */
-.soundpath {
+.soundpath, .qsohelp {
   width: min(620px, 100%);
   gap: 0;
   font-size: 13px;
   line-height: 1.6;
   text-align: left;
 }
-.soundpath h3 {
+.soundpath h3, .qsohelp h3 {
   margin: 20px 0 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--you);
 }
-.soundpath p { margin: 0 0 10px; color: var(--ink-dim); }
-.soundpath b { color: var(--ink); font-weight: 600; }
-.soundpath ul { margin: 0 0 10px; padding-left: 18px; color: var(--ink-dim); }
-.soundpath li { margin-bottom: 6px; }
+.soundpath p, .qsohelp p { margin: 0 0 10px; color: var(--ink-dim); }
+.soundpath b, .qsohelp b { color: var(--ink); font-weight: 600; }
+.soundpath ul, .qsohelp ul { margin: 0 0 10px; padding-left: 18px; color: var(--ink-dim); }
+.soundpath li, .qsohelp li { margin-bottom: 6px; }
 /* The title and the way out are fixed and the reading scrolls between them.
    This runs longer than a short window, and a way out you have to read to the
    end to reach is not a way out. */
-.soundpath { overflow: hidden; }
-.soundpath .prose { flex: 1; min-height: 0; overflow-y: auto; }
-.soundpath .confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.soundpath, .qsohelp { overflow: hidden; }
+.soundpath .prose, .qsohelp .prose { flex: 1; min-height: 0; overflow-y: auto; }
+.soundpath .confirm, .qsohelp .confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 /* Focus goes here on open so Escape has somewhere to land, and a ring around
    the whole sheet reads as an error rather than as a place to type. */
-.soundpath:focus { outline: none; }
+.soundpath:focus, .qsohelp:focus { outline: none; }
 
 /* ---- zen mode ------------------------------------------------------------ */
 
@@ -2329,6 +2330,25 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .you .text { color: var(--you); }
 .qsolog .live .keying { color: var(--ink-faint); }
 .qsonote { margin: 0; }
+/* The guide on the page, before the first QSO: read as the help reads. */
+.qsoguide { max-width: 72ch; font-size: 13px; line-height: 1.6; }
+.qsoguide p, .qsoguide ul { color: var(--ink-dim); }
+.qsoguide ul { padding-left: 18px; }
+.qsoguide h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
+/* The settings link in the guide: the theme's blue, inline in its sentence. */
+.qsoguide button.link,
+.qsohelp button.link { color: var(--you); padding: 0; font: inherit; vertical-align: baseline; }
+.qsoguide button.link:hover,
+.qsohelp button.link:hover { color: var(--ink); }
+/* How a QSO goes: the example, one line each, your side in your blue. */
+.qsoexample { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.qsoexample li { display: flex; gap: 12px; min-width: 0; }
+.qsoexample .who { flex: 0 0 5ch; color: var(--ink-dim); font-family: var(--mono); font-size: 13px; }
+.qsoexample .text { display: flex; flex-direction: column; min-width: 0; }
+.qsoexample code { font-family: var(--mono); overflow-wrap: anywhere; }
+.qsoexample .you code { color: var(--you); }
+.qsoexample .note { color: var(--ink-faint); font-size: 12px; }
+.qsosend code { font-family: var(--mono); }
 /* Blurred enough that only the number of characters can be told. Not
    selectable, so a drag cannot read it either. */
 .qsolog .blurred { filter: blur(5px); user-select: none; }
