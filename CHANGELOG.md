@@ -23,6 +23,10 @@ nothing to the site. The next release carries them.
 - On the **QSO** page, the **Calibration** you choose corrects how your sending is copied, as it does for a recording.
 - **Lenient** copy on the **QSO** page reads your sending at your own spacing and takes a call with one character wrong. **Strict** copy reads it at the set speed.
 
+### Changed
+
+- **Follow**, **Live grading** and **Live progress** read your sending through the **Calibration** you choose, as the review does afterwards.
+
 ## v1.8.1 — 2026-10-15
 
 ### Changed

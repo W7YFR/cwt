@@ -17,7 +17,7 @@ import { buildJsonReport } from "@/io/report";
 import { contextWindow, type Focus } from "@/render/focus";
 import { PACED_STOP_AFTER_SEC, PLAY_PAD } from "@/render/geometry";
 import { rangeSide, rangeTimes, type CharRange } from "@/render/layout";
-import type { Profile } from "@/io/profiles";
+import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
 import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
@@ -314,6 +314,13 @@ export function ReviewScreen({
      A blank take rather than an empty list, so the row is there to be filled
      rather than appearing from nowhere when the take lands. */
   const recording = rec.recorder !== null;
+  /* The calibration a take being recorded is read through: the one chosen,
+     since a recording comes from the microphone. Live progress reads it the
+     same way, so what it colors is what the review will grade. */
+  const liveCalibration = useMemo(() => {
+    const profile = profileForSource(profiles.find((p) => p.id === profileId) ?? null, true);
+    return profile ? calibrationOf(profile) : null;
+  }, [profiles, profileId]);
   const incoming = useMemo(
     () =>
       reviewTake(
@@ -1023,6 +1030,7 @@ export function ReviewScreen({
           recorder={rec.recorder}
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
+          calibration={liveCalibration}
           ideal={incoming.ideal}
           handle={handle}
           follow={settings.plainFollow}
@@ -1044,6 +1052,7 @@ export function ReviewScreen({
                   recorder: rec.recorder,
                   charWpm: settings.charWpm,
                   farnsworthWpm: settings.farnsworthWpm,
+                  calibration: liveCalibration,
                 }
               : null
           }

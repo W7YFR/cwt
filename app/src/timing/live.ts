@@ -285,12 +285,16 @@ export class LiveFollower {
   private best = 0;
   /** The Morse of the message's first character. */
   private readonly first: string;
+  private readonly calibration: Calibration | undefined;
 
-  constructor(rate: number, target: readonly string[], timing: Timing) {
+  /** With `calibration`, the take's edges are corrected for the microphone
+   *  path, as the review corrects them afterwards. */
+  constructor(rate: number, target: readonly string[], timing: Timing, calibration?: Calibration) {
     this.audio = new Decimator(rate);
     this.target = target;
     this.timing = timing;
     this.first = CHAR_TO_MORSE[target[0] ?? ""] ?? "";
+    this.calibration = calibration;
   }
 
   push(samples: Float32Array): void {
@@ -298,7 +302,14 @@ export class LiveFollower {
   }
 
   step(): Progress {
-    const sent = sentSymbols(this.audio.samples(), this.audio.rate, this.timing, this.toneHz);
+    const sent = sentSymbols(
+      this.audio.samples(),
+      this.audio.rate,
+      this.timing,
+      this.toneHz,
+      false,
+      this.calibration,
+    );
     const verdicts = graded(this.target, sent.symbols);
     const matches = verdicts.filter(Boolean).length;
     const at =

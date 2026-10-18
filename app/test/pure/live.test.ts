@@ -263,3 +263,24 @@ describe("the end of the message", () => {
     expect(f.step().done).toBe(true);
   });
 });
+
+describe("following a take through a calibration", () => {
+  it("reads the take to its end, every character right", () => {
+    const timing = targetTiming(25, 25);
+    const message = "CQ DE W7YFR";
+    const { samples } = synthesize(message, timing, { rate: 48000, padSec: 0.3 });
+    const all = new Float32Array(samples.length + 48000 * 2);
+    all.set(samples);
+    const target = keyedSymbols(message);
+    const follower = new LiveFollower(48000, target, timing, {
+      wpm: 25,
+      releaseOffsetSec: 0.006,
+      spreadSec: 0.001,
+      elements: 40,
+    });
+    for (let k = 0; k < all.length; k += 128) follower.push(all.subarray(k, k + 128));
+    const p = follower.step();
+    expect(p.done).toBe(true);
+    expect(p.graded).toEqual(target.map(() => true));
+  });
+});
