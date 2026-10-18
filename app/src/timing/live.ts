@@ -91,6 +91,8 @@ export interface Sent {
   readonly quietSec: number;
   /** The tone this pass decoded at. */
   readonly toneHz: number;
+  /** The on and off runs the pass read, for measuring the sender. */
+  readonly segments: readonly Segment[];
 }
 
 /** Marks keyed before the sender's own timing is measured. Fewer than this
@@ -125,7 +127,7 @@ export function sentSymbols(
   toneHz?: number,
   measure = false,
 ): Sent {
-  const none = { symbols: [], text: "", keying: null, quietSec: 0, toneHz: toneHz ?? 0 };
+  const none = { symbols: [], text: "", keying: null, quietSec: 0, toneHz: toneHz ?? 0, segments: [] };
   if (samples.length === 0) return none;
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {
@@ -141,7 +143,7 @@ export function sentSymbols(
   const { segments } = found;
   const { chars } = buildTimeline(segments, measure ? measured(segments, timing) : timing);
   const last = chars[chars.length - 1];
-  if (!last) return { ...none, toneHz: found.toneHz };
+  if (!last) return { ...none, toneHz: found.toneHz, segments };
 
   let end = 0;
   for (const s of segments) end += s[1];
@@ -154,6 +156,7 @@ export function sentSymbols(
     keying: done ? null : last.pattern,
     quietSec,
     toneHz: found.toneHz,
+    segments,
   };
 }
 
@@ -339,6 +342,32 @@ export interface Copy {
   readonly keying: string | null;
   /** The sender has handed the turn over. */
   readonly over: boolean;
+  /** The speeds the sender keyed the over at, once it is over and long
+   *  enough to measure. Null until then. */
+  readonly sentWpm: SentWpm | null;
+}
+
+export interface SentWpm {
+  readonly charWpm: number;
+  readonly farnsworthWpm: number;
+}
+
+/** Marks an over needs before its speed is measured. Fewer, as a lone K, say
+ *  too little about the spacing. */
+export const SPEED_MIN_MARKS = 12;
+
+/** The speeds `segments` were keyed at, or null with too few marks. */
+export function sentWpm(segments: readonly Segment[]): SentWpm | null {
+  let marks = 0;
+  for (const s of segments) if (s[0] === 1) marks++;
+  if (marks < SPEED_MIN_MARKS) return null;
+  try {
+    const t = estimateTiming(segments);
+    if (!(t.charWpm > 0) || !(t.farnsworthWpm > 0)) return null;
+    return { charWpm: t.charWpm, farnsworthWpm: Math.min(t.farnsworthWpm, t.charWpm) };
+  } catch {
+    return null;
+  }
 }
 
 /** Whether an over has ended: a turn word and `TURN_QUIET_SEC`, twice that
@@ -389,6 +418,6 @@ export class LiveCopy {
       this.toneHz = sent.toneHz;
     }
     const over = sent.keying === null && overEnded(sent.text, sent.quietSec, this.timing);
-    return { text: sent.text, keying: sent.keying, over };
+    return { text: sent.text, keying: sent.keying, over, sentWpm: over ? sentWpm(sent.segments) : null };
   }
 }

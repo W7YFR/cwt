@@ -30,6 +30,9 @@ export function revealed(text: string, n: number): string {
   return out.trimEnd();
 }
 
+/** What a locked copy shows before the QSO ends. */
+export type LockedShows = "nothing" | "grade" | "right";
+
 /** One part of an over as graded: a character with its verdict, or the
  *  space between words with none. */
 export interface Mark {

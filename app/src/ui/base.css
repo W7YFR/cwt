@@ -525,6 +525,9 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    calibration onto a line of its own. */
 .viewpanel [data-panel="audio"] .panelgroups { column-gap: 12px; }
 .viewpanel [data-panel="audio"] select { width: 140px; text-overflow: ellipsis; }
+/* The QSO page's microphone, alone in its column: its select fills it, and a
+   long name ends in an ellipsis rather than widening the column. */
+.viewpanel [data-panel="microphone"] select { width: 180px; text-overflow: ellipsis; }
 /* Out of the flow while empty, so it takes no gap. Not hidden: a live region
    that is not rendered does not announce what is written into it. */
 .viewpanel [data-panel="audio"] .hint:empty { position: absolute; }
@@ -2343,6 +2346,30 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .cright { color: var(--you); }
 .qsolog .cwrong { color: var(--bad); text-decoration: underline; }
 .qsolog .copied { color: var(--ink-dim); font-size: 13px; }
+.qsolog .locked { color: var(--ink-dim); }
+/* A choice in the header keeps each of its labels on one line, and on a
+   phone its buttons close up so all five fit the header's width. */
+header .modeswitch button { white-space: nowrap; }
+@media (max-width: 440px) {
+  header .modeswitch button { padding-left: 9px; padding-right: 9px; }
+}
+/* The speed you sent a line at, after it, quiet. */
+.qsolog .lwpm { margin-left: auto; padding-left: 12px; color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }
+
+/* The QSO page's settings, on columns a little wider than the practice
+   page's: Overall (Farnsworth) and its reading need the room, one over the
+   other with Character speed in the Speed column. */
+.viewpanel.qsopanel,
+.viewpanel.qsopanel .modesrow { grid-template-columns: repeat(auto-fill, 210px); }
+@media (max-width: 440px) {
+  .viewpanel.qsopanel, .viewpanel.qsopanel .modesrow { grid-template-columns: 1fr; }
+}
+.viewpanel [data-panel="speed"] label { white-space: nowrap; }
+.viewpanel [data-panel="speed"] input[type="range"],
+.viewpanel [data-panel="microphone"] input[type="range"] { width: 180px; }
+
+/* A locked copy that shows only what you got right: the rest are dots. */
+.qsolog .rightonly .unknown { color: var(--ink-faint); }

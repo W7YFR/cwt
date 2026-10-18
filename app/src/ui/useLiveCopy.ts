@@ -19,7 +19,7 @@ export interface OverCopy extends Copy {
   readonly turn: number;
 }
 
-const NONE: OverCopy = { text: "", keying: null, over: false, turn: 0 };
+const NONE: OverCopy = { text: "", keying: null, over: false, sentWpm: null, turn: 0 };
 
 /** With `lenient`, the over is read at the sender's own timing once there is
  *  enough of it to measure. A change takes effect at the next session. */
@@ -72,11 +72,11 @@ export function useLiveCopy(
 
     worker.onmessage = (ev: MessageEvent<CopyRead>) => {
       if (ev.data.gen !== gen) return;
-      const { text, keying, over } = ev.data;
+      const { text, keying, over, sentWpm } = ev.data;
       const now = `${text}|${keying ?? ""}|${over}`;
       if (now === shown) return;
       shown = now;
-      setCopy({ text, keying, over, turn: gen });
+      setCopy({ text, keying, over, sentWpm, turn: gen });
     };
 
     begin();

@@ -13,7 +13,7 @@ import { userEvent } from "vitest/browser";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { keyingPlan } from "@/audio/synth";
-import { loadSpeed, savePrefs, type Prefs } from "@/io/storage";
+import { loadPrefs, loadSpeed, savePrefs, type Prefs } from "@/io/storage";
 import { targetTiming } from "@/timing";
 import { QsoScreen } from "@/ui/QsoScreen";
 import "@/ui/base.css";
@@ -86,11 +86,12 @@ async function click(el: HTMLElement | null): Promise<void> {
   await act(async () => el!.click());
 }
 
-/** Pick `value` in the select `id`. */
-async function choose(id: string, value: string): Promise<void> {
-  await act(async () => {
-    await userEvent.selectOptions($<HTMLSelectElement>(`#${id}`)!, value);
-  });
+/** Press the button labeled `label` in the switch `testId`. */
+async function pick(testId: string, label: string): Promise<void> {
+  const button = $$<HTMLButtonElement>(`[data-testid="${testId}"] button`).find(
+    (b) => b.textContent === label,
+  );
+  await click(button ?? null);
 }
 
 /** Move the slider `id` to `value`, as a drag would. */
@@ -219,11 +220,12 @@ describe("a QSO from your CQ", () => {
 
 describe("copying the station", () => {
   it("keeps the copy open after the last over, and grades it on request", async () => {
-    await open({ qsoTheirText: "before" });
+    // Lock off, so the first box is still open when the last over ends.
+    await open({ qsoTheirText: "before", qsoLockCopy: false });
     const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
 
     // Copy on mid-QSO: the over already read gets no box.
-    await choose("qso-their-text", "copy");
+    await pick("qso-their-text", "Copy");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
 
     await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
@@ -262,9 +264,14 @@ describe("copying the station", () => {
 });
 
 describe("your speed", () => {
-  it("is the practice page's speed, on its sliders, and locks while a session runs", async () => {
+  it("is the practice page's speed, on its sliders in the settings, and locks while a session runs", async () => {
     mount({ charWpm: 20, farnsworthWpm: 15 });
     const field = (id: string) => $<HTMLInputElement>(`#${id}`)!;
+    // In the settings, as their own Speed section.
+    expect(field("wpm").closest("[inert]"), "closed with the settings").not.toBeNull();
+    await click($('[data-testid="panel-toggle"]'));
+    expect(field("wpm").closest('[data-panel="speed"]')).not.toBeNull();
+    expect(field("wpm").closest("[inert]"), "open to change").toBeNull();
     expect(field("wpm").value).toBe("20");
     expect(field("farns").value).toBe("15");
     expect($("#wpm-out")?.textContent).toContain("20");
@@ -282,6 +289,100 @@ describe("your speed", () => {
     await until("the session to start", () => status().startsWith("Your turn"));
     expect(field("wpm").closest("[inert]"), "locked while it runs").not.toBeNull();
     expect(field("input-device").closest("[inert]"), "the microphone too").not.toBeNull();
-    expect($("#qso-their-text")!.closest("[inert]"), "what shows can still change").toBeNull();
+    expect(field("qso-length").closest("[inert]"), "the rest can still change").toBeNull();
+    expect($('[data-testid="qso-their-text"]')!.closest("[inert]"), "and what shows").toBeNull();
   }, QSO_MS);
+});
+
+describe("copy mode options", () => {
+  /** A QSO in Copy mode, with the station's answer to the CQ in a box. */
+  async function copyAnswer(prefs: Prefs): Promise<HTMLInputElement> {
+    await open({ qsoTheirText: "copy", ...prefs });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const box = $<HTMLInputElement>('[data-testid="qso-type"]');
+    expect(box).not.toBeNull();
+    await act(async () => {
+      await userEvent.fill(box!, "w7yfr de");
+    });
+    return box!;
+  }
+
+  it("locks your copy when you start sending", async () => {
+    await copyAnswer({});
+    await mic.key("QRS K");
+    await until("the copy to lock", () => $('[data-testid="qso-locked"]') !== null);
+    expect($('[data-testid="qso-locked"]')!.textContent).toBe("W7YFR DE");
+    expect($$('[data-testid="qso-type"]')).toHaveLength(0);
+    await until("the turn to come back", () => status().startsWith("Your turn"));
+  }, QSO_MS);
+
+  it("locks it on Enter, and grades it at once when asked", async () => {
+    const box = await copyAnswer({ qsoLockedShows: "grade" });
+    await act(async () => {
+      box.focus();
+      await userEvent.keyboard("{Enter}");
+    });
+    expect($$('[data-testid="qso-type"]')).toHaveLength(0);
+    expect($(".qsolog .graded")?.textContent).toContain("You copied W7YFR DE");
+    expect($('[data-testid="qso-stop"]'), "Enter did not stop the session").not.toBeNull();
+  }, QSO_MS);
+
+  it("shows only what you got right, when asked, and the rest as dots", async () => {
+    // The exchange, which always opens with your call and DE. The answer to
+    // the CQ has wordings that do not.
+    await open({ qsoTheirText: "before", qsoLockedShows: "right" });
+    const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
+    await pick("qso-their-text", "Copy");
+    await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
+    const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
+    await act(async () => {
+      await userEvent.fill(box, "w7yfr de");
+    });
+    await act(async () => {
+      box.focus();
+      await userEvent.keyboard("{Enter}");
+    });
+    const shown = $('[data-testid="qso-right-only"]');
+    expect(shown).not.toBeNull();
+    // You typed W7YFR DE: those characters show, in place. Nothing is marked
+    // wrong, and nothing you missed is spelled out.
+    expect(shown!.textContent!.startsWith("W7YFR DE ")).toBe(true);
+    expect(shown!.querySelectorAll(".cwrong")).toHaveLength(0);
+    expect(shown!.querySelectorAll(".unknown").length).toBeGreaterThan(0);
+    expect($(".qsolog .copied"), "no count").toBeNull();
+  }, QSO_MS);
+
+  it("leaves your copy open while you send, with Lock off", async () => {
+    await copyAnswer({ qsoLockCopy: false });
+    const before = theirs().length;
+    await mic.key("QRS K");
+    await until("the answer", () => theirs().length > before);
+    expect($$('[data-testid="qso-type"]').length).toBeGreaterThan(0);
+    expect($('[data-testid="qso-locked"]')).toBeNull();
+    await until("the turn to come back", () => status().startsWith("Your turn"));
+  }, QSO_MS);
+});
+
+describe("your speed on each line", () => {
+  it("shows the speed you sent each over at", async () => {
+    await open({ qsoTheirText: "before", qsoShowSpeed: true });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const shown = $('[data-testid="qso-line-wpm"]')?.textContent ?? "";
+    const wpm = Number(/^(\d+)/.exec(shown)?.[1]);
+    expect(shown).toMatch(/ wpm$/);
+    expect(Math.abs(wpm - WPM), `measured ${shown} for ${WPM}`).toBeLessThanOrEqual(3);
+  }, QSO_MS);
+});
+
+describe("the listening level", () => {
+  it("is the practice page's, in the Audio settings", async () => {
+    mount({ gainDb: 6 });
+    await click($('[data-testid="panel-toggle"]'));
+    const level = $<HTMLInputElement>("#gain")!;
+    expect(level.closest('[data-panel="microphone"]'), "with the microphone").not.toBeNull();
+    expect(level.value).toBe("6");
+    await slide("gain", 12);
+    expect(loadPrefs().gainDb).toBe(12);
+    expect($("#gain-out")?.textContent).toContain("12");
+  });
 });

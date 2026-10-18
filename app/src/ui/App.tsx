@@ -98,9 +98,14 @@ export function App(): React.ReactElement {
       setPageRaw(next);
       setError(null);
       savePrefs({ ...loadPrefs(), page: next });
-      // The QSO page may have set the speed. A session with nothing recorded
-      // in it takes it up, as it does after calibrating.
-      if (next === "practice") take.adoptSavedSpeed();
+      // The QSO page may have set the speed and the listening level. A
+      // session with nothing recorded in it takes up the speed, as it does
+      // after calibrating. The level is about you, so every session takes it.
+      if (next === "practice") {
+        take.adoptSavedSpeed();
+        const gainDb = loadPrefs().gainDb;
+        if (gainDb !== undefined && gainDb !== take.settings.gainDb) take.setSettings({ gainDb });
+      }
     },
     [take],
   );

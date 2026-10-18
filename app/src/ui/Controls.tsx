@@ -494,7 +494,7 @@ export function ChartSettingsButton({
  * A barred setting keeps its place and its value, dimmed, with the reason
  * first in its tooltip. Hidden, the settings around it moved every time
  * another one changed, and there was no way to find out it existed. */
-function Check({
+export function Check({
   id,
   label,
   help,
@@ -567,20 +567,7 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
           </div>
         )}
         <div className="panelgroups">
-          <div className="group">
-            <label htmlFor="gain" title={GAIN_HELP}>
-              Listening level <output id="gain-out">{fmtGain(s.gainDb)}</output>
-            </label>
-            <input
-              type="range"
-              id="gain"
-              min={-6}
-              max={42}
-              step={1}
-              value={s.gainDb}
-              onChange={(e) => onChange({ gainDb: Number(e.target.value) })}
-            />
-          </div>
+          <ListeningLevel gainDb={s.gainDb} onChange={(gainDb) => onChange({ gainDb })} />
           {props.onLoop && (
             <Check
               id="loop"
@@ -788,7 +775,7 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
 
 /** One named section of the panel. A group to assistive tech, named by its
  *  heading, so a checkbox called "Enabled" says what it enables. */
-function Section({
+export function Section({
   name,
   title,
   children,
@@ -804,6 +791,33 @@ function Section({
         {title}
       </span>
       {children}
+    </div>
+  );
+}
+
+/** How loud playback is, in dB. The practice page's settings and the QSO
+ *  page both draw this. */
+export function ListeningLevel({
+  gainDb,
+  onChange,
+}: {
+  gainDb: number;
+  onChange(gainDb: number): void;
+}): React.ReactElement {
+  return (
+    <div className="group">
+      <label htmlFor="gain" title={GAIN_HELP}>
+        Listening level <output id="gain-out">{fmtGain(gainDb)}</output>
+      </label>
+      <input
+        type="range"
+        id="gain"
+        min={-6}
+        max={42}
+        step={1}
+        value={gainDb}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
     </div>
   );
 }

@@ -18,13 +18,22 @@ import { loadPrefs, loadSpeed, loadUser, savePrefs, saveSpeed } from "@/io/stora
 import { DEFAULT_SPEED, answer, newQso, type Qso } from "@/qso/cq";
 import type { Speed } from "@/qso/speed";
 import type { Length } from "@/qso/wording";
-import { gradeCopy, revealed, type TheirText, type YourText } from "@/qso/show";
+import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconUser } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
-import { MicrophoneGroup, SelectGroup, SpeedSliders } from "./Controls";
+import {
+  ChartSettingsButton,
+  Check,
+  ListeningLevel,
+  MicrophoneGroup,
+  Section,
+  SelectGroup,
+  SpeedSliders,
+} from "./Controls";
+import type { SentWpm } from "@/timing/live";
 import { useLiveCopy } from "./useLiveCopy";
 import { useRecorder } from "./useRecorder";
 import { APP_NAME, Brandmark } from "./Wordmark";
@@ -105,15 +114,63 @@ interface Line {
   readonly typed: string;
   /** The station text it arrived under, for the station's overs. */
   readonly mode: TheirText;
+  /** Copy mode: your copy can no longer change. */
+  readonly locked: boolean;
+  /** The speed you sent it at, for your overs, when it could be measured. */
+  readonly sentWpm: SentWpm | null;
 }
 
-/** Enter and Escape in a copy box are typing, not commands. The recorder
- *  listens on the document, and these keys would stop the session. */
-function keepKeys(ev: React.KeyboardEvent): void {
+/** A measured speed as the log writes it: 23 wpm, or 23/17 wpm. */
+function wpmOf(s: SentWpm): string {
+  return wpm({ charWpm: Math.round(s.charWpm), farnsworthWpm: Math.round(s.farnsworthWpm) });
+}
+
+const LOCK_HELP =
+  "Your copy of the station's over can no longer change once you start sending. " +
+  "Enter in the box locks it too.";
+const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
+  { value: "nothing", label: "Nothing yet" },
+  { value: "grade", label: "The grade" },
+  { value: "right", label: "What I got right" },
+];
+const LOCKED_SHOWS_HELP =
+  "What a locked copy shows before the QSO ends: nothing yet, the grade, or only the " +
+  "characters you copied right, with nothing to mark what you missed. The full grade " +
+  "shows when the QSO ends.";
+const SHOW_SPEED_HELP = "Each of your overs shows the speed you sent it at.";
+
+/** Enter and Escape in a copy box are not the recorder's: it listens on the
+ *  document, and these keys would stop the session. Enter locks the copy. */
+function keepKeys(ev: React.KeyboardEvent, lock: () => void): void {
   if (ev.key === "Enter" || ev.key === "Escape") {
     ev.preventDefault();
     ev.stopPropagation();
   }
+  if (ev.key === "Enter") lock();
+}
+
+/** Your copy of an over, showing only what you got right. Each character
+ *  you got right is in its place. Every other one is a dot, so nothing says
+ *  which you missed or what they were. */
+function RightOnly({ line }: { line: Line }): React.ReactElement {
+  const grade = gradeCopy(line.text, line.typed);
+  return (
+    <span className="text rightonly" data-testid="qso-right-only">
+      {grade.marks.map((m, i) =>
+        m.ok === null ? (
+          <span key={i}>{m.text}</span>
+        ) : m.ok ? (
+          <span key={i} className="cright">
+            {m.text}
+          </span>
+        ) : (
+          <span key={i} className="unknown">
+            ·
+          </span>
+        ),
+      )}
+    </span>
+  );
 }
 
 /** Your copy of an over, graded. */
@@ -134,6 +191,19 @@ function Graded({ line }: { line: Line }): React.ReactElement {
       </span>
     </span>
   );
+}
+
+/** An on or off setting kept as a preference, with its default. */
+function useOnOff(
+  key: "qsoSettingsOpen" | "qsoLockCopy" | "qsoShowSpeed",
+  or: boolean,
+): readonly [boolean, (next: boolean) => void] {
+  const [value, setRaw] = useState<boolean>(() => loadPrefs()[key] ?? or);
+  const set = (next: boolean) => {
+    setRaw(next);
+    savePrefs({ ...loadPrefs(), [key]: next });
+  };
+  return [value, set];
 }
 
 export interface QsoScreenProps {
@@ -191,6 +261,16 @@ export function QsoScreen({
     setYourTextRaw(next);
     savePrefs({ ...loadPrefs(), qsoYourText: next });
   };
+  const [settingsOpen, setSettingsOpen] = useOnOff("qsoSettingsOpen", false);
+  const [lockCopy, setLockCopy] = useOnOff("qsoLockCopy", true);
+  const [lockedShows, setLockedShowsRaw] = useState<LockedShows>(
+    () => loadPrefs().qsoLockedShows ?? "nothing",
+  );
+  const setLockedShows = (next: LockedShows) => {
+    setLockedShowsRaw(next);
+    savePrefs({ ...loadPrefs(), qsoLockedShows: next });
+  };
+  const [showSpeed, setShowSpeed] = useOnOff("qsoShowSpeed", false);
   const qso = useRef<Qso>(newQso(Math.random, "", speed));
   /** Which QSO of the session is running, counted from 0. */
   const qsoNo = useRef(0);
@@ -236,6 +316,15 @@ export function QsoScreen({
     [],
   );
   useEffect(() => () => player.destroy(), [player]);
+
+  /* How loud the station plays: the practice page's listening level, kept in
+     the same preference. */
+  const [gainDb, setGainDbRaw] = useState(() => loadPrefs().gainDb ?? 0);
+  const setGainDb = (next: number) => {
+    setGainDbRaw(next);
+    savePrefs({ ...loadPrefs(), gainDb: next });
+  };
+  useEffect(() => player.setGainDb(gainDb), [player, gainDb]);
 
   const quiet = useCallback(() => {
     if (timer.current !== null) clearTimeout(timer.current);
@@ -299,6 +388,18 @@ export function QsoScreen({
     setNote("");
   }, [finished, phase, copy.turn, copy.text, copy.keying, close]);
 
+  /* You have started sending: with Lock on, your copy of the station's overs
+     can no longer change. */
+  useEffect(() => {
+    if (!lockCopy || phase !== "listening" || copy.turn === answered.current) return;
+    if (!copy.text && !copy.keying) return;
+    setLines((l) =>
+      l.some((line) => !line.you && line.mode === "copy" && !line.locked)
+        ? l.map((line) => (!line.you && line.mode === "copy" ? { ...line, locked: true } : line))
+        : l,
+    );
+  }, [lockCopy, phase, copy.turn, copy.text, copy.keying]);
+
   /* Your over is done: answer it. */
   useEffect(() => {
     if (!copy.over || phase !== "listening" || !recorder) return;
@@ -318,6 +419,8 @@ export function QsoScreen({
       qso: n,
       typed: "",
       mode: "before",
+      locked: false,
+      sentWpm: copy.sentWpm,
     };
 
     qso.current = turn.ended ? newQso(Math.random, turn.qso.you, speed) : turn.qso;
@@ -346,7 +449,16 @@ export function QsoScreen({
         setPlaying({ line: lineCount.current, shown: 0 });
         setLines((l) => [
           ...l,
-          { who: them.call, text: reply, you: false, qso: n, typed: "", mode: theirMode.current },
+          {
+            who: them.call,
+            text: reply,
+            you: false,
+            qso: n,
+            typed: "",
+            mode: theirMode.current,
+            locked: false,
+            sentWpm: null,
+          },
         ]);
         setTheirSpeed(at);
         player.playTarget(timeline, {
@@ -383,6 +495,8 @@ export function QsoScreen({
 
   const setTyped = (at: number, typed: string) =>
     setLines((l) => l.map((line, i) => (i === at ? { ...line, typed } : line)));
+  const lock = (at: number) =>
+    setLines((l) => l.map((line, i) => (i === at ? { ...line, locked: true } : line)));
 
   /** How one of the station's overs shows. Copy holds for the overs that
    *  arrived under it, and only for those: switched on mid-QSO, it does not
@@ -419,6 +533,15 @@ export function QsoScreen({
       return <span className="text">{line.text || "(nothing copied)"}</span>;
     }
     if (mode === "none") return <span className="text off">not shown</span>;
+    if (mode === "copy" && line.locked) {
+      if (lockedShows === "grade") return <Graded line={line} />;
+      if (lockedShows === "right") return <RightOnly line={line} />;
+      return (
+        <span className="text locked" data-testid="qso-locked">
+          {line.typed.trim() ? line.typed.toUpperCase() : "(nothing copied)"}
+        </span>
+      );
+    }
     if (mode === "copy") {
       return (
         <input
@@ -429,7 +552,7 @@ export function QsoScreen({
           autoFocus
           spellCheck={false}
           autoComplete="off"
-          onKeyDown={keepKeys}
+          onKeyDown={(ev) => keepKeys(ev, () => lock(at))}
           onChange={(ev) => setTyped(at, ev.target.value)}
         />
       );
@@ -459,67 +582,129 @@ export function QsoScreen({
           </span>
         </h1>
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
-        <div className="cornergroup" inert={recorder !== null} data-locked={recorder !== null}>
+        {/* The quick choice, where the practice page has Plain, Paced and Zen.
+            Its options are in the settings, under Station text modes. */}
+        <div
+          className="modeswitch"
+          role="group"
+          aria-label="Station text"
+          title={THEIR_TEXT_HELP}
+          data-testid="qso-their-text"
+        >
+          {THEIR_TEXTS.map((m) => (
+            <button key={m.value} aria-pressed={theirText === m.value} onClick={() => setTheirText(m.value)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <div className="cornergroup">
           <button
             className="iconbtn cornerbtn"
             aria-label="Configuration"
             title="Configuration"
             onClick={onConfigure}
+            disabled={recorder !== null}
           >
             <IconUser />
           </button>
+          <ChartSettingsButton open={settingsOpen} onToggle={() => setSettingsOpen(!settingsOpen)} />
         </div>
       </header>
 
-      {/* The same controls as the practice page, drawn the same way. Your
-          speed and the microphone lock while a session runs: your copy is
-          read at the speed, and the session holds the microphone open. The
-          rest can change between overs. */}
-      <section className="controls">
-        <SpeedSliders
-          charWpm={speed.charWpm}
-          farnsworthWpm={speed.farnsworthWpm}
-          onChange={(patch) => setSpeed({ ...speed, ...patch })}
-          locked={recorder !== null}
-        />
-        <MicrophoneGroup
-          devices={rec.devices}
-          deviceId={deviceId}
-          onDeviceChange={onDeviceChange}
-          locked={recorder !== null}
-        />
-        <SelectGroup
-          id="qso-copy"
-          label="Copy"
-          help={COPY_HELP}
-          value={copyMode}
-          options={COPY_MODES}
-          onChange={(v) => setCopyMode(v as CopyMode)}
-        />
-        <SelectGroup
-          id="qso-length"
-          label="Length"
-          help={LENGTH_HELP}
-          value={length}
-          options={LENGTHS}
-          onChange={(v) => setLength(v as Length)}
-        />
-        <SelectGroup
-          id="qso-their-text"
-          label="Station text"
-          help={THEIR_TEXT_HELP}
-          value={theirText}
-          options={THEIR_TEXTS}
-          onChange={(v) => setTheirText(v as TheirText)}
-        />
-        <SelectGroup
-          id="qso-your-text"
-          label="Your text"
-          help={YOUR_TEXT_HELP}
-          value={yourText}
-          options={YOUR_TEXTS}
-          onChange={(v) => setYourText(v as YourText)}
-        />
+      {/* The settings, as on the practice page: set once, then left. */}
+      <section className="chartsettings" data-open={String(settingsOpen)}>
+        <div inert={!settingsOpen}>
+          <div className="viewpanel qsopanel" id="view-panel">
+            {/* The practice page's speed sliders. They lock while a session
+                runs: your copy is read at this speed. */}
+            <Section name="speed" title="Speed">
+              <div className="panelgroups">
+                <SpeedSliders
+                  charWpm={speed.charWpm}
+                  farnsworthWpm={speed.farnsworthWpm}
+                  onChange={(patch) => setSpeed({ ...speed, ...patch })}
+                  locked={recorder !== null}
+                />
+              </div>
+            </Section>
+            <Section name="microphone" title="Audio">
+              <div className="panelgroups">
+                <MicrophoneGroup
+                  devices={rec.devices}
+                  deviceId={deviceId}
+                  onDeviceChange={onDeviceChange}
+                  locked={recorder !== null}
+                />
+                <ListeningLevel gainDb={gainDb} onChange={setGainDb} />
+              </div>
+            </Section>
+            <Section name="qso" title="QSO">
+              <div className="panelgroups">
+                <SelectGroup
+                  id="qso-copy"
+                  label="Copy"
+                  help={COPY_HELP}
+                  value={copyMode}
+                  options={COPY_MODES}
+                  onChange={(v) => setCopyMode(v as CopyMode)}
+                />
+                <SelectGroup
+                  id="qso-length"
+                  label="Length"
+                  help={LENGTH_HELP}
+                  value={length}
+                  options={LENGTHS}
+                  onChange={(v) => setLength(v as Length)}
+                />
+              </div>
+            </Section>
+            <Section name="yours" title="Your text">
+              <div className="panelgroups">
+                <SelectGroup
+                  id="qso-your-text"
+                  label="Shows"
+                  help={YOUR_TEXT_HELP}
+                  value={yourText}
+                  options={YOUR_TEXTS}
+                  onChange={(v) => setYourText(v as YourText)}
+                />
+                <Check
+                  id="qso-show-speed"
+                  label="Speed on each line"
+                  help={SHOW_SPEED_HELP}
+                  checked={showSpeed}
+                  onChange={setShowSpeed}
+                />
+              </div>
+            </Section>
+            <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">
+              <span className="uplabel" id="panel-modes">
+                Station text modes
+              </span>
+              <div className="modesrow">
+                <Section name="copy" title="Copy">
+                  <div className="aid">
+                    <Check
+                      id="qso-lock-copy"
+                      label="Lock when I send"
+                      help={LOCK_HELP}
+                      checked={lockCopy}
+                      onChange={setLockCopy}
+                    />
+                    <SelectGroup
+                      id="qso-locked-shows"
+                      label="Once locked, show"
+                      help={LOCKED_SHOWS_HELP}
+                      value={lockedShows}
+                      options={LOCKED_SHOWS}
+                      onChange={(v) => setLockedShows(v as LockedShows)}
+                    />
+                  </div>
+                </Section>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <main className="panel qso" data-testid="qso">
@@ -564,6 +749,11 @@ export function QsoScreen({
             <li key={i} className={line.you ? "you" : "them"}>
               <span className="who">{whoOf(line)}</span>
               {textOf(line, i)}
+              {showSpeed && line.you && line.sentWpm && (
+                <span className="lwpm" data-testid="qso-line-wpm">
+                  {wpmOf(line.sentWpm)}
+                </span>
+              )}
             </li>
           ))}
           {/* Not an over already answered: after a reply, the last one is

@@ -430,6 +430,15 @@ export interface Prefs {
   qsoTheirText?: "before" | "sent" | "hidden" | "copy" | "none";
   /** How your own overs show on the QSO page. Absent is as sent. */
   qsoYourText?: "sent" | "hidden" | "none";
+  /** The QSO page's settings band was open. */
+  qsoSettingsOpen?: boolean;
+  /** Copy mode: your copy locks when you start sending. Absent is on. */
+  qsoLockCopy?: boolean;
+  /** Copy mode: what a locked copy shows before the QSO ends: nothing yet,
+   *  the grade, or only what you got right. Absent is nothing yet. */
+  qsoLockedShows?: "nothing" | "grade" | "right";
+  /** Your overs show the speed you sent them at. Absent is off. */
+  qsoShowSpeed?: boolean;
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -592,6 +601,10 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoLength: oneOf("full", "short", "pieces"),
   qsoTheirText: oneOf("before", "sent", "hidden", "copy", "none"),
   qsoYourText: oneOf("sent", "hidden", "none"),
+  qsoSettingsOpen: isBool,
+  qsoLockCopy: isBool,
+  qsoLockedShows: oneOf("nothing", "grade", "right"),
+  qsoShowSpeed: isBool,
 };
 
 export function loadPrefs(): Prefs {
