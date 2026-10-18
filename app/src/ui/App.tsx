@@ -26,7 +26,8 @@ import type { AudioClip } from "@/types";
 import { APP_VERSION } from "@/build-info";
 import { Calibrate } from "./Calibrate";
 import { LANDING_VERSION, Landing } from "./Landing";
-import { Settings } from "./Settings";
+import { Settings, type ConfigTab } from "./Settings";
+import { UnsetNotesText, type UnsetNotes } from "./SlotMenu";
 import { ReviewScreen } from "./ReviewScreen";
 import { QsoScreen } from "./QsoScreen";
 import type { Page } from "./PageSwitch";
@@ -49,6 +50,9 @@ export function App(): React.ReactElement {
      The sentence is for a person and is expected to be reworded; this is what
      anything else branches on or asserts against. */
   const [errorKind, setErrorKind] = useState<string>("failed");
+  /* Notes such as "(your call)" that a paste into the message could not fill
+     in. A warning, not an error: the paste went in. */
+  const [unset, setUnset] = useState<UnsetNotes | null>(null);
   const [intended, setIntended] = useState(() => loadPrefs().expected ?? "");
   const [deviceId, setDeviceId] = useState<string | undefined>(
     () => loadPrefs().deviceId,
@@ -91,6 +95,8 @@ export function App(): React.ReactElement {
     });
   }, []);
   const [configuring, setConfiguring] = useState(false);
+  /** The tab Configuration opens at, when something asked for one. */
+  const [configTab, setConfigTab] = useState<ConfigTab | undefined>(undefined);
   /* Practice or QSO, kept across a reload. */
   const [page, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
   const setPage = useCallback(
@@ -257,6 +263,15 @@ export function App(): React.ReactElement {
     savePrefs(next);
   }, []);
 
+  /** Into Configuration at the user's details, where the values that fill a
+   *  note are set. */
+  const configureUser = useCallback(() => {
+    setError(null);
+    setUnset(null);
+    setConfigTab("user");
+    setConfiguring(true);
+  }, []);
+
   /* The intended message outlives the take, because practicing the same text
      until it comes out clean is the whole loop this tool exists for. */
   const chooseIntended = useCallback((text: string) => {
@@ -375,6 +390,15 @@ export function App(): React.ReactElement {
         </p>
       )}
 
+      {unset && (
+        <p className="banner warn" role="status" data-testid="unset-notes">
+          <UnsetNotesText unset={unset} onConfigure={configureUser} />{" "}
+          <button className="link" onClick={() => setUnset(null)}>
+            dismiss
+          </button>
+        </p>
+      )}
+
       {error && (
         <p className="banner error" role="alert" data-kind={errorKind}>
           {error}{" "}
@@ -406,7 +430,11 @@ export function App(): React.ReactElement {
             // correcting by nothing.
             setProfileId(activeProfile()?.id);
           }}
-          onClose={() => setConfiguring(false)}
+          tab={configTab}
+          onClose={() => {
+            setConfiguring(false);
+            setConfigTab(undefined);
+          }}
         />
       ) : calibrating ? (
         <Calibrate
@@ -491,6 +519,8 @@ export function App(): React.ReactElement {
             setError(null);
             setConfiguring(true);
           }}
+          onConfigureUser={configureUser}
+          onUnsetNotes={setUnset}
           onFile={(file) => void openFile(file)}
           onClear={() => {
             setError(null);

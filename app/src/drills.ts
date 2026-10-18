@@ -85,6 +85,80 @@ export function fillDrills(drills: readonly Drill[], user: UserInfo): Drill[] {
   return drills.map((d) => fillDrill(d, user));
 }
 
+/** The words a note in brackets can use for each detail, in lower case. A
+ *  rig is the two slots the catalog sends it as. */
+const NOTE_WORDS: readonly (readonly [readonly Slot[], readonly string[]])[] = [
+  [["callsign"], ["call", "callsign", "call sign", "sign"]],
+  [["name"], ["name", "first name", "op", "handle"]],
+  [["city"], ["qth", "city", "town", "location", "loc"]],
+  [["region_short"], ["state", "st", "province", "prov", "region", "region short"]],
+  [["region_long"], ["state name", "full state", "region long"]],
+  [["age"], ["age"]],
+  [["year_licensed"], ["year licensed", "licensed", "lic", "year", "ham since"]],
+  [["antenna"], ["antenna", "ant"]],
+  [["rig_manufacturer", "rig_model"], ["rig", "radio", "transceiver", "xcvr"]],
+  [["rig_manufacturer"], ["manufacturer", "make", "rig manufacturer"]],
+  [["rig_model"], ["model", "rig model"]],
+  [["power"], ["power", "pwr", "watts", "w"]],
+];
+
+/** A note in brackets, such as "(your call)" or "(UR QTH)". */
+const NOTE_RE = /\(([^()\n]*)\)/g;
+
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const swap = a[i - 1] === b[j - 1] ? 0 : 1;
+      next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + swap);
+    }
+    row = next;
+  }
+  return row[b.length]!;
+}
+
+/** The slots a note in brackets stands for, or null when it names no user
+ *  detail. A word one letter off still matches, if it has four letters or more. */
+export function slotsForNote(note: string): readonly Slot[] | null {
+  const words = note
+    .toLowerCase()
+    .replace(/'s\b/g, "")
+    .replace(/[^a-z ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (["your", "ur", "yr", "my"].includes(words[0] ?? "")) words.shift();
+  const said = words.join(" ");
+  if (!said) return null;
+  let near: readonly Slot[] | null = null;
+  for (const [slots, names] of NOTE_WORDS) {
+    for (const name of names) {
+      const off = editDistance(said, name);
+      if (off === 0) return slots;
+      if (off === 1 && said.length >= 4) near ??= slots;
+    }
+  }
+  return near;
+}
+
+/** Text with each note in brackets that names a user detail, such as
+ *  "(your call)", replaced by what `fill` gives for its slots. `fill` also gets
+ *  the note as written. A note that names no detail, or that `fill` gives null
+ *  for, stays as it is. */
+export function replaceNotes(
+  text: string,
+  fill: (slots: readonly Slot[], note: string) => string | null,
+): string {
+  return text.replace(NOTE_RE, (whole, note: string) => {
+    const slots = slotsForNote(note);
+    return (slots && fill(slots, whole)) ?? whole;
+  });
+}
+
+/** Notes in brackets as slots, such as `{callsign}` for "(your call)". */
+export const notesToSlots = (text: string): string =>
+  replaceNotes(text, (slots) => slots.map((s) => `{${s}}`).join(" "));
+
 const DAILY = "Daily Sending";
 const QSO = "QSO";
 

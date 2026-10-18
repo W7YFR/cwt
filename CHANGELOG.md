@@ -7,6 +7,19 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- Paste a QSO with notes such as `(your call)` or `(your QTH)` into a drill, and each note goes in as its slot. In **Intended message** and **New session**, it goes in as your value from **User**.
+- A warning names a note whose value is not set, with a link to **User**. In **Intended message**, the note fills in once the value is set.
+
+### Changed
+
+- A banner at the top of the page lines up with the header.
+
+### Fixed
+
+- A message pasted into **Intended message** keeps its line breaks as breaks.
+
 ## v1.9.0 — 2026-10-18
 
 ### Added

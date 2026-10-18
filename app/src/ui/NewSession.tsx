@@ -26,7 +26,15 @@ import { TIMES_MAX, TIMES_MIN, passCount } from "@/timing";
 import { TIMES_HELP } from "./copy";
 import { DrillPicker } from "./DrillPicker";
 import { RecDot } from "./Record";
-import { SlotMenu, slotValue, useInsertAtCursor } from "./SlotMenu";
+import {
+  SlotMenu,
+  notesToValues,
+  onPasteConverted,
+  slotValue,
+  UnsetNotesText,
+  unsetNotes,
+  useInsertAtCursor,
+} from "./SlotMenu";
 import { useUpperField } from "./useUpperField";
 
 export interface NewSessionProps {
@@ -46,6 +54,8 @@ export interface NewSessionProps {
     record: boolean,
   ): void;
   onCancel(): void;
+  /** Close, and open the user's details in Configuration. */
+  onConfigureUser?: (() => void) | undefined;
 }
 
 export function NewSession(props: NewSessionProps): React.ReactElement {
@@ -62,6 +72,9 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
   const sent = useUpperField<HTMLTextAreaElement>(setText);
   const box = sent.ref;
   const insert = useInsertAtCursor(box, text, setText);
+  // A pasted note such as "(your call)" goes in as its value.
+  const paste = onPasteConverted((t) => notesToValues(t, user), insert);
+  const unset = unsetNotes(text, user);
 
   /* Straight into the textarea: the message is the reason the dialog opened,
      and the speeds usually carry over from the session before it. */
@@ -134,7 +147,13 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
           value={text}
           placeholder="The source of truth to grade against"
           onChange={sent.onChange}
+          onPaste={paste}
         />
+        {unset && (
+          <p className="hint warn" role="status" data-testid="unset-notes">
+            <UnsetNotesText unset={unset} onConfigure={props.onConfigureUser} />
+          </p>
+        )}
 
         {/* The three numbers a session is fixed at, in one row. Times belongs
             here and not only in the control row above the chart: it is as much

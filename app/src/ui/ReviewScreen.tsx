@@ -44,6 +44,7 @@ import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
 import { reviewTake } from "@/timing";
 import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
+import type { UnsetNotes } from "./SlotMenu";
 import { downloadStem } from "./format";
 import { useRecorder } from "./useRecorder";
 import type { LoadedTake } from "./useTake";
@@ -86,6 +87,11 @@ export interface ReviewScreenProps {
   onCalibrate(): void;
   /** Into the configuration screen, and back here afterwards. */
   onConfigure(): void;
+  /** Into the configuration screen at the user's details. */
+  onConfigureUser?(): void;
+  /** A paste into the message left notes such as "(your call)" with no
+   *  value, or null when it left none. */
+  onUnsetNotes?(unset: UnsetNotes | null): void;
   /** Drop the recording and stay here — see useTake.reset. */
   onClear(): void;
   /** Open a recording from disk — the same path a dropped file takes. */
@@ -188,6 +194,8 @@ export function ReviewScreen({
   onChange,
   onAudio,
   onError,
+  onConfigureUser,
+  onUnsetNotes,
   deviceId,
   profiles,
   profileId,
@@ -937,6 +945,7 @@ export function ReviewScreen({
         onChange={onChange}
         fromFile={loaded.take.source !== MIC_SOURCE}
         locked={recording}
+        onUnsetNotes={onUnsetNotes}
       />
 
       {/* A band of its own rather than a line of the header. In the header the
@@ -1004,6 +1013,13 @@ export function ReviewScreen({
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
           onCancel={() => setStarting(false)}
+          onConfigureUser={
+            onConfigureUser &&
+            (() => {
+              setStarting(false);
+              onConfigureUser();
+            })
+          }
           onStart={(next, record) => {
             setStarting(false);
             onNewSession(next);

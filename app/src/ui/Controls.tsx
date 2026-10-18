@@ -11,11 +11,13 @@
  * See `ViewControls` below.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IconCog } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
+import { loadUser } from "@/io/storage";
+import { BREAK } from "@/morse";
 import {
   BREAK_MAX_SEC,
   BREAK_MIN_SEC,
@@ -84,6 +86,12 @@ import {
 import { fmtGain, fmtPpu, fmtTolerance, fmtWpm } from "./format";
 import { RUN_SORTS, recentCount, type RunSort } from "./runOrder";
 import { useUpperField } from "./useUpperField";
+import {
+  notesToValues,
+  unsetNotes,
+  useInsertAtCursor,
+  type UnsetNotes,
+} from "./SlotMenu";
 
 /** The two speed sliders, character and overall. The practice page and the
  *  QSO page both draw these, so a speed is set the same way on each. */
@@ -146,6 +154,9 @@ export interface ControlsProps {
   fromFile: boolean;
   /** A take is running, so nothing here can change. */
   locked?: boolean;
+  /** A paste left notes such as "(your call)" with no value, or null when it
+   *  left none. */
+  onUnsetNotes?: ((unset: UnsetNotes | null) => void) | undefined;
 }
 
 /** The row over the chart: what you send, at what speed, judged how closely.
@@ -157,6 +168,31 @@ export function Controls(props: ControlsProps): React.ReactElement {
   const expected = useUpperField(
     useCallback((next: string) => onChange({ expected: next }), [onChange]),
   );
+  const insert = useInsertAtCursor(expected.ref, s.expected, (next) =>
+    onChange({ expected: next }),
+  );
+  /* A note such as "(YOUR CALL)" left in the message fills in once its value
+     is set. Checked as the row appears, which is on the way back from
+     Configuration. A note still with no value warns again. */
+  useEffect(() => {
+    const user = loadUser();
+    const filled = notesToValues(s.expected, user);
+    if (filled !== s.expected) onChange({ expected: filled });
+    const unset = unsetNotes(filled, user);
+    if (unset) props.onUnsetNotes?.(unset);
+  }, []);
+
+  // A pasted note such as "(your call)" goes in as its value. The box is one
+  // line, so each line break goes in as a break.
+  const paste: React.ClipboardEventHandler<HTMLInputElement> = (e) => {
+    const pasted = e.clipboardData.getData("text/plain");
+    const user = loadUser();
+    props.onUnsetNotes?.(unsetNotes(pasted, user));
+    const filled = notesToValues(pasted, user).trim().replace(/\s*\n\s*/g, ` ${BREAK} `);
+    if (filled === pasted) return;
+    e.preventDefault();
+    insert(filled.toUpperCase());
+  };
 
   return (
     <section className="controls" inert={props.locked === true} data-locked={props.locked === true}>
@@ -203,6 +239,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
               value={s.expected}
               ref={expected.ref}
               onChange={expected.onChange}
+              onPaste={paste}
             />
             {s.expected !== "" && (
               <button
