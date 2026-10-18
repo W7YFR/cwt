@@ -108,9 +108,9 @@ const LENGTHS: ReadonlyArray<Option<LengthChoice>> = [
   { value: "mixed", label: "Mixed" },
 ];
 const LENGTH_HELP =
-  "How much the station says in each over. Full sends each item twice, Short once, and " +
-  "Piece by piece sends its report, name and QTH one per over. Mixed changes from one " +
-  "station to the next, and from one over to the next.";
+  "How much the station says in each line. Full sends each item twice, Short once, and " +
+  "Piece by piece sends its report, name and QTH one per line. Mixed changes from one " +
+  "station to the next, and from one line to the next.";
 
 /** With Mixed, how often a station goes piece by piece. The rest mix Full
  *  and Short, over by over. */
@@ -132,7 +132,7 @@ const THEIR_TEXTS: ReadonlyArray<Option<TheirText>> = [
   { value: "none", label: "Off" },
 ];
 const THEIR_TEXT_HELP =
-  "What shows of the station's overs: whole as soon as one starts, each character as it is " +
+  "What shows of the station's lines: whole as soon as one starts, each character as it is " +
   "sent, the same blurred, a box to type your copy in, or nothing. A change applies to the " +
   "lines already shown, and what you typed stays. All of it shows when the QSO ends.";
 const BLUR_CALL_HELP =
@@ -145,7 +145,7 @@ const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
   { value: "none", label: "Off" },
 ];
 const YOUR_TEXT_HELP =
-  "What shows of your own overs as you send them: each character, the same blurred, or nothing.";
+  "What shows of your own lines as you send them: each character, the same blurred, or nothing.";
 
 interface Line {
   readonly who: string;
@@ -231,7 +231,7 @@ function wpmOf(s: SentWpm): string {
 }
 
 const LOCK_HELP =
-  "Your copy of the station's over can no longer change once you start sending. " +
+  "Your copy of the station's line can no longer change once you start sending. " +
   "Enter in the box locks it too.";
 const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
   { value: "nothing", label: "My copy" },
