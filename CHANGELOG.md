@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.10.1 — 2026-10-18
+
 ### Development
 
 - The QSO browser tests are in five files, which run side by side.
