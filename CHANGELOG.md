@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.9.0 — 2026-10-18
+
 ### Added
 
 - A **QSO** page, opened from the **Practice** and **QSO** switch in the header. Call CQ, and a made-up station answers in CW and works you through report, name and QTH to 73, with an example QSO to show what to send.
