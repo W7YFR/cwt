@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.10.0 — 2026-10-18
+
 ### Added
 
 - Paste a QSO with notes such as `(your call)` or `(your QTH)` into a drill, and each note goes in as its slot. In **Intended message** and **New session**, it goes in as your value from **User**.
