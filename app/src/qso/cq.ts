@@ -481,6 +481,13 @@ class Over {
     return empty ? "botched" : "sent";
   }
 
+  /** Whether it names a station other than `them` and `you`. */
+  namesOther(them: string, you: string): boolean {
+    return this.words.some(
+      (w) => isCall(w) && w !== you && !this.isThem(w, them) && !(this.ear.lenient && nearly(w, them)),
+    );
+  }
+
   /** Whether it acknowledges: R, QSL, TNX, FB, OK and the like. */
   acknowledges(): boolean {
     return this.words.some((w) => ["R", "RR", "RRR", "QSL", "TU", "TNX", "FB", "OK", "SOLID"].includes(w));
@@ -643,13 +650,22 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     }
 
     case "called": {
-      if (over.asksAbout(them.call)) return say(qso, wording.confirmCall(voice(qso)));
+      // Its call confirmed at your asking: from here you are working it, and
+      // your next over need not carry its call.
+      if (over.asksAbout(them.call)) {
+        return say({ ...qso, working: true }, wording.confirmCall(voice(qso)));
+      }
       // Its call one character off: it puts you right, and waits.
       const heard = over.hasExactly(them.call);
       if (!heard && !qso.working && over.has(them.call)) {
         return say(qso, wording.correctCall(voice(qso)));
       }
-      if (heard || qso.working) {
+      // Your report, name or QTH, begun or sent, with no other station named:
+      // nobody else is on the frequency, so you are working this one.
+      const exchanging =
+        (over.pieces().length > 0 || over.botched().length > 0) &&
+        !over.namesOther(them.call, qso.you);
+      if (heard || qso.working || exchanging) {
         qso = { ...qso, working: true };
         // AGN alone. With its call and more, the over is your exchange.
         if (again && !heard) return say(qso, qso.last);

@@ -326,6 +326,15 @@ describe("copy mode options", () => {
     await until("the turn to come back", () => yourTurn());
   }, QSO_MS);
 
+  it("does not lock it for a single stray character", async () => {
+    await copyAnswer({});
+    // One dit: a click, or the key bumped. Not you sending.
+    await mic.key("E");
+    await wait(600);
+    expect($$('[data-testid="qso-type"]'), "still open").toHaveLength(1);
+    expect($('[data-testid="qso-locked"]')).toBeNull();
+  }, QSO_MS);
+
   it("locks it on Enter, and grades it at once when asked", async () => {
     const box = await copyAnswer({ qsoLockedShows: "grade" });
     await act(async () => {
@@ -361,16 +370,15 @@ describe("copy mode options", () => {
     expect(shown!.querySelectorAll(".cwrong")).toHaveLength(0);
     expect(shown!.querySelectorAll(".unknown").length).toBeGreaterThan(0);
     expect($(".qsolog .copied"), "no count").toBeNull();
-    // Right is the theme's green, not the blue of your own lines.
+    // Right is a blue dot under the character, which keeps its own color.
     const right = shown!.querySelector(".cright")!;
     const probe = document.createElement("span");
-    probe.style.color = "var(--ok)";
+    probe.style.color = "var(--you)";
     host.append(probe);
-    expect(getComputedStyle(right).color).toBe(getComputedStyle(probe).color);
+    const blue = getComputedStyle(probe).color;
     probe.remove();
-    expect(getComputedStyle(right).color).not.toBe(
-      getComputedStyle($(".qsolog li.you .text")!).color,
-    );
+    expect(getComputedStyle(right, "::after").backgroundColor).toBe(blue);
+    expect(getComputedStyle(right).color).not.toBe(blue);
   }, QSO_MS);
 
   it("leaves your copy open while you send, with Lock off", async () => {
@@ -381,6 +389,18 @@ describe("copy mode options", () => {
     expect($$('[data-testid="qso-type"]').length).toBeGreaterThan(0);
     expect($('[data-testid="qso-locked"]')).toBeNull();
     await until("the turn to come back", () => yourTurn());
+  }, QSO_MS);
+});
+
+describe("the station's speed on its lines", () => {
+  it("shows the speed the station sent each line at, and follows QRS", async () => {
+    await open({ qsoTheirText: "before", qsoShowTheirSpeed: true });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const speeds = () => $$('.qsolog li.them [data-testid="qso-line-wpm"]').map((e) => e.textContent);
+    expect(speeds()).toEqual([`${WPM} wpm`]);
+    expect($('.qsolog li.you [data-testid="qso-line-wpm"]'), "yours stays off").toBeNull();
+    await send("QRS K");
+    expect(speeds()).toEqual([`${WPM} wpm`, `${WPM}/24 wpm`]);
   }, QSO_MS);
 });
 

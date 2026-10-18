@@ -171,6 +171,10 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   white-space: pre;
   font-family: var(--mono);
   line-height: 1;
+  /* Set here, not inherited. The practice page draws this inside a button,
+     where the browser resets letter spacing, and the QSO page inside a span,
+     where it inherited the heading's: the same drawing was wider there. */
+  letter-spacing: normal;
   font-size: calc(var(--brand-h, 26px) / var(--rows, 6));
 }
 
@@ -2361,12 +2365,23 @@ button.cal { font-size: 11px; padding: 3px 8px; }
   font: inherit;
   text-transform: uppercase;
 }
-.qsolog .graded { display: flex; flex-direction: column; gap: 2px; }
-/* Right in the green the rest of the app grades right in, not the blue: in
-   this log, blue is your own sending, and a graded station over in it read
-   as yours. */
-.qsolog .cright { color: var(--ok); }
-.qsolog .cwrong { color: var(--bad); text-decoration: underline; }
+.qsolog .graded { display: flex; flex-direction: column; gap: 6px; }
+/* A graded copy keeps the text's own color, with a dot under each character,
+   as Zen mode's live grading has: blue if you copied it right, red if not.
+   Out of the flow and sized in em, so the dots move nothing. */
+.qsolog .cright, .qsolog .cwrong { position: relative; }
+.qsolog .cright::after, .qsolog .cwrong::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.3em;
+  width: 0.3em;
+  height: 0.3em;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+.qsolog .cright::after { background: var(--you); }
+.qsolog .cwrong::after { background: var(--bad); }
 .qsolog .copied { color: var(--ink-dim); font-size: 13px; }
 .qsolog .locked { color: var(--ink-dim); }
 /* A choice in the header keeps each of its labels on one line, and on a
@@ -2377,6 +2392,8 @@ header .modeswitch button { white-space: nowrap; }
 }
 /* The speed you sent a line at, after it, quiet. */
 .qsolog .lwpm { margin-left: auto; padding-left: 12px; color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
+/* Your speed in your blue, so whose speed is whose reads at a glance. */
+.qsolog .you .lwpm { color: var(--you); }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }

@@ -437,8 +437,10 @@ export interface Prefs {
   /** Copy mode: what a locked copy shows before the QSO ends: nothing yet,
    *  the grade, or only what you got right. Absent is nothing yet. */
   qsoLockedShows?: "nothing" | "grade" | "right";
-  /** Your overs show the speed you sent them at. Absent is off. */
+  /** Your lines show the speed you sent them at. Absent is off. */
   qsoShowSpeed?: boolean;
+  /** The station's lines show the speed it sent them at. Absent is off. */
+  qsoShowTheirSpeed?: boolean;
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -605,6 +607,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoLockCopy: isBool,
   qsoLockedShows: oneOf("nothing", "grade", "right"),
   qsoShowSpeed: isBool,
+  qsoShowTheirSpeed: isBool,
 };
 
 export function loadPrefs(): Prefs {

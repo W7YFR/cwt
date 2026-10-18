@@ -57,6 +57,10 @@ const REPLY_DELAY_SEC = [0.6, 1.4] as const;
  *  last of the reply can still be in the room. */
 const AFTER_REPLY_MS = 250;
 
+/** Characters you must have sent before the page takes it that you are
+ *  sending, and locks or grades your copy. */
+const SENDING_CHARS = 3;
+
 /** The longest one over may run. The recording starts over at each over. */
 const MAX_OVER_SEC = 600;
 
@@ -118,7 +122,8 @@ interface Line {
   readonly mode: TheirText;
   /** Copy mode: your copy can no longer change. */
   readonly locked: boolean;
-  /** The speed you sent it at, for your overs, when it could be measured. */
+  /** The speed it was sent at: measured from your sending, when it could be,
+   *  or the station's own. */
   readonly sentWpm: SentWpm | null;
 }
 
@@ -139,7 +144,8 @@ const LOCKED_SHOWS_HELP =
   "What a locked copy shows before the QSO ends: nothing yet, the grade, or only the " +
   "characters you copied right, with nothing to mark what you missed. The full grade " +
   "shows when the QSO ends.";
-const SHOW_SPEED_HELP = "Each of your overs shows the speed you sent it at.";
+const SHOW_SPEED_HELP = "Each of your lines shows the speed you sent it at.";
+const SHOW_THEIR_SPEED_HELP = "Each of the station's lines shows the speed it sent it at.";
 
 /** Enter and Escape in a copy box are not the recorder's: it listens on the
  *  document, and these keys would stop the session. Enter locks the copy. */
@@ -197,7 +203,7 @@ function Graded({ line }: { line: Line }): React.ReactElement {
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(
-  key: "qsoSettingsOpen" | "qsoLockCopy" | "qsoShowSpeed",
+  key: "qsoSettingsOpen" | "qsoLockCopy" | "qsoShowSpeed" | "qsoShowTheirSpeed",
   or: boolean,
 ): readonly [boolean, (next: boolean) => void] {
   const [value, setRaw] = useState<boolean>(() => loadPrefs()[key] ?? or);
@@ -283,6 +289,7 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoLockedShows: next });
   };
   const [showSpeed, setShowSpeed] = useOnOff("qsoShowSpeed", false);
+  const [showTheirSpeed, setShowTheirSpeed] = useOnOff("qsoShowTheirSpeed", false);
   const [helpOpen, setHelpOpen] = useState(false);
   const qso = useRef<Qso>(newQso(Math.random, "", speed));
   /** Which QSO of the session is running, counted from 0. */
@@ -399,25 +406,32 @@ export function QsoScreen({
     }, AFTER_REPLY_MS);
   };
 
+  /* You have begun sending: at least `SENDING_CHARS` characters read back. A
+     single character, or one still being keyed, is as often a click, a bump
+     of the key or the room ringing after the reply as it is you, and taken as
+     sending it locked or graded a copy while it was still being typed. */
+  const sending =
+    phase === "listening" &&
+    copy.turn !== answered.current &&
+    copy.text.replace(/\s+/g, "").length >= SENDING_CHARS;
+
   /* Your next over has begun: the copy of the QSO before is done. */
   useEffect(() => {
-    if (finished === null || phase !== "listening" || copy.turn === answered.current) return;
-    if (!copy.text && !copy.keying) return;
+    if (finished === null || !sending) return;
     close(finished);
     setNote("");
-  }, [finished, phase, copy.turn, copy.text, copy.keying, close]);
+  }, [finished, sending, close]);
 
   /* You have started sending: with Lock on, your copy of the station's overs
      can no longer change. */
   useEffect(() => {
-    if (!lockCopy || phase !== "listening" || copy.turn === answered.current) return;
-    if (!copy.text && !copy.keying) return;
+    if (!lockCopy || !sending) return;
     setLines((l) =>
       l.some((line) => !line.you && line.mode === "copy" && !line.locked)
         ? l.map((line) => (!line.you && line.mode === "copy" ? { ...line, locked: true } : line))
         : l,
     );
-  }, [lockCopy, phase, copy.turn, copy.text, copy.keying]);
+  }, [lockCopy, sending]);
 
   /* Your over is done: answer it. */
   useEffect(() => {
@@ -476,7 +490,7 @@ export function QsoScreen({
             typed: "",
             mode: theirMode.current,
             locked: false,
-            sentWpm: null,
+            sentWpm: at,
           },
         ]);
         setTheirSpeed(at);
@@ -709,6 +723,13 @@ export function QsoScreen({
                 options={THEIR_TEXTS}
                 onChange={(v) => setTheirText(v as TheirText)}
               />
+              <Check
+                id="qso-show-their-speed"
+                label="Speed"
+                help={SHOW_THEIR_SPEED_HELP}
+                checked={showTheirSpeed}
+                onChange={setShowTheirSpeed}
+              />
             </div>
           </Section>
           <Section name="yours" title="Your text">
@@ -723,7 +744,7 @@ export function QsoScreen({
               />
               <Check
                 id="qso-show-speed"
-                label="Speed on each line"
+                label="Speed"
                 help={SHOW_SPEED_HELP}
                 checked={showSpeed}
                 onChange={setShowSpeed}
@@ -801,7 +822,7 @@ export function QsoScreen({
             <li key={i} className={line.you ? "you" : "them"}>
               <span className="who">{whoOf(line)}</span>
               {textOf(line, i)}
-              {showSpeed && line.you && line.sentWpm && (
+              {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
                 <span className="lwpm" data-testid="qso-line-wpm">
                   {wpmOf(line.sentWpm)}
                 </span>

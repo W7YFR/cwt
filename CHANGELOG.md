@@ -10,10 +10,10 @@ nothing to the site. The next release carries them.
 ### Added
 
 - A **QSO** page, opened from the **Practice** and **QSO** switch in the header. Call CQ, and a made-up station answers in CW and works you through report, name and QTH to 73. Two example QSOs show what to send.
-- The station words its overs differently each time, and goes on only once you have sent back each part. It asks again when it cannot copy you, answers NAME?, QTH?, RST? or part of its call with a ?, and takes a correction after the error sign.
+- The station words its replies differently each time, and goes on only once you have sent back each part. It asks again when it cannot copy you, answers NAME?, QTH?, RST? or part of its call with a ?, and takes a correction after the error sign.
 - QRS makes the station send its last over again, slower, and QRQ makes it send faster. QRS 12 or QRQ 20 asks for that speed.
-- **Station text** in the **QSO** page's settings sets what shows of the station's overs: **Whole**, **As sent**, **Blurred**, **Copy** or **Off**. With **Copy**, you type what you hear, and your copy is graded when the QSO ends, or when it locks if **Once locked, show** says so.
-- The **QSO** page's settings set **Length**, **Copy** (**Lenient** or **Strict**), what shows of your own overs, and **Speed on each line**. The speed sliders and the **Audio** settings, **Calibration** among them, are the practice page's, and either page sets them for both.
+- **Station text** in the **QSO** page's settings sets what shows of the station's lines: **Whole**, **As sent**, **Blurred**, **Copy** or **Off**. With **Copy**, you type what you hear, and your copy is graded when the QSO ends, or when it locks if **Once locked, show** says so.
+- The **QSO** page's settings set **Length**, **Copy** (**Lenient** or **Strict**), what shows of your own lines, and **Speed** for each side, which shows the speed each line was sent at. The speed sliders and the **Audio** settings, **Calibration** among them, are the practice page's, and either page sets them for both.
 - The station's call stays out of the log's labels until you have copied it.
 
 ### Changed

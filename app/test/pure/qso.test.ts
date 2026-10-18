@@ -867,3 +867,33 @@ describe("the help's example QSO", () => {
   });
 });
 
+
+describe("working the station without its call", () => {
+  const LENIENT: Context = { rand: () => 0, hour: 20, ear: { lenient: true, saved: "" } };
+  const called = (): Qso => answer(newQso(seeded()), "CQ CQ CQ DE W7YFR K", LENIENT).qso;
+
+  it("goes on with your report after confirming its call", () => {
+    // The QSO from the screenshot: its call asked about and confirmed, then
+    // your report with no call in it.
+    let q = called();
+    const c = q.them.call;
+    q = answer(q, "AGN?", LENIENT).qso;
+    const confirmed = answer(q, `${c}?`, LENIENT);
+    expect(confirmed.reply).toBe(`R R DE ${c} ${c} K`);
+    const t = answer(confirmed.qso, "K GE OM TU FER CALL UR RST IS 5NN 5NN K", LENIENT);
+    expect(t.qso.stage).toBe("exchanged");
+    expect(t.reply).toContain("R TNX FER RPT");
+  });
+
+  it("goes on with your report even unasked, when no other station is named", () => {
+    const t = answer(called(), "GE OM UR RST 579 579 NAME BOB K", LENIENT);
+    expect(t.qso.stage).toBe("exchanged");
+  });
+
+  it("does not take an over named to another station as its own", () => {
+    const q = called();
+    const t = answer(q, "N9ZZZ DE W7YFR UR 579 K", LENIENT);
+    expect(t.qso.stage).toBe("called");
+    expect(t.reply).toBe(`DE ${q.them.call} ${q.them.call} K`);
+  });
+});
