@@ -3,24 +3,26 @@
 ## Workflow
 
 The contributor runs every release step. Claude may create the branch, since
-starting a task starts there. Claude never commits, because every commit
-needs human review. Claude never runs `make bump`, `make pr`,
+starting a task starts there. Claude commits only when the contributor asks
+for a commit in that message, never on its own: every commit needs human
+review first. An earlier ask does not carry over. Claude never runs
+`make bump`, `make pr`,
 `make release` or `make tag`, never pushes, and never opens, edits or merges
 a pull request.
 
 When asked, Claude stages work for review. Work on several changes at once
 can then be committed in parts: Claude stages the hunks for one part, and the
-contributor reviews and commits it. Staging changes only the index. Claude
-never resets or moves the branch. Claude may suggest a commit message for the
-staged part, but the contributor commits it. A suggested message is one line:
-a type prefix and a summary, such as `fix: caption a matched prosign`. It has
-no body and no trailer.
+contributor reviews and commits it, or asks Claude to. Staging changes only
+the index. Claude never resets or moves the branch. A commit message, by
+Claude or suggested by Claude, is one line: a type prefix and a summary,
+such as `fix: caption a matched prosign`. It has no body and no trailer.
 
 1. Claude or the contributor branches from `main` with a type prefix:
    `feat/` (minor), `fix/` or `chore/` (patch). The prefix sets the version
    bump, so pick it from what the change is.
 2. Claude implements the change and writes the `CHANGELOG.md` entry as the
-   work lands. The contributor reviews and commits each piece.
+   work lands. The contributor reviews each piece, and commits it or asks
+   Claude to.
 3. The contributor may ask for `/changelog-check`, which verifies the entry
    against the diff.
 4. The contributor runs `make pr`. It bumps the version, pushes, and opens

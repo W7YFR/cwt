@@ -45,6 +45,16 @@ export interface UseRecorderOptions {
    * nothing to do with what is on screen. The two screens that offer a record
    * button turn it on, and there the key and the button mean the same thing. */
   startKey?: boolean | undefined;
+  /** What Enter does while recording, in place of finishing. The QSO page
+   *  pauses with it. */
+  onEnterKey?: (() => void) | undefined;
+  /** What R does with nothing recording, in place of starting a recording:
+   *  the page's own start, which the QSO page needs to begin or go on with
+   *  a session. */
+  onStartKey?: (() => void) | undefined;
+  /** Enter starts too, as R does, with nothing recording. The QSO page
+   *  turns it on while paused, so Enter goes on as it paused. */
+  enterStarts?: boolean | undefined;
   /** The longest a recording may run. At this length it finishes itself.
    *  Unset, the recorder's own safety cap applies. */
   maxSeconds?: number | undefined;
@@ -129,7 +139,17 @@ function bareR(ev: KeyboardEvent): boolean {
 }
 
 export function useRecorder(options: UseRecorderOptions): RecorderHandle {
-  const { deviceId, maxSeconds, onClip, onError, onStart, startKey = false } = options;
+  const {
+    deviceId,
+    maxSeconds,
+    onClip,
+    onError,
+    onStart,
+    onEnterKey,
+    onStartKey,
+    enterStarts = false,
+    startKey = false,
+  } = options;
   const [devices, setDevices] = useState<InputDevice[]>([]);
   /** The device list came back with nothing in it worth picking between. */
   const [unnamed, setUnnamed] = useState(false);
@@ -357,7 +377,8 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       if (!recorder) {
         // Busy is a recording being analyzed — the same state that disables
         // the button this key stands in for.
-        if (!bareR(ev) || busy) return;
+        const enter = enterStarts && ev.key === "Enter";
+        if (!(bareR(ev) || enter) || busy) return;
         /* And the same three states that button has, for the same reason:
            the key and the button are two ways in to one thing, and a rule
            only one of them obeys is not a rule. Blocked, there is nothing
@@ -365,12 +386,15 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
            device that has not been chosen yet. */
         if (blocked || !probed) return;
         ev.preventDefault();
-        void (needAccess ? grantAccess() : start());
+        if (needAccess) void grantAccess();
+        else if (onStartKey) onStartKey();
+        else void start();
         return;
       }
       if (ev.key === "Enter") {
         ev.preventDefault();
-        void finish();
+        if (onEnterKey) onEnterKey();
+        else void finish();
       } else if (ev.key === "Escape") {
         ev.preventDefault();
         void discard();
@@ -388,6 +412,9 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     discard,
     finish,
     grantAccess,
+    onEnterKey,
+    onStartKey,
+    enterStarts,
     needAccess,
     recorder,
     restart,

@@ -376,6 +376,45 @@ export function SelectGroup({
   );
 }
 
+/** One choice of a few, all in view: a caption over joined buttons, the
+ *  one in force pressed, as the Practice and QSO switch is. One click
+ *  changes it. */
+export function ChoiceGroup({
+  id,
+  label,
+  help,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  help?: string;
+  value: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onChange(value: string): void;
+}): React.ReactElement {
+  return (
+    <div className="group choicegroup" title={help}>
+      <span className="caption" id={`${id}-label`}>
+        {label}
+      </span>
+      <div className="modeswitch" role="group" aria-labelledby={`${id}-label`} data-testid={id}>
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={value === o.value}
+            onClick={() => onChange(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const VIEWS = [
   { value: "per-char", label: "Per character" },
   { value: "absolute", label: "Absolute time" },
@@ -583,7 +622,8 @@ export function SettingsBand({
  *
  * Audio comes first, on every page: where the sound comes from, what corrects
  * it, and how loud it plays. Then the page's own sections, then a row of its
- * modes' options, as the practice page has for Plain, Paced and Zen. */
+ * own settings where it has them, then a row of its modes' options, as the
+ * practice page has for Plain, Paced and Zen. */
 export function SettingsPanel({
   audio,
   gainDb,
@@ -592,6 +632,7 @@ export function SettingsPanel({
   className,
   modesTitle,
   modes,
+  pageRow,
   children,
 }: {
   /** The microphone and its calibration. Absent where there is no recorder
@@ -605,6 +646,9 @@ export function SettingsPanel({
   /** The modes' row: its title, and a Section for each mode with options. */
   modesTitle?: string;
   modes?: React.ReactNode;
+  /** A row of Sections for what is set for this page alone, under the
+   *  settings the pages share. */
+  pageRow?: React.ReactNode;
   children?: React.ReactNode;
 }): React.ReactElement {
   return (
@@ -623,6 +667,8 @@ export function SettingsPanel({
       </Section>
 
       {children}
+
+      {pageRow && <div className="pagerow">{pageRow}</div>}
 
       {modes && (
         <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">

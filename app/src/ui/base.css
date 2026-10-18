@@ -512,6 +512,15 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* The recording modes, a row of their own under the rest, laid out on the
    same columns so their sections line up with the ones above. */
 .viewpanel .modes { grid-column: 1 / -1; }
+/* A page's own settings, a row of their own under the shared ones, on the
+   same columns. */
+.viewpanel .pagerow {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 180px);
+  align-items: start;
+  gap: 16px 20px;
+}
 .viewpanel .modesrow {
   display: grid;
   grid-template-columns: repeat(auto-fill, 180px);
@@ -535,7 +544,7 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
 /* Too narrow for two columns: one, the width of the window, and Audio's two
    lines wrap inside it. */
 @media (max-width: 440px) {
-  .viewpanel, .viewpanel .modesrow { grid-template-columns: 1fr; }
+  .viewpanel, .viewpanel .modesrow, .viewpanel .pagerow { grid-template-columns: 1fr; }
   .viewpanel [data-panel="audio"] { grid-column: auto; }
 }
 /* Every other section is a column of its settings. */
@@ -2387,6 +2396,19 @@ button.cal { font-size: 11px; padding: 3px 8px; }
    not your blue: blue in this log is your own sending. The dots under it
    say what is right. */
 .qsolog .graded .yourcopy, .qsolog .rightonly { color: var(--ink-dim); }
+/* Blanks keep their width: each stands for a character you left out. */
+.qsolog .rightonly { white-space: pre-wrap; }
+/* Your copy over the station's line, a column for each character, so each
+   typed character sits over the one it was graded against. A word's
+   columns stay on one line; a long line breaks between words, both rows
+   together. */
+.qsolog .aligned { display: flex; flex-wrap: wrap; column-gap: 1ch; row-gap: 10px; }
+.qsolog .cword { display: inline-flex; white-space: pre; }
+.qsolog .ccol { display: inline-flex; flex-direction: column; gap: 6px; }
+/* Every row one height, set here rather than by its text: a word you did
+   not copy has nothing over it, and an empty row as tall as its text left
+   that word lower than the rest. */
+.qsolog .ccol > span { display: block; height: 1.4em; line-height: 1.4em; }
 .qsolog .locked { color: var(--ink-dim); }
 /* A choice in the header keeps each of its labels on one line, and on a
    phone its buttons close up so all five fit the header's width. */
@@ -2406,9 +2428,25 @@ header .modeswitch button { white-space: nowrap; }
    page's: Overall (Farnsworth) and its reading need the room, one over the
    other with Character speed in the Speed column. */
 .viewpanel.qsopanel,
+.viewpanel.qsopanel .pagerow,
 .viewpanel.qsopanel .modesrow { grid-template-columns: repeat(auto-fill, 210px); }
-@media (max-width: 440px) {
-  .viewpanel.qsopanel, .viewpanel.qsopanel .modesrow { grid-template-columns: 1fr; }
+/* A choice with its options in view, the buttons small, so most fit one
+   column. The sections with the longest take two, where two fit: spanning
+   two of one column would add a second, past the panel's edge. */
+.viewpanel .choicegroup .modeswitch button { padding: 3px 9px; font-size: 12px; white-space: nowrap; }
+/* Closer on the smallest phones, so the longest row still fits. */
+@media (max-width: 400px) {
+  .viewpanel .choicegroup .modeswitch button { padding-left: 7px; padding-right: 7px; }
+}
+@media (min-width: 561px) {
+  .viewpanel.qsopanel [data-panel="qso"],
+  .viewpanel.qsopanel [data-panel="theirs"],
+  .viewpanel.qsopanel [data-panel="copy"] { grid-column: span 2; }
+}
+/* One column a little sooner than the practice page's: below this, two
+   columns do not fit beside a section that spans both. */
+@media (max-width: 560px) {
+  .viewpanel.qsopanel, .viewpanel.qsopanel .pagerow, .viewpanel.qsopanel .modesrow { grid-template-columns: 1fr; }
 }
 .viewpanel [data-panel="speed"] label { white-space: nowrap; }
 .viewpanel [data-panel="speed"] input[type="range"] { width: 180px; }

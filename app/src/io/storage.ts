@@ -425,17 +425,20 @@ export interface Prefs {
   /** How the QSO page reads your sending. Absent is lenient. */
   qsoCopy?: "strict" | "lenient";
   /** How much the QSO page's station says in each over. Absent is full. */
-  qsoLength?: "full" | "short" | "pieces";
+  qsoLength?: "full" | "short" | "pieces" | "mixed";
   /** How the station's overs show on the QSO page. Absent is whole. */
   qsoTheirText?: "before" | "sent" | "hidden" | "copy" | "none";
+  /** Blurred station text blurs the station's call in the log too. Absent
+   *  is off. */
+  qsoBlurCall?: boolean;
   /** How your own overs show on the QSO page. Absent is as sent. */
   qsoYourText?: "sent" | "hidden" | "none";
   /** The QSO page's settings band was open. */
   qsoSettingsOpen?: boolean;
   /** Copy mode: your copy locks when you start sending. Absent is on. */
   qsoLockCopy?: boolean;
-  /** Copy mode: what a locked copy shows before the QSO ends: nothing yet,
-   *  the grade, or only what you got right. Absent is nothing yet. */
+  /** Copy mode: what a locked copy shows before the QSO ends: your copy, your
+   *  copy marked right and wrong, or the graded result. Absent is your copy. */
   qsoLockedShows?: "nothing" | "grade" | "right";
   /** Your lines show the speed you sent them at. Absent is off. */
   qsoShowSpeed?: boolean;
@@ -600,8 +603,9 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   customDrills: isCustomDrills,
   page: oneOf("practice", "qso"),
   qsoCopy: oneOf("strict", "lenient"),
-  qsoLength: oneOf("full", "short", "pieces"),
+  qsoLength: oneOf("full", "short", "pieces", "mixed"),
   qsoTheirText: oneOf("before", "sent", "hidden", "copy", "none"),
+  qsoBlurCall: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
   qsoSettingsOpen: isBool,
   qsoLockCopy: isBool,
@@ -822,4 +826,28 @@ export function forgetCurrentTake(): void {
   delete next.currentId;
   delete next.session;
   savePrefs(next);
+}
+
+/* The QSO page's log, so a reload comes back to it. Kept apart from the
+   preferences: it changes with every key typed into a copy. */
+const QSO_KEY = "cwt:qso";
+
+/** Remember the QSO page's log, or forget it with null. */
+export function rememberQso(log: unknown): void {
+  try {
+    if (log === null) localStorage.removeItem(QSO_KEY);
+    else localStorage.setItem(QSO_KEY, JSON.stringify(log));
+  } catch {
+    /* nothing kept; the page still works */
+  }
+}
+
+/** The QSO page's log as last remembered, unchecked, or null. */
+export function recallQso(): unknown {
+  try {
+    const raw = localStorage.getItem(QSO_KEY);
+    return raw === null ? null : (JSON.parse(raw) as unknown);
+  } catch {
+    return null;
+  }
 }
