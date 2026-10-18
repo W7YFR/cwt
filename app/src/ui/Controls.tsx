@@ -85,6 +85,58 @@ import { fmtGain, fmtPpu, fmtTolerance, fmtWpm } from "./format";
 import { RUN_SORTS, recentCount, type RunSort } from "./runOrder";
 import { useUpperField } from "./useUpperField";
 
+/** The two speed sliders, character and overall. The practice page and the
+ *  QSO page both draw these, so a speed is set the same way on each. */
+export function SpeedSliders({
+  charWpm,
+  farnsworthWpm,
+  onChange,
+  locked = false,
+}: {
+  charWpm: number;
+  farnsworthWpm: number;
+  onChange(patch: { charWpm?: number; farnsworthWpm?: number }): void;
+  /** Shown, but not to be changed. */
+  locked?: boolean;
+}): React.ReactElement {
+  return (
+    <>
+      <div className="group" inert={locked} data-locked={locked}>
+        <label htmlFor="wpm">
+          Character speed <output id="wpm-out">{fmtWpm(charWpm)}</output>
+        </label>
+        <input
+          type="range"
+          id="wpm"
+          min={SPEED_MIN}
+          max={SPEED_MAX}
+          step={1}
+          value={charWpm}
+          onChange={(e) => onChange({ charWpm: Number(e.target.value) })}
+        />
+      </div>
+
+      <div className="group" inert={locked} data-locked={locked}>
+        <label htmlFor="farns">
+          Overall (Farnsworth) <output id="farns-out">{fmtWpm(farnsworthWpm)}</output>
+        </label>
+        <input
+          type="range"
+          id="farns"
+          min={SPEED_MIN}
+          /* Overall speed cannot exceed character speed, so the slider's
+             ceiling follows the other one rather than letting the pair go
+             invalid and silently clamping behind your back. */
+          max={charWpm}
+          step={1}
+          value={farnsworthWpm}
+          onChange={(e) => onChange({ farnsworthWpm: Number(e.target.value) })}
+        />
+      </div>
+    </>
+  );
+}
+
 export interface ControlsProps {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
@@ -108,38 +160,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
 
   return (
     <section className="controls" inert={props.locked === true} data-locked={props.locked === true}>
-      <div className="group">
-        <label htmlFor="wpm">
-          Character speed <output id="wpm-out">{fmtWpm(s.charWpm)}</output>
-        </label>
-        <input
-          type="range"
-          id="wpm"
-          min={SPEED_MIN}
-          max={SPEED_MAX}
-          step={1}
-          value={s.charWpm}
-          onChange={(e) => onChange({ charWpm: Number(e.target.value) })}
-        />
-      </div>
-
-      <div className="group">
-        <label htmlFor="farns">
-          Overall (Farnsworth) <output id="farns-out">{fmtWpm(s.farnsworthWpm)}</output>
-        </label>
-        <input
-          type="range"
-          id="farns"
-          min={SPEED_MIN}
-          /* Overall speed cannot exceed character speed, so the slider's
-             ceiling follows the other one rather than letting the pair go
-             invalid and silently clamping behind your back. */
-          max={s.charWpm}
-          step={1}
-          value={s.farnsworthWpm}
-          onChange={(e) => onChange({ farnsworthWpm: Number(e.target.value) })}
-        />
-      </div>
+      <SpeedSliders charWpm={s.charWpm} farnsworthWpm={s.farnsworthWpm} onChange={onChange} />
 
       <div className="group">
         <label htmlFor="tol">
@@ -318,7 +339,7 @@ export interface ViewControlsProps extends ChartSettingsProps {
 }
 
 /** A select with its caption above it, barred in place when it cannot apply. */
-function SelectGroup({
+export function SelectGroup({
   id,
   label,
   help,
@@ -787,10 +808,52 @@ function Section({
   );
 }
 
+/** The microphone, barred in place when there is only one. The practice
+ *  page's settings and the QSO page both draw this. */
+export function MicrophoneGroup({
+  devices,
+  deviceId,
+  onDeviceChange,
+  locked = false,
+}: {
+  devices: readonly InputDevice[];
+  deviceId: string | undefined;
+  onDeviceChange(id: string | undefined): void;
+  /** Shown, but not to be changed. */
+  locked?: boolean;
+}): React.ReactElement {
+  const oneInput = devices.length <= 1 ? ONE_INPUT : null;
+  return (
+    <div
+      className="group"
+      data-disabled={oneInput !== null}
+      title={barredTitle(oneInput, MIC_HELP)}
+      inert={locked}
+      data-locked={locked}
+    >
+      <label htmlFor="input-device">Microphone</label>
+      <select
+        id="input-device"
+        value={deviceId ?? ""}
+        disabled={oneInput !== null}
+        onChange={(e) => onDeviceChange(e.target.value || undefined)}
+      >
+        <option value="">Default input</option>
+        {/* Keyed by position as well as by id: before the browser hands
+            over the identifiers, several inputs share an empty one. */}
+        {devices.map((d, i) => (
+          <option key={`${d.deviceId}:${i}`} value={d.deviceId}>
+            {d.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 /** The microphone and its calibration, each barred in place when there is
  *  nothing to choose. */
 function AudioGroups({ audio }: { audio: AudioSetup }): React.ReactElement {
-  const oneInput = audio.devices.length <= 1 ? ONE_INPUT : null;
   const choices = profilesFor([...audio.profiles], audio.deviceId, audio.profileId);
   const active = audio.profiles.find((p) => p.id === audio.profileId) ?? null;
   const calBarred = !audio.appliesToTake
@@ -802,24 +865,11 @@ function AudioGroups({ audio }: { audio: AudioSetup }): React.ReactElement {
         : null;
   return (
     <>
-      <div className="group" data-disabled={oneInput !== null} title={barredTitle(oneInput, MIC_HELP)}>
-        <label htmlFor="input-device">Microphone</label>
-        <select
-          id="input-device"
-          value={audio.deviceId ?? ""}
-          disabled={oneInput !== null}
-          onChange={(e) => audio.onDeviceChange(e.target.value || undefined)}
-        >
-          <option value="">Default input</option>
-          {/* Keyed by position as well as by id: before the browser hands
-              over the identifiers, several inputs share an empty one. */}
-          {audio.devices.map((d, i) => (
-            <option key={`${d.deviceId}:${i}`} value={d.deviceId}>
-              {d.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <MicrophoneGroup
+        devices={audio.devices}
+        deviceId={audio.deviceId}
+        onDeviceChange={audio.onDeviceChange}
+      />
 
       <div
         className="group"

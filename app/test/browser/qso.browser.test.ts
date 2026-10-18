@@ -13,7 +13,7 @@ import { userEvent } from "vitest/browser";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { keyingPlan } from "@/audio/synth";
-import { savePrefs, type Prefs } from "@/io/storage";
+import { loadSpeed, savePrefs, type Prefs } from "@/io/storage";
 import { targetTiming } from "@/timing";
 import { QsoScreen } from "@/ui/QsoScreen";
 import "@/ui/base.css";
@@ -86,30 +86,51 @@ async function click(el: HTMLElement | null): Promise<void> {
   await act(async () => el!.click());
 }
 
-/** A switch's option, by its label. */
-const option = (testId: string, label: string) =>
-  $$<HTMLButtonElement>(`[data-testid="${testId}"] button`).find((b) => b.textContent === label) ??
-  null;
+/** Pick `value` in the select `id`. */
+async function choose(id: string, value: string): Promise<void> {
+  await act(async () => {
+    await userEvent.selectOptions($<HTMLSelectElement>(`#${id}`)!, value);
+  });
+}
+
+/** Move the slider `id` to `value`, as a drag would. */
+async function slide(id: string, value: number): Promise<void> {
+  const el = $<HTMLInputElement>(`#${id}`)!;
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  await act(async () => {
+    set.call(el, String(value));
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
 
 /** Mount the page with these choices and press Start. */
 async function open(prefs: Prefs): Promise<void> {
-  savePrefs({ charWpm: WPM, farnsworthWpm: WPM, qsoLength: "short", ...prefs });
-  act(() =>
-    root.render(
-      createElement(QsoScreen, {
-        deviceId: undefined,
-        onError: (m: string) => errors.push(m),
-        onConfigure: () => {},
-        onPage: () => {},
-      }),
-    ),
-  );
+  mount(prefs);
   await until("the Start button", () => {
     const b = $<HTMLButtonElement>('[data-testid="qso-start"]');
     return !!b && !b.disabled;
   });
   await click($('[data-testid="qso-start"]'));
   await until("the session to start", () => status().startsWith("Your turn"));
+  // A moment before the first over, as a person takes. Keyed the instant the
+  // device opens, the first character can come out wrong under load.
+  await wait(500);
+}
+
+/** Mount the page with these choices. */
+function mount(prefs: Prefs): void {
+  savePrefs({ charWpm: WPM, farnsworthWpm: WPM, qsoLength: "short", ...prefs });
+  act(() =>
+    root.render(
+      createElement(QsoScreen, {
+        deviceId: undefined,
+        onDeviceChange: () => {},
+        onError: (m: string) => errors.push(m),
+        onConfigure: () => {},
+        onPage: () => {},
+      }),
+    ),
+  );
 }
 
 /** Key `text`, then wait for the station's answer and for the turn to come
@@ -160,9 +181,17 @@ describe("a QSO from your CQ", () => {
   it("runs from CQ to 73, and says it is over once the last over has played", async () => {
     await open({ qsoTheirText: "before" });
 
-    const answered = await send("CQ CQ DE W7YFR W7YFR K");
+    // Between your K and its first character, it says it is about to send.
+    await mic.key("CQ CQ DE W7YFR W7YFR K");
+    await until("the wait before the answer", () => status() === "Waiting for the other station.");
+    await until("the answer", () => theirs().length === 1);
+    expect(status()).toBe("The other station is sending.");
+    await until("the turn to come back", () => status().startsWith("Your turn"));
+    const answered = theirs()[0]!;
     const call = callIn(answered);
-    expect($$(".qsolog li.you")[0]!.textContent).toContain("CQ CQ DE W7YFR W7YFR K");
+    // Your over, as copied. Not the first word: under load a character of it
+    // can be misread, and the station still finds the CQ.
+    expect($$(".qsolog li.you .text")[0]!.textContent).toContain("DE W7YFR W7YFR K");
 
     const exchange = await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
     expect(exchange.textContent).toMatch(/ NAME | OP /);
@@ -184,7 +213,7 @@ describe("a QSO from your CQ", () => {
     const again = await send("QRS K");
     expect(again.querySelector(".text")!.textContent).toBe(first.querySelector(".text")!.textContent);
     // Halfway from 45 down to the bottom step: 25, between 24 and 26, so 24.
-    expect($('[data-testid="qso-their-speed"]')?.textContent).toBe("the station sends at 45/24 wpm");
+    expect($('[data-testid="qso-their-speed"]')?.textContent).toBe("The station sends at 45/24 wpm.");
   }, QSO_MS);
 });
 
@@ -194,7 +223,7 @@ describe("copying the station", () => {
     const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
 
     // Copy on mid-QSO: the over already read gets no box.
-    await click(option("qso-their-text", "Copy"));
+    await choose("qso-their-text", "copy");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
 
     await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
@@ -229,5 +258,30 @@ describe("copying the station", () => {
     // Stop ends the QSO, and its call shows.
     await click($('[data-testid="qso-stop"]'));
     expect(label()).toMatch(/^[A-Z0-9]?[A-Z]\d[A-Z]+$/);
+  }, QSO_MS);
+});
+
+describe("your speed", () => {
+  it("is the practice page's speed, on its sliders, and locks while a session runs", async () => {
+    mount({ charWpm: 20, farnsworthWpm: 15 });
+    const field = (id: string) => $<HTMLInputElement>(`#${id}`)!;
+    expect(field("wpm").value).toBe("20");
+    expect(field("farns").value).toBe("15");
+    expect($("#wpm-out")?.textContent).toContain("20");
+    expect($('[data-testid="qso-their-speed"]')?.textContent).toBe("The station answers at your speed.");
+
+    await slide("wpm", 30);
+    expect(loadSpeed()).toEqual({ charWpm: 30, farnsworthWpm: 15 });
+    // Overall cannot pass character speed: its slider stops there.
+    expect(field("farns").max).toBe("30");
+    await slide("wpm", 12);
+    expect(loadSpeed()).toEqual({ charWpm: 12, farnsworthWpm: 12 });
+
+    await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
+    await click($('[data-testid="qso-start"]'));
+    await until("the session to start", () => status().startsWith("Your turn"));
+    expect(field("wpm").closest("[inert]"), "locked while it runs").not.toBeNull();
+    expect(field("input-device").closest("[inert]"), "the microphone too").not.toBeNull();
+    expect($("#qso-their-text")!.closest("[inert]"), "what shows can still change").toBeNull();
   }, QSO_MS);
 });

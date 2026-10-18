@@ -93,11 +93,17 @@ export function App(): React.ReactElement {
   const [configuring, setConfiguring] = useState(false);
   /* Practice or QSO, kept across a reload. */
   const [page, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
-  const setPage = useCallback((next: Page) => {
-    setPageRaw(next);
-    setError(null);
-    savePrefs({ ...loadPrefs(), page: next });
-  }, []);
+  const setPage = useCallback(
+    (next: Page) => {
+      setPageRaw(next);
+      setError(null);
+      savePrefs({ ...loadPrefs(), page: next });
+      // The QSO page may have set the speed. A session with nothing recorded
+      // in it takes it up, as it does after calibrating.
+      if (next === "practice") take.adoptSavedSpeed();
+    },
+    [take],
+  );
 
   /* Which calibration is being applied, held here because it changes what the
      decoder does to every recording that follows. `null` is the default and a
@@ -428,6 +434,7 @@ export function App(): React.ReactElement {
       ) : page === "qso" ? (
         <QsoScreen
           deviceId={deviceId}
+          onDeviceChange={chooseDevice}
           onError={setError}
           onConfigure={() => {
             setError(null);

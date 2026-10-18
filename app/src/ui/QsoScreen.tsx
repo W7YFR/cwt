@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
-import { loadPrefs, loadSpeed, loadUser, savePrefs } from "@/io/storage";
+import { loadPrefs, loadSpeed, loadUser, savePrefs, saveSpeed } from "@/io/storage";
 import { DEFAULT_SPEED, answer, newQso, type Qso } from "@/qso/cq";
 import type { Speed } from "@/qso/speed";
 import type { Length } from "@/qso/wording";
@@ -24,6 +24,7 @@ import { targetTiming } from "@/timing/model";
 import { IconUser } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
+import { MicrophoneGroup, SelectGroup, SpeedSliders } from "./Controls";
 import { useLiveCopy } from "./useLiveCopy";
 import { useRecorder } from "./useRecorder";
 import { APP_NAME, Brandmark } from "./Wordmark";
@@ -55,74 +56,43 @@ type CopyMode = "strict" | "lenient";
 interface Option<T> {
   readonly value: T;
   readonly label: string;
-  readonly help: string;
 }
 
 const LENGTHS: ReadonlyArray<Option<Length>> = [
-  { value: "full", label: "Full", help: "Each item twice, the way it is sent on the air" },
-  { value: "short", label: "Short", help: "Each item once, with fewer words around it" },
-  { value: "pieces", label: "Piece by piece", help: "Report, then name, then QTH, one per over" },
+  { value: "full", label: "Full" },
+  { value: "short", label: "Short" },
+  { value: "pieces", label: "Piece by piece" },
 ];
-
-/** A labeled switch between a few options. */
-function Choice<T extends string>({
-  label,
-  testId,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  testId: string;
-  options: ReadonlyArray<Option<T>>;
-  value: T;
-  onChange(value: T): void;
-}): React.ReactElement {
-  return (
-    <div className="qsochoice">
-      <span className="qsochoicelabel">{label}</span>
-      <div className="modeswitch" role="group" aria-label={label} data-testid={testId}>
-        {options.map((m) => (
-          <button
-            key={m.value}
-            aria-pressed={value === m.value}
-            title={m.help}
-            onClick={() => onChange(m.value)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+const LENGTH_HELP =
+  "How much the station says in each over. Full sends each item twice, Short once, and " +
+  "Piece by piece sends its report, name and QTH one per over.";
 
 const COPY_MODES: ReadonlyArray<Option<CopyMode>> = [
-  {
-    value: "lenient",
-    label: "Lenient",
-    help: "Read your sending at your own timing, and take a call with one character wrong",
-  },
-  {
-    value: "strict",
-    label: "Strict",
-    help: "Read your sending at the set speed, and take only calls sent exactly",
-  },
+  { value: "lenient", label: "Lenient" },
+  { value: "strict", label: "Strict" },
 ];
+const COPY_HELP =
+  "How the station reads your sending. Lenient reads it at your own spacing and takes a " +
+  "call with one character wrong. Strict reads it at your speed and takes only calls sent exactly.";
 
 const THEIR_TEXTS: ReadonlyArray<Option<TheirText>> = [
-  { value: "before", label: "Whole", help: "Show each over whole as soon as it starts" },
-  { value: "sent", label: "As sent", help: "Show each character as it is sent" },
-  { value: "hidden", label: "Blurred", help: "Show each character as it is sent, blurred" },
-  { value: "copy", label: "Copy", help: "Type what you hear, and see it graded at the end of the QSO" },
-  { value: "none", label: "Off", help: "Show nothing until the end of the QSO" },
+  { value: "before", label: "Whole" },
+  { value: "sent", label: "As sent" },
+  { value: "hidden", label: "Blurred" },
+  { value: "copy", label: "Copy" },
+  { value: "none", label: "Off" },
 ];
+const THEIR_TEXT_HELP =
+  "What shows of the station's overs: whole as soon as one starts, each character as it is " +
+  "sent, the same blurred, a box to type your copy in, or nothing. All of it shows when the QSO ends.";
 
 const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
-  { value: "sent", label: "As sent", help: "Show each character as you send it" },
-  { value: "hidden", label: "Blurred", help: "Show each character as you send it, blurred" },
-  { value: "none", label: "Off", help: "Show nothing until the end of the QSO" },
+  { value: "sent", label: "As sent" },
+  { value: "hidden", label: "Blurred" },
+  { value: "none", label: "Off" },
 ];
+const YOUR_TEXT_HELP =
+  "What shows of your own overs as you send them: each character, the same blurred, or nothing.";
 
 interface Line {
   readonly who: string;
@@ -168,6 +138,7 @@ function Graded({ line }: { line: Line }): React.ReactElement {
 
 export interface QsoScreenProps {
   deviceId: string | undefined;
+  onDeviceChange(id: string | undefined): void;
   onError(message: string): void;
   onConfigure(): void;
   onPage(page: Page): void;
@@ -175,11 +146,20 @@ export interface QsoScreenProps {
 
 export function QsoScreen({
   deviceId,
+  onDeviceChange,
   onError,
   onConfigure,
   onPage,
 }: QsoScreenProps): React.ReactElement {
-  const speed = useMemo(() => loadSpeed() ?? DEFAULT_SPEED, []);
+  /* Your speed: the one the practice page uses, read and written through the
+     same pair. Set before a session, since the copy is read at it. */
+  const [speed, setSpeedRaw] = useState<Speed>(() => loadSpeed() ?? DEFAULT_SPEED);
+  const setSpeed = (next: Speed) => {
+    const fixed = { ...next, farnsworthWpm: Math.min(next.farnsworthWpm, next.charWpm) };
+    setSpeedRaw(fixed);
+    setTheirSpeed(fixed);
+    saveSpeed(fixed.charWpm, fixed.farnsworthWpm);
+  };
 
   const [phase, setPhase] = useState<Phase>("listening");
   const [lines, setLines] = useState<Line[]>([]);
@@ -466,7 +446,9 @@ export function QsoScreen({
     ? "Press Start, then call CQ."
     : phase === "listening"
       ? "Your turn. Hand it over with K."
-      : "The other station is sending.";
+      : phase === "waiting"
+        ? "Waiting for the other station."
+        : "The other station is sending.";
 
   return (
     <>
@@ -488,6 +470,57 @@ export function QsoScreen({
           </button>
         </div>
       </header>
+
+      {/* The same controls as the practice page, drawn the same way. Your
+          speed and the microphone lock while a session runs: your copy is
+          read at the speed, and the session holds the microphone open. The
+          rest can change between overs. */}
+      <section className="controls">
+        <SpeedSliders
+          charWpm={speed.charWpm}
+          farnsworthWpm={speed.farnsworthWpm}
+          onChange={(patch) => setSpeed({ ...speed, ...patch })}
+          locked={recorder !== null}
+        />
+        <MicrophoneGroup
+          devices={rec.devices}
+          deviceId={deviceId}
+          onDeviceChange={onDeviceChange}
+          locked={recorder !== null}
+        />
+        <SelectGroup
+          id="qso-copy"
+          label="Copy"
+          help={COPY_HELP}
+          value={copyMode}
+          options={COPY_MODES}
+          onChange={(v) => setCopyMode(v as CopyMode)}
+        />
+        <SelectGroup
+          id="qso-length"
+          label="Length"
+          help={LENGTH_HELP}
+          value={length}
+          options={LENGTHS}
+          onChange={(v) => setLength(v as Length)}
+        />
+        <SelectGroup
+          id="qso-their-text"
+          label="Station text"
+          help={THEIR_TEXT_HELP}
+          value={theirText}
+          options={THEIR_TEXTS}
+          onChange={(v) => setTheirText(v as TheirText)}
+        />
+        <SelectGroup
+          id="qso-your-text"
+          label="Your text"
+          help={YOUR_TEXT_HELP}
+          value={yourText}
+          options={YOUR_TEXTS}
+          onChange={(v) => setYourText(v as YourText)}
+        />
+      </section>
 
       <main className="panel qso" data-testid="qso">
         <p className="qsostatus" role="status" aria-live="polite">
@@ -516,46 +549,14 @@ export function QsoScreen({
               <LevelMeter level={rec.level} />
             </>
           )}
-          <span className="hint">
-            {wpm(speed)}, set on the practice page
-            {!same(theirSpeed, speed) && (
-              <>
-                {" "}
-                · <span data-testid="qso-their-speed">the station sends at {wpm(theirSpeed)}</span>
-              </>
-            )}
+          {/* Your speed does two jobs: your sending is copied at it, and each
+              new station answers at it. QRS and QRQ change the station's speed
+              alone. */}
+          <span className="hint" data-testid="qso-their-speed">
+            {same(theirSpeed, speed)
+              ? "The station answers at your speed."
+              : `The station sends at ${wpm(theirSpeed)}.`}
           </span>
-        </div>
-
-        <div className="qsooptions">
-          <Choice
-            label="Copy"
-            testId="qso-copy"
-            options={COPY_MODES}
-            value={copyMode}
-            onChange={setCopyMode}
-          />
-          <Choice
-            label="Length"
-            testId="qso-length"
-            options={LENGTHS}
-            value={length}
-            onChange={setLength}
-          />
-          <Choice
-            label="Station text"
-            testId="qso-their-text"
-            options={THEIR_TEXTS}
-            value={theirText}
-            onChange={setTheirText}
-          />
-          <Choice
-            label="Your text"
-            testId="qso-your-text"
-            options={YOUR_TEXTS}
-            value={yourText}
-            onChange={setYourText}
-          />
         </div>
 
         <ol className="qsolog" data-testid="qso-log">

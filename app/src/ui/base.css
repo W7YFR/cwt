@@ -2308,7 +2308,8 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 
 /* The QSO page: the panel under the header, centered the way Configuration
    is, with the conversation as a log. */
-.panel.qso { margin: 24px auto; max-width: 760px; }
+/* Under the controls, at their width, as the chart is on the practice page. */
+.panel.qso { margin: 12px 20px; max-width: none; width: auto; }
 .qsostatus { margin: 0; font-size: 16px; }
 .qsocontrols { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .qsocontrols .meter { flex: 0 0 120px; }
@@ -2328,9 +2329,6 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .you .text { color: var(--you); }
 .qsolog .live .keying { color: var(--ink-faint); }
 .qsonote { margin: 0; }
-.qsooptions { display: flex; flex-wrap: wrap; gap: 12px 24px; }
-.qsochoice { display: flex; align-items: center; gap: 8px; }
-.qsochoicelabel { color: var(--ink-dim); }
 /* Blurred enough that only the number of characters can be told. Not
    selectable, so a drag cannot read it either. */
 .qsolog .blurred { filter: blur(5px); user-select: none; }

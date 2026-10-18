@@ -84,6 +84,12 @@ export function correctCall(s: Say): string {
   return pick(s.rand, [`MY CALL ${c} ${c} K`, `${s.you} DE ${c} ${c} ${c} K`, `CALL IS ${c} ${c} K`]);
 }
 
+/** It cannot go faster, or slower, than it is. */
+export function cannotChange(s: Say, slower: boolean): string {
+  const q = slower ? "QRS" : "QRQ";
+  return pick(s.rand, [`SRI NO ${q} K`, `${q} NIL SRI K`, `SRI CANT ${slower ? "GO SLOWER" : "GO FASTER"} K`]);
+}
+
 /** It asks for your call, for a CQ it could not read. */
 export function askCall(s: Say): string {
   const c = s.them.call;

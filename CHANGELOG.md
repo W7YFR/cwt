@@ -17,6 +17,7 @@ nothing to the site. The next release carries them.
 - On the **QSO** page, NAME?, QTH?, RST? or part of the station's call with a ?, such as N1?, gets just that one thing.
 - **Station text** and **Your text** on the **QSO** page set what shows of each over: **Whole**, **As sent**, **Blurred** or **Off**. With **Copy**, you type what you hear from the station, and your copy is graded after the QSO, when you call CQ again or press **Grade my copy**.
 - On the **QSO** page, the station's call stays out of the labels until you have copied it, unless **Station text** is **Whole**.
+- The **QSO** page has the practice page's speed sliders and **Microphone**, and either page sets them for both. Each station answers at your speed until you send QRS or QRQ.
 - **Lenient** copy on the **QSO** page reads your sending at your own spacing and takes a call with one character wrong. **Strict** copy reads it at the set speed.
 
 ## v1.8.1 — 2026-10-15

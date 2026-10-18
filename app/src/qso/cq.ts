@@ -608,7 +608,14 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
         : ask.slower
           ? qrs(qso.speed, qso.search)
           : qrq(qso.speed, qso.search);
+    const stuck =
+      moved.speed.charWpm === qso.speed.charWpm &&
+      moved.speed.farnsworthWpm === qso.speed.farnsworthWpm;
     qso = { ...qso, ...moved };
+    // At the top or bottom step, a request alone gets SRI, not the same over.
+    if (stuck && over.onlyAsks()) {
+      return { qso, reply: wording.cannotChange(voice(qso), ask.slower), ended: false };
+    }
     if (ask.slower || over.onlyAsks()) return { qso, reply: qso.last, ended: false };
   }
 

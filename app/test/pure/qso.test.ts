@@ -798,3 +798,24 @@ describe("your sign-off", () => {
     expect(answer(exchanged(LENIENT), "HPECUAGN", LENIENT).ended).toBe(true);
   });
 });
+
+describe("QRQ and QRS past the last step", () => {
+  const FIRST: Context = { rand: () => 0, hour: 20 };
+  const at = (charWpm: number, farnsworthWpm: number) =>
+    answer(newQso(seeded(), "", { charWpm, farnsworthWpm }), "CQ DE W7YFR K", FIRST).qso;
+
+  it("says it cannot go faster at the top step", () => {
+    const t = answer(at(40, 40), "QRQ K", FIRST);
+    expect(t.reply).toBe("SRI NO QRQ K");
+    expect(t.qso.speed).toEqual({ charWpm: 40, farnsworthWpm: 40 });
+  });
+
+  it("says it cannot go slower at the bottom step", () => {
+    expect(answer(at(20, 6), "QRS K", FIRST).reply).toBe("SRI NO QRS K");
+  });
+
+  it("goes on with the rest of an over with QRQ in it", () => {
+    const q = at(40, 40);
+    expect(answer(q, `${q.them.call} DE W7YFR UR 599 QRQ KN`, FIRST).qso.stage).toBe("exchanged");
+  });
+});
