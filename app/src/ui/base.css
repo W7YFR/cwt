@@ -2383,9 +2383,10 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .cright::after { background: var(--you); }
 .qsolog .cwrong::after { background: var(--bad); }
 .qsolog .copied { color: var(--ink-dim); font-size: 13px; }
-/* What you typed, in your blue, above what the station sent, in its own
-   color: the two read as yours and theirs. */
-.qsolog .graded .yourcopy, .qsolog .rightonly { color: var(--you); }
+/* Your copy is of the station's line, so it is grey as a locked copy is,
+   not your blue: blue in this log is your own sending. The dots under it
+   say what is right. */
+.qsolog .graded .yourcopy, .qsolog .rightonly { color: var(--ink-dim); }
 .qsolog .locked { color: var(--ink-dim); }
 /* A choice in the header keeps each of its labels on one line, and on a
    phone its buttons close up so all five fit the header's width. */

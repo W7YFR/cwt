@@ -255,7 +255,14 @@ describe("copying the station", () => {
     expect(boxes()).toHaveLength(0);
     const graded = $$(".qsolog .graded");
     expect(graded).toHaveLength(2);
-    expect(graded[0]!.textContent).toContain(`You copied W7YFR DE ${call}`);
+    // Your copy as typed, then what was sent, then the count.
+    expect(graded[0]!.querySelector('[data-testid="qso-your-copy"]')!.textContent).toBe(
+      `W7YFR DE ${call}`,
+    );
+    expect(graded[0]!.querySelector('[data-testid="qso-sent-copy"]')!.textContent).toMatch(
+      new RegExp(`^W7YFR DE ${call} `),
+    );
+    expect(graded[0]!.querySelector(".copied")!.textContent).toMatch(/^\d+ of \d+ copied$/);
     expect(note()).toBe("The QSO is over. Call CQ for the next one.");
   }, QSO_MS);
 
@@ -342,7 +349,7 @@ describe("copy mode options", () => {
       await userEvent.keyboard("{Enter}");
     });
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
-    expect($(".qsolog .graded")?.textContent).toContain("You copied W7YFR DE");
+    expect($('.qsolog [data-testid="qso-your-copy"]')?.textContent).toBe("W7YFR DE");
     expect($('[data-testid="qso-stop"]'), "Enter did not stop the session").not.toBeNull();
 
   }, QSO_MS);
@@ -364,13 +371,15 @@ describe("copy mode options", () => {
     });
     const shown = $('[data-testid="qso-right-only"]');
     expect(shown).not.toBeNull();
-    // You typed W7YFR DE: those characters show, in place. Nothing is marked
-    // wrong, and nothing you missed is spelled out.
-    expect(shown!.textContent!.startsWith("W7YFR DE ")).toBe(true);
+    // Your copy, W7YFR DE, as typed: each character right, nothing marked
+    // wrong, and nothing of the station's line or the count shown.
+    expect(shown!.textContent).toBe("W7YFR DE");
+    expect(shown!.querySelectorAll(".cright")).toHaveLength(7);
     expect(shown!.querySelectorAll(".cwrong")).toHaveLength(0);
-    expect(shown!.querySelectorAll(".unknown").length).toBeGreaterThan(0);
+    expect($('.qsolog [data-testid="qso-sent-copy"]'), "the station's line kept back").toBeNull();
     expect($(".qsolog .copied"), "no count").toBeNull();
-    // Right is a blue dot under the character, which keeps its own color.
+    // Right is a blue dot under the character. The copy is grey, as the
+    // station's side is, not your blue.
     const right = shown!.querySelector(".cright")!;
     const probe = document.createElement("span");
     probe.style.color = "var(--you)";
