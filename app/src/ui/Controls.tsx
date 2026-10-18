@@ -539,6 +539,8 @@ export interface AudioSetup {
   /** The session is being re-read under a new calibration. */
   rereading: boolean;
   onCalibrate?: (() => void) | undefined;
+  /** Shown, but not to be changed: a session has the microphone open. */
+  locked?: boolean;
 }
 
 export interface SettingsPanelProps extends ChartSettingsProps {
@@ -547,6 +549,91 @@ export interface SettingsPanelProps extends ChartSettingsProps {
    *  is the transport's, and L toggles it too. */
   loop?: boolean;
   onLoop?(): void;
+}
+
+/** The settings band's shell: rolled up or open under the header, and
+ *  unreachable while rolled up. Both pages draw their settings in it. */
+export function SettingsBand({
+  open,
+  locked = false,
+  bandRef,
+  children,
+}: {
+  open: boolean;
+  /** Open, but not to be changed: a take is recording. */
+  locked?: boolean;
+  bandRef?: React.Ref<HTMLElement>;
+  children: React.ReactNode;
+}): React.ReactElement {
+  /* Always in the tree, open or not: a band that is only rendered while open
+     has nothing to roll down FROM, and a closed one has to be unreachable
+     rather than merely invisible — `inert` takes it out of the tab order and
+     off the accessibility tree together, which two attributes doing half
+     each would eventually disagree about. */
+  return (
+    <section className="chartsettings" data-open={String(open)} ref={bandRef}>
+      <div inert={!open || locked} data-locked={locked}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/** The settings both pages share, and room for each page's own.
+ *
+ * Audio comes first, on every page: where the sound comes from, what corrects
+ * it, and how loud it plays. Then the page's own sections, then a row of its
+ * modes' options, as the practice page has for Plain, Paced and Zen. */
+export function SettingsPanel({
+  audio,
+  gainDb,
+  onGainDb,
+  audioExtra,
+  className,
+  modesTitle,
+  modes,
+  children,
+}: {
+  /** The microphone and its calibration. Absent where there is no recorder
+   *  to set them for. */
+  audio?: AudioSetup | undefined;
+  gainDb: number;
+  onGainDb(gainDb: number): void;
+  /** More on the playback line, after the listening level. */
+  audioExtra?: React.ReactNode;
+  className?: string;
+  /** The modes' row: its title, and a Section for each mode with options. */
+  modesTitle?: string;
+  modes?: React.ReactNode;
+  children?: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className={className ? `viewpanel ${className}` : "viewpanel"} id="view-panel">
+      <Section name="audio" title="Audio">
+        {/* Two lines: where the sound comes from, then how it plays back. */}
+        {audio && (
+          <div className="panelgroups">
+            <AudioGroups audio={audio} />
+          </div>
+        )}
+        <div className="panelgroups">
+          <ListeningLevel gainDb={gainDb} onChange={onGainDb} />
+          {audioExtra}
+        </div>
+      </Section>
+
+      {children}
+
+      {modes && (
+        <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">
+          <span className="uplabel" id="panel-modes">
+            {modesTitle}
+          </span>
+          <div className="modesrow">{modes}</div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Every setting the control row has no room for, in a band under the header.
@@ -558,151 +645,28 @@ export interface SettingsPanelProps extends ChartSettingsProps {
 export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElement {
   const { settings: s, onChange } = props;
   return (
-    <div className="viewpanel" id="view-panel">
-      <Section name="audio" title="Audio">
-        {/* Two lines: where the sound comes from, then how it plays back. */}
-        {props.audio && (
-          <div className="panelgroups">
-            <AudioGroups audio={props.audio} />
-          </div>
-        )}
-        <div className="panelgroups">
-          <ListeningLevel gainDb={s.gainDb} onChange={(gainDb) => onChange({ gainDb })} />
-          {props.onLoop && (
-            <Check
-              id="loop"
-              label="Loop"
-              help={LOOP_HELP}
-              checked={props.loop ?? false}
-              onChange={() => props.onLoop?.()}
-            />
-          )}
-        </div>
-      </Section>
-
-      <Section name="target" title="Target">
-        <div className="panelgroups">
-          <div className="group">
-            <NumberField
-              id="repeat-pause"
-              name="Repeat pause"
-              unit="s"
-              spoken="seconds"
-              help={REPEAT_PAUSE_HELP}
-              value={s.repeatPauseSec}
-              min={REPEAT_PAUSE_MIN_SEC}
-              max={REPEAT_PAUSE_MAX_SEC}
-              step={1}
-              onChange={(v) => onChange({ repeatPauseSec: v })}
-            />
-          </div>
-          <div className="group">
-            <NumberField
-              id="break-sec"
-              name="Break length"
-              unit="s"
-              spoken="seconds"
-              help={BREAK_HELP}
-              value={s.breakSec}
-              min={BREAK_MIN_SEC}
-              max={BREAK_MAX_SEC}
-              step={1}
-              onChange={(v) => onChange({ breakSec: v })}
-            />
-          </div>
-        </div>
-      </Section>
-
-      <Section name="grading" title="Grading">
-        <div className="panelgroups">
+    <SettingsPanel
+      audio={props.audio}
+      gainDb={s.gainDb}
+      onGainDb={(gainDb) => onChange({ gainDb })}
+      audioExtra={
+        props.onLoop && (
           <Check
-            id="ignore-construction"
-            label="Spacing only"
-            help={IGNORE_CONSTRUCTION_HELP}
-            checked={s.ignoreConstruction}
-            onChange={(v) => onChange({ ignoreConstruction: v })}
+            id="loop"
+            label="Loop"
+            help={LOOP_HELP}
+            checked={props.loop ?? false}
+            onChange={() => props.onLoop?.()}
           />
-        </div>
-      </Section>
-
-      <Section name="display" title="Chart">
-        <div className="panelgroups">
-          <Check
-            id="collapse-rests"
-            label="Collapse rests"
-            help={COLLAPSE_RESTS_HELP}
-            checked={s.collapseRests}
-            onChange={(v) => onChange({ collapseRests: v })}
-          />
-          <Check
-            id="char-markers"
-            label="Marks only"
-            help={CHAR_MARKERS_HELP}
-            checked={s.charMarkers}
-            onChange={(v) => onChange({ charMarkers: v })}
-          />
-          <Check
-            id="run-scores"
-            label="Scores"
-            help={RUN_SCORES_HELP}
-            checked={s.runScores}
-            onChange={(v) => onChange({ runScores: v })}
-          />
-          <Check
-            id="caption-all"
-            label="Decode all"
-            help={CAPTION_ALL_HELP}
-            checked={s.captionAll}
-            onChange={(v) => onChange({ captionAll: v })}
-          />
-        </div>
-      </Section>
-
-      {/* Not the chart: these put a whole block on the page or take it away,
-          which is a different kind of decision from how the marks above are
-          drawn. */}
-      <Section name="extras" title="Page">
-        <div className="panelgroups">
-          <Check
-            id="show-chart-controls"
-            label="Chart controls"
-            help={SHOW_CHART_CONTROLS_HELP}
-            checked={s.showChartControls}
-            onChange={(v) => onChange({ showChartControls: v })}
-          />
-          <Check
-            id="show-downloads"
-            label="Downloads"
-            help={SHOW_DOWNLOADS_HELP}
-            checked={s.showDownloads}
-            onChange={(v) => onChange({ showDownloads: v })}
-          />
-          <Check
-            id="show-hints"
-            label="Hints"
-            help={SHOW_HINTS_HELP}
-            checked={s.showHints}
-            onChange={(v) => onChange({ showHints: v })}
-          />
-          <Check
-            id="advanced-grading"
-            label="Advanced grading"
-            help={ADVANCED_GRADING_HELP}
-            checked={s.advancedGrading}
-            onChange={(v) => onChange({ advancedGrading: v })}
-          />
-        </div>
-      </Section>
-
-      {/* The options of the three ways to record, on a row of their own: they
-          are the settings changed from one sitting to the next, and the rest
-          are set once. Which mode records is picked beside the record button;
-          these are set ahead of it, so they stay live whichever is picked. */}
-      <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">
-        <span className="uplabel" id="panel-modes">
-          Recording modes
-        </span>
-        <div className="modesrow">
+        )
+      }
+      /* The options of the three ways to record, on a row of their own: they
+         are the settings changed from one sitting to the next, and the rest
+         are set once. Which mode records is picked beside the record button;
+         these are set ahead of it, so they stay live whichever is picked. */
+      modesTitle="Recording modes"
+      modes={
+        <>
           <Section name="plain" title="Plain">
             <div className="aid">
               <Check
@@ -767,9 +731,123 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
               </div>
             </div>
           </Section>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+        <Section name="target" title="Target">
+          <div className="panelgroups">
+            <div className="group">
+              <NumberField
+                id="repeat-pause"
+                name="Repeat pause"
+                unit="s"
+                spoken="seconds"
+                help={REPEAT_PAUSE_HELP}
+                value={s.repeatPauseSec}
+                min={REPEAT_PAUSE_MIN_SEC}
+                max={REPEAT_PAUSE_MAX_SEC}
+                step={1}
+                onChange={(v) => onChange({ repeatPauseSec: v })}
+              />
+            </div>
+            <div className="group">
+              <NumberField
+                id="break-sec"
+                name="Break length"
+                unit="s"
+                spoken="seconds"
+                help={BREAK_HELP}
+                value={s.breakSec}
+                min={BREAK_MIN_SEC}
+                max={BREAK_MAX_SEC}
+                step={1}
+                onChange={(v) => onChange({ breakSec: v })}
+              />
+            </div>
+          </div>
+        </Section>
+
+        <Section name="grading" title="Grading">
+          <div className="panelgroups">
+            <Check
+              id="ignore-construction"
+              label="Spacing only"
+              help={IGNORE_CONSTRUCTION_HELP}
+              checked={s.ignoreConstruction}
+              onChange={(v) => onChange({ ignoreConstruction: v })}
+            />
+          </div>
+        </Section>
+
+        <Section name="display" title="Chart">
+          <div className="panelgroups">
+            <Check
+              id="collapse-rests"
+              label="Collapse rests"
+              help={COLLAPSE_RESTS_HELP}
+              checked={s.collapseRests}
+              onChange={(v) => onChange({ collapseRests: v })}
+            />
+            <Check
+              id="char-markers"
+              label="Marks only"
+              help={CHAR_MARKERS_HELP}
+              checked={s.charMarkers}
+              onChange={(v) => onChange({ charMarkers: v })}
+            />
+            <Check
+              id="run-scores"
+              label="Scores"
+              help={RUN_SCORES_HELP}
+              checked={s.runScores}
+              onChange={(v) => onChange({ runScores: v })}
+            />
+            <Check
+              id="caption-all"
+              label="Decode all"
+              help={CAPTION_ALL_HELP}
+              checked={s.captionAll}
+              onChange={(v) => onChange({ captionAll: v })}
+            />
+          </div>
+        </Section>
+
+        {/* Not the chart: these put a whole block on the page or take it away,
+            which is a different kind of decision from how the marks above are
+            drawn. */}
+        <Section name="extras" title="Page">
+          <div className="panelgroups">
+            <Check
+              id="show-chart-controls"
+              label="Chart controls"
+              help={SHOW_CHART_CONTROLS_HELP}
+              checked={s.showChartControls}
+              onChange={(v) => onChange({ showChartControls: v })}
+            />
+            <Check
+              id="show-downloads"
+              label="Downloads"
+              help={SHOW_DOWNLOADS_HELP}
+              checked={s.showDownloads}
+              onChange={(v) => onChange({ showDownloads: v })}
+            />
+            <Check
+              id="show-hints"
+              label="Hints"
+              help={SHOW_HINTS_HELP}
+              checked={s.showHints}
+              onChange={(v) => onChange({ showHints: v })}
+            />
+            <Check
+              id="advanced-grading"
+              label="Advanced grading"
+              help={ADVANCED_GRADING_HELP}
+              checked={s.advancedGrading}
+              onChange={(v) => onChange({ advancedGrading: v })}
+            />
+          </div>
+        </Section>
+    </SettingsPanel>
   );
 }
 
@@ -883,10 +961,13 @@ function AudioGroups({ audio }: { audio: AudioSetup }): React.ReactElement {
         devices={audio.devices}
         deviceId={audio.deviceId}
         onDeviceChange={audio.onDeviceChange}
+        locked={audio.locked === true}
       />
 
       <div
         className="group"
+        inert={audio.locked === true}
+        data-locked={audio.locked === true}
         data-testid="calpick"
         data-disabled={calBarred !== null}
         title={barredTitle(calBarred, CAL_HELP)}

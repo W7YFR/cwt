@@ -126,6 +126,10 @@ function mount(prefs: Prefs): void {
       createElement(QsoScreen, {
         deviceId: undefined,
         onDeviceChange: () => {},
+        profiles: [],
+        profileId: undefined,
+        onProfileChange: () => {},
+        onCalibrate: () => {},
         onError: (m: string) => errors.push(m),
         onConfigure: () => {},
         onPage: () => {},
@@ -289,6 +293,7 @@ describe("your speed", () => {
     await until("the session to start", () => status().startsWith("Your turn"));
     expect(field("wpm").closest("[inert]"), "locked while it runs").not.toBeNull();
     expect(field("input-device").closest("[inert]"), "the microphone too").not.toBeNull();
+    expect(field("calibration").closest("[inert]"), "and its calibration").not.toBeNull();
     expect(field("qso-length").closest("[inert]"), "the rest can still change").toBeNull();
     expect($('[data-testid="qso-their-text"]')!.closest("[inert]"), "and what shows").toBeNull();
   }, QSO_MS);
@@ -379,7 +384,10 @@ describe("the listening level", () => {
     mount({ gainDb: 6 });
     await click($('[data-testid="panel-toggle"]'));
     const level = $<HTMLInputElement>("#gain")!;
-    expect(level.closest('[data-panel="microphone"]'), "with the microphone").not.toBeNull();
+    expect(level.closest('[data-panel="audio"]'), "with the microphone").not.toBeNull();
+    // The Audio settings are the practice page's own, calibration and all.
+    expect($('[data-panel="audio"] #input-device')).not.toBeNull();
+    expect($('[data-panel="audio"] [data-testid="calpick"] #calibration')).not.toBeNull();
     expect(level.value).toBe("6");
     await slide("gain", 12);
     expect(loadPrefs().gainDb).toBe(12);

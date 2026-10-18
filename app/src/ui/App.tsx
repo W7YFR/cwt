@@ -440,6 +440,13 @@ export function App(): React.ReactElement {
         <QsoScreen
           deviceId={deviceId}
           onDeviceChange={chooseDevice}
+          profiles={profiles}
+          profileId={profileId}
+          onProfileChange={chooseProfile}
+          onCalibrate={() => {
+            setError(null);
+            setCalibrating(true);
+          }}
           onError={setError}
           onConfigure={() => {
             setError(null);

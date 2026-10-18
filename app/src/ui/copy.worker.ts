@@ -7,6 +7,7 @@
 
 import { LiveCopy, type Copy } from "@/timing/live";
 import { targetTiming } from "@/timing/model";
+import type { Calibration } from "@/dsp";
 
 /** Starts an over. Replies carry `gen`, so the page can drop a reply about
  *  the over before. */
@@ -18,6 +19,8 @@ export interface CopyStart {
   readonly farnsworthWpm: number;
   /** Read the over at the sender's own timing. */
   readonly lenient: boolean;
+  /** The microphone path's correction, when one is chosen. */
+  readonly calibration: Calibration | null;
 }
 
 /** Audio captured since the last of these. */
@@ -57,7 +60,12 @@ scope.onmessage = (ev) => {
   const msg = ev.data;
   if (msg.type === "start") {
     gen = msg.gen;
-    copy = new LiveCopy(msg.rate, targetTiming(msg.charWpm, msg.farnsworthWpm), msg.lenient);
+    copy = new LiveCopy(
+      msg.rate,
+      targetTiming(msg.charWpm, msg.farnsworthWpm),
+      msg.lenient,
+      msg.calibration ?? undefined,
+    );
     fresh = false;
     return;
   }

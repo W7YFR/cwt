@@ -27,12 +27,13 @@ import { LevelMeter, RecDot } from "./Record";
 import {
   ChartSettingsButton,
   Check,
-  ListeningLevel,
-  MicrophoneGroup,
   Section,
   SelectGroup,
+  SettingsBand,
+  SettingsPanel,
   SpeedSliders,
 } from "./Controls";
+import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
 import type { SentWpm } from "@/timing/live";
 import { useLiveCopy } from "./useLiveCopy";
 import { useRecorder } from "./useRecorder";
@@ -209,6 +210,12 @@ function useOnOff(
 export interface QsoScreenProps {
   deviceId: string | undefined;
   onDeviceChange(id: string | undefined): void;
+  /** The saved calibrations, and the one in use. */
+  profiles: readonly Profile[];
+  profileId: string | undefined;
+  onProfileChange(id: string | undefined): void;
+  /** Open the calibration wizard. */
+  onCalibrate(): void;
   onError(message: string): void;
   onConfigure(): void;
   onPage(page: Page): void;
@@ -217,6 +224,10 @@ export interface QsoScreenProps {
 export function QsoScreen({
   deviceId,
   onDeviceChange,
+  profiles,
+  profileId,
+  onProfileChange,
+  onCalibrate,
   onError,
   onConfigure,
   onPage,
@@ -355,7 +366,13 @@ export function QsoScreen({
     () => (recorder ? { recorder, ...speed } : null),
     [recorder, speed],
   );
-  const copy = useLiveCopy(source, phase === "listening", lenient);
+  /* The calibration in use, as the decoder takes it. Always the microphone
+     here, so it always applies. */
+  const calibration = useMemo(() => {
+    const profile = profileForSource(profiles.find((p) => p.id === profileId) ?? null, true);
+    return profile ? calibrationOf(profile) : null;
+  }, [profiles, profileId]);
+  const copy = useLiveCopy(source, phase === "listening", lenient, calibration);
 
   afterReply.current = () => {
     timer.current = setTimeout(() => {
@@ -611,101 +628,103 @@ export function QsoScreen({
         </div>
       </header>
 
-      {/* The settings, as on the practice page: set once, then left. */}
-      <section className="chartsettings" data-open={String(settingsOpen)}>
-        <div inert={!settingsOpen}>
-          <div className="viewpanel qsopanel" id="view-panel">
-            {/* The practice page's speed sliders. They lock while a session
-                runs: your copy is read at this speed. */}
-            <Section name="speed" title="Speed">
-              <div className="panelgroups">
-                <SpeedSliders
-                  charWpm={speed.charWpm}
-                  farnsworthWpm={speed.farnsworthWpm}
-                  onChange={(patch) => setSpeed({ ...speed, ...patch })}
-                  locked={recorder !== null}
-                />
-              </div>
-            </Section>
-            <Section name="microphone" title="Audio">
-              <div className="panelgroups">
-                <MicrophoneGroup
-                  devices={rec.devices}
-                  deviceId={deviceId}
-                  onDeviceChange={onDeviceChange}
-                  locked={recorder !== null}
-                />
-                <ListeningLevel gainDb={gainDb} onChange={setGainDb} />
-              </div>
-            </Section>
-            <Section name="qso" title="QSO">
-              <div className="panelgroups">
-                <SelectGroup
-                  id="qso-copy"
-                  label="Copy"
-                  help={COPY_HELP}
-                  value={copyMode}
-                  options={COPY_MODES}
-                  onChange={(v) => setCopyMode(v as CopyMode)}
-                />
-                <SelectGroup
-                  id="qso-length"
-                  label="Length"
-                  help={LENGTH_HELP}
-                  value={length}
-                  options={LENGTHS}
-                  onChange={(v) => setLength(v as Length)}
-                />
-              </div>
-            </Section>
-            <Section name="yours" title="Your text">
-              <div className="panelgroups">
-                <SelectGroup
-                  id="qso-your-text"
-                  label="Shows"
-                  help={YOUR_TEXT_HELP}
-                  value={yourText}
-                  options={YOUR_TEXTS}
-                  onChange={(v) => setYourText(v as YourText)}
-                />
+      {/* The settings both pages share, then this page's own. */}
+      <SettingsBand open={settingsOpen}>
+        <SettingsPanel
+          className="qsopanel"
+          audio={{
+            devices: rec.devices,
+            deviceId,
+            onDeviceChange,
+            profiles,
+            profileId,
+            onProfileChange,
+            // Always the microphone here, so a calibration always applies.
+            appliesToTake: true,
+            rereading: false,
+            onCalibrate,
+            // The session holds the microphone open, and its copy is read
+            // through this correction.
+            locked: recorder !== null,
+          }}
+          gainDb={gainDb}
+          onGainDb={setGainDb}
+          modesTitle="Station text modes"
+          modes={
+            <Section name="copy" title="Copy">
+              <div className="aid">
                 <Check
-                  id="qso-show-speed"
-                  label="Speed on each line"
-                  help={SHOW_SPEED_HELP}
-                  checked={showSpeed}
-                  onChange={setShowSpeed}
+                  id="qso-lock-copy"
+                  label="Lock when I send"
+                  help={LOCK_HELP}
+                  checked={lockCopy}
+                  onChange={setLockCopy}
+                />
+                <SelectGroup
+                  id="qso-locked-shows"
+                  label="Once locked, show"
+                  help={LOCKED_SHOWS_HELP}
+                  value={lockedShows}
+                  options={LOCKED_SHOWS}
+                  onChange={(v) => setLockedShows(v as LockedShows)}
                 />
               </div>
             </Section>
-            <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">
-              <span className="uplabel" id="panel-modes">
-                Station text modes
-              </span>
-              <div className="modesrow">
-                <Section name="copy" title="Copy">
-                  <div className="aid">
-                    <Check
-                      id="qso-lock-copy"
-                      label="Lock when I send"
-                      help={LOCK_HELP}
-                      checked={lockCopy}
-                      onChange={setLockCopy}
-                    />
-                    <SelectGroup
-                      id="qso-locked-shows"
-                      label="Once locked, show"
-                      help={LOCKED_SHOWS_HELP}
-                      value={lockedShows}
-                      options={LOCKED_SHOWS}
-                      onChange={(v) => setLockedShows(v as LockedShows)}
-                    />
-                  </div>
-                </Section>
-              </div>
+          }
+        >
+          {/* The practice page's speed sliders. They lock while a session
+              runs: your copy is read at this speed. */}
+          <Section name="speed" title="Speed">
+            <div className="panelgroups">
+              <SpeedSliders
+                charWpm={speed.charWpm}
+                farnsworthWpm={speed.farnsworthWpm}
+                onChange={(patch) => setSpeed({ ...speed, ...patch })}
+                locked={recorder !== null}
+              />
             </div>
-          </div>
-        </div>
-      </section>
+          </Section>
+          <Section name="qso" title="QSO">
+            <div className="panelgroups">
+              <SelectGroup
+                id="qso-copy"
+                label="Copy"
+                help={COPY_HELP}
+                value={copyMode}
+                options={COPY_MODES}
+                onChange={(v) => setCopyMode(v as CopyMode)}
+              />
+              <SelectGroup
+                id="qso-length"
+                label="Length"
+                help={LENGTH_HELP}
+                value={length}
+                options={LENGTHS}
+                onChange={(v) => setLength(v as Length)}
+              />
+            </div>
+          </Section>
+          <Section name="yours" title="Your text">
+            <div className="panelgroups">
+              <SelectGroup
+                id="qso-your-text"
+                label="Shows"
+                help={YOUR_TEXT_HELP}
+                value={yourText}
+                options={YOUR_TEXTS}
+                onChange={(v) => setYourText(v as YourText)}
+              />
+              <Check
+                id="qso-show-speed"
+                label="Speed on each line"
+                help={SHOW_SPEED_HELP}
+                checked={showSpeed}
+                onChange={setShowSpeed}
+              />
+            </div>
+          </Section>
+        </SettingsPanel>
+      </SettingsBand>
 
       <main className="panel qso" data-testid="qso">
         <p className="qsostatus" role="status" aria-live="polite">

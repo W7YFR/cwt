@@ -19,7 +19,8 @@ nothing to the site. The next release carries them.
 - In **Copy**, your copy locks when you start sending or press Enter. **Once locked, show** sets what a locked copy shows before the QSO ends: **Nothing yet**, **The grade**, or **What I got right**.
 - **Speed on each line** on the **QSO** page shows the speed you sent each over at.
 - On the **QSO** page, the station's call stays out of the labels until you have copied it, unless **Station text** is **Whole**.
-- The **QSO** page has the practice page's layout: the station text choice in the header, and the speed sliders, **Microphone**, **Listening level** and the rest under the settings button. Either page sets these for both, and each station answers at your speed until you send QRS or QRQ.
+- The **QSO** page has the practice page's layout: the station text choice in the header, and the speed sliders, the practice page's **Audio** settings and the rest under the settings button. Either page sets these for both, and each station answers at your speed until you send QRS or QRQ.
+- On the **QSO** page, the **Calibration** you choose corrects how your sending is copied, as it does for a recording.
 - **Lenient** copy on the **QSO** page reads your sending at your own spacing and takes a call with one character wrong. **Strict** copy reads it at the set speed.
 
 ## v1.8.1 — 2026-10-15

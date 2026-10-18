@@ -23,7 +23,7 @@
  */
 
 import type { Segment, Timing } from "@/types";
-import { segmentsFrom } from "@/dsp";
+import { segmentsFrom, type Calibration } from "@/dsp";
 import { CHAR_TO_MORSE, SYMBOL_RE, canonicalChar } from "@/morse";
 import { estimateTiming } from "./estimate";
 import { buildTimeline, opensWord } from "./timeline";
@@ -119,13 +119,17 @@ function measured(segments: readonly Segment[], timing: Timing): Timing {
  *
  * With `measure`, the characters and words are read at the sender's own
  * timing once there is enough keying to measure it, not at `timing`. The
- * last character is still held for `timing`'s character gap. */
+ * last character is still held for `timing`'s character gap.
+ *
+ * With `calibration`, the edges are corrected for the microphone path, as a
+ * finished take is: see `segmentsFrom`. */
 export function sentSymbols(
   samples: Float32Array,
   rate: number,
   timing: Timing,
   toneHz?: number,
   measure = false,
+  calibration?: Calibration,
 ): Sent {
   const none = { symbols: [], text: "", keying: null, quietSec: 0, toneHz: toneHz ?? 0, segments: [] };
   if (samples.length === 0) return none;
@@ -139,7 +143,10 @@ export function sentSymbols(
   const scaled = new Float32Array(samples.length);
   for (let i = 0; i < samples.length; i++) scaled[i] = samples[i]! / peak;
 
-  const found = segmentsFrom(scaled, rate, toneHz !== undefined ? { toneHz } : {});
+  const found = segmentsFrom(scaled, rate, {
+    ...(toneHz !== undefined ? { toneHz } : {}),
+    ...(calibration ? { calibration } : {}),
+  });
   const { segments } = found;
   const { chars } = buildTimeline(segments, measure ? measured(segments, timing) : timing);
   const last = chars[chars.length - 1];
@@ -392,14 +399,17 @@ export class LiveCopy {
   private readonly audio: Decimator;
   private readonly timing: Timing;
   private readonly measure: boolean;
+  private readonly calibration: Calibration | undefined;
   private toneHz: number | undefined;
 
-  /** With `measure`, the over is read at the sender's own timing. See
+  /** With `measure`, the over is read at the sender's own timing. With
+   *  `calibration`, its edges are corrected for the microphone path. See
    *  `sentSymbols`. */
-  constructor(rate: number, timing: Timing, measure = false) {
+  constructor(rate: number, timing: Timing, measure = false, calibration?: Calibration) {
     this.audio = new Decimator(rate);
     this.timing = timing;
     this.measure = measure;
+    this.calibration = calibration;
   }
 
   push(samples: Float32Array): void {
@@ -413,6 +423,7 @@ export class LiveCopy {
       this.timing,
       this.toneHz,
       this.measure,
+      this.calibration,
     );
     if (this.toneHz === undefined && sent.symbols.length >= TONE_LOCK_CHARS) {
       this.toneHz = sent.toneHz;

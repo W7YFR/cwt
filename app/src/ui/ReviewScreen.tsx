@@ -25,6 +25,7 @@ import {
   ChartSettingsButton,
   ChartSettingsPanel,
   Controls,
+  SettingsBand,
   ViewControls,
   fitSpeed,
 } from "./Controls";
@@ -893,36 +894,30 @@ export function ReviewScreen({
         </div>
       </header>
 
-      {/* Always in the tree, open or not: a band that is only rendered while
-          open has nothing to roll down FROM, and a closed one has to be
-          unreachable rather than merely invisible — `inert` takes it out of
-          the tab order and off the accessibility tree together, which two
-          attributes doing half each would eventually disagree about. */}
-      <section className="chartsettings" data-open={String(chartSettings)} ref={panelRef}>
-        <div inert={!chartSettings || recording} data-locked={recording}>
-          <ChartSettingsPanel
-            settings={settings}
-            runs={stack.length}
-            onChange={onChange}
-            loop={loop}
-            onLoop={() => setLoop((on) => !on)}
-            /* The setup goes behind the settings button, like everything else
-               that is not the loop: which microphone, what to correct it by,
-               and how loud to play it back. */
-            audio={{
-              devices: rec.devices,
-              deviceId,
-              onDeviceChange,
-              profiles,
-              profileId,
-              onProfileChange: chooseProfile,
-              appliesToTake: loaded.take.source === MIC_SOURCE,
-              rereading,
-              onCalibrate,
-            }}
-          />
-        </div>
-      </section>
+      {/* Always in the tree, open or not: see SettingsBand. */}
+      <SettingsBand open={chartSettings} locked={recording} bandRef={panelRef}>
+        <ChartSettingsPanel
+          settings={settings}
+          runs={stack.length}
+          onChange={onChange}
+          loop={loop}
+          onLoop={() => setLoop((on) => !on)}
+          /* The setup goes behind the settings button, like everything else
+             that is not the loop: which microphone, what to correct it by,
+             and how loud to play it back. */
+          audio={{
+            devices: rec.devices,
+            deviceId,
+            onDeviceChange,
+            profiles,
+            profileId,
+            onProfileChange: chooseProfile,
+            appliesToTake: loaded.take.source === MIC_SOURCE,
+            rereading,
+            onCalibrate,
+          }}
+        />
+      </SettingsBand>
 
       {/* Locked while a take runs, with the scores, the report, the settings
           panel and the header's corner. What is sent, how fast and against

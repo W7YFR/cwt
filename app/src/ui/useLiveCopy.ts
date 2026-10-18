@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Copy } from "@/timing/live";
+import type { Calibration } from "@/dsp";
 import type { CopyAudio, CopyRead, CopyStart } from "./copy.worker";
 import type { LiveSource } from "./useLiveProgress";
 
@@ -22,11 +23,13 @@ export interface OverCopy extends Copy {
 const NONE: OverCopy = { text: "", keying: null, over: false, sentWpm: null, turn: 0 };
 
 /** With `lenient`, the over is read at the sender's own timing once there is
- *  enough of it to measure. A change takes effect at the next session. */
+ *  enough of it to measure. With `calibration`, its edges are corrected for
+ *  the microphone path. Either takes effect at the next over. */
 export function useLiveCopy(
   source: LiveSource | null,
   listening: boolean,
   lenient: boolean,
+  calibration: Calibration | null = null,
 ): OverCopy {
   const [copy, setCopy] = useState<OverCopy>(NONE);
   const recorder = source?.recorder ?? null;
@@ -37,6 +40,8 @@ export function useLiveCopy(
   hearing.current = listening;
   const loose = useRef(lenient);
   loose.current = lenient;
+  const correction = useRef(calibration);
+  correction.current = calibration;
 
   useEffect(() => {
     setCopy(NONE);
@@ -66,6 +71,7 @@ export function useLiveCopy(
         charWpm,
         farnsworthWpm,
         lenient: loose.current,
+        calibration: correction.current,
       };
       worker.postMessage(start);
     };

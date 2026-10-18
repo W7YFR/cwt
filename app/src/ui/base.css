@@ -525,9 +525,6 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
    calibration onto a line of its own. */
 .viewpanel [data-panel="audio"] .panelgroups { column-gap: 12px; }
 .viewpanel [data-panel="audio"] select { width: 140px; text-overflow: ellipsis; }
-/* The QSO page's microphone, alone in its column: its select fills it, and a
-   long name ends in an ellipsis rather than widening the column. */
-.viewpanel [data-panel="microphone"] select { width: 180px; text-overflow: ellipsis; }
 /* Out of the flow while empty, so it takes no gap. Not hidden: a live region
    that is not rendered does not announce what is written into it. */
 .viewpanel [data-panel="audio"] .hint:empty { position: absolute; }
@@ -2368,8 +2365,7 @@ header .modeswitch button { white-space: nowrap; }
   .viewpanel.qsopanel, .viewpanel.qsopanel .modesrow { grid-template-columns: 1fr; }
 }
 .viewpanel [data-panel="speed"] label { white-space: nowrap; }
-.viewpanel [data-panel="speed"] input[type="range"],
-.viewpanel [data-panel="microphone"] input[type="range"] { width: 180px; }
+.viewpanel [data-panel="speed"] input[type="range"] { width: 180px; }
 
 /* A locked copy that shows only what you got right: the rest are dots. */
 .qsolog .rightonly .unknown { color: var(--ink-faint); }

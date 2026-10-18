@@ -4,7 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
-import { LiveCopy, overEnded } from "@/timing/live";
+import { LiveCopy, overEnded, sentSymbols } from "@/timing/live";
+import type { Calibration } from "@/dsp";
 import {
   answer,
   erased,
@@ -817,5 +818,37 @@ describe("QRQ and QRS past the last step", () => {
   it("goes on with the rest of an over with QRQ in it", () => {
     const q = at(40, 40);
     expect(answer(q, `${q.them.call} DE W7YFR UR 599 QRQ KN`, FIRST).qso.stage).toBe("exchanged");
+  });
+});
+
+describe("copying an over through a calibration", () => {
+  it("corrects the edges, and reads the over the same", () => {
+    // A microphone path that holds each mark 8 ms long, and the profile that
+    // takes it back off.
+    const timing = targetTiming(25);
+    const text = "CQ DE W7YFR K";
+    const clean = synthesize(text, timing, { rate: 48000, padSec: 0.3 }).samples;
+    const tail = new Float32Array(clean.length + 48000 * 3);
+    tail.set(clean);
+    const read = (calibration?: Calibration) => {
+      const copy = new LiveCopy(48000, timing, false, calibration);
+      for (let k = 0; k < tail.length; k += 128) copy.push(tail.subarray(k, k + 128));
+      return copy.step();
+    };
+    const cal: Calibration = { wpm: 25, releaseOffsetSec: 0.008, spreadSec: 0.001, elements: 40 };
+    expect(read().text).toBe(text);
+    const corrected = read(cal);
+    expect(corrected.text).toBe(text);
+    expect(corrected.over).toBe(true);
+
+    // The correction is applied: each mark comes out 8 ms shorter.
+    const marks = (calibration?: Calibration) =>
+      sentSymbols(tail, 48000, timing, undefined, false, calibration)
+        .segments.filter((g) => g[0] === 1)
+        .map((g) => g[1]);
+    const plain = marks();
+    const fixed = marks(cal);
+    expect(fixed).toHaveLength(plain.length);
+    for (let i = 0; i < plain.length; i++) expect(plain[i]! - fixed[i]!).toBeCloseTo(0.008, 3);
   });
 });
