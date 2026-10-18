@@ -1131,7 +1131,11 @@ export function QsoScreen({
       </SettingsBand>
 
       {helpOpen && (
-        <QsoHelp onClose={() => setHelpOpen(false)} onSettings={() => setSettingsOpen(true)} />
+        <QsoHelp
+          onClose={() => setHelpOpen(false)}
+          onSettings={() => setSettingsOpen(true)}
+          settingsOpen={settingsOpen}
+        />
       )}
 
       <main className="panel qso" data-testid="qso">
@@ -1192,7 +1196,7 @@ export function QsoScreen({
 
         {guideShown && (
           <div className="qsoguide prose" data-testid="qso-guide">
-            <QsoGuide onSettings={() => setSettingsOpen(true)} />
+            <QsoGuide onSettings={() => setSettingsOpen(true)} settingsOpen={settingsOpen} />
           </div>
         )}
 

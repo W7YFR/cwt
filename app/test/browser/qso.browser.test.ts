@@ -89,14 +89,27 @@ async function click(el: HTMLElement | null): Promise<void> {
   await act(async () => el!.click());
 }
 
-/** Choose what shows of the station's overs, in the settings. */
-async function showTheirs(value: string): Promise<void> {
+/** Choose what shows of the station's overs, in the settings: one of the
+ *  buttons, by its label. */
+async function showTheirs(label: string): Promise<void> {
   if ($('[data-testid="panel-toggle"]')?.getAttribute("aria-pressed") !== "true") {
     await click($('[data-testid="panel-toggle"]'));
   }
-  await act(async () => {
-    await userEvent.selectOptions($<HTMLSelectElement>("#qso-their-text")!, value);
-  });
+  const button = $$<HTMLButtonElement>('[data-testid="qso-their-text"] button').find(
+    (b) => b.textContent === label,
+  );
+  await click(button ?? null);
+  expect(button!.getAttribute("aria-pressed")).toBe("true");
+}
+
+/** One row of a graded copy, as read: yours over the station's, each a
+ *  column's text, words split where the columns are. */
+function row(graded: Element, side: "yourcopy" | "sentcopy"): string {
+  return [...graded.querySelectorAll(".cword")]
+    .map((w) => [...w.querySelectorAll(`.${side}`)].map((c) => c.textContent).join(""))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Move the slider `id` to `value`, as a drag would. */
@@ -234,7 +247,7 @@ describe("copying the station", () => {
     const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
 
     // Copy on mid-QSO: the over already read gets no box.
-    await showTheirs("copy");
+    await showTheirs("Copy");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
 
     await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
@@ -255,13 +268,9 @@ describe("copying the station", () => {
     expect(boxes()).toHaveLength(0);
     const graded = $$(".qsolog .graded");
     expect(graded).toHaveLength(2);
-    // Your copy as typed, then what was sent, then the count.
-    expect(graded[0]!.querySelector('[data-testid="qso-your-copy"]')!.textContent).toBe(
-      `W7YFR DE ${call}`,
-    );
-    expect(graded[0]!.querySelector('[data-testid="qso-sent-copy"]')!.textContent).toMatch(
-      new RegExp(`^W7YFR DE ${call} `),
-    );
+    // Your copy as typed, over what was sent, then the count.
+    expect(row(graded[0]!, "yourcopy")).toBe(`W7YFR DE ${call}`);
+    expect(row(graded[0]!, "sentcopy")).toMatch(new RegExp(`^W7YFR DE ${call} `));
     expect(graded[0]!.querySelector(".copied")!.textContent).toMatch(/^\d+ of \d+ copied$/);
     expect(note()).toBe("The QSO is over. Call CQ for the next one.");
   }, QSO_MS);
@@ -306,8 +315,8 @@ describe("your speed", () => {
     expect(field("wpm").closest("[inert]"), "locked while it runs").not.toBeNull();
     expect(field("input-device").closest("[inert]"), "the microphone too").not.toBeNull();
     expect(field("calibration").closest("[inert]"), "and its calibration").not.toBeNull();
-    expect(field("qso-length").closest("[inert]"), "the rest can still change").toBeNull();
-    expect(field("qso-their-text").closest("[inert]"), "and what shows").toBeNull();
+    expect($('[data-testid="qso-length"]')!.closest("[inert]"), "the rest can still change").toBeNull();
+    expect($('[data-testid="qso-their-text"]')!.closest("[inert]"), "and what shows").toBeNull();
   }, QSO_MS);
 });
 
@@ -349,17 +358,19 @@ describe("copy mode options", () => {
       await userEvent.keyboard("{Enter}");
     });
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
-    expect($('.qsolog [data-testid="qso-your-copy"]')?.textContent).toBe("W7YFR DE");
+    // Spaces aside: lined up with the station's answer, which varies, your
+    // copy can take a column's space between its characters.
+    expect(row($(".qsolog .graded")!, "yourcopy").replace(/ /g, "")).toBe("W7YFRDE");
     expect($('[data-testid="qso-stop"]'), "Enter did not stop the session").not.toBeNull();
 
   }, QSO_MS);
 
-  it("shows only what you got right, when asked, and the rest as dots", async () => {
+  it("shows only your copy marked, when asked, with a blank for each character left out", async () => {
     // The exchange, which always opens with your call and DE. The answer to
     // the CQ has wordings that do not.
     await open({ qsoTheirText: "before", qsoLockedShows: "right" });
     const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
-    await showTheirs("copy");
+    await showTheirs("Copy");
     await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     await act(async () => {
@@ -371,12 +382,15 @@ describe("copy mode options", () => {
     });
     const shown = $('[data-testid="qso-right-only"]');
     expect(shown).not.toBeNull();
-    // Your copy, W7YFR DE, as typed: each character right, nothing marked
-    // wrong, and nothing of the station's line or the count shown.
-    expect(shown!.textContent).toBe("W7YFR DE");
+    // Your copy, W7YFR DE, as typed: each character right. The rest of the
+    // station's line is blanks, each marked missed, so the copy does not look
+    // whole. Nothing of the station's characters or the count shows.
+    expect(shown!.textContent!.trimEnd()).toBe("W7YFR DE");
     expect(shown!.querySelectorAll(".cright")).toHaveLength(7);
-    expect(shown!.querySelectorAll(".cwrong")).toHaveLength(0);
-    expect($('.qsolog [data-testid="qso-sent-copy"]'), "the station's line kept back").toBeNull();
+    const missed = [...shown!.querySelectorAll(".cwrong")];
+    expect(missed.length).toBeGreaterThan(0);
+    expect(missed.every((m) => m.textContent === " "), "missed as blanks").toBe(true);
+    expect($(".qsolog .sentcopy"), "the station's line kept back").toBeNull();
     expect($(".qsolog .copied"), "no count").toBeNull();
     // Right is a blue dot under the character. The copy is grey, as the
     // station's side is, not your blue.
@@ -448,9 +462,13 @@ describe("anatomy of a QSO", () => {
     expect(guide()!.querySelectorAll(".qsoexample").length).toBe(1);
     expect($('[data-testid="qso-help-open"]'), "no ? while the guide is on the page").toBeNull();
 
-    // Its settings link opens the settings.
+    // Its settings link opens the settings. Open, it points at them instead.
     await click($('[data-testid="qso-guide-settings"]'));
     expect($('[data-testid="panel-toggle"]')!.getAttribute("aria-pressed")).toBe("true");
+    expect($('[data-testid="qso-guide-settings"]')).toBeNull();
+    expect(guide()!.textContent).toContain(
+      "Change your speed and configure the QSO parameters in the settings panel.",
+    );
 
     await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
     await click($('[data-testid="qso-start"]'));
@@ -523,4 +541,42 @@ describe("the session's own words", () => {
   }, QSO_MS);
 });
 
+describe("pausing and going on", () => {
+  it("pauses, then goes on with the station's last over played again, on its own line", async () => {
+    await open({ qsoTheirText: "before" });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const lines = () => $$(".qsolog li").length;
+    const before = lines();
 
+    await click($('[data-testid="qso-pause"]'));
+    expect($('[data-testid="qso-stop"]')).toBeNull();
+    expect($('[data-testid="qso-continue"]')?.textContent).toContain("Continue");
+    expect(status()).toBe("Press Continue to go on with the QSO.");
+    expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual(["R", "Enter"]);
+    // Paused, the QSO is not over: the station's call stays as it was.
+    expect(note()).toBe("");
+
+    await click($('[data-testid="qso-continue"]'));
+    await until("the last over to play again", () => status() === "The other station is sending.");
+    await until("the turn to come back", () => yourTurn());
+    expect(lines(), "played again, not added").toBe(before);
+  }, QSO_MS);
+
+  it("comes back after a reload, to go on with", async () => {
+    await open({ qsoTheirText: "before" });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const shown = $(".qsolog")!.textContent;
+
+    // The page goes, without a Stop, and comes back.
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount({ qsoTheirText: "before" });
+    expect($(".qsolog")!.textContent).toBe(shown);
+    await until("the Continue button", () => {
+      const b = $<HTMLButtonElement>('[data-testid="qso-continue"]');
+      return !!b && !b.disabled;
+    });
+    expect(status()).toBe("Press Continue to go on with the QSO.");
+    expect($('[data-testid="qso-guide"]')).toBeNull();
+  }, QSO_MS);
+});

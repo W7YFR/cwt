@@ -596,6 +596,32 @@ describe("showing an over", () => {
     expect(g.sent.filter((m) => m.ok === false).map((m) => m.text)).toEqual(["M"]);
   });
 
+  it("lines a character up with the one sent next to it, past a gap", () => {
+    const sent = "W7YFR DE K1NO R R TNX FER RPT GM OM RST 569 569 BK";
+    const g = gradeCopy(sent, "W7YFR DE K1NO R R TNX FER ... RST 569 569 BK");
+    // The R of FER is right; what the gap stands for is missed.
+    const missed = g.sent.filter((m) => m.ok === false).map((m) => m.text).join("");
+    expect(missed).toBe("RPTGMOM");
+    expect(g.right).toBe(30);
+    expect(g.total).toBe(37);
+  });
+
+  it("sets your copy over the station's line, column by column", () => {
+    const g = gradeCopy("W7YFR DE K1NO FB OM NAME HR AL AL BK", "W7YFR DE K1NO ... HR AL AL BK");
+    /** A row as drawn: each column as wide as its wider side. */
+    const draw = (side: "yours" | "sent") =>
+      g.columns
+        .map((c) => {
+          const w = Math.max(...[c.yours, c.sent].map((ms) => ms.map((m) => m.text).join("").length));
+          return c[side].map((m) => m.text).join("").padEnd(w);
+        })
+        .join("");
+    const yours = draw("yours");
+    const sent = draw("sent");
+    expect(yours.indexOf("HR AL AL BK")).toBe(sent.indexOf("HR AL AL BK"));
+    expect(yours.indexOf("...")).toBe(sent.indexOf("FB"));
+  });
+
   it("marks what you did not copy missed, and nothing as yours", () => {
     const g = gradeCopy("NAME BOB", "NAME");
     expect(g.right).toBe(4);

@@ -17,7 +17,14 @@ import { examples } from "@/qso/examples";
 
 /** The guide itself: what a QSO is, a worked example, and what to send. On
  *  the page before the first QSO, and in the help after it. */
-export function QsoGuide({ onSettings }: { onSettings(): void }): React.ReactElement {
+export function QsoGuide({
+  onSettings,
+  settingsOpen,
+}: {
+  onSettings(): void;
+  /** The settings are open already: the guide points at them, not to them. */
+  settingsOpen: boolean;
+}): React.ReactElement {
   const shown = useMemo(() => examples(), []);
   return (
     <>
@@ -60,13 +67,17 @@ export function QsoGuide({ onSettings }: { onSettings(): void }): React.ReactEle
         <li>If you get stuck, send what the station asked for.</li>
       </ul>
 
-      <p>
-        Open the{" "}
-        <button type="button" className="link" data-testid="qso-guide-settings" onClick={onSettings}>
-          settings
-        </button>{" "}
-        to change your speed and configure the QSO parameters.
-      </p>
+      {settingsOpen ? (
+        <p>Change your speed and configure the QSO parameters in the settings panel.</p>
+      ) : (
+        <p>
+          Open the{" "}
+          <button type="button" className="link" data-testid="qso-guide-settings" onClick={onSettings}>
+            settings
+          </button>{" "}
+          to change your speed and configure the QSO parameters.
+        </p>
+      )}
     </>
   );
 }
@@ -75,8 +86,10 @@ export function QsoGuide({ onSettings }: { onSettings(): void }): React.ReactEle
 export function QsoHelp({
   onClose,
   onSettings,
+  settingsOpen,
 }: {
   onClose(): void;
+  settingsOpen: boolean;
   /** Open the settings. The help closes first, so they are in view. */
   onSettings(): void;
 }): React.ReactElement {
@@ -110,6 +123,7 @@ export function QsoHelp({
         <h2 id="qsohelp-title">Anatomy of a QSO</h2>
         <div className="prose">
           <QsoGuide
+            settingsOpen={settingsOpen}
             onSettings={() => {
               onClose();
               onSettings();
