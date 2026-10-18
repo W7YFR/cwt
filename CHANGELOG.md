@@ -20,6 +20,10 @@ nothing to the site. The next release carries them.
 
 - A message pasted into **Intended message** keeps its line breaks as breaks.
 
+### Development
+
+- Claude runs `make pr` when the contributor asks for it in that message.
+
 ## v1.9.0 — 2026-10-18
 
 ### Added

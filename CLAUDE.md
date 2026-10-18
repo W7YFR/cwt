@@ -2,13 +2,14 @@
 
 ## Workflow
 
-The contributor runs every release step. Claude may create the branch, since
-starting a task starts there. Claude commits only when the contributor asks
-for a commit in that message, never on its own: every commit needs human
-review first. An earlier ask does not carry over. Claude never runs
-`make bump`, `make pr`,
-`make release` or `make tag`, never pushes, and never opens, edits or merges
-a pull request.
+The contributor runs the release steps, and may ask Claude to run `make pr`.
+Claude may create the branch, since starting a task starts there. Claude
+commits only when the contributor asks for a commit in that message, never on
+its own: every commit needs human review first. An earlier ask does not carry
+over. Claude runs `make pr` on the same terms: only when the contributor asks
+for it in that message. Otherwise Claude never pushes, and never opens, edits
+or merges a pull request. Claude never runs `make bump`, `make release` or
+`make tag`.
 
 When asked, Claude stages work for review. Work on several changes at once
 can then be committed in parts: Claude stages the hunks for one part, and the
@@ -25,9 +26,9 @@ such as `fix: caption a matched prosign`. It has no body and no trailer.
    Claude to.
 3. The contributor may ask for `/changelog-check`, which verifies the entry
    against the diff.
-4. The contributor runs `make pr`. It bumps the version, pushes, and opens
-   the pull request. The title is `[TYPE] vX.Y.Z`. The body is the branch's
-   changelog entry. A second run updates the pull request.
+4. The contributor runs `make pr`, or asks Claude to. It bumps the version,
+   pushes, and opens the pull request. The title is `[TYPE] vX.Y.Z`. The body
+   is the branch's changelog entry. A second run updates the pull request.
 5. The contributor merges when CI is green.
 6. The contributor runs `make release`. It updates `main`, tags and pushes
    the version with the entry as its notes, and deletes the merged branch.
