@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.13.1 — 2026-10-19
+
 ### Fixed
 
 - After an update, a reload no longer hangs on "looking for your last session…" while CWT is open in another tab. The page asks you to close that tab, then opens.
