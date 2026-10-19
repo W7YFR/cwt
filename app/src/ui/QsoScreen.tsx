@@ -84,9 +84,14 @@ const TYPING_QUIET_MS = 1200;
  *  sending. A prosign alone, as <SK>, is meant. */
 const NOISE_RE = /^[^KR?<]$/;
 
-/** Characters you must have sent before the page takes it that you are
- *  sending, and locks or grades your copy. */
-const SENDING_CHARS = 3;
+/** Whether what the decoder has read so far is you sending, which locks or
+ *  grades your copy. The decoder reads a character only from a narrow tone
+ *  above the level floor, so noise does not make one. A bumped paddle does:
+ *  one dit or one dah. So one character counts unless it is E or T. */
+function isSending(text: string): boolean {
+  const chars = text.replace(/\s+/g, "");
+  return chars.length >= 2 || (chars.length === 1 && chars !== "E" && chars !== "T");
+}
 
 /** The longest one over may run. The recording starts over at each over. */
 const MAX_OVER_SEC = 600;
@@ -715,14 +720,12 @@ export function QsoScreen({
     sendReply(line.text, qso.current.them, speed, n, at);
   };
 
-  /* You have begun sending: at least `SENDING_CHARS` characters read back. A
-     single character, or one still being keyed, is as often a click, a bump
-     of the key or the room ringing after the reply as it is you, and taken as
-     sending it locked or graded a copy while it was still being typed. */
+  /* You have begun sending: see `isSending`. Only characters read back, not
+     one still being keyed. */
   const sending =
     phase === "listening" &&
     copy.turn !== answered.current &&
-    copy.text.replace(/\s+/g, "").length >= SENDING_CHARS;
+    isSending(copy.text);
 
   /* Your next over has begun: the copy of the QSO before is done. */
   useEffect(() => {

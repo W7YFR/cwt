@@ -56,6 +56,13 @@ describe("copy mode options", () => {
     expect($('[data-testid="qso-locked"]')).toBeNull();
   });
 
+  it("locks it on the first character of more than one element", async () => {
+    await copyAnswer({});
+    await key("K");
+    await until("the copy to lock", () => $('[data-testid="qso-locked"]') !== null);
+    expect($$('[data-testid="qso-type"]')).toHaveLength(0);
+  });
+
   it("locks it on Enter, and grades it at once when asked", async () => {
     const box = await copyAnswer({ qsoLockedShows: "grade" });
     box.focus();
