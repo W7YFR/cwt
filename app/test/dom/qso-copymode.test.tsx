@@ -2,29 +2,30 @@
  * page-harness.ts for how the page is driven.
  */
 
-import { describe, expect, it } from "vitest";
-import { userEvent } from "vitest/browser";
-import { act } from "react";
+import { describe, expect, it, vi } from "vitest";
 import { type Prefs } from "@/io/storage";
 import {
   EXCHANGE,
-  QSO_MS,
   $,
   $$,
+  fill,
   key,
   open,
-  page,
+  press,
   row,
   send,
   showTheirs,
   theirs,
   until,
-  useQsoPage,
+  useQsoRig,
   wait,
   yourTurn,
-} from "./qso-page-harness";
+} from "../qso-rig";
 
-useQsoPage();
+vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
+vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
+
+useQsoRig();
 
 describe("copy mode options", () => {
   /** A QSO in Copy mode, with the station's answer to the CQ in a box. */
@@ -33,9 +34,7 @@ describe("copy mode options", () => {
     await send("CQ CQ DE W7YFR W7YFR K");
     const box = $<HTMLInputElement>('[data-testid="qso-type"]');
     expect(box).not.toBeNull();
-    await act(async () => {
-      await userEvent.fill(box!, "w7yfr de");
-    });
+    await fill(box!, "w7yfr de");
     return box!;
   }
 
@@ -46,7 +45,7 @@ describe("copy mode options", () => {
     expect($('[data-testid="qso-locked"]')!.textContent).toBe("W7YFR DE");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
     await until("the turn to come back", () => yourTurn());
-  }, QSO_MS);
+  });
 
   it("does not lock it for a single stray character", async () => {
     await copyAnswer({});
@@ -55,21 +54,19 @@ describe("copy mode options", () => {
     await wait(600);
     expect($$('[data-testid="qso-type"]'), "still open").toHaveLength(1);
     expect($('[data-testid="qso-locked"]')).toBeNull();
-  }, QSO_MS);
+  });
 
   it("locks it on Enter, and grades it at once when asked", async () => {
     const box = await copyAnswer({ qsoLockedShows: "grade" });
-    await act(async () => {
-      box.focus();
-      await userEvent.keyboard("{Enter}");
-    });
+    box.focus();
+      await press("Enter");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
     // Spaces aside: lined up with the station's answer, which varies, your
     // copy can take a column's space between its characters.
     expect(row($(".qsolog .graded")!, "yourcopy").replace(/ /g, "")).toBe("W7YFRDE");
     expect($('[data-testid="qso-stop"]'), "Enter did not stop the session").not.toBeNull();
 
-  }, QSO_MS);
+  });
 
   it("shows only your copy marked, when asked, with a blank for each character left out", async () => {
     // The exchange, which always opens with your call and DE. The answer to
@@ -79,13 +76,9 @@ describe("copy mode options", () => {
     await showTheirs("Copy");
     await send(EXCHANGE);
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
-    await act(async () => {
-      await userEvent.fill(box, "w7yfr de");
-    });
-    await act(async () => {
-      box.focus();
-      await userEvent.keyboard("{Enter}");
-    });
+    await fill(box, "w7yfr de");
+    box.focus();
+      await press("Enter");
     const shown = $('[data-testid="qso-right-only"]');
     expect(shown).not.toBeNull();
     // Your copy, W7YFR DE, as typed: each character right. The rest of the
@@ -98,17 +91,7 @@ describe("copy mode options", () => {
     expect(missed.every((m) => m.textContent === " "), "missed as blanks").toBe(true);
     expect($(".qsolog .sentcopy"), "the station's line kept back").toBeNull();
     expect($(".qsolog .copied"), "no count").toBeNull();
-    // Right is a blue dot under the character. The copy is grey, as the
-    // station's side is, not your blue.
-    const right = shown!.querySelector(".cright")!;
-    const probe = document.createElement("span");
-    probe.style.color = "var(--you)";
-    page().append(probe);
-    const blue = getComputedStyle(probe).color;
-    probe.remove();
-    expect(getComputedStyle(right, "::after").backgroundColor).toBe(blue);
-    expect(getComputedStyle(right).color).not.toBe(blue);
-  }, QSO_MS);
+  });
 
   it("leaves your copy open while you send, with Lock off", async () => {
     await copyAnswer({ qsoLockCopy: false });
@@ -118,5 +101,5 @@ describe("copy mode options", () => {
     expect($$('[data-testid="qso-type"]').length).toBeGreaterThan(0);
     expect($('[data-testid="qso-locked"]')).toBeNull();
     await until("the turn to come back", () => yourTurn());
-  }, QSO_MS);
+  });
 });

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Copy, CopyStats } from "@/timing/live";
 import { micLog } from "@/micdebug";
 import type { Calibration } from "@/dsp";
-import type { CopyAudio, CopyRead, CopyStart } from "./copy.worker";
+import type { CopyAudio, CopyRead, CopyStart } from "./copyPass";
 import type { LiveSource } from "./useLiveProgress";
 
 const READ_EVERY_MS = 75;

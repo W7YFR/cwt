@@ -1,27 +1,28 @@
 /* Copying the station: the copy boxes through a whole QSO, and the station's
- * label. See qso-page-harness.ts for how the page is driven.
+ * label. See qso-rig.tsx for how the page is driven.
  */
 
-import { describe, expect, it } from "vitest";
-import { userEvent } from "vitest/browser";
-import { act } from "react";
+import { describe, expect, it, vi } from "vitest";
 import {
   EXCHANGE,
-  QSO_MS,
   $,
   $$,
   callIn,
   click,
+  fill,
   note,
   open,
   row,
   send,
   showTheirs,
   theirs,
-  useQsoPage,
-} from "./qso-page-harness";
+  useQsoRig,
+} from "../qso-rig";
 
-useQsoPage();
+vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
+vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
+
+useQsoRig();
 
 describe("copying the station", () => {
   it("keeps the copy open after the last over, and grades it on request", async () => {
@@ -36,16 +37,12 @@ describe("copying the station", () => {
     await send(EXCHANGE);
     const boxes = () => $$<HTMLInputElement>('[data-testid="qso-type"]');
     expect(boxes()).toHaveLength(1);
-    await act(async () => {
-      await userEvent.fill(boxes()[0]!, `w7yfr de ${call}`);
-    });
+    await fill(boxes()[0]!, `w7yfr de ${call}`);
 
     await send("R TNX 73 <SK>");
     expect(boxes(), "both boxes open after the last over").toHaveLength(2);
     expect(note()).toContain("Finish your copy");
-    await act(async () => {
-      await userEvent.fill(boxes()[1]!, "tu 73");
-    });
+    await fill(boxes()[1]!, "tu 73");
 
     await click($('[data-testid="qso-grade"]'));
     expect(boxes()).toHaveLength(0);
@@ -56,7 +53,7 @@ describe("copying the station", () => {
     expect(row(graded[0]!, "sentcopy")).toMatch(new RegExp(`^W7YFR DE ${call} `));
     expect(graded[0]!.querySelector(".copied")!.textContent).toMatch(/^\d+ of \d+ copied$/);
     expect(note()).toBe("The QSO is over. Call CQ for the next one.");
-  }, QSO_MS);
+  });
 
   it("labels the station's lines Station until you have its call", async () => {
     await open({ qsoTheirText: "copy" });
@@ -68,5 +65,5 @@ describe("copying the station", () => {
     // Stop ends the QSO, and its call shows.
     await click($('[data-testid="qso-stop"]'));
     expect(label()).toMatch(/^[A-Z0-9]?[A-Z]\d[A-Z]+$/);
-  }, QSO_MS);
+  });
 });
