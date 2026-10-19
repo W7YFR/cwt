@@ -18,6 +18,7 @@ nothing to the site. The next release carries them.
 - On the **QSO** page, the session stops when a QSO ends. **Start** begins the next one.
 - The **QSO** page's settings are grouped by subject, **The other station**, **You** and **After a QSO**. Each setting says what it does, such as **How much it sends** for Length, and a line under each choice explains the option chosen.
 - The **Practice** page's settings take the same form: **While I record**, **The message**, **Grading**, **The chart** and **On the page**, each setting named for what it does, such as **Shrink long pauses** for Collapse rests. **Listening level** is now **Playback volume** on both pages.
+- In the settings, each setting's explanation shows from a **?** at the end of its row, not as a tooltip over the whole setting.
 
 ## v1.12.0 — 2026-10-19
 
