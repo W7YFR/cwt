@@ -8,14 +8,16 @@ import {
   $,
   $$,
   click,
+  ended,
   fill,
+  key,
   lastSent,
-  note,
   open,
   row,
   send,
   showTheirs,
   theirs,
+  until,
   useQsoRig,
 } from "../qso-rig";
 
@@ -41,9 +43,12 @@ describe("copying the station", () => {
     const typed = lastSent().split(" ").slice(0, 3).join(" ");
     await fill(boxes()[0]!, typed.toLowerCase());
 
-    await send("R TNX 73 <SK>");
+    const before = theirs().length;
+    await key("R TNX 73 <SK>");
+    await until("the last over", () => theirs().length > before);
+    await until("the session to stop", ended);
     expect(boxes(), "both boxes open after the last over").toHaveLength(2);
-    expect(note()).toContain("Finish your copy");
+    expect($('[data-testid="qso-grade"]'), "the copy waits to be graded").not.toBeNull();
     await fill(boxes()[1]!, "tu 73");
 
     await click($('[data-testid="qso-grade"]'));
@@ -54,7 +59,7 @@ describe("copying the station", () => {
     expect(row(graded[0]!, "yourcopy")).toBe(typed);
     expect(row(graded[0]!, "sentcopy").startsWith(`${typed} `)).toBe(true);
     expect(graded[0]!.querySelector(".copied")!.textContent).toMatch(/^\d+ of \d+ copied$/);
-    expect(note()).toBe("The QSO is over. Call CQ for the next one.");
+    expect($('[data-testid="qso-tape"]'), "the QSO can be played back").not.toBeNull();
   });
 
   it("labels the station's lines Station until you have its call", async () => {

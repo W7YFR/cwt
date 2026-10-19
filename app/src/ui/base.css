@@ -2438,34 +2438,217 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .lwpm { margin-left: auto; padding-left: 12px; color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
 /* Your speed in your blue, so whose speed is whose reads at a glance. */
 .qsolog .you .lwpm { color: var(--you); }
+/* The end of a row: the speed and the play button, centered together on the
+   row's first line of text, whatever the text below it wraps to. */
+.qsolog .lend {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 1.5em;
+  padding-left: 12px;
+}
+.qsolog .lend .lwpm { margin-left: 0; padding-left: 0; }
+.qsolog .qsoplay { width: 24px; height: 24px; font-size: 11px; }
+/* Play QSO and Download, under the last line of a QSO that is over, lined up
+   with the text. */
+.qsolog .qsotape { padding-left: calc(8ch + 12px); gap: 8px; }
+.qsolog .qsotape button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+.qsolog .qsotape .ico { margin-right: 6px; font-style: normal; }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }
 
-/* The QSO page's settings, on columns a little wider than the practice
-   page's: Overall (Farnsworth) and its reading need the room, one over the
-   other with Character speed in the Speed column. */
-.viewpanel.qsopanel,
-.viewpanel.qsopanel .pagerow,
-.viewpanel.qsopanel .modesrow { grid-template-columns: repeat(auto-fill, 210px); }
-/* A choice with its options in view, the buttons small, so most fit one
-   column. The sections with the longest take two, where two fit: spanning
-   two of one column would add a second, past the panel's edge. */
+/* Both pages' settings, as a form: sections by subject in two wide
+   columns. Each
+   setting is one row, its name on the left and its control on the right, so
+   the eye runs down one column of names. Headings stand out from the names
+   under them. One column where two do not fit. */
+.viewpanel.formpanel,
+.viewpanel.formpanel .pagerow {
+  grid-template-columns: repeat(auto-fill, 600px);
+  gap: 24px 48px;
+}
+.viewpanel.formpanel [data-panel="audio"] { grid-column: auto; }
+.viewpanel.formpanel .uplabel {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.viewpanel.formpanel .panelgroups,
+.viewpanel.formpanel .panelrow:not([data-panel="audio"]) .panelgroups {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.viewpanel.formpanel .panelgroups + .panelgroups { margin-top: 8px; }
+/* A row: the name, then the control. A checkbox's name is beside its box, so
+   the box sits in the control column. */
+.viewpanel.formpanel .group {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 14px;
+}
+/* Each control as wide as itself, but selects and sliders, which fill. */
+.viewpanel.formpanel .group > :not(select):not(input[type="range"]):not(.sliderow):not(.helptip):not(.group) { justify-self: start; }
+/* The question mark, at the right end of its row's first line, the same
+   place in every row. */
+.viewpanel.formpanel .group > .helptip { grid-column: 3; grid-row: 1; justify-self: end; }
+.viewpanel.formpanel .group > label.check { grid-column: 2; min-height: 22px; }
+/* What the choices do, under them, in view rather than in a tooltip. */
+.viewpanel.formpanel .group > .note {
+  grid-column: 2;
+  /* As tall as its text: held to a control's height, it left a gap under
+     every note that the rows without one did not have. */
+  min-height: 0;
+  height: auto;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+.viewpanel.formpanel .setrow { row-gap: 6px; }
+.viewpanel.formpanel .setrow > .caption { align-self: start; line-height: 22px; }
+.viewpanel.formpanel .setrow > .group { grid-column: 2 / -1; display: flex; flex-direction: row; align-items: center; justify-self: stretch; margin: 0; min-height: 0; }
+.viewpanel.formpanel .setrow > .group > .helptip { margin-left: auto; padding-left: 14px; }
+.viewpanel.formpanel .setrow > .group > label.check { min-height: 22px; min-width: 0; flex: 1 1 auto; }
+.viewpanel.formpanel .setrow > .group > .helptip { flex: none; }
+/* Speed's names carry their readings, as Overall (Farnsworth) 25 wpm, so its
+   name column is wider. */
+.viewpanel.formpanel [data-panel="speed"] .group { grid-template-columns: 200px auto; }
+.viewpanel.formpanel .group > .caption,
+.viewpanel.formpanel .group > label:not(.check) {
+  height: auto;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-dim);
+}
+.viewpanel.formpanel label.check { font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 200px; }
+/* A choice with its options in view, the buttons small, so each fits its
+   column. */
 .viewpanel .choicegroup .modeswitch button { padding: 3px 9px; font-size: 12px; white-space: nowrap; }
 /* Closer on the smallest phones, so the longest row still fits. */
 @media (max-width: 400px) {
   .viewpanel .choicegroup .modeswitch button { padding-left: 7px; padding-right: 7px; }
 }
-@media (min-width: 561px) {
-  .viewpanel.qsopanel [data-panel="qso"],
-  .viewpanel.qsopanel [data-panel="theirs"],
-  .viewpanel.qsopanel [data-panel="copy"] { grid-column: span 2; }
-}
-/* One column a little sooner than the practice page's: below this, two
-   columns do not fit beside a section that spans both. */
+/* One column, the names above their controls again: too narrow for both on
+   one line. */
 @media (max-width: 560px) {
-  .viewpanel.qsopanel, .viewpanel.qsopanel .pagerow, .viewpanel.qsopanel .modesrow { grid-template-columns: 1fr; }
+  .viewpanel.formpanel, .viewpanel.formpanel .pagerow { grid-template-columns: 1fr; }
+  .viewpanel.formpanel .group { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .viewpanel.formpanel .group > .helptip { grid-column: 2; }
+  .viewpanel.formpanel .group > label.check,
+  .viewpanel.formpanel .group > .note { grid-column: 1; }
+}
+/* Each section's settings on a panel of their own, a hairline between rows
+   across its width, so a name and the control it goes with read as one row
+   however far apart they sit. Audio's two lines make one panel. */
+.viewpanel.formpanel .panelrow > .panelgroups {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 14px;
+  gap: 0;
+}
+.viewpanel.formpanel .panelrow > .panelgroups > .group { padding: 9px 0; }
+.viewpanel.formpanel .panelrow > .panelgroups > .group + .group { border-top: 1px solid var(--line); }
+/* Up by the section's 4px gap and the border's width, so the two meet in a
+   single hairline. */
+.viewpanel.formpanel .panelrow > .panelgroups + .panelgroups {
+  margin-top: -5px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.viewpanel.formpanel .panelrow > .panelgroups:has(+ .panelgroups) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* Selects and sliders fill the control column, so a row has no dead space
+   after its control. The calibration's select shares its line with
+   Calibrate. */
+.viewpanel.formpanel .group > select,
+.viewpanel.formpanel [data-panel="audio"] select,
+.viewpanel.formpanel .group > input[type="range"],
+.viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 100%; min-width: 0; }
+.viewpanel.formpanel .group > .sliderow { display: flex; gap: 8px; min-width: 0; }
+.viewpanel.formpanel .group > .sliderow > select { flex: 1; }
+/* A section of checkboxes alone has no names on the left to line up with,
+   so its boxes start at the left. */
+.viewpanel.formpanel .checks .group > label.check { grid-column: 1 / 3; }
+/* A number box carries its name: the name in the name column, the box and
+   its unit in the control column. */
+.viewpanel.formpanel .group > label.field {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: 200px auto auto;
+  justify-content: start;
+  align-items: center;
+  column-gap: 14px;
+}
+.viewpanel.formpanel .group > label.field .fieldname {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-dim);
+}
+.viewpanel.formpanel .group > label.field .unit { margin-left: -8px; }
+/* A number box among a row's options, as Paced's count-in: its name, box
+   and unit on one line in the control column, its name as a checkbox's is. */
+.viewpanel.formpanel .setrow .group > label.field { display: flex; align-items: center; gap: 8px; }
+.viewpanel.formpanel .setrow .group > label.field .fieldname { color: var(--ink); flex-basis: auto; }
+.viewpanel.formpanel .setrow .group > label.field .unit { margin-left: -2px; }
+@media (max-width: 560px) {
+  .viewpanel.formpanel .setrow > .group { grid-column: 1; }
+  .viewpanel.formpanel .group > label.field { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+  .viewpanel.formpanel .group > label.field .fieldname { flex-basis: 100%; }
+  .viewpanel.formpanel .group > label.field .unit { margin-left: 0; }
 }
 .viewpanel [data-panel="speed"] label { white-space: nowrap; }
 .viewpanel [data-panel="speed"] input[type="range"] { width: 180px; }
 
+
+/* A setting's explanation, behind a question mark in a small circle at the
+   end of its row. Hovered or focused, the explanation shows in a box by it,
+   at once, rather than as the browser's slow tooltip over the whole setting.
+   The box is placed against the window (see HelpTip), so no panel clips it. */
+.helptip { display: inline-flex; align-items: center; }
+.helptip .helpdot {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid var(--ink-faint);
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-faint);
+  font: 600 10px/13px system-ui, -apple-system, "Segoe UI", sans-serif;
+  text-align: center;
+  cursor: help;
+}
+.helptip .helpdot:hover, .helptip .helpdot:focus-visible { border-color: var(--you); color: var(--you); }
+.tip {
+  position: fixed;
+  z-index: 1000;
+  width: max-content;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / .35);
+  color: var(--ink);
+  font: 12px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  white-space: pre-line;
+  pointer-events: none;
+}
+.tip[hidden] { display: none; }
+
+/* Sections stacked in one column of the page's row, as You over After a QSO,
+   so a short section does not sit alone beside a tall one. */
+.viewpanel .sectioncol { display: flex; flex-direction: column; gap: 24px; min-width: 0; }

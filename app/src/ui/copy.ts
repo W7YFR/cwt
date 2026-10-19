@@ -228,7 +228,7 @@ export const SHOW_CHART_CONTROLS_HELP =
    place, above what the setting does. A barred setting stays where it is, so
    the panel does not move under the pointer as other settings change. */
 
-export const NEEDS_LIVE_PROGRESS = "Needs Live progress.";
+export const NEEDS_LIVE_PROGRESS = "Needs Show where I am in the message.";
 export const NEEDS_RUNS = "Needs more than one run.";
 export const NEEDS_RUNS_SHOWN = "Needs more than one run on the chart.";
 export const ONE_INPUT = "This is the only input the browser offers.";

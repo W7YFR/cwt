@@ -18,15 +18,16 @@ import type { ReviewSettings, Take } from "@/types";
 const DB_NAME = "cwt";
 /** The upgrade is additive and version-agnostic: it creates whichever stores
  *  are missing and touches nothing that is already there, so a database being
- *  made for the first time gets both in one pass.
+ *  made for the first time gets all of them in one pass.
  *
  *  Only ever raise this. IndexedDB refuses to open an existing database at a
  *  lower version — and the refusal is quiet here, because a failed open is
  *  swallowed by every caller, leaving an app that works perfectly while
  *  saving nothing. */
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const TAKES = "takes";
 const CALIBRATIONS = "calibrations";
+const QSO_OVERS = "qsoOvers";
 
 export interface StoredTake {
   take: Take;
@@ -81,6 +82,9 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(CALIBRATIONS)) {
         const store = db.createObjectStore(CALIBRATIONS, { keyPath: "id" });
         store.createIndex("recordedAt", "recordedAt");
+      }
+      if (!db.objectStoreNames.contains(QSO_OVERS)) {
+        db.createObjectStore(QSO_OVERS, { keyPath: "line" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -436,6 +440,10 @@ export interface Prefs {
   qsoReplay?: boolean;
   /** How your own overs show on the QSO page. Absent is as sent. */
   qsoYourText?: "sent" | "hidden" | "none";
+  /** When the QSO page's play buttons show. Absent is always. */
+  qsoPlayback?: "never" | "always" | "end";
+  /** Download shows under a QSO that is over. Absent is on. */
+  qsoShowDownload?: boolean;
   /** The QSO page's settings band was open. */
   qsoSettingsOpen?: boolean;
   /** Copy mode: your copy locks when you start sending. Absent is on. */
@@ -611,6 +619,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoBlurCall: isBool,
   qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
+  qsoPlayback: oneOf("never", "always", "end"),
+  qsoShowDownload: isBool,
   qsoSettingsOpen: isBool,
   qsoLockCopy: isBool,
   qsoLockedShows: oneOf("nothing", "grade", "right"),
@@ -830,6 +840,66 @@ export function forgetCurrentTake(): void {
   delete next.currentId;
   delete next.session;
   savePrefs(next);
+}
+
+/* ---- the QSO page's overs ------------------------------------------------ */
+
+/* Your overs on the QSO page, as recorded, so a reload can still play them.
+ * Kept by the line of the log they are, for as long as the log is: a new
+ * session clears both. Sixteen-bit, as a take's audio is. */
+
+/** How many overs are kept. An over is about half a megabyte once the wait
+ *  before it is cut, so this is a long session's worth and a hard bound. */
+export const KEEP_QSO_OVERS = 60;
+
+export interface QsoOver {
+  readonly line: number;
+  readonly rate: number;
+  readonly samples: Int16Array;
+}
+
+/** Keep over `line`. The oldest go past `KEEP_QSO_OVERS`. */
+export async function keepQsoOver(line: number, samples: Float32Array, rate: number): Promise<void> {
+  try {
+    const pcm = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      pcm[i] = Math.round(Math.max(-1, Math.min(1, samples[i]!)) * 32767);
+    }
+    const db = await openDb();
+    await txIn(db, QSO_OVERS, "readwrite", (s) => s.put({ line, rate, samples: pcm } satisfies QsoOver));
+    const lines = await txIn<number[]>(db, QSO_OVERS, "readonly", (s) => s.getAllKeys() as IDBRequest<number[]>);
+    for (const old of lines.slice(0, Math.max(0, lines.length - KEEP_QSO_OVERS))) {
+      await txIn(db, QSO_OVERS, "readwrite", (s) => s.delete(old));
+    }
+    db.close();
+  } catch {
+    /* nothing kept; the over still plays until a reload */
+  }
+}
+
+/** The overs kept, by line, as samples from -1 to 1. */
+export async function recallQsoOvers(): Promise<Map<number, { samples: Float32Array; rate: number }>> {
+  const out = new Map<number, { samples: Float32Array; rate: number }>();
+  try {
+    const db = await openDb();
+    const rows = await txIn<QsoOver[]>(db, QSO_OVERS, "readonly", (s) => s.getAll());
+    db.close();
+    for (const r of rows) out.set(r.line, { samples: Float32Array.from(r.samples, (x) => x / 32767), rate: r.rate });
+  } catch {
+    /* none */
+  }
+  return out;
+}
+
+/** Forget every over kept: the log they belong to has gone. */
+export async function forgetQsoOvers(): Promise<void> {
+  try {
+    const db = await openDb();
+    await txIn(db, QSO_OVERS, "readwrite", (s) => s.clear());
+    db.close();
+  } catch {
+    /* as above */
+  }
 }
 
 /* The QSO page's log, so a reload comes back to it. Kept apart from the

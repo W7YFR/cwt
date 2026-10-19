@@ -937,8 +937,9 @@ const showDownloads = () => tickSetting("show-downloads");
 
   it("holds the settings still as the window is resized", async () => {
     /* A section is a fixed width: resizing changes how many fit on a line,
-       and nothing else. The microphone and the calibration share one line at
-       every width with room for two columns. */
+       and nothing else. Each setting is a row of its section: the
+       calibration under the microphone, their selects lined up in the
+       control column, at every width. */
     const [w, h] = [window.innerWidth, window.innerHeight];
     try {
       localStorage.setItem("cwt:prefs", JSON.stringify({ settingsOpen: true }));
@@ -948,11 +949,9 @@ const showDownloads = () => tickSetting("show-downloads");
         const widths = [...container.querySelectorAll<HTMLElement>(".viewpanel [data-panel]")]
           .filter((e) => e.dataset.panel !== "modes")
           .map((e) => Math.round(e.getBoundingClientRect().width));
-        const mid = (sel: string) => {
-          const b = container.querySelector(sel)!.getBoundingClientRect();
-          return b.top + b.height / 2;
-        };
-        return { widths, apart: Math.abs(mid("#input-device") - mid("#calibration")) };
+        const mic = container.querySelector("#input-device")!.getBoundingClientRect();
+        const cal = container.querySelector("#calibration")!.getBoundingClientRect();
+        return { widths, below: cal.top >= mic.bottom, offset: Math.abs(cal.left - mic.left) };
       };
       const seen = [];
       for (const width of [1400, 1000, 700]) {
@@ -963,7 +962,8 @@ const showDownloads = () => tickSetting("show-downloads");
       }
       for (const m of seen) {
         expect(m.widths, "every section the same size").toEqual(seen[0]!.widths);
-        expect(m.apart, "microphone and calibration on one line").toBeLessThan(3);
+        expect(m.below, "the calibration on a row under the microphone").toBe(true);
+        expect(m.offset, "their selects lined up").toBeLessThan(2);
       }
     } finally {
       await act(async () => {

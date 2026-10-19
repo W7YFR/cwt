@@ -71,6 +71,8 @@ export const lastSent = (): string => {
 };
 /** Your turn to send: between QSOs it says to call CQ, during one it says
  *  it is your turn. */
+/** The session has stopped: Start is back, as at the end of a QSO. */
+export const ended = () => $('[data-testid="qso-start"]') !== null;
 export const yourTurn = () => status() === "Call CQ to make a contact." || status() === "Your turn.";
 
 export async function click(el: HTMLElement | null): Promise<void> {
@@ -187,7 +189,15 @@ export function callIn(line: HTMLElement): string {
 
 /** A fresh page, microphone and clock for each test in the file that calls
  *  this. */
+/** How long one QSO test may run. */
+const QSO_TEST_MS = 30_000;
+
 export function useQsoRig(): void {
+  /* Each test works a QSO, or most of one, on the fake clock: about a second
+     and a half here, and several times that on a loaded CI runner, where the
+     default 5 s cut one short. The waits inside allow 60 s; this gives the
+     test as a whole room to match. */
+  vi.setConfig({ testTimeout: QSO_TEST_MS });
   beforeEach(() => {
     vi.useFakeTimers({
       toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date", "performance"],
