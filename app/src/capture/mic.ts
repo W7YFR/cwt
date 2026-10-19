@@ -153,6 +153,11 @@ export function watchMicAccess(onChange: (access: MicAccess) => void): () => voi
   };
 }
 
+/** Seconds after the device opens that are kept as silence. An interface can
+ *  thump as it starts, and a filter on the line rings with it as a short,
+ *  faint tone, which reads as a dit. Nobody keys this soon. */
+export const SETTLE_SEC = 0.5;
+
 export interface Recorder {
   /** Seconds captured so far. */
   elapsed(): number;
@@ -263,6 +268,9 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   let lastReport = 0;
   let stopped = false;
   const maxFrames = Math.ceil(maxSeconds * ctx.sampleRate);
+  // Counted from the device opening, not from a restart: see `SETTLE_SEC`.
+  const settleFrames = Math.round(SETTLE_SEC * ctx.sampleRate);
+  let opened = 0;
 
   // Always watched: the transcript keeps it, printed or not.
   const health = captureHealth(ctx.sampleRate);
@@ -270,6 +278,8 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     if (stopped) return;
     const frame = ev.data.out;
     health(ev.data.at, frame);
+    if (opened < settleFrames) frame.fill(0, 0, Math.min(frame.length, settleFrames - opened));
+    opened += frame.length;
     chunks.push(frame);
     total += frame.length;
     if (total >= maxFrames) {

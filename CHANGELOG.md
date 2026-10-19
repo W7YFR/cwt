@@ -16,6 +16,7 @@ nothing to the site. The next release carries them.
 ### Fixed
 
 - With **Lock when I send**, your copy locks at your first character, not a few characters later.
+- A sound from the microphone as it opens no longer reads as keying. In **Zen** mode, no dots show before you start.
 
 ## v1.11.0 — 2026-10-19
 
