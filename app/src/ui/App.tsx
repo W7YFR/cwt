@@ -21,6 +21,7 @@ import {
   rememberLandingAsked,
   rememberLandingSeen,
   savePrefs,
+  watchUpgradeBlocked,
 } from "@/io/storage";
 import type { AudioClip } from "@/types";
 import { APP_VERSION } from "@/build-info";
@@ -35,6 +36,7 @@ import { useFileDrop } from "./useFileDrop";
 import { OPEN_FILE_CLOSED } from "./copy";
 import { useMicAccess } from "./useMicAccess";
 import { useTake } from "./useTake";
+import { AppName } from "./Wordmark";
 
 /** How long the boot may take before it says anything.
  *
@@ -73,6 +75,10 @@ export function App(): React.ReactElement {
      screen fits the chart as it always has. */
   const [restored, setRestored] = useState(false);
   const [slowBoot, setSlowBoot] = useState(false);
+  /* Another tab holds the saved takes open at an older version, and this
+     page waits for it to close. */
+  const [upgradeBlocked, setUpgradeBlocked] = useState(false);
+  useEffect(() => watchUpgradeBlocked(setUpgradeBlocked), []);
   const [opening, setOpening] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
   /* Dev only: `?calexample` lists real calibrations, one for each outcome,
@@ -387,6 +393,15 @@ export function App(): React.ReactElement {
           Microphone access is blocked, so there is nothing to record from.
           Allow it for this site — the control is on the icon at the left of
           the address bar — then reload.
+        </p>
+      )}
+
+      {upgradeBlocked && (
+        <p className="banner error" role="alert" data-testid="upgrade-blocked">
+          {/* One span, or the banner's flex gap opens after the name. */}
+          <span>
+            <AppName /> is open in another tab. Close that tab to continue.
+          </span>
         </p>
       )}
 

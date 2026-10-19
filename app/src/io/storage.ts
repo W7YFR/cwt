@@ -87,9 +87,42 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(QSO_OVERS, { keyPath: "line" });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error("could not open the database"));
+    /* Another tab holds the database open at an older version. The open
+       waits until that tab lets go, so say why the page is waiting. */
+    req.onblocked = () => setUpgradeBlocked(true);
+    req.onsuccess = () => {
+      setUpgradeBlocked(false);
+      const db = req.result;
+      /* A newer version in another tab wants to upgrade. Let go, or that tab
+         waits for this one to close. */
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    req.onerror = () => {
+      setUpgradeBlocked(false);
+      reject(req.error ?? new Error("could not open the database"));
+    };
   });
+}
+
+/* Whether an open waits on another tab, for the page to show. */
+let upgradeBlocked = false;
+const blockedListeners = new Set<(blocked: boolean) => void>();
+
+function setUpgradeBlocked(blocked: boolean): void {
+  if (blocked === upgradeBlocked) return;
+  upgradeBlocked = blocked;
+  for (const listener of blockedListeners) listener(blocked);
+}
+
+/** Call `listener` when an open starts or stops waiting on another tab.
+ *  Returns the call that stops listening. */
+export function watchUpgradeBlocked(listener: (blocked: boolean) => void): () => void {
+  blockedListeners.add(listener);
+  listener(upgradeBlocked);
+  return () => {
+    blockedListeners.delete(listener);
+  };
 }
 
 function txIn<T>(
@@ -140,6 +173,8 @@ export interface TakeStore {
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
   close(): void;
+  /** Call `run` when the connection closes for another tab's upgrade. */
+  onClose(run: () => void): void;
 }
 
 export async function openTakeStore(): Promise<TakeStore> {
@@ -194,6 +229,13 @@ export async function openTakeStore(): Promise<TakeStore> {
 
     close() {
       db.close();
+    },
+
+    onClose(run) {
+      db.onversionchange = () => {
+        db.close();
+        run();
+      };
     },
   };
 }
@@ -698,10 +740,20 @@ function store(): Promise<TakeStore> {
   if (!opening) {
     // A failed open must not be cached, or one transient error would disable
     // storage for the life of the tab.
-    opening = openTakeStore().catch((e: unknown) => {
-      opening = null;
-      throw e;
-    });
+    opening = openTakeStore().then(
+      (store) => {
+        /* The connection closes for a newer version's upgrade. The next call
+           opens again, not on the closed one. */
+        store.onClose(() => {
+          opening = null;
+        });
+        return store;
+      },
+      (e: unknown) => {
+        opening = null;
+        throw e;
+      },
+    );
   }
   return opening;
 }

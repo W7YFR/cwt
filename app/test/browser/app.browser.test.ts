@@ -12,7 +12,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App, BOOT_MESSAGE_DELAY_MS } from "@/ui/App";
 import { LANDING_VERSION } from "@/ui/Landing";
-import { loadPrefs, recallTake, rememberTake } from "@/io/storage";
+import { loadPrefs, recallTake, rememberTake, watchUpgradeBlocked } from "@/io/storage";
 import { encodeWavBuffer } from "@/audio/wav";
 import { synthesize } from "@/audio/synth";
 import { targetTiming } from "@/timing";
@@ -115,6 +115,14 @@ function setRange(el: HTMLInputElement, value: number) {
   )!.set!;
   setter.call(el, String(value));
   el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** The result of an IndexedDB request, once it succeeds. */
+function settled<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }
 
 let container: HTMLDivElement;
@@ -285,6 +293,67 @@ describe("the app", () => {
       release();
       await new Promise((res) => setTimeout(res, 20));
     });
+  });
+
+  it("asks for the other tab to close when it holds an older version", async () => {
+    /* A tab still on an older release holds the database open, and knows
+       nothing about letting go. The upgrade waits for it, and so does the
+       boot. The page has to say why it waits, and go on once the tab closes. */
+    await settled(indexedDB.deleteDatabase("cwt"));
+    const older = indexedDB.open("cwt", 2);
+    older.onupgradeneeded = () => {
+      older.result.createObjectStore("takes", { keyPath: "id" });
+    };
+    const held = await settled(older);
+    localStorage.setItem("cwt:prefs", JSON.stringify({ currentId: "held" }));
+
+    try {
+      root = createRoot(container);
+      const r = root;
+      await act(async () => {
+        r.render(createElement(App));
+      });
+      // Chromium says the open is blocked only once the render has settled.
+      await act(async () => {
+        await new Promise((res) => {
+          const stop = watchUpgradeBlocked((blocked) => blocked && res(null));
+          setTimeout(() => {
+            stop();
+            res(null);
+          }, 2000);
+        });
+      });
+      expect(container.querySelector("[data-testid='upgrade-blocked']")).not.toBeNull();
+      expect(onLanding()).toBe(false);
+    } finally {
+      // Open, it would block every test after this one.
+      await act(async () => {
+        held.close();
+        await new Promise((res) => setTimeout(res, 200));
+      });
+    }
+    expect(container.querySelector("[data-testid='upgrade-blocked']")).toBeNull();
+    expect(onLanding()).toBe(true);
+  });
+
+  it("lets a newer version in another tab upgrade", async () => {
+    /* This tab holds the database open from the boot. A newer release in
+       another tab must not wait on it, or that tab is the one stuck. */
+    localStorage.setItem("cwt:prefs", JSON.stringify({ currentId: "held" }));
+    await recallTake();
+    const newer = indexedDB.open("cwt", 99);
+    const blocked = new Promise<"blocked">((res) => {
+      newer.onblocked = () => res("blocked");
+    });
+    const opened = settled(newer).then((db) => {
+      db.close();
+      return "opened" as const;
+    });
+    expect(await Promise.race([opened, blocked])).toBe("opened");
+
+    // Back to the version this build opens, for the tests after this one.
+    await settled(indexedDB.deleteDatabase("cwt"));
+    expect(await recallTake()).toBeNull();
   });
 
   it("opens on the recording it was left with", async () => {
