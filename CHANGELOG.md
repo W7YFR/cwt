@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.12.0 — 2026-10-19
+
 ### Changed
 
 - On the **QSO** page, the station opens a line with both calls now and then by its own habit, and more often when you do. It no longer sends them at the start of nearly every line.
