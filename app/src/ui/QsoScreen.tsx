@@ -39,6 +39,8 @@ import {
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconHelp, IconUser } from "./Icons";
+import { DebugDownload } from "./DebugDownload";
+import { keepDebugAudio, micLog } from "@/micdebug";
 import { QsoGuide, QsoHelp } from "./QsoHelp";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
@@ -553,6 +555,15 @@ export function QsoScreen({
   useEffect(() => {
     if (recorder) {
       hadRecorder.current = true;
+      micLog("qso: session", {
+        rate: recorder.rate,
+        speed,
+        copy: copyMode,
+        length,
+        deviceId: deviceId ? `${deviceId.slice(0, 8)}…` : "(default input)",
+        calibration: profiles.find((p) => p.id === profileId)?.nickname ?? "(none)",
+        applied: calibration,
+      });
       if (replayOnStart.current) {
         replayOnStart.current = false;
         replay.current();
@@ -725,6 +736,22 @@ export function QsoScreen({
     if (copy.turn === answered.current) return;
     answered.current = copy.turn;
     const heard = copy.text.trim();
+    // The over as the decoder had it, kept for the debug download.
+    {
+      const audio = recorder.since(0);
+      keepDebugAudio(`over ${qsoNo.current}: ${heard || "(nothing)"}`, audio, recorder.rate);
+      micLog("qso: over", {
+        heard,
+        sentWpm: copy.sentWpm,
+        seconds: Number((audio.length / recorder.rate).toFixed(2)),
+        // The same over at each step: recorded, read, sent to the decoder,
+        // dropped while the station played, and received by the decoder.
+        recorded: audio.length,
+        ...copy.flow,
+        lenient,
+        speed,
+      });
+    }
     // One character alone is noise on the line, a click or a bump of the key,
     // not a turn. Not answered, and the turn starts over. K, R and ? alone
     // are answers, so they still count.
@@ -1168,6 +1195,17 @@ export function QsoScreen({
               <LevelMeter level={rec.level} />
             </>
           )}
+          <DebugDownload
+            current={() =>
+              recorder
+                ? {
+                    label: `in progress: ${copy.text || "(nothing)"}${copy.keying ? ` [${copy.keying}]` : ""}`,
+                    samples: recorder.since(0),
+                    rate: recorder.rate,
+                  }
+                : null
+            }
+          />
           {/* Your speed does two jobs: your sending is copied at it, and each
               new station answers at it. QRS and QRQ change the station's speed
               alone. */}

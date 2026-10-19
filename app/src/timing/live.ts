@@ -406,8 +406,27 @@ export function overEnded(text: string, quietSec: number, timing: Timing): boole
  *
  * The same passes as `LiveFollower`, but what comes back is the text itself,
  * and the over ends when the sender hands the turn over. */
+/** What one pass of the live copy worked from, for the debug transcript. */
+export interface CopyStats {
+  /** Samples pushed so far this over, at the capture rate. */
+  readonly received: number;
+  /** The rate the over is decoded at, after decimation. */
+  readonly rate: number;
+  /** Decimated samples decoded in this pass. */
+  readonly samples: number;
+  /** The tone decoded at, and whether it is locked for the rest of the over. */
+  readonly toneHz: number;
+  readonly locked: boolean;
+  /** Marks and gaps found. */
+  readonly segments: number;
+  /** How long the pass took. */
+  readonly passMs: number;
+}
+
 export class LiveCopy {
   private readonly audio: Decimator;
+  private received = 0;
+  private last: CopyStats | null = null;
   private readonly timing: Timing;
   private readonly measure: boolean;
   private readonly calibration: Calibration | undefined;
@@ -424,10 +443,18 @@ export class LiveCopy {
   }
 
   push(samples: Float32Array): void {
+    this.received += samples.length;
     this.audio.push(samples);
   }
 
+  /** What the last pass worked from, or null before the first. */
+  stats(): CopyStats | null {
+    return this.last;
+  }
+
   step(): Copy {
+    const began = typeof performance === "undefined" ? 0 : performance.now();
+    const locked = this.toneHz !== undefined;
     const sent = sentSymbols(
       this.audio.samples(),
       this.audio.rate,
@@ -439,6 +466,15 @@ export class LiveCopy {
     if (this.toneHz === undefined && sent.symbols.length >= TONE_LOCK_CHARS) {
       this.toneHz = sent.toneHz;
     }
+    this.last = {
+      received: this.received,
+      rate: this.audio.rate,
+      samples: this.audio.samples().length,
+      toneHz: Math.round(sent.toneHz),
+      locked,
+      segments: sent.segments.length,
+      passMs: Math.round((typeof performance === "undefined" ? 0 : performance.now()) - began),
+    };
     const over = sent.keying === null && overEnded(sent.text, sent.quietSec, this.timing);
     return { text: sent.text, keying: sent.keying, over, sentWpm: over ? sentWpm(sent.segments) : null };
   }

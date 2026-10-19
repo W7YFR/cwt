@@ -35,7 +35,9 @@ class CaptureProcessor extends AudioWorkletProcessor {
         for (let i = 0; i < n; i++) out[i] += ch[i];
       }
       if (channels > 1) for (let i = 0; i < n; i++) out[i] /= channels;
-      this.port.postMessage(out, [out.buffer]);
+      // With the frame clock, so the page can tell a block the audio thread
+      // never delivered from one that arrived late.
+      this.port.postMessage({ at: currentFrame, out }, [out.buffer]);
     }
     return true;
   }
@@ -208,6 +210,18 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   });
 
   micLog("startRecording: device open");
+  {
+    // What the browser actually gave, which is not always what was asked:
+    // a processing feature left on changes every mark.
+    const track = stream.getAudioTracks()[0];
+    micLog("startRecording: track", {
+      label: track?.label ?? "(none)",
+      settings: track?.getSettings?.() ?? null,
+    });
+    track?.addEventListener("mute", () => micLog("track muted"));
+    track?.addEventListener("unmute", () => micLog("track unmuted"));
+    track?.addEventListener("ended", () => micLog("track ended"));
+  }
 
   const Ctor =
     window.AudioContext ??
@@ -218,6 +232,12 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     throw new Error("this browser has no Web Audio support");
   }
   const ctx = new Ctor();
+  micLog("startRecording: context", {
+    sampleRate: ctx.sampleRate,
+    baseLatency: ctx.baseLatency,
+    state: ctx.state,
+  });
+  ctx.addEventListener("statechange", () => micLog("context state", ctx.state));
 
   const blobUrl = URL.createObjectURL(
     new Blob([WORKLET_SOURCE], { type: "application/javascript" }),
@@ -244,9 +264,12 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   let stopped = false;
   const maxFrames = Math.ceil(maxSeconds * ctx.sampleRate);
 
-  node.port.onmessage = (ev: MessageEvent<Float32Array>) => {
+  // Always watched: the transcript keeps it, printed or not.
+  const health = captureHealth(ctx.sampleRate);
+  node.port.onmessage = (ev: MessageEvent<{ at: number; out: Float32Array }>) => {
     if (stopped) return;
-    const frame = ev.data;
+    const frame = ev.data.out;
+    health(ev.data.at, frame);
     chunks.push(frame);
     total += frame.length;
     if (total >= maxFrames) {
@@ -327,5 +350,71 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
       total = 0;
       await release();
     },
+  };
+}
+
+/** Watch the capture for what would garble the keying, and say so in the
+ *  transcript. Audio the audio thread skipped, blocks
+ *  that arrive in bursts, a change of block size, and sudden jumps between
+ *  one sample and the next, which are clicks, are each counted. A summary
+ *  line every five seconds gives the counts and the level. */
+function captureHealth(rate: number): (at: number, frame: Float32Array) => void {
+  const SUMMARY_SEC = 5;
+  /** A step this large between two samples is a click, not a tone. */
+  const JUMP = 0.25;
+  let expected: number | null = null;
+  let lastMs = 0;
+  let last = 0;
+  let size = 0;
+  let frames = 0;
+  let skipped = 0;
+  let jumps = 0;
+  let peak = 0;
+  let sumSq = 0;
+  let count = 0;
+  let maxGapMs = 0;
+  let since = 0;
+  return (at, frame) => {
+    const now = performance.now();
+    if (expected !== null && at !== expected) {
+      micLog("capture: audio skipped", { frames: at - expected, ms: ((at - expected) / rate) * 1000 });
+      skipped += Math.max(0, at - expected);
+    }
+    expected = at + frame.length;
+    if (frame.length !== size) {
+      micLog("capture: block size", frame.length);
+      size = frame.length;
+    }
+    if (lastMs) maxGapMs = Math.max(maxGapMs, now - lastMs);
+    lastMs = now;
+    for (let i = 0; i < frame.length; i++) {
+      const x = frame[i]!;
+      if (Math.abs(x - last) > JUMP) jumps++;
+      last = x;
+      const a = Math.abs(x);
+      if (a > peak) peak = a;
+      sumSq += x * x;
+    }
+    count += frame.length;
+    frames++;
+    since += frame.length;
+    if (since >= SUMMARY_SEC * rate) {
+      micLog("capture: summary", {
+        blocks: frames,
+        skippedFrames: skipped,
+        clicks: jumps,
+        peak: Number(peak.toFixed(4)),
+        rms: Number(Math.sqrt(sumSq / Math.max(1, count)).toFixed(5)),
+        longestWaitMs: Math.round(maxGapMs),
+      });
+      since = 0;
+      frames = 0;
+      skipped = 0;
+      jumps = 0;
+      peak = 0;
+      sumSq = 0;
+      count = 0;
+      maxGapMs = 0;
+    }
   };
 }
