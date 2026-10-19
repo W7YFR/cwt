@@ -180,23 +180,42 @@ export function gotPiece(s: Say): string {
 /** What it sends for a question about one thing. */
 export type Question = "call" | Piece;
 
-/** The answer to your questions, each one once, in the order asked. */
-export function answers(s: Say, asked: readonly Question[]): string {
+/** One item of its exchange, as plain as it goes: 599, BOB, SALEM OR. */
+function valueOf(s: Say, p: Piece): string {
+  return p === "report" ? s.them.rst : p === "name" ? s.them.name : s.them.qth;
+}
+
+/** The answer to your questions, each one once, in the order asked.
+ *
+ * `checked` are the items you sent back with a ?, as in SALEM OR ?. It
+ * confirms them first: R R SALEM OR. With `close` false, the answer has no
+ * K, so the station can go on in the same over. */
+export function answers(
+  s: Say,
+  asked: readonly Question[],
+  checked: readonly Piece[] = [],
+  close = true,
+): string {
   const c = s.them.call;
+  const yes = checked.length
+    ? words(pick(s.rand, ["R R", "YES", "RR"]), ...checked.map((p) => valueOf(s, p)))
+    : "";
   const parts = asked.map((q) => {
     if (q === "call") return pick(s.rand, [`${c} ${c}`, `DE ${c} ${c}`, `${c} ${c} ${c}`]);
     return ITEM[q]({ ...s, length: "full" });
   });
-  return words(...parts, pick(s.rand, ["K", "KN"]));
+  return words(yes, ...parts, close ? pick(s.rand, ["K", "KN"]) : "");
 }
 
 const LABEL: Readonly<Record<Piece, string>> = { report: "RST", name: "NAME", qth: "QTH" };
 
-/** It asks for the pieces of your exchange it gave and has not had back. */
-export function askFor(s: Say, missing: readonly Piece[]): string {
+/** It asks for the pieces of your exchange it gave and has not had back.
+ *  With `calls` false, it sends no calls first: the ask follows an answer
+ *  in the same over. */
+export function askFor(s: Say, missing: readonly Piece[], calls = true): string {
   const c = s.them.call;
   const labels = missing.map((p) => LABEL[p]);
-  const head = maybe(s.rand, `${s.you} DE ${c}`);
+  const head = calls ? maybe(s.rand, `${s.you} DE ${c}`) : "";
   if (labels.length === 1) {
     const l = labels[0]!;
     return words(head, pick(s.rand, [`UR ${l}? KN`, `${l}? KN`, `PSE UR ${l}? KN`]));

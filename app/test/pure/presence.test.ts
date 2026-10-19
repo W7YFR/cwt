@@ -17,7 +17,7 @@ import { existsSync } from "node:fs";
 import { DATA_DIR } from "../oracle-fs";
 import { normalizePeak, readWav } from "../wav";
 import { gaussian, makeTake, rng } from "../impair";
-import { KEYING_PROMINENCE, segmentsFrom, tonePresence } from "@/dsp";
+import { KEYING_NARROWNESS, KEYING_PROMINENCE, segmentsFrom, tonePresence } from "@/dsp";
 import { NoKeyingError, analyzeClip } from "@/io/take";
 
 const RATE = 8000;
@@ -31,6 +31,26 @@ function noise(seconds: number, rate = RATE, humHz = 0): Float32Array {
     x[i] = 0.1 * gaussian(rand) + hum;
   }
   return normalizePeak(x);
+}
+
+/** `x` through a band-pass at `hz`, twice: a line cleaned up for CW. */
+function bandPassed(x: Float32Array, hz: number, q = 2.4, rate = RATE): Float32Array {
+  const w = (2 * Math.PI * hz) / rate;
+  const alpha = Math.sin(w) / (2 * q);
+  const a0 = 1 + alpha;
+  const [b0, b2, a1, a2] = [alpha / a0, -alpha / a0, (-2 * Math.cos(w)) / a0, (1 - alpha) / a0];
+  let y = x;
+  for (let pass = 0; pass < 2; pass++) {
+    const out = new Float32Array(y.length);
+    let [x1, x2, y1, y2] = [0, 0, 0, 0];
+    for (let i = 0; i < y.length; i++) {
+      const v = b0 * y[i]! + b2 * x2 - a1 * y1 - a2 * y2;
+      [x2, x1, y2, y1] = [x1, y[i]!, y1, v];
+      out[i] = v;
+    }
+    y = out;
+  }
+  return normalizePeak(y);
 }
 
 describe("is there any keying here", () => {
@@ -53,6 +73,15 @@ describe("is there any keying here", () => {
       expect(p.prominence, `${p.prominence.toFixed(1)}`).toBeLessThan(10);
     });
 
+    it("says no to noise through a narrow band-pass, which stands out of the band", () => {
+      // The filter makes the noise peak in the band, so the band test alone
+      // passes it. The peak is broad, and the bins beside it say so.
+      const p = tonePresence(bandPassed(noise(5), 550), RATE);
+      expect(p.prominence).toBeGreaterThan(KEYING_PROMINENCE);
+      expect(p.keyed).toBe(false);
+      expect(p.narrowness, `${p.narrowness.toFixed(1)}`).toBeLessThan(KEYING_NARROWNESS / 3);
+    });
+
     it("says no to noise with mains hum under it", () => {
       // Hum is a tone, but not one in the CW band, and its harmonics are not
       // sharp enough to dominate the band's median.
@@ -67,6 +96,13 @@ describe("is there any keying here", () => {
       const p = tonePresence(normalizePeak(take.samples), RATE);
       expect(p.keyed).toBe(true);
       expect(p.prominence).toBeGreaterThan(100 * KEYING_PROMINENCE);
+    });
+
+    it("says yes to keying through the same band-pass", () => {
+      const take = makeTake("CQ DE W1AW", 20, null, RATE, { snrDb: 20, seed: 7 });
+      const p = tonePresence(bandPassed(take.samples, 600), RATE);
+      expect(p.keyed).toBe(true);
+      expect(p.narrowness).toBeGreaterThan(3 * KEYING_NARROWNESS);
     });
 
     it("says yes at 8 dB SNR, the worst the robustness grid asks for", () => {

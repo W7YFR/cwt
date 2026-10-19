@@ -11,7 +11,11 @@
  *     sent wrong gets it put right. Only the exact call moves it on;
  *   - your call after DE replaces the one it copied before;
  *   - part of its call with a ?, as in N1?, gets its call. NAME?, QTH?, RST?
- *     and CALL? get that one thing. None of these moves the QSO on;
+ *     and CALL? get that one thing. An item of its own exchange with a ?, as
+ *     in SALEM OR ?, gets it confirmed. When the rest of the over moves the
+ *     QSO on, the answer comes with the next part. A check never moves it
+ *     on. A piece of yours it still waits for, it asks for with the answer.
+ *     AGN after an answer gets the answer again;
  *   - QRS gets its last over again, slower, and QRQ makes it faster. The two
  *     search for your speed by halving (see speed.ts). The new speed holds
  *     until you ask again;
@@ -66,6 +70,8 @@ export interface Qso {
   /** You have sent its call back, so it is working you, even while it asks
    *  for a piece again. */
   readonly working: boolean;
+  /** Piece by piece: the pieces it sent out of turn, because you asked. */
+  readonly told: readonly wording.Piece[];
 }
 
 /** How the station reads your overs. */
@@ -203,6 +209,7 @@ export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED): Qso 
     piece: 0,
     got: [],
     working: false,
+    told: [],
   };
 }
 
@@ -246,6 +253,10 @@ const DE_STOP = new Set([
   "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "<BT>", "R", "RR", "TNX", "TU", "UR", "RST",
   "NAME", "QTH", "GM", "GA", "GE", "FB",
 ]);
+
+/** Words that hand the turn over or name the stations, and say nothing
+ *  else. */
+const TURN_WORDS = new Set(["DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "<BT>", "PSE"]);
 
 /** Questions that are part of an exchange, not about what was sent. */
 const NOT_QUESTIONS = new Set(["HW?", "CPY?"]);
@@ -302,7 +313,7 @@ class Over {
 
   constructor(
     heard: string,
-    private readonly ear: Ear,
+    readonly ear: Ear,
   ) {
     this.words = joinQuestions(erased(wordsOf(heard)));
     this.joined = this.words.join("");
@@ -420,13 +431,19 @@ class Over {
     );
   }
 
-  /** What it asks about one thing: part of `call` with a ?, as in N1? or
-   *  N1 ?, or NAME?, QTH?, RST? or CALL?. Each once, in the order asked. The
-   *  whole call with a ? is not here: see `asksAbout`. */
-  questions(call: string): wording.Question[] {
-    const out: wording.Question[] = [];
-    const add = (q: wording.Question) => {
-      if (!out.includes(q)) out.push(q);
+  /** What it asks about one thing: part of `them`'s call with a ?, as in
+   *  N1? or N1 ?, or NAME?, QTH?, RST? or CALL?. Each once, in the order
+   *  asked. The whole call with a ? is not here: see `asksAbout`.
+   *
+   *  `checked` are the items of its exchange you sent back with a ?, as in
+   *  SALEM OR ? or BOB?. `rest` is the over with these questions taken
+   *  out. */
+  asks(them: Station): { asked: wording.Question[]; checked: wording.Piece[]; rest: Over } {
+    const call = them.call;
+    const asked: wording.Question[] = [];
+    const checked: wording.Piece[] = [];
+    const add = <T>(list: T[], q: T) => {
+      if (!list.includes(q)) list.push(q);
     };
     const partOfCall = (w: string) =>
       w.length >= 2 &&
@@ -435,20 +452,46 @@ class Over {
       !(w in ASKS_FOR) &&
       (/\d/.test(w) || w.length >= 3) &&
       call.includes(w);
+    const qth = them.qth.split(" ");
+    const theirs = (w: string): wording.Piece | null =>
+      w === them.rst || (them.rst === "599" && w === "5NN")
+        ? "report"
+        : w === them.name
+          ? "name"
+          : qth.includes(w)
+            ? "qth"
+            : null;
     const { words } = this;
+    const kept: string[] = [];
+    // An item checked takes the words of it before the ?, and its label:
+    // all of QTH SALEM OR ?.
+    const check = (item: wording.Piece) => {
+      add(checked, item);
+      const label = item === "report" ? ["UR", "RST", "RPT"] : item === "name" ? ["NAME", "OP", "NM"] : ["QTH"];
+      while (kept.length) {
+        const last = kept[kept.length - 1]!;
+        if (theirs(last) !== item && !label.includes(last) && !FILLER.has(last)) break;
+        kept.pop();
+      }
+    };
     for (let i = 0; i < words.length; i++) {
       const w = words[i]!;
       if (w === "?") {
-        if (i > 0 && partOfCall(words[i - 1]!)) add("call");
+        const prev = i > 0 ? words[i - 1]! : "";
+        const item = theirs(prev);
+        if (item) check(item);
+        else if (partOfCall(prev)) add(asked, "call");
+        else kept.push(w);
         continue;
       }
-      if (!w.endsWith("?")) continue;
       const bare = w.replace(/\?+$/, "");
-      const asked = ASKS_FOR[bare];
-      if (asked) add(asked);
-      else if (partOfCall(bare)) add("call");
+      const item = w.endsWith("?") ? theirs(bare) : null;
+      if (item) check(item);
+      else if (w.endsWith("?") && ASKS_FOR[bare]) add(asked, ASKS_FOR[bare]);
+      else if (w.endsWith("?") && partOfCall(bare)) add(asked, "call");
+      else kept.push(w);
     }
-    return out;
+    return { asked, checked, rest: new Over(kept.join(" "), this.ear) };
   }
 
   /** The pieces of your own exchange it holds: a report, a name, a QTH. */
@@ -567,8 +610,17 @@ class Over {
 
 /** The pieces of its exchange the station has sent so far. */
 function sentPieces(qso: Qso): readonly wording.Piece[] {
-  if (qso.stage === "pieces") return wording.PIECES.slice(0, qso.piece);
+  if (qso.stage === "pieces") {
+    return wording.PIECES.filter((p, i) => i < qso.piece || qso.told.includes(p));
+  }
   return qso.stage === "exchanged" ? wording.PIECES : [];
+}
+
+/** Piece by piece: the next piece from `at` on that it has not sent out of
+ *  turn. `PIECES.length` when none is left. */
+function nextPiece(qso: Qso, at: number): number {
+  while (at < wording.PIECES.length && qso.told.includes(wording.PIECES[at]!)) at++;
+  return at;
 }
 
 function say(qso: Qso, reply: string, stage: Stage = qso.stage): Turn {
@@ -589,8 +641,6 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   } = context;
   const over = new Over(heard, ear);
   const { them } = qso;
-  // HW? asks how you copied, so it is not a request to send again.
-  const again = over.has("AGN") || over.words.some((w) => ["?", "AGN?", "QRZ?"].includes(w));
   const voice = (q: Qso): wording.Say => ({
     them,
     you: q.you,
@@ -632,11 +682,54 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     if (name) qso = { ...qso, yourName: name };
     const got = over.pieces().filter((p) => !qso.got.includes(p));
     if (got.length) qso = { ...qso, got: [...qso.got, ...got] };
-    // A question about one thing gets that thing. Not kept as the last over,
-    // so AGN after it still means the over before.
-    const asked = over.questions(them.call);
-    if (asked.length) return { qso, reply: wording.answers(voice(qso), asked), ended: false };
+    // A question about one thing gets that thing, and an item of its
+    // exchange sent back with a ? gets it confirmed. When the rest of the
+    // over moves the QSO on, it goes on in the same over.
+    const { asked, checked, rest } = over.asks(them);
+    if (asked.length || checked.length) {
+      if (qso.stage === "pieces") {
+        const told = asked.filter((q): q is wording.Piece => q !== "call");
+        qso = { ...qso, told: [...qso.told, ...told.filter((p) => !qso.told.includes(p))] };
+      }
+      const exchanging = qso.stage === "pieces" || qso.stage === "exchanged";
+      // The rest moves it on only when it says something: not K, DE or a
+      // call. A check never does: you are not sure of what you copied, so
+      // it waits for you to go on.
+      const says = rest.words.some((w) => !TURN_WORDS.has(w) && !isCall(w));
+      const next = exchanging && says && !checked.length ? reply(qso, rest, context) : null;
+      if (next && next.reply && (next.ended || next.qso.stage !== qso.stage || next.qso.piece !== qso.piece)) {
+        const both = `${wording.answers(voice(qso), asked, checked, false)} <BT> ${next.reply}`;
+        return { qso: { ...next.qso, last: both }, reply: both, ended: next.ended };
+      }
+      // A piece of yours it still waits for, it asks for with the answer.
+      const missing = exchanging ? sentPieces(qso).filter((p) => !qso.got.includes(p)) : [];
+      if (missing.length) {
+        const owed = qso.stage === "pieces" ? missing.slice(0, 1) : missing;
+        const ask = wording.askFor(voice(qso), owed, false);
+        return say(qso, `${wording.answers(voice(qso), asked, checked, false)} <BT> ${ask}`);
+      }
+      return say(qso, wording.answers(voice(qso), asked, checked));
+    }
   }
+
+  return reply(qso, over, context);
+}
+
+/** The station's answer to an over with no question in it about one
+ *  thing. */
+function reply(qso: Qso, over: Over, context: Context): Turn {
+  const { rand = Math.random, hour = new Date().getHours(), length = "full" } = context;
+  const { them } = qso;
+  // HW? asks how you copied, so it is not a request to send again.
+  const again = over.has("AGN") || over.words.some((w) => ["?", "AGN?", "QRZ?"].includes(w));
+  const voice = (q: Qso): wording.Say => ({
+    them,
+    you: q.you,
+    name: q.yourName,
+    rand,
+    hour,
+    length,
+  });
 
   switch (qso.stage) {
     case "cq":
@@ -694,9 +787,10 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
       if (missing.length) {
         return hold(wording.askFor(voice(qso), qso.stage === "pieces" ? missing.slice(0, 1) : missing));
       }
-      if (qso.stage === "pieces" && qso.piece < wording.PIECES.length) {
+      const at = nextPiece(qso, qso.piece);
+      if (qso.stage === "pieces" && at < wording.PIECES.length) {
         const open = over.pieces().length || over.acknowledges() ? wording.gotPiece(voice(qso)) : "";
-        return say({ ...qso, piece: qso.piece + 1 }, wording.piece(voice(qso), qso.piece, open));
+        return say({ ...qso, piece: at + 1 }, wording.piece(voice(qso), at, open));
       }
       return say(qso, wording.signFirst(voice(qso)), "signing");
     }

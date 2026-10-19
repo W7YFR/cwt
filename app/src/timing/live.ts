@@ -112,6 +112,10 @@ function measured(segments: readonly Segment[], timing: Timing): Timing {
   }
 }
 
+/** The least peak, as a fraction of full scale, that can be keying: -60
+ *  dBFS. A sender keys well above it. */
+export const MIN_KEYING_PEAK = 0.001;
+
 /** Decode what has been keyed so far.
  *
  * Give `toneHz` once it is known. Finding the tone is most of the cost of a
@@ -138,7 +142,9 @@ export function sentSymbols(
     const a = Math.abs(samples[i]!);
     if (a > peak) peak = a;
   }
-  if (!(peak > 0)) return none;
+  // Quieter than this is not keying. Each pass scales the audio to its own
+  // peak, so without a floor a faint noise floor reads as marks.
+  if (!(peak >= MIN_KEYING_PEAK)) return none;
   // The threshold works on absolute amplitude, as in the review.
   const scaled = new Float32Array(samples.length);
   for (let i = 0; i < samples.length; i++) scaled[i] = samples[i]! / peak;

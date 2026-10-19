@@ -58,6 +58,17 @@ function copyOf(
 }
 
 describe("copying an over", () => {
+  it("reads nothing from keying below the floor, however clean", () => {
+    const timing = targetTiming(25);
+    const keyed = synthesize("K7PP", timing, { rate: 48000, padSec: 0.3 }).samples;
+    let peak = 0;
+    for (const v of keyed) peak = Math.max(peak, Math.abs(v));
+    const at = (level: number) => sentSymbols(keyed.map((v) => (v / peak) * level), 48000, timing).text;
+    expect(at(0.01)).toBe("K7PP");
+    expect(at(0.0005)).toBe("");
+    expect(at(0.00001)).toBe("");
+  });
+
   it("reads the words with spaces between them", () => {
     const last = copyOf("CQ CQ DE W7YFR K", 20, 2).at(-1)!;
     expect(last.text).toBe("CQ CQ DE W7YFR K");
@@ -542,11 +553,56 @@ describe("questions about one thing", () => {
     expect(answer(q, "NAME? QTH? KN", FIRST).reply).toBe(`NAME ${name} ${name} QTH ${qth} ${qth} K`);
   });
 
-  it("does not move the QSO on, and AGN after it still means the over before", () => {
+  it("does not move the QSO on alone, and AGN after it gets the answer again", () => {
     const q = exchanged();
     const t = answer(q, "NAME? KN", FIRST);
     expect(t.qso.stage).toBe("exchanged");
-    expect(answer(t.qso, "AGN KN", FIRST).reply).toBe(q.last);
+    expect(answer(t.qso, "AGN KN", FIRST).reply).toBe(t.reply);
+    expect(answer(t.qso, "QRS KN", FIRST).reply).toBe(t.reply);
+  });
+
+  it("confirms its QTH, name or report sent back with a ?", () => {
+    const q = exchanged();
+    const { name, qth, rst } = q.them;
+    for (const [over, item] of [
+      [`${qth} ? KN`, qth],
+      [`${qth}? KN`, qth],
+      [`${name}? KN`, name],
+      [`${rst} ? KN`, rst],
+    ] as const) {
+      const t = answer(q, over, FIRST);
+      expect(t.reply).toBe(`R R ${item} K`);
+      expect(t.qso.stage).toBe("exchanged");
+    }
+  });
+
+  it("does not move on for a check, even with an acknowledgement", () => {
+    const q = exchanged();
+    const t = answer(q, `R ${q.them.qth} ? KN`, FIRST);
+    expect(t.reply).toBe(`R R ${q.them.qth} K`);
+    expect(t.qso.stage).toBe("exchanged");
+  });
+
+  it("answers and sends its next piece when the over goes on", () => {
+    const ctx: Context = { ...FIRST, length: "pieces" };
+    let q = answer(newQso(seeded()), "CQ DE W7YFR K", ctx).qso;
+    const { call: c, name, qth } = q.them;
+    q = answer(q, `${c} DE W7YFR UR 599 KN`, ctx).qso;
+    const t = answer(q, "TU FER RPT QTH IS SEATTLE QTH? KN", ctx);
+    expect(t.reply).toBe(`QTH ${qth} ${qth} <BT> W7YFR DE ${c} R NAME ${name} ${name} KN`);
+    expect(answer(t.qso, "AGN KN", ctx).reply).toBe(t.reply);
+    // It still waits for your name, so it asks for it with each answer.
+    expect(answer(t.qso, `${qth} ? KN`, ctx).reply).toBe(`R R ${qth} <BT> UR NAME? KN`);
+    expect(answer(t.qso, "QTH? KN", ctx).reply).toBe(`QTH ${qth} ${qth} <BT> UR NAME? KN`);
+    // Its QTH went with the answer, so your name settles the last piece.
+    expect(answer(t.qso, "NAME BOB KN", ctx).qso.stage).toBe("signing");
+  });
+
+  it("answers and signs when the over goes on after its exchange", () => {
+    const q = exchanged();
+    const t = answer(q, "R TU QTH? KN", FIRST);
+    expect(t.reply).toMatch(new RegExp(`^QTH ${q.them.qth} ${q.them.qth} <BT> `));
+    expect(t.qso.stage).toBe("signing");
   });
 
   it("takes HW? as part of an exchange, not a question", () => {

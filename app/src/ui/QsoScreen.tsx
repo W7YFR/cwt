@@ -137,6 +137,9 @@ const THEIR_TEXT_HELP =
   "What shows of the station's lines: whole as soon as one starts, each character as it is " +
   "sent, the same blurred, a box to type your copy in, or nothing. A change applies to the " +
   "lines already shown, and what you typed stays. All of it shows when the QSO ends.";
+const REPLAY_HELP =
+  "When you press Continue, the station sends its last line again before your turn.";
+
 const BLUR_CALL_HELP =
   "While the station's text is blurred, a copy box or off, its call is blurred in the log " +
   "too, until the QSO ends.";
@@ -215,6 +218,8 @@ function recallKept(): Kept | null {
   const closed = [...new Set([...k.closed, ...ended])];
   return {
     ...(k as Kept),
+    // A QSO kept before `told` was added.
+    qso: { ...(k.qso as Qso), told: Array.isArray(k.qso.told) ? k.qso.told : [] },
     finished,
     closed,
     stopped:
@@ -361,7 +366,13 @@ function Graded({ line }: { line: Line }): React.ReactElement {
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(
-  key: "qsoSettingsOpen" | "qsoLockCopy" | "qsoShowSpeed" | "qsoShowTheirSpeed" | "qsoBlurCall",
+  key:
+    | "qsoSettingsOpen"
+    | "qsoLockCopy"
+    | "qsoShowSpeed"
+    | "qsoShowTheirSpeed"
+    | "qsoBlurCall"
+    | "qsoReplay",
   or: boolean,
 ): readonly [boolean, (next: boolean) => void] {
   const [value, setRaw] = useState<boolean>(() => loadPrefs()[key] ?? or);
@@ -443,6 +454,7 @@ export function QsoScreen({
   };
   const [settingsOpen, setSettingsOpen] = useOnOff("qsoSettingsOpen", false);
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
+  const [replayOnContinue, setReplayOnContinue] = useOnOff("qsoReplay", true);
   const [lockCopy, setLockCopy] = useOnOff("qsoLockCopy", true);
   const [lockedShows, setLockedShowsRaw] = useState<LockedShows>(
     () => loadPrefs().qsoLockedShows ?? "nothing",
@@ -468,8 +480,8 @@ export function QsoScreen({
   const [stopped, setStopped] = useState(() => kept?.stopped ?? true);
   /** Pause, not Stop, is ending the session now. */
   const pausing = useRef(false);
-  /** Continue was pressed: once the microphone is open, the station's last
-   *  over plays again. */
+  /** Continue was pressed with Replay on Continue on: once the microphone
+   *  is open, the station's last over plays again. */
   const replayOnStart = useRef(false);
   const replay = useRef<() => void>(() => {});
   /** The reply now waiting to go in the log, so a pause or a reload in the
@@ -852,7 +864,9 @@ export function QsoScreen({
     setStopped(false);
     setPlaying(null);
     answered.current = -1;
-    replayOnStart.current = true;
+    // A reply still due goes out either way. The setting is for the last
+    // over, already in the log.
+    replayOnStart.current = replayOnContinue || pending.current !== null;
     void rec.start().finally(() => setStarting(false));
   };
 
@@ -994,7 +1008,7 @@ export function QsoScreen({
 
   const status = !recorder
     ? open
-      ? "Press Continue to go on with the QSO."
+      ? "Press Continue to go on with the QSO, or Restart for a new one."
       : "Press Start, then call CQ."
     : phase === "listening"
       ? qso.current.stage === "cq"
@@ -1092,6 +1106,13 @@ export function QsoScreen({
                     options={LENGTHS}
                     onChange={(v) => setLength(v as LengthChoice)}
                   />
+                  <Check
+                    id="qso-replay"
+                    label="Replay on Continue"
+                    help={REPLAY_HELP}
+                    checked={replayOnContinue}
+                    onChange={setReplayOnContinue}
+                  />
                 </div>
               </Section>
               <Section name="theirs" title="Station text">
@@ -1176,14 +1197,27 @@ export function QsoScreen({
               Allow the microphone
             </button>
           ) : !recorder ? (
-            <button
-              className="primary"
-              data-testid={open ? "qso-continue" : "qso-start"}
-              disabled={rec.probing || rec.blocked || rec.busy || starting}
-              onClick={open ? resume : start}
-            >
-              <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
-            </button>
+            <>
+              <button
+                className="primary"
+                data-testid={open ? "qso-continue" : "qso-start"}
+                disabled={rec.probing || rec.blocked || rec.busy || starting}
+                onClick={open ? resume : start}
+              >
+                <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
+              </button>
+              {/* Restart clears the log and starts a new QSO with a new
+                  station, as Start does when there is nothing to go on with. */}
+              {open && !starting && (
+                <button
+                  data-testid="qso-restart"
+                  disabled={rec.probing || rec.blocked || rec.busy}
+                  onClick={start}
+                >
+                  Restart
+                </button>
+              )}
+            </>
           ) : (
             <>
               <button data-testid="qso-pause" onClick={pause}>

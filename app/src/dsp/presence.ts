@@ -23,6 +23,11 @@
  * magnitude wide on both sides of the threshold below, which is the only
  * reason a single scalar is defensible here.
  *
+ * One sound passes that test and is not keying: noise through a narrow
+ * filter, as a line cleaned up for CW has. The filter makes the noise peak in
+ * the band, broadly. A tone is narrow. So the peak must also stand above the
+ * bins just beside it: see `KEYING_NARROWNESS`.
+ *
  * The failure direction is safe. Something that is not keying but does hold a
  * dominant tone — a carrier, a whistle — passes, and is then decoded as badly
  * as it would have been before this existed. Nothing that was working stops.
@@ -38,6 +43,26 @@ import { goertzelPower, TONE_MAX_HZ, TONE_MIN_HZ } from "./tone";
  * and 1.9x below synthetic keying at 0 dB SNR — noise as loud as the signal,
  * which is past anything the decoder can read anyway. */
 export const KEYING_PROMINENCE = 100;
+
+/** How far the strongest bin must stand above the bins 50 to 150 Hz either
+ *  side of it.
+ *
+ * A keyed tone is a few hertz wide, so its neighbours hold only the noise.
+ * Filtered noise is a broad hump, so its neighbours are nearly as strong:
+ * 7.0 to 10.9 on a line through a 550 Hz band-pass with nobody keying, and
+ * 1.6 to 3.0 for silence. Real keying measured 138 at worst, single dits
+ * through a webcam across the room. 35 sits more than 3x from both. White
+ * noise is flat, so this asks no more of keying in white noise than the band
+ * test does. */
+export const KEYING_NARROWNESS = 35;
+
+/** The neighbours: this far either side of the strongest bin, Hz. */
+const NEAR_FROM_HZ = 50;
+const NEAR_TO_HZ = 150;
+
+/** Step for the narrow look around the strongest bin, Hz. Fine enough that
+ *  the tone itself is not missed between steps. */
+const FINE_STEP_HZ = 5;
 
 /** Rate to survey at. Comfortably above twice the top of the band, and the
  *  same choice tone.ts makes, so both see the same spectrum. */
@@ -56,6 +81,8 @@ export interface Presence {
    *  unchanged by scaling the input, which is what makes it usable after
    *  peak normalization. */
   readonly prominence: number;
+  /** Strongest bin over the bins just beside it. Unchanged by scaling too. */
+  readonly narrowness: number;
   /** Whether anything in here is worth decoding. */
   readonly keyed: boolean;
 }
@@ -69,7 +96,7 @@ function medianOf(v: readonly number[]): number {
 
 /** Look for a tone in the CW band, and say whether one is there. */
 export function tonePresence(samples: Float32Array, rate: number): Presence {
-  const none: Presence = { prominence: 0, keyed: false };
+  const none: Presence = { prominence: 0, narrowness: 0, keyed: false };
   if (samples.length === 0) return none;
 
   const factor = Math.max(1, Math.floor(rate / SURVEY_RATE));
@@ -85,13 +112,23 @@ export function tonePresence(samples: Float32Array, rate: number): Presence {
   // and a keyed tone that is only present a third of the time still
   // accumulates across every block it appears in.
   const blockLen = Math.max(16, Math.min(x.length, Math.round(r / BIN_HZ)));
-  const powers: number[] = [];
-  for (let f = lo; f <= hi + 1e-9; f += STEP_HZ) {
+  const power = (f: number) => {
     let total = 0;
     for (let at = 0; at + blockLen <= x.length; at += blockLen) {
       total += goertzelPower(x, r, f, at, at + blockLen);
     }
-    powers.push(total);
+    return total;
+  };
+  const powers: number[] = [];
+  let strongest = lo;
+  let most = -1;
+  for (let f = lo; f <= hi + 1e-9; f += STEP_HZ) {
+    const p = power(f);
+    if (p > most) {
+      most = p;
+      strongest = f;
+    }
+    powers.push(p);
   }
   if (powers.length === 0) return none;
 
@@ -104,5 +141,28 @@ export function tonePresence(samples: Float32Array, rate: number): Presence {
   // A floor of exactly zero is a tone with no noise under it anywhere else in
   // the band, which is as prominent as a tone can get.
   const prominence = floor > 0 ? peak / floor : Infinity;
-  return { prominence, keyed: prominence >= KEYING_PROMINENCE };
+  if (prominence < KEYING_PROMINENCE) return { prominence, narrowness: 0, keyed: false };
+  const narrowness = narrownessAt(power, strongest, r);
+  return { prominence, narrowness, keyed: narrowness >= KEYING_NARROWNESS };
+}
+
+/** The strongest bin near `around`, found at a finer step, over the median of
+ *  the bins `NEAR_FROM_HZ` to `NEAR_TO_HZ` either side of it. */
+function narrownessAt(power: (f: number) => number, around: number, rate: number): number {
+  let top = 0;
+  let at = around;
+  for (let f = around - STEP_HZ; f <= around + STEP_HZ; f += FINE_STEP_HZ) {
+    const p = power(f);
+    if (p > top) {
+      top = p;
+      at = f;
+    }
+  }
+  const near: number[] = [];
+  for (let d = NEAR_FROM_HZ; d <= NEAR_TO_HZ; d += FINE_STEP_HZ) {
+    for (const f of [at - d, at + d]) if (f > 0 && f < rate / 2) near.push(power(f));
+  }
+  const floor = medianOf(near);
+  if (!(top > 0)) return 0;
+  return floor > 0 ? top / floor : Infinity;
 }
