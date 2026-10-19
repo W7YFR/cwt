@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.10.2 — 2026-10-19
+
 ### Development
 
 - The QSO tests run on a fake clock, in seconds, in the dom tier. One QSO still runs in real audio in the browser tier.
