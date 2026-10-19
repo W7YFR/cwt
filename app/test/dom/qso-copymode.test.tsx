@@ -10,6 +10,7 @@ import {
   $$,
   fill,
   key,
+  lastSent,
   open,
   press,
   row,
@@ -76,23 +77,23 @@ describe("copy mode options", () => {
   });
 
   it("shows only your copy marked, when asked, with a blank for each character left out", async () => {
-    // The exchange, which always opens with your call and DE. The answer to
-    // the CQ has wordings that do not.
     await open({ qsoTheirText: "before", qsoLockedShows: "right" });
     await send("CQ CQ DE W7YFR W7YFR K");
     await showTheirs("Copy");
     await send(EXCHANGE);
+    // The first two words of the station's line, as it sent them.
+    const typed = lastSent().split(" ").slice(0, 2).join(" ");
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
-    await fill(box, "w7yfr de");
+    await fill(box, typed.toLowerCase());
     box.focus();
       await press("Enter");
     const shown = $('[data-testid="qso-right-only"]');
     expect(shown).not.toBeNull();
-    // Your copy, W7YFR DE, as typed: each character right. The rest of the
-    // station's line is blanks, each marked missed, so the copy does not look
-    // whole. Nothing of the station's characters or the count shows.
-    expect(shown!.textContent!.trimEnd()).toBe("W7YFR DE");
-    expect(shown!.querySelectorAll(".cright")).toHaveLength(7);
+    // Your copy as typed: each character right. The rest of the station's
+    // line is blanks, each marked missed, so the copy does not look whole.
+    // Nothing of the station's characters or the count shows.
+    expect(shown!.textContent!.trimEnd()).toBe(typed);
+    expect(shown!.querySelectorAll(".cright")).toHaveLength(typed.replace(/ /g, "").length);
     const missed = [...shown!.querySelectorAll(".cwrong")];
     expect(missed.length).toBeGreaterThan(0);
     expect(missed.every((m) => m.textContent === " "), "missed as blanks").toBe(true);

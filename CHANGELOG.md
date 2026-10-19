@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- On the **QSO** page, the station opens a line with both calls now and then by its own habit, and most of the time when you do. It no longer sends them at the start of nearly every line.
+- On the **QSO** page, the station opens a line with both calls now and then by its own habit, and more often when you do. It no longer sends them at the start of nearly every line.
 
 ### Fixed
 

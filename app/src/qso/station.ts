@@ -67,6 +67,6 @@ export function randomStation(rand: Rand, not = ""): Station {
     qth: pick(rand, QTHS),
     rst: pick(rand, RSTS),
     toneHz: 550 + Math.round(rand() * 20) * 10,
-    habit: 0.1 + 0.8 * rand(),
+    habit: 0.05 + 0.3 * rand(),
   };
 }

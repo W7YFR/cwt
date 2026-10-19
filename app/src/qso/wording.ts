@@ -9,8 +9,8 @@
  * the exchange comes one item per over.
  *
  * A line in the middle of the QSO opens with both calls by the station's own
- * habit, and most of the time when your last over did. Its first exchange
- * and its sign-off always carry them.
+ * habit, and half the time when your last over did. A full exchange ends
+ * with them, and the sign-off carries them.
  */
 
 import { pick, type Rand, type Station } from "./station";
@@ -53,8 +53,8 @@ export function greeting(hour: number): string {
 }
 
 /** How often a line opens with both calls when your last over did. Operators
- *  match each other's style, most of the time. */
-const MIRROR = 0.8;
+ *  match each other's style, now and then. */
+const MIRROR = 0.5;
 
 /** Whether a line in the middle of the QSO opens with both calls: by the
  *  station's own habit, and more often when your last over did. */
@@ -162,14 +162,16 @@ export function exchange(s: Say, gotReport: boolean): string {
   const hello = maybe(rand, `${greeting(s.hour)} ${to(s)}`);
   const parts = [report(s), nameOf(s), qthOf(s)];
   if (rand() >= KEEP) parts.splice(1, 2, parts[2]!, parts[1]!);
+  // Both calls first by habit. A full exchange ends with them all the same.
+  const head = opens(s) ? `${s.you} DE ${c}` : "";
   if (short(s)) {
     const ask = pick(rand, ["HW?", ""]);
-    return words(s.you, "DE", c, open, ...parts, ask, pick(rand, ["KN", "BK", "K"]));
+    return words(head, open, ...parts, ask, pick(rand, ["KN", "BK", "K"]));
   }
   const bt = rand() < 0.3 ? "<BT>" : "";
   const ask = pick(rand, ["HW?", "HW CPY?", "SO HW?", ""]);
   const end = pick(rand, ["KN", "K", "BK"]);
-  return words(s.you, "DE", c, open, hello, bt, ...parts, ask, s.you, "DE", c, end);
+  return words(head, open, hello, bt, ...parts, ask, s.you, "DE", c, end);
 }
 
 /** One piece of the exchange, for piece by piece: piece `at` of `PIECES`.
@@ -182,7 +184,7 @@ export function piece(s: Say, at: number, open: string): string {
   const c = s.them.call;
   const first = at === 0;
   const last = at === PIECES.length - 1;
-  const head = first || opens(s) ? `${s.you} DE ${c}` : "";
+  const head = opens(s) ? `${s.you} DE ${c}` : "";
   const hello = first ? maybe(rand, `${greeting(s.hour)} ${to(s)}`) : "";
   const ask = last ? pick(rand, ["HW?", "HW CPY?", "SO HW?"]) : "";
   const end = pick(rand, ["KN", "BK", "K"]);

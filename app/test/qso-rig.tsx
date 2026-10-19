@@ -63,6 +63,12 @@ export const $$ = <T extends Element = HTMLElement>(sel: string) => [...host.que
 export const status = () => $(".qsostatus")?.textContent ?? "";
 export const note = () => $(".qsonote")?.textContent ?? "";
 export const theirs = () => $$(".qsolog li.them");
+/** The text of the station's last line, as the page keeps it. Shown or not,
+ *  the log the page saves for a reload holds it. */
+export const lastSent = (): string => {
+  const kept = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}") as { lines?: { you: boolean; text: string }[] };
+  return (kept.lines ?? []).filter((l) => !l.you).at(-1)?.text ?? "";
+};
 /** Your turn to send: between QSOs it says to call CQ, during one it says
  *  it is your turn. */
 export const yourTurn = () => status() === "Call CQ to make a contact." || status() === "Your turn.";

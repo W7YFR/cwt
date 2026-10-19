@@ -7,9 +7,9 @@ import {
   EXCHANGE,
   $,
   $$,
-  callIn,
   click,
   fill,
+  lastSent,
   note,
   open,
   row,
@@ -28,7 +28,7 @@ describe("copying the station", () => {
   it("keeps the copy open after the last over, and grades it on request", async () => {
     // Lock off, so the first box is still open when the last over ends.
     await open({ qsoTheirText: "before", qsoLockCopy: false });
-    const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
+    await send("CQ CQ DE W7YFR W7YFR K");
 
     // Copy on mid-QSO: the over already read gets no box.
     await showTheirs("Copy");
@@ -37,7 +37,9 @@ describe("copying the station", () => {
     await send(EXCHANGE);
     const boxes = () => $$<HTMLInputElement>('[data-testid="qso-type"]');
     expect(boxes()).toHaveLength(1);
-    await fill(boxes()[0]!, `w7yfr de ${call}`);
+    // The first three words of the station's line, as it sent them.
+    const typed = lastSent().split(" ").slice(0, 3).join(" ");
+    await fill(boxes()[0]!, typed.toLowerCase());
 
     await send("R TNX 73 <SK>");
     expect(boxes(), "both boxes open after the last over").toHaveLength(2);
@@ -49,8 +51,8 @@ describe("copying the station", () => {
     const graded = $$(".qsolog .graded");
     expect(graded).toHaveLength(2);
     // Your copy as typed, over what was sent, then the count.
-    expect(row(graded[0]!, "yourcopy")).toBe(`W7YFR DE ${call}`);
-    expect(row(graded[0]!, "sentcopy")).toMatch(new RegExp(`^W7YFR DE ${call} `));
+    expect(row(graded[0]!, "yourcopy")).toBe(typed);
+    expect(row(graded[0]!, "sentcopy").startsWith(`${typed} `)).toBe(true);
     expect(graded[0]!.querySelector(".copied")!.textContent).toMatch(/^\d+ of \d+ copied$/);
     expect(note()).toBe("The QSO is over. Call CQ for the next one.");
   });
