@@ -1,0 +1,225 @@
+/* The QSO page, end to end: what the qso-*.browser.test.ts files share.
+ *
+ * The microphone is a keyer: a tone the test keys any text into while the
+ * page runs. So a test can work a whole QSO the way a person does: call CQ,
+ * read what the station sent, answer it, and look at the page at each turn.
+ * The decoder worker, the script and the player are the real ones. The pure
+ * tier tests the script's answers one over at a time. These are the tests
+ * that they come together in the right order on the page.
+ *
+ * A QSO plays in real time, so the tests are in several files. Vitest runs
+ * files side by side, and the tests in one file one after another.
+ */
+
+import { afterEach, beforeEach, expect } from "vitest";
+import { userEvent } from "vitest/browser";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { keyingPlan } from "@/audio/synth";
+import { savePrefs, type Prefs } from "@/io/storage";
+import { targetTiming } from "@/timing";
+import { QsoScreen } from "@/ui/QsoScreen";
+import "@/ui/base.css";
+
+/** Fast enough that a QSO fits in a test, slow enough to copy cleanly. Even
+ *  so, a Short QSO runs most of a minute: the station's exchange alone is some
+ *  fifty characters, and each over waits two seconds after its K. */
+export const WPM = 45;
+
+/** Long enough for a whole QSO. */
+export const QSO_MS = 120_000;
+
+/** Your exchange, with no call in it. The station takes it as its own, since
+ *  nobody else is on the frequency. A call in it is a risk the tests do not
+ *  need: one character of it misread, as on a busy machine, and the station
+ *  puts its call right, or takes yours for another station. */
+export const EXCHANGE = "UR 599 NAME BOB QTH SALEM OR KN";
+
+/** A stream the test keys text into. */
+function keyer(): { key(text: string): Promise<void>; restore(): void } {
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  osc.frequency.value = 600;
+  const gate = ctx.createGain();
+  gate.gain.value = 0;
+  const dest = ctx.createMediaStreamDestination();
+  osc.connect(gate).connect(dest);
+  osc.start();
+  const was = navigator.mediaDevices.getUserMedia;
+  navigator.mediaDevices.getUserMedia = () => Promise.resolve(dest.stream);
+  return {
+    async key(text) {
+      let t = ctx.currentTime + 0.1;
+      for (const [on, sec] of keyingPlan(text, targetTiming(WPM, WPM))) {
+        gate.gain.setValueAtTime(on ? 0.5 : 0, t);
+        t += sec;
+      }
+      gate.gain.setValueAtTime(0, t);
+      await wait((t - ctx.currentTime) * 1000);
+    },
+    restore() {
+      navigator.mediaDevices.getUserMedia = was;
+      void ctx.close();
+    },
+  };
+}
+
+let host: HTMLDivElement;
+let root: Root;
+let mic: ReturnType<typeof keyer>;
+let errors: string[];
+
+/** Key `text` into the microphone, and wait until it has played. */
+export const key = (text: string): Promise<void> => mic.key(text);
+
+/** The element the page is mounted in. */
+export const page = (): HTMLDivElement => host;
+
+/** The page goes, without a Stop, as on a reload. Mount it again after. */
+export function unmount(): void {
+  act(() => root.unmount());
+  root = createRoot(host);
+}
+
+/** Time passing, inside act, so the page's updates land in it. */
+export const wait = (ms: number) =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, ms));
+  });
+
+/** Wait until `ok` holds, or fail saying `what`. */
+export async function until(what: string, ok: () => boolean, ms = 30_000): Promise<void> {
+  for (let t = 0; t < ms; t += 100) {
+    if (ok()) return;
+    await wait(100);
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+export const $ = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel);
+export const $$ = <T extends Element = HTMLElement>(sel: string) => [...host.querySelectorAll<T>(sel)];
+export const status = () => $(".qsostatus")?.textContent ?? "";
+export const note = () => $(".qsonote")?.textContent ?? "";
+export const theirs = () => $$(".qsolog li.them");
+/** Your turn to send: between QSOs it says to call CQ, during one it says
+ *  it is your turn. */
+export const yourTurn = () => status() === "Call CQ to make a contact." || status() === "Your turn.";
+
+export async function click(el: HTMLElement | null): Promise<void> {
+  expect(el, "a control to click").not.toBeNull();
+  await act(async () => el!.click());
+}
+
+/** Choose what shows of the station's overs, in the settings: one of the
+ *  buttons, by its label. */
+export async function showTheirs(label: string): Promise<void> {
+  if ($('[data-testid="panel-toggle"]')?.getAttribute("aria-pressed") !== "true") {
+    await click($('[data-testid="panel-toggle"]'));
+  }
+  const button = $$<HTMLButtonElement>('[data-testid="qso-their-text"] button').find(
+    (b) => b.textContent === label,
+  );
+  await click(button ?? null);
+  expect(button!.getAttribute("aria-pressed")).toBe("true");
+}
+
+/** One row of a graded copy, as read: yours over the station's, each a
+ *  column's text, words split where the columns are. */
+export function row(graded: Element, side: "yourcopy" | "sentcopy"): string {
+  return [...graded.querySelectorAll(".cword")]
+    .map((w) => [...w.querySelectorAll(`.${side}`)].map((c) => c.textContent).join(""))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Move the slider `id` to `value`, as a drag would. */
+export async function slide(id: string, value: number): Promise<void> {
+  const el = $<HTMLInputElement>(`#${id}`)!;
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  await act(async () => {
+    set.call(el, String(value));
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+/** Mount the page with these choices and press Start. */
+export async function open(prefs: Prefs): Promise<void> {
+  mount(prefs);
+  await until("the Start button", () => {
+    const b = $<HTMLButtonElement>('[data-testid="qso-start"]');
+    return !!b && !b.disabled;
+  });
+  await click($('[data-testid="qso-start"]'));
+  await until("the session to start", () => yourTurn());
+  // A moment before the first over, as a person takes. Keyed the instant the
+  // device opens, the first character can come out wrong under load.
+  await wait(500);
+}
+
+/** Mount the page with these choices. */
+export function mount(prefs: Prefs): void {
+  savePrefs({ charWpm: WPM, farnsworthWpm: WPM, qsoLength: "short", ...prefs });
+  act(() =>
+    root.render(
+      createElement(QsoScreen, {
+        deviceId: undefined,
+        onDeviceChange: () => {},
+        profiles: [],
+        profileId: undefined,
+        onProfileChange: () => {},
+        onCalibrate: () => {},
+        onError: (m: string) => errors.push(m),
+        onConfigure: () => {},
+        onPage: () => {},
+      }),
+    ),
+  );
+}
+
+/** Key `text`, then wait for the station's answer and for the turn to come
+ *  back. Returns the station's over, as a line of the log. */
+export async function send(text: string): Promise<HTMLElement> {
+  const before = theirs().length;
+  await mic.key(text);
+  await until(`an answer to ${text}`, () => theirs().length > before);
+  await until("the turn to come back", () => yourTurn());
+  return theirs()[theirs().length - 1]!;
+}
+
+/** The station's call, read off an over that shows whole. */
+export function callIn(line: HTMLElement): string {
+  const text = line.querySelector(".text")?.textContent ?? "";
+  const call = text.split(" ").find((w) => /^[A-Z0-9]?[A-Z]\d[A-Z]+$/.test(w) && w !== "W7YFR");
+  expect(call, `a call in "${text}"`).toBeDefined();
+  return call!;
+}
+
+/** A fresh page and microphone for each test in the file that calls this. */
+export function useQsoPage(): void {
+  beforeEach(async () => {
+    // A real click first: the browser holds audio until a gesture.
+    const go = document.createElement("button");
+    go.textContent = "go";
+    document.body.append(go);
+    await userEvent.click(go);
+    go.remove();
+
+    localStorage.clear();
+    errors = [];
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    mic = keyer();
+  });
+
+  afterEach(async () => {
+    const stop = $<HTMLButtonElement>('[data-testid="qso-stop"]');
+    if (stop) await click(stop);
+    act(() => root.unmount());
+    host.remove();
+    mic.restore();
+    localStorage.clear();
+    expect(errors, "errors the page reported").toEqual([]);
+  });
+}

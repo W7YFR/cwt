@@ -106,7 +106,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           PREVIOUS: ${{ steps.version.outputs.previous }}
 
-  # The gate. Required in the ruleset on main, along with `version`.
+  # The gate, with `browser`. Both are required in the ruleset on main, along
+  # with `version`.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -130,10 +131,22 @@ jobs:
       # Pure + DOM. Milliseconds, no browser needed.
       - run: npm test
 
-      # The third tier needs a real Chromium — jsdom has no canvas and no Web
-      # Audio, so the rendering and capture paths are only actually exercised
-      # here. `--with-deps` because a bare runner lacks the shared libraries
-      # the browser links against.
+  # The third tier needs a real Chromium — jsdom has no canvas and no Web
+  # Audio, so the rendering and capture paths are only actually exercised
+  # here. Its own job, so it starts at once rather than after the tiers above:
+  # its QSO tests play in real time and take the longest.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+
+      # `--with-deps` because a bare runner lacks the shared libraries the
+      # browser links against.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
 
@@ -165,7 +178,7 @@ jobs:
           BEFORE: ${{ github.event.before }}
 
   build:
-    needs: [test, changes]
+    needs: [test, browser, changes]
     if: needs.changes.outputs.ships == 'true'
     runs-on: ubuntu-latest
     steps:

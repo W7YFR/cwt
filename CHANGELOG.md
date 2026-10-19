@@ -7,6 +7,12 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Development
+
+- The QSO browser tests are in five files, which run side by side.
+- The QSO browser tests send their exchange without calls, so a misread call no longer fails them.
+- CI runs the browser tests in their own `browser` job, beside `test`.
+
 ## v1.10.0 — 2026-10-18
 
 ### Added
