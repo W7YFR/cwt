@@ -428,15 +428,24 @@ export function ChoiceGroup({
   label: string;
   help?: string;
   value: string;
-  options: ReadonlyArray<{ value: string; label: string }>;
+  /** Each choice, with a sentence on what it does. The chosen one's shows
+   *  under the buttons. */
+  options: ReadonlyArray<{ value: string; label: string; note?: string }>;
   onChange(value: string): void;
 }): React.ReactElement {
+  const note = options.find((o) => o.value === value)?.note;
   return (
     <div className="group choicegroup" title={help}>
       <span className="caption" id={`${id}-label`}>
         {label}
       </span>
-      <div className="modeswitch" role="group" aria-labelledby={`${id}-label`} data-testid={id}>
+      <div
+        className="modeswitch"
+        role="group"
+        aria-labelledby={`${id}-label`}
+        aria-describedby={note ? `${id}-note` : undefined}
+        data-testid={id}
+      >
         {options.map((o) => (
           <button
             key={o.value}
@@ -448,6 +457,11 @@ export function ChoiceGroup({
           </button>
         ))}
       </div>
+      {note && (
+        <span className="note" id={`${id}-note`}>
+          {note}
+        </span>
+      )}
     </div>
   );
 }

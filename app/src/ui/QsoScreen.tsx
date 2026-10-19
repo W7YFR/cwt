@@ -117,16 +117,19 @@ type CopyMode = "strict" | "lenient";
 interface Option<T> {
   readonly value: T;
   readonly label: string;
+  /** What it does, in a sentence, shown under the choice while it is the one
+   *  chosen. */
+  readonly note?: string;
 }
 
 /** A length to choose: one of the script's, or a mix of them. */
 type LengthChoice = Length | "mixed";
 
 const LENGTHS: ReadonlyArray<Option<LengthChoice>> = [
-  { value: "full", label: "Full" },
-  { value: "short", label: "Short" },
-  { value: "pieces", label: "Piece by piece" },
-  { value: "mixed", label: "Mixed" },
+  { value: "full", label: "Full", note: "Its report, name and QTH in one line, each sent twice." },
+  { value: "short", label: "Short", note: "Its report, name and QTH in one line, each sent once." },
+  { value: "pieces", label: "Piece by piece", note: "Its report, name and QTH one at a time, a line each." },
+  { value: "mixed", label: "Mixed", note: "Any of these, changing from one station to the next." },
 ];
 const LENGTH_HELP =
   "How much the station says in each line. Full sends each item twice, Short once, and " +
@@ -138,19 +141,19 @@ const LENGTH_HELP =
 const MIXED_PIECES = 1 / 3;
 
 const COPY_MODES: ReadonlyArray<Option<CopyMode>> = [
-  { value: "lenient", label: "Lenient" },
-  { value: "strict", label: "Strict" },
+  { value: "lenient", label: "Lenient", note: "It allows your own spacing, and a call one letter off." },
+  { value: "strict", label: "Strict", note: "It wants your set speed, and the call sent exactly." },
 ];
 const COPY_HELP =
   "How the station reads your sending. Lenient reads it at your own spacing and takes a " +
   "call with one character wrong. Strict reads it at your speed and takes only calls sent exactly.";
 
 const THEIR_TEXTS: ReadonlyArray<Option<TheirText>> = [
-  { value: "before", label: "Whole" },
-  { value: "sent", label: "As sent" },
-  { value: "hidden", label: "Blurred" },
-  { value: "copy", label: "Copy" },
-  { value: "none", label: "Off" },
+  { value: "before", label: "Whole", note: "Each line shows whole as soon as it starts." },
+  { value: "sent", label: "As sent", note: "Each letter shows as it is sent." },
+  { value: "hidden", label: "Blurred", note: "Each line shows blurred until the QSO ends." },
+  { value: "copy", label: "Copy", note: "A box to type what you hear, graded when the QSO ends." },
+  { value: "none", label: "Off", note: "Nothing shows until the QSO ends." },
 ];
 const THEIR_TEXT_HELP =
   "What shows of the station's lines: whole as soon as one starts, each character as it is " +
@@ -166,9 +169,9 @@ const BLUR_CALL_HELP =
 /** When the play buttons show. */
 type Playback = "never" | "always" | "end";
 const PLAYBACKS: ReadonlyArray<Option<Playback>> = [
-  { value: "never", label: "Never" },
-  { value: "always", label: "Always" },
-  { value: "end", label: "At end" },
+  { value: "never", label: "Never", note: "No buttons to play lines again." },
+  { value: "always", label: "Always", note: "On every line. They play once the microphone is off." },
+  { value: "end", label: "At end", note: "On every line once the QSO is over, with Play QSO." },
 ];
 const PLAYBACK_HELP =
   "When the play buttons show: on each line and as Play QSO under a QSO that is over. " +
@@ -177,9 +180,9 @@ const PLAYBACK_HELP =
 const SHOW_DOWNLOAD_HELP = "Under a QSO that is over, Download saves it as a WAV file.";
 
 const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
-  { value: "sent", label: "As sent" },
-  { value: "hidden", label: "Blurred" },
-  { value: "none", label: "Off" },
+  { value: "sent", label: "As sent", note: "Each letter shows as you send it." },
+  { value: "hidden", label: "Blurred", note: "Your lines show blurred until the QSO ends." },
+  { value: "none", label: "Off", note: "Nothing shows of your lines until the QSO ends." },
 ];
 const YOUR_TEXT_HELP =
   "What shows of your own lines as you send them: each character, the same blurred, or nothing.";
@@ -276,9 +279,9 @@ const LOCK_HELP =
   "Your copy of the station's line can no longer change once you start sending. " +
   "Enter in the box locks it too.";
 const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
-  { value: "nothing", label: "My copy" },
-  { value: "right", label: "What I got right" },
-  { value: "grade", label: "Graded result" },
+  { value: "nothing", label: "My copy", note: "Your copy as you typed it." },
+  { value: "right", label: "What I got right", note: "Your copy, each letter marked right or missed." },
+  { value: "grade", label: "Graded result", note: "Your copy graded against what the station sent." },
 ];
 const LOCKED_SHOWS_HELP =
   "What a locked copy shows before the QSO ends: your copy as typed, your copy with each " +
@@ -396,6 +399,17 @@ function Graded({ line }: { line: Line }): React.ReactElement {
         {grade.right} of {grade.total} copied
       </span>
     </span>
+  );
+}
+
+/** A setting's name on the left of a control that carries none there,
+ *  such as a checkbox, so the row reads like the rest. */
+function Row({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
+  return (
+    <div className="group setrow">
+      <span className="caption">{label}</span>
+      {children}
+    </div>
   );
 }
 
@@ -1263,64 +1277,24 @@ export function QsoScreen({
           }}
           gainDb={gainDb}
           onGainDb={setGainDb}
-          modesTitle="Station text modes"
-          modes={
-            <Section name="copy" title="Copy">
-              <div className="aid">
-                <Check
-                  id="qso-lock-copy"
-                  label="Lock when I send"
-                  help={LOCK_HELP}
-                  checked={lockCopy}
-                  onChange={setLockCopy}
-                />
-                <ChoiceGroup
-                  id="qso-locked-shows"
-                  label="Once locked, show"
-                  help={LOCKED_SHOWS_HELP}
-                  value={lockedShows}
-                  options={LOCKED_SHOWS}
-                  onChange={(v) => setLockedShows(v as LockedShows)}
-                />
-              </div>
-            </Section>
-          }
-          /* What is set for this page alone, on a row under the audio and
-             the speed, which both pages share. */
+          /* What is set for this page alone, under the audio and the speed,
+             which both pages share. Grouped by what each is about: the
+             station, you, and what comes after a QSO. */
           pageRow={
             <>
-              <Section name="qso" title="QSO">
+              <Section name="station" title="The other station">
                 <div className="panelgroups">
                   <ChoiceGroup
-                    id="qso-copy"
-                    label="Copy"
-                    help={COPY_HELP}
-                    value={copyMode}
-                    options={COPY_MODES}
-                    onChange={(v) => setCopyMode(v as CopyMode)}
-                  />
-                  <ChoiceGroup
                     id="qso-length"
-                    label="Length"
+                    label="How much it sends"
                     help={LENGTH_HELP}
                     value={length}
                     options={LENGTHS}
                     onChange={(v) => setLength(v as LengthChoice)}
                   />
-                  <Check
-                    id="qso-replay"
-                    label="Replay on Continue"
-                    help={REPLAY_HELP}
-                    checked={replayOnContinue}
-                    onChange={setReplayOnContinue}
-                  />
-                </div>
-              </Section>
-              <Section name="theirs" title="Station text">
-                <div className="panelgroups">
                   <ChoiceGroup
                     id="qso-their-text"
-                    label="Shows"
+                    label="Its lines show"
                     help={THEIR_TEXT_HELP}
                     value={theirText}
                     options={THEIR_TEXTS}
@@ -1328,25 +1302,50 @@ export function QsoScreen({
                   />
                   <Check
                     id="qso-blur-call"
-                    label="Blur call with copy"
+                    label="Hide its call while I copy"
                     help={BLUR_CALL_HELP}
                     checked={blurCall}
                     onChange={setBlurCall}
                   />
                   <Check
                     id="qso-show-their-speed"
-                    label="Speed"
+                    label="Show its speed on each line"
                     help={SHOW_THEIR_SPEED_HELP}
                     checked={showTheirSpeed}
                     onChange={setShowTheirSpeed}
                   />
+                  <Row label="When I start sending">
+                    <Check
+                      id="qso-lock-copy"
+                      label="Lock my copy"
+                      help={LOCK_HELP}
+                      checked={lockCopy}
+                      onChange={setLockCopy}
+                    />
+                  </Row>
+                  <ChoiceGroup
+                    id="qso-locked-shows"
+                    label="My locked copy shows"
+                    help={LOCKED_SHOWS_HELP}
+                    value={lockedShows}
+                    options={LOCKED_SHOWS}
+                    onChange={(v) => setLockedShows(v as LockedShows)}
+                  />
                 </div>
               </Section>
-              <Section name="yours" title="Your text">
+              <Section name="you" title="You">
                 <div className="panelgroups">
                   <ChoiceGroup
+                    id="qso-copy"
+                    label="The station reads my sending"
+                    help={COPY_HELP}
+                    value={copyMode}
+                    options={COPY_MODES}
+                    onChange={(v) => setCopyMode(v as CopyMode)}
+                  />
+                  <ChoiceGroup
                     id="qso-your-text"
-                    label="Shows"
+                    label="My lines show"
                     help={YOUR_TEXT_HELP}
                     value={yourText}
                     options={YOUR_TEXTS}
@@ -1354,14 +1353,14 @@ export function QsoScreen({
                   />
                   <Check
                     id="qso-show-speed"
-                    label="Speed"
+                    label="Show my speed on each line"
                     help={SHOW_SPEED_HELP}
                     checked={showSpeed}
                     onChange={setShowSpeed}
                   />
                 </div>
               </Section>
-              <Section name="playback" title="Playback">
+              <Section name="after" title="After a QSO">
                 <div className="panelgroups">
                   <ChoiceGroup
                     id="qso-playback"
@@ -1373,11 +1372,20 @@ export function QsoScreen({
                   />
                   <Check
                     id="qso-show-download"
-                    label="Show Download"
+                    label="Show Download, to save it as audio"
                     help={SHOW_DOWNLOAD_HELP}
                     checked={showDownload}
                     onChange={setShowDownload}
                   />
+                  <Row label="After a pause">
+                    <Check
+                      id="qso-replay"
+                      label="Continue plays the station's last line again"
+                      help={REPLAY_HELP}
+                      checked={replayOnContinue}
+                      onChange={setReplayOnContinue}
+                    />
+                  </Row>
                 </div>
               </Section>
             </>

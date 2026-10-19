@@ -2460,29 +2460,79 @@ header .modeswitch button { white-space: nowrap; }
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }
 
-/* The QSO page's settings, on columns a little wider than the practice
-   page's: Overall (Farnsworth) and its reading need the room, one over the
-   other with Character speed in the Speed column. */
+/* The QSO page's settings, as a form: sections by subject in two wide
+   columns, Audio and Speed, then The station and You, then After a QSO. Each
+   setting is one row, its name on the left and its control on the right, so
+   the eye runs down one column of names. Headings stand out from the names
+   under them. One column where two do not fit. */
 .viewpanel.qsopanel,
-.viewpanel.qsopanel .pagerow,
-.viewpanel.qsopanel .modesrow { grid-template-columns: repeat(auto-fill, 210px); }
-/* A choice with its options in view, the buttons small, so most fit one
-   column. The sections with the longest take two, where two fit: spanning
-   two of one column would add a second, past the panel's edge. */
+.viewpanel.qsopanel .pagerow {
+  grid-template-columns: repeat(auto-fill, 560px);
+  gap: 24px 48px;
+}
+.viewpanel.qsopanel [data-panel="audio"] { grid-column: auto; }
+.viewpanel.qsopanel .uplabel {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.viewpanel.qsopanel .panelgroups,
+.viewpanel.qsopanel .panelrow:not([data-panel="audio"]) .panelgroups {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.viewpanel.qsopanel .panelgroups + .panelgroups { margin-top: 8px; }
+/* A row: the name, then the control. A checkbox's name is beside its box, so
+   the box sits in the control column. */
+.viewpanel.qsopanel .group {
+  display: grid;
+  grid-template-columns: 200px auto;
+  justify-content: start;
+  align-items: center;
+  column-gap: 14px;
+}
+.viewpanel.qsopanel .group > label.check { grid-column: 2; min-height: 22px; }
+/* What the choices do, under them, in view rather than in a tooltip. */
+.viewpanel.qsopanel .group > .note {
+  grid-column: 2;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+.viewpanel.qsopanel .setrow > .group { display: flex; align-items: center; justify-self: start; margin: 0; min-height: 0; }
+.viewpanel.qsopanel .setrow > .group > label.check { min-height: 22px; }
+/* Speed's names carry their readings, as Overall (Farnsworth) 25 wpm, so its
+   name column is wider. */
+.viewpanel.qsopanel [data-panel="speed"] .group { grid-template-columns: 200px auto; }
+.viewpanel.qsopanel .group > .caption,
+.viewpanel.qsopanel .group > label:not(.check) {
+  height: auto;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-dim);
+}
+.viewpanel.qsopanel label.check { font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.viewpanel.qsopanel [data-panel="speed"] input[type="range"] { width: 200px; }
+/* A choice with its options in view, the buttons small, so each fits its
+   column. */
 .viewpanel .choicegroup .modeswitch button { padding: 3px 9px; font-size: 12px; white-space: nowrap; }
 /* Closer on the smallest phones, so the longest row still fits. */
 @media (max-width: 400px) {
   .viewpanel .choicegroup .modeswitch button { padding-left: 7px; padding-right: 7px; }
 }
-@media (min-width: 561px) {
-  .viewpanel.qsopanel [data-panel="qso"],
-  .viewpanel.qsopanel [data-panel="theirs"],
-  .viewpanel.qsopanel [data-panel="copy"] { grid-column: span 2; }
-}
-/* One column a little sooner than the practice page's: below this, two
-   columns do not fit beside a section that spans both. */
+/* One column, the names above their controls again: too narrow for both on
+   one line. */
 @media (max-width: 560px) {
-  .viewpanel.qsopanel, .viewpanel.qsopanel .pagerow, .viewpanel.qsopanel .modesrow { grid-template-columns: 1fr; }
+  .viewpanel.qsopanel, .viewpanel.qsopanel .pagerow { grid-template-columns: 1fr; }
+  .viewpanel.qsopanel .group { grid-template-columns: 1fr; row-gap: 4px; }
+  .viewpanel.qsopanel .group > label.check,
+  .viewpanel.qsopanel .group > .note { grid-column: 1; }
 }
 .viewpanel [data-panel="speed"] label { white-space: nowrap; }
 .viewpanel [data-panel="speed"] input[type="range"] { width: 180px; }
