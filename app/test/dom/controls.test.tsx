@@ -142,8 +142,16 @@ function renderStateful() {
   }
   render(<Harnessed />);
   openPanel();
-  return () => screen.getByLabelText(/delay start/i) as HTMLInputElement;
+  return () => byId("pace-lead") as HTMLInputElement;
 }
+
+/** A setting by its id: what it does may be reworded, its id stays. */
+function byId(id: string): HTMLElement {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`no #${id}`);
+  return el;
+}
+const queryId = (id: string) => document.getElementById(id);
 
 describe("controls", () => {
   it("shows every reading padded to a constant width", () => {
@@ -281,7 +289,7 @@ describe("controls", () => {
     for (const id of ids) expect(off.container.querySelector(id), id).toBeNull();
     // The way back, and the switch itself.
     expect(screen.getByTestId("panel-toggle")).toBeTruthy();
-    expect(screen.getByLabelText(/chart controls/i)).toBeTruthy();
+    expect(byId("show-chart-controls")).toBeTruthy();
   });
 
   it("keeps the axis out and everything else behind the cog", async () => {
@@ -297,8 +305,8 @@ describe("controls", () => {
     for (const always of ["#view", "#zoom", "#run-sort"]) {
       expect(container.querySelector(always), always).not.toBeNull();
     }
-    expect(screen.queryByLabelText(/collapse rests/i)).toBeNull();
-    expect(screen.queryByLabelText(/^clock axis$/i)).toBeNull();
+    expect(queryId("collapse-rests")).toBeNull();
+    expect(queryId("pace-absolute")).toBeNull();
 
     const cog = screen.getByTestId("panel-toggle");
     expect(cog.getAttribute("aria-pressed")).toBe("false");
@@ -306,15 +314,15 @@ describe("controls", () => {
 
     // Both bands at once: what is drawn, and what runs while you send.
     expect(cog.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByLabelText(/collapse rests/i)).toBeTruthy();
-    expect(screen.getByLabelText(/^clock axis$/i)).toBeTruthy();
+    expect(byId("collapse-rests")).toBeTruthy();
+    expect(byId("pace-absolute")).toBeTruthy();
     // And the axis never went anywhere.
     expect(container.querySelector("#view")).not.toBeNull();
 
     // The cog is the way back out as well as the way in.
     await user.click(cog);
-    expect(screen.queryByLabelText(/collapse rests/i)).toBeNull();
-    expect(screen.queryByLabelText(/^clock axis$/i)).toBeNull();
+    expect(queryId("collapse-rests")).toBeNull();
+    expect(queryId("pace-absolute")).toBeNull();
   });
 
   it("groups each setting by the question it answers", async () => {
@@ -323,25 +331,18 @@ describe("controls", () => {
     await user.click(screen.getByTestId("panel-toggle"));
 
     const row = (name: string) => container.querySelector(`[data-panel='${name}']`)!;
-    expect(row("target")).toContainElement(screen.getByLabelText("Break length in seconds"));
-    expect(row("target")).toContainElement(screen.getByLabelText("Repeat pause in seconds"));
-    expect(row("grading")).toContainElement(screen.getByLabelText(/^spacing only$/i));
-    // The three ways to record, together in a group of their own.
-    for (const mode of ["plain", "zen", "pacing"]) {
-      expect(row("modes"), mode).toContainElement(row(mode) as HTMLElement);
+    expect(row("target")).toContainElement(byId("break-sec"));
+    expect(row("target")).toContainElement(byId("repeat-pause"));
+    expect(row("grading")).toContainElement(byId("ignore-construction"));
+    // The three ways to record, together in a section of their own.
+    for (const id of ["plain-follow", "plain-grading", "zen-progress", "zen-grading", "pace-absolute", "pace-lead"]) {
+      expect(row("modes"), id).toContainElement(byId(id));
     }
-    expect(screen.getByRole("group", { name: "Recording modes" })).toBe(row("modes"));
-    expect(row("plain").querySelector(".uplabel")!.textContent).toBe("Plain");
-    expect(row("zen").querySelector(".uplabel")!.textContent).toBe("Zen");
-    expect(row("plain")).toContainElement(screen.getByLabelText(/^follow$/i));
-    expect(row("zen")).toContainElement(screen.getByLabelText(/live progress/i));
-    expect(row("pacing")).toContainElement(screen.getByLabelText(/^clock axis$/i));
-    expect(row("pacing")).toContainElement(screen.getByLabelText("Delay start in seconds"));
-    expect(row("display")).toContainElement(screen.getByLabelText(/collapse rests/i));
-    expect(row("display")).toContainElement(screen.getByLabelText(/^scores$/i));
+    expect(row("display")).toContainElement(byId("collapse-rests"));
+    expect(row("display")).toContainElement(byId("run-scores"));
     expect(row("audio")).toContainElement(container.querySelector<HTMLElement>("#gain"));
-    expect(row("extras")).toContainElement(screen.getByLabelText(/advanced grading/i));
-    for (const name of ["audio", "target", "grading", "plain", "zen", "pacing", "display", "extras"]) {
+    expect(row("extras")).toContainElement(byId("advanced-grading"));
+    for (const name of ["audio", "modes", "target", "grading", "display", "extras"]) {
       expect(row(name).querySelector(".uplabel")!.textContent, name).not.toBe("");
     }
   });
@@ -364,13 +365,13 @@ describe("controls", () => {
     const user = userEvent.setup();
     const seen: Partial<ReviewSettings>[] = [];
     const { unmount } = renderView({ runs: 1 });
-    expect(screen.queryByLabelText(/^scores$/i)).toBeNull();
-    expect(screen.queryByLabelText(/decode all/i)).toBeNull();
+    expect(queryId("run-scores")).toBeNull();
+    expect(queryId("caption-all")).toBeNull();
     unmount();
 
     renderView({ runs: 3, onChange: (p) => seen.push(p), open: true });
-    await user.click(screen.getByLabelText(/^scores$/i));
-    await user.click(screen.getByLabelText(/decode all/i));
+    await user.click(byId("run-scores"));
+    await user.click(byId("caption-all"));
     // Defaults are scores on, one caption — so each click is the other way.
     expect(seen).toEqual([{ runScores: false }, { captionAll: true }]);
   });
@@ -413,13 +414,13 @@ describe("controls", () => {
     const chart = container.querySelector("[data-panel='display']")!;
 
     const boxes = [
-      [/chart controls/i, true, { showChartControls: false }],
-      [/^downloads$/i, false, { showDownloads: true }],
-      [/^hints$/i, true, { showHints: false }],
-      [/advanced grading/i, true, { advancedGrading: false }],
+      ["show-chart-controls", true, { showChartControls: false }],
+      ["show-downloads", false, { showDownloads: true }],
+      ["show-hints", true, { showHints: false }],
+      ["advanced-grading", true, { advancedGrading: false }],
     ] as const;
     for (const [label, on, patch] of boxes) {
-      const box = screen.getByLabelText(label) as HTMLInputElement;
+      const box = byId(label) as HTMLInputElement;
       expect(box.checked, String(label)).toBe(on);
       expect(extras, String(label)).toContainElement(box);
       await user.click(box);
@@ -434,7 +435,7 @@ describe("controls", () => {
     const user = userEvent.setup();
     const seen: Partial<ReviewSettings>[] = [];
     const { container } = renderView({ open: true, onChange: (p) => seen.push(p) });
-    const box = screen.getByLabelText(/^spacing only$/i) as HTMLInputElement;
+    const box = byId("ignore-construction") as HTMLInputElement;
     expect(box.checked).toBe(true);
     expect(container.querySelector("[data-panel='grading']")).toContainElement(box);
     await user.click(box);
@@ -450,7 +451,7 @@ describe("controls", () => {
     // Stop is on the chart, and Loop and the listening level are in Audio.
     expect(screen.queryByRole("button", { name: /stop/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /loop/i })).toBeNull();
-    expect(screen.queryByLabelText(/listening level/i)).toBeNull();
+    expect(queryId("gain")).toBeNull();
   });
 
   it("says what an empty intended message means, inside the box", () => {
@@ -509,7 +510,7 @@ describe("controls", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderView({ onChange, open: true });
-    const box = screen.getByLabelText(/marks only/i) as HTMLInputElement;
+    const box = byId("char-markers") as HTMLInputElement;
     expect(box.checked).toBe(false);
     await user.click(box);
     expect(onChange).toHaveBeenCalledWith({ charMarkers: true });
@@ -523,14 +524,14 @@ describe("controls", () => {
     const onChange = vi.fn();
     const { rerender } = renderView({ onChange, open: true });
     rerender(view({ zenMode: false, paceCursor: false }, onChange));
-    for (const label of [/live progress/i, /^clock axis$/i, /delay start/i]) {
-      expect(screen.getByLabelText(label), String(label)).toBeEnabled();
+    for (const id of ["zen-progress", "pace-absolute", "pace-lead"]) {
+      expect(byId(id), id).toBeEnabled();
     }
     // On to start.
-    expect((screen.getByLabelText(/live progress/i) as HTMLInputElement).checked).toBe(true);
-    await user.click(screen.getByLabelText(/live progress/i));
+    expect((byId("zen-progress") as HTMLInputElement).checked).toBe(true);
+    await user.click(byId("zen-progress"));
     expect(onChange).toHaveBeenCalledWith({ zenProgress: false });
-    const box = screen.getByLabelText(/delay start/i) as HTMLInputElement;
+    const box = byId("pace-lead") as HTMLInputElement;
     await user.clear(box);
     await user.type(box, "5");
     expect(onChange).toHaveBeenLastCalledWith({ paceLeadSec: 5 });
@@ -541,7 +542,7 @@ describe("controls", () => {
     const onChange = vi.fn();
     const { container } = renderView({ onChange, open: true });
     const box = container.querySelector<HTMLInputElement>("#plain-grading")!;
-    expect(container.querySelector("[data-panel='plain']")).toContainElement(box);
+    expect(container.querySelector("[data-panel='modes']")).toContainElement(box);
     expect(box.checked).toBe(true);
     expect(box).toBeEnabled();
     await user.click(box);
@@ -556,11 +557,11 @@ describe("controls", () => {
     // Zen's: Plain has one of its own, below.
     const box = () => document.querySelector<HTMLInputElement>("#zen-grading")!;
     expect(box()).toBeDisabled();
-    expect(box().closest("label")!.getAttribute("title")).toMatch(/needs live progress/i);
+    expect(box().closest("label")!.getAttribute("title")).toMatch(/^Needs /);
 
     rerender(view({ zenMode: true, zenProgress: true }, onChange));
     expect(box()).toBeEnabled();
-    expect(box().closest("label")!.getAttribute("title")).not.toMatch(/needs live progress/i);
+    expect(box().closest("label")!.getAttribute("title")).not.toMatch(/^Needs /);
     await user.click(box());
     expect(onChange).toHaveBeenCalledWith({ zenGrading: true });
   });
@@ -576,7 +577,7 @@ describe("controls", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderView({ onChange, open: true });
-    const box = screen.getByLabelText(/^follow$/i) as HTMLInputElement;
+    const box = byId("plain-follow") as HTMLInputElement;
     expect(box.checked, "on to start").toBe(true);
     await user.click(box);
     expect(onChange).toHaveBeenCalledWith({ plainFollow: false });
@@ -623,7 +624,7 @@ describe("controls", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderView({ onChange, open: true });
-    const box = screen.getByLabelText("Break length in seconds") as HTMLInputElement;
+    const box = byId("break-sec") as HTMLInputElement;
     expect(box.value).toBe(String(defaults().breakSec));
     await user.clear(box);
     await user.type(box, "12");
@@ -637,7 +638,7 @@ describe("controls", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { rerender } = renderView({ onChange, open: true });
-    const box = () => screen.getByLabelText("Repeat pause in seconds") as HTMLInputElement;
+    const box = () => byId("repeat-pause") as HTMLInputElement;
     rerender(view({ times: 1 }, onChange));
     expect(document.querySelector("[data-panel='target']")).toContainElement(box());
     expect(box()).toBeEnabled();

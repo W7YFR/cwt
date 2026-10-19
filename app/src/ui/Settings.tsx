@@ -494,7 +494,7 @@ function DrillSection({ user }: { user: UserInfo }): React.ReactElement {
           </p>
           <p>
             A new line is a long break. Use it to write both sides of a QSO.
-            The target waits at each break for the Break length configured in the
+            The target waits at each break for the Rest at each break set in the
             settings, and a break is never graded. In the message box a break shows
             as <code>|</code>.
           </p>

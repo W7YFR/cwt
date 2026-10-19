@@ -54,6 +54,7 @@ import {
   Check,
   ChoiceGroup,
   Section,
+  SettingRow,
   SettingsBand,
   SettingsPanel,
   SpeedSliders,
@@ -399,17 +400,6 @@ function Graded({ line }: { line: Line }): React.ReactElement {
         {grade.right} of {grade.total} copied
       </span>
     </span>
-  );
-}
-
-/** A setting's name on the left of a control that carries none there,
- *  such as a checkbox, so the row reads like the rest. */
-function Row({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
-  return (
-    <div className="group setrow">
-      <span className="caption">{label}</span>
-      {children}
-    </div>
   );
 }
 
@@ -1259,7 +1249,7 @@ export function QsoScreen({
       {/* The settings both pages share, then this page's own. */}
       <SettingsBand open={settingsOpen}>
         <SettingsPanel
-          className="qsopanel"
+          className="formpanel qsopanel"
           audio={{
             devices: rec.devices,
             deviceId,
@@ -1314,7 +1304,7 @@ export function QsoScreen({
                     checked={showTheirSpeed}
                     onChange={setShowTheirSpeed}
                   />
-                  <Row label="When I start sending">
+                  <SettingRow label="When I start sending">
                     <Check
                       id="qso-lock-copy"
                       label="Lock my copy"
@@ -1322,7 +1312,7 @@ export function QsoScreen({
                       checked={lockCopy}
                       onChange={setLockCopy}
                     />
-                  </Row>
+                  </SettingRow>
                   <ChoiceGroup
                     id="qso-locked-shows"
                     label="My locked copy shows"
@@ -1377,7 +1367,7 @@ export function QsoScreen({
                     checked={showDownload}
                     onChange={setShowDownload}
                   />
-                  <Row label="After a pause">
+                  <SettingRow label="After a pause">
                     <Check
                       id="qso-replay"
                       label="Continue plays the station's last line again"
@@ -1385,7 +1375,7 @@ export function QsoScreen({
                       checked={replayOnContinue}
                       onChange={setReplayOnContinue}
                     />
-                  </Row>
+                  </SettingRow>
                 </div>
               </Section>
             </>

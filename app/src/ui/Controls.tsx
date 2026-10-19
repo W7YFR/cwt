@@ -743,6 +743,7 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
   const { settings: s, onChange } = props;
   return (
     <SettingsPanel
+      className="formpanel"
       audio={props.audio}
       gainDb={s.gainDb}
       onGainDb={(gainDb) => onChange({ gainDb })}
@@ -750,201 +751,211 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
         props.onLoop && (
           <Check
             id="loop"
-            label="Loop"
+            label="Repeat playback when it ends"
             help={LOOP_HELP}
             checked={props.loop ?? false}
             onChange={() => props.onLoop?.()}
           />
         )
       }
-      /* The options of the three ways to record, on a row of their own: they
-         are the settings changed from one sitting to the next, and the rest
-         are set once. Which mode records is picked beside the record button;
-         these are set ahead of it, so they stay live whichever is picked. */
-      modesTitle="Recording modes"
-      modes={
-        <>
-          <Section name="plain" title="Plain">
-            <div className="aid">
-              <Check
-                id="plain-follow"
-                label="Follow"
-                help={PLAIN_FOLLOW_HELP}
-                checked={s.plainFollow}
-                onChange={(v) => onChange({ plainFollow: v })}
-              />
-              <Check
-                id="plain-grading"
-                label="Live grading"
-                help={PLAIN_GRADING_HELP}
-                checked={s.plainGrading}
-                onChange={(v) => onChange({ plainGrading: v })}
-              />
-            </div>
-          </Section>
-
-          <Section name="zen" title="Zen">
-            <div className="aid">
-              <Check
-                id="zen-progress"
-                label="Live progress"
-                help={ZEN_PROGRESS_HELP}
-                checked={s.zenProgress}
-                onChange={(v) => onChange({ zenProgress: v })}
-              />
-              <Check
-                id="zen-grading"
-                label="Live grading"
-                help={ZEN_GRADING_HELP}
-                checked={s.zenGrading}
-                barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
-                onChange={(v) => onChange({ zenGrading: v })}
-              />
-            </div>
-          </Section>
-
-          <Section name="pacing" title="Pacing">
-            <div className="aid">
-              <Check
-                id="pace-absolute"
-                label="Clock axis"
-                help={PACE_ABSOLUTE_HELP}
-                checked={s.paceAbsolute}
-                onChange={(v) => onChange({ paceAbsolute: v })}
-              />
-              <div className="group">
-                <NumberField
-                  id="pace-lead"
-                  name="Delay start"
-                  unit="s"
-                  spoken="seconds"
-                  help={PACE_LEAD_HELP}
-                  value={s.paceLeadSec}
-                  min={PACE_LEAD_MIN_SEC}
-                  max={PACE_LEAD_MAX_SEC}
-                  step={1}
-                  onChange={(v) => onChange({ paceLeadSec: v })}
-                />
-              </div>
-            </div>
-          </Section>
-        </>
-      }
     >
-        <Section name="target" title="Target">
-          <div className="panelgroups">
+      {/* The options of the three ways to record: the settings changed from
+          one sitting to the next. Which mode records is picked beside the
+          record button; these are set ahead of it, so they stay live whichever
+          is picked. */}
+      <Section name="modes" title="While I record">
+        <div className="panelgroups">
+          <SettingRow label="Plain">
+            <Check
+              id="plain-follow"
+              label="Scroll the chart with me, and stop when I finish"
+              help={PLAIN_FOLLOW_HELP}
+              checked={s.plainFollow}
+              onChange={(v) => onChange({ plainFollow: v })}
+            />
+            <Check
+              id="plain-grading"
+              label="Grade each character as I key it"
+              help={PLAIN_GRADING_HELP}
+              checked={s.plainGrading}
+              onChange={(v) => onChange({ plainGrading: v })}
+            />
+          </SettingRow>
+          <SettingRow label="Zen">
+            <Check
+              id="zen-progress"
+              label="Show where I am in the message"
+              help={ZEN_PROGRESS_HELP}
+              checked={s.zenProgress}
+              onChange={(v) => onChange({ zenProgress: v })}
+            />
+            <Check
+              id="zen-grading"
+              label="Grade each character as I key it"
+              help={ZEN_GRADING_HELP}
+              checked={s.zenGrading}
+              barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
+              onChange={(v) => onChange({ zenGrading: v })}
+            />
+          </SettingRow>
+          <SettingRow label="Paced">
+            <Check
+              id="pace-absolute"
+              label="Show Absolute time while recording"
+              help={PACE_ABSOLUTE_HELP}
+              checked={s.paceAbsolute}
+              onChange={(v) => onChange({ paceAbsolute: v })}
+            />
             <div className="group">
               <NumberField
-                id="repeat-pause"
-                name="Repeat pause"
+                id="pace-lead"
+                name="Count-in"
                 unit="s"
                 spoken="seconds"
-                help={REPEAT_PAUSE_HELP}
-                value={s.repeatPauseSec}
-                min={REPEAT_PAUSE_MIN_SEC}
-                max={REPEAT_PAUSE_MAX_SEC}
+                help={PACE_LEAD_HELP}
+                value={s.paceLeadSec}
+                min={PACE_LEAD_MIN_SEC}
+                max={PACE_LEAD_MAX_SEC}
                 step={1}
-                onChange={(v) => onChange({ repeatPauseSec: v })}
+                onChange={(v) => onChange({ paceLeadSec: v })}
               />
             </div>
-            <div className="group">
-              <NumberField
-                id="break-sec"
-                name="Break length"
-                unit="s"
-                spoken="seconds"
-                help={BREAK_HELP}
-                value={s.breakSec}
-                min={BREAK_MIN_SEC}
-                max={BREAK_MAX_SEC}
-                step={1}
-                onChange={(v) => onChange({ breakSec: v })}
-              />
-            </div>
-          </div>
-        </Section>
+          </SettingRow>
+        </div>
+      </Section>
 
-        <Section name="grading" title="Grading">
-          <div className="panelgroups">
-            <Check
-              id="ignore-construction"
-              label="Spacing only"
-              help={IGNORE_CONSTRUCTION_HELP}
-              checked={s.ignoreConstruction}
-              onChange={(v) => onChange({ ignoreConstruction: v })}
+      <Section name="target" title="The message">
+        <div className="panelgroups">
+          <div className="group">
+            <NumberField
+              id="repeat-pause"
+              name="Pause between repeats"
+              unit="s"
+              spoken="seconds"
+              help={REPEAT_PAUSE_HELP}
+              value={s.repeatPauseSec}
+              min={REPEAT_PAUSE_MIN_SEC}
+              max={REPEAT_PAUSE_MAX_SEC}
+              step={1}
+              onChange={(v) => onChange({ repeatPauseSec: v })}
             />
           </div>
-        </Section>
+          <div className="group">
+            <NumberField
+              id="break-sec"
+              name="Rest at each break"
+              unit="s"
+              spoken="seconds"
+              help={BREAK_HELP}
+              value={s.breakSec}
+              min={BREAK_MIN_SEC}
+              max={BREAK_MAX_SEC}
+              step={1}
+              onChange={(v) => onChange({ breakSec: v })}
+            />
+          </div>
+        </div>
+      </Section>
 
-        <Section name="display" title="Chart">
-          <div className="panelgroups">
-            <Check
-              id="collapse-rests"
-              label="Collapse rests"
-              help={COLLAPSE_RESTS_HELP}
-              checked={s.collapseRests}
-              onChange={(v) => onChange({ collapseRests: v })}
-            />
-            <Check
-              id="char-markers"
-              label="Marks only"
-              help={CHAR_MARKERS_HELP}
-              checked={s.charMarkers}
-              onChange={(v) => onChange({ charMarkers: v })}
-            />
-            <Check
-              id="run-scores"
-              label="Scores"
-              help={RUN_SCORES_HELP}
-              checked={s.runScores}
-              onChange={(v) => onChange({ runScores: v })}
-            />
-            <Check
-              id="caption-all"
-              label="Decode all"
-              help={CAPTION_ALL_HELP}
-              checked={s.captionAll}
-              onChange={(v) => onChange({ captionAll: v })}
-            />
-          </div>
-        </Section>
+      <Section name="grading" title="Grading">
+        <div className="panelgroups checks">
+          <Check
+            id="ignore-construction"
+            label="Grade only the spacing, for a keyer"
+            help={IGNORE_CONSTRUCTION_HELP}
+            checked={s.ignoreConstruction}
+            onChange={(v) => onChange({ ignoreConstruction: v })}
+          />
+        </div>
+      </Section>
 
-        {/* Not the chart: these put a whole block on the page or take it away,
-            which is a different kind of decision from how the marks above are
-            drawn. */}
-        <Section name="extras" title="Page">
-          <div className="panelgroups">
-            <Check
-              id="show-chart-controls"
-              label="Chart controls"
-              help={SHOW_CHART_CONTROLS_HELP}
-              checked={s.showChartControls}
-              onChange={(v) => onChange({ showChartControls: v })}
-            />
-            <Check
-              id="show-downloads"
-              label="Downloads"
-              help={SHOW_DOWNLOADS_HELP}
-              checked={s.showDownloads}
-              onChange={(v) => onChange({ showDownloads: v })}
-            />
-            <Check
-              id="show-hints"
-              label="Hints"
-              help={SHOW_HINTS_HELP}
-              checked={s.showHints}
-              onChange={(v) => onChange({ showHints: v })}
-            />
-            <Check
-              id="advanced-grading"
-              label="Advanced grading"
-              help={ADVANCED_GRADING_HELP}
-              checked={s.advancedGrading}
-              onChange={(v) => onChange({ advancedGrading: v })}
-            />
-          </div>
-        </Section>
+      <Section name="display" title="The chart">
+        <div className="panelgroups checks">
+          <Check
+            id="collapse-rests"
+            label="Shrink long pauses"
+            help={COLLAPSE_RESTS_HELP}
+            checked={s.collapseRests}
+            onChange={(v) => onChange({ collapseRests: v })}
+          />
+          <Check
+            id="char-markers"
+            label="Collapse character construction"
+            help={CHAR_MARKERS_HELP}
+            checked={s.charMarkers}
+            onChange={(v) => onChange({ charMarkers: v })}
+          />
+          <Check
+            id="run-scores"
+            label="Show each attempt's scores"
+            help={RUN_SCORES_HELP}
+            checked={s.runScores}
+            onChange={(v) => onChange({ runScores: v })}
+          />
+          <Check
+            id="caption-all"
+            label="Caption every attempt"
+            help={CAPTION_ALL_HELP}
+            checked={s.captionAll}
+            onChange={(v) => onChange({ captionAll: v })}
+          />
+        </div>
+      </Section>
+
+      {/* Not the chart: these put a whole block on the page or take it away,
+          which is a different kind of decision from how the marks above are
+          drawn. */}
+      <Section name="extras" title="On the page">
+        <div className="panelgroups checks">
+          <Check
+            id="show-chart-controls"
+            label="Show the chart's controls"
+            help={SHOW_CHART_CONTROLS_HELP}
+            checked={s.showChartControls}
+            onChange={(v) => onChange({ showChartControls: v })}
+          />
+          <Check
+            id="show-downloads"
+            label="Show the download buttons"
+            help={SHOW_DOWNLOADS_HELP}
+            checked={s.showDownloads}
+            onChange={(v) => onChange({ showDownloads: v })}
+          />
+          <Check
+            id="show-hints"
+            label="Show hints"
+            help={SHOW_HINTS_HELP}
+            checked={s.showHints}
+            onChange={(v) => onChange({ showHints: v })}
+          />
+          <Check
+            id="advanced-grading"
+            label="Show the detailed grading tables"
+            help={ADVANCED_GRADING_HELP}
+            checked={s.advancedGrading}
+            onChange={(v) => onChange({ advancedGrading: v })}
+          />
+        </div>
+      </Section>
     </SettingsPanel>
+  );
+}
+
+/** A setting's name on the left of controls that carry none there, such as
+ *  checkboxes, so the row reads like the rest. Several stack in the control
+ *  column under the one name. */
+export function SettingRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="group setrow">
+      <span className="caption">{label}</span>
+      {children}
+    </div>
   );
 }
 
@@ -982,7 +993,7 @@ export function ListeningLevel({
   return (
     <div className="group">
       <label htmlFor="gain" title={GAIN_HELP}>
-        Listening level <output id="gain-out">{fmtGain(gainDb)}</output>
+        Playback volume <output id="gain-out">{fmtGain(gainDb)}</output>
       </label>
       <input
         type="range"
