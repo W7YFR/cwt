@@ -517,6 +517,21 @@ describe("reply length", () => {
     expect(t.reply).toMatch(/^W7YFR DE \S+ R NAME /);
   });
 
+  it("opens a piece with both calls by its habit, and more often when you did", () => {
+    const ctx: Context = { ...FIRST, length: "pieces" };
+    let q = answer(start(), "CQ DE W7YFR K", ctx).qso;
+    const c = q.them.call;
+    // A station that never opens with the calls by habit.
+    q = { ...q, them: { ...q.them, habit: 0 } };
+    q = answer(q, "UR 579 KN", ctx).qso;
+    expect(q.stage).toBe("pieces");
+    expect(q.last).not.toContain(" DE ");
+    const plain = answer(q, "R NAME BOB KN", ctx).reply!;
+    expect(plain).not.toContain(" DE ");
+    const mirrored = answer(q, `${c} DE W7YFR R NAME BOB KN`, ctx).reply!;
+    expect(mirrored).toMatch(new RegExp(`^W7YFR DE ${c} `));
+  });
+
   it("signs off when you send 73 between pieces", () => {
     const ctx: Context = { ...FIRST, length: "pieces" };
     let q = answer(start(), "CQ DE W7YFR K", ctx).qso;

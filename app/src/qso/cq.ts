@@ -531,6 +531,13 @@ class Over {
     );
   }
 
+  /** Whether it opens with both calls: `them` DE your call, before
+   *  anything else. */
+  opensWithCalls(them: string): boolean {
+    const at = this.words.indexOf("DE");
+    return at >= 1 && at <= 2 && this.words.slice(0, at).some((w) => this.isThem(w, them)) && isCall(this.words[at + 1] ?? "");
+  }
+
   /** Whether it acknowledges: R, QSL, TNX, FB, OK and the like. */
   acknowledges(): boolean {
     return this.words.some((w) => ["R", "RR", "RRR", "QSL", "TU", "TNX", "FB", "OK", "SOLID"].includes(w));
@@ -641,6 +648,7 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   } = context;
   const over = new Over(heard, ear);
   const { them } = qso;
+  const mirror = over.opensWithCalls(them.call);
   const voice = (q: Qso): wording.Say => ({
     them,
     you: q.you,
@@ -648,6 +656,7 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     rand,
     hour,
     length,
+    mirror,
   });
 
   // Your call after DE, once the station has one, replaces it.
@@ -720,6 +729,7 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
 function reply(qso: Qso, over: Over, context: Context): Turn {
   const { rand = Math.random, hour = new Date().getHours(), length = "full" } = context;
   const { them } = qso;
+  const mirror = over.opensWithCalls(them.call);
   // HW? asks how you copied, so it is not a request to send again.
   const again = over.has("AGN") || over.words.some((w) => ["?", "AGN?", "QRZ?"].includes(w));
   const voice = (q: Qso): wording.Say => ({
@@ -729,6 +739,7 @@ function reply(qso: Qso, over: Over, context: Context): Turn {
     rand,
     hour,
     length,
+    mirror,
   });
 
   switch (qso.stage) {

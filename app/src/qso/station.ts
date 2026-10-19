@@ -15,6 +15,10 @@ export interface Station {
   readonly rst: string;
   /** The tone the station is heard at, in Hz. */
   readonly toneHz: number;
+  /** How often it opens a line in the middle of the QSO with both calls,
+   *  0 to 1. Each operator has their own habit. Absent in a QSO kept before
+   *  there was one. */
+  readonly habit?: number;
 }
 
 const NAMES = [
@@ -63,5 +67,6 @@ export function randomStation(rand: Rand, not = ""): Station {
     qth: pick(rand, QTHS),
     rst: pick(rand, RSTS),
     toneHz: 550 + Math.round(rand() * 20) * 10,
+    habit: 0.05 + 0.3 * rand(),
   };
 }
