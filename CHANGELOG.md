@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.13.0 — 2026-10-19
+
 ### Added
 
 - On the **QSO** page, each line has a play button to hear it again while the microphone is off.
