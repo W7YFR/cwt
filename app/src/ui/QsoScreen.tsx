@@ -12,13 +12,17 @@
  * everything hidden shows, and your copy is graded.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
+import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import {
   loadPrefs,
   loadSpeed,
   loadUser,
+  forgetQsoOvers,
+  keepQsoOver,
   recallQso,
+  recallQsoOvers,
   rememberQso,
   savePrefs,
   saveSpeed,
@@ -27,6 +31,7 @@ import { DEFAULT_SPEED, answer, newQso, type Qso } from "@/qso/cq";
 import type { Speed } from "@/qso/speed";
 import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
+import { lineAudio, tape, trimmed, type Clip, type TapeLine } from "@/qso/tape";
 import {
   gradeCopy,
   revealed,
@@ -38,7 +43,7 @@ import {
 } from "@/qso/show";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconHelp, IconUser } from "./Icons";
+import { IconDownload, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
 import { DebugDownload } from "./DebugDownload";
 import { keepDebugAudio, micLog } from "@/micdebug";
 import { QsoGuide, QsoHelp } from "./QsoHelp";
@@ -79,6 +84,12 @@ const AFTER_REPLY_MS = 250;
 /** How long after the last key in a copy box the line that shows your
  *  sending stays hidden. */
 const TYPING_QUIET_MS = 1200;
+
+/** The tone a station line plays at when the log kept none. */
+const DEFAULT_TONE_HZ = 600;
+
+/** The rate a tape is made at when it holds none of your recording. */
+const TAPE_RATE = 24000;
 
 /** An over that is one plain character, other than K, R or ?: noise, not
  *  sending. A prosign alone, as <SK>, is meant. */
@@ -173,6 +184,9 @@ interface Line {
   /** The speed it was sent at: measured from your sending, when it could be,
    *  or the station's own. */
   readonly sentWpm: SentWpm | null;
+  /** The tone the station sent it at, for the station's overs. Absent in a
+   *  log kept before it was. */
+  readonly toneHz?: number;
 }
 
 /** What a reload brings back of the session: the log and the QSO under
@@ -528,6 +542,35 @@ export function QsoScreen({
   );
   useEffect(() => () => player.destroy(), [player]);
 
+  /* Playing a line or a whole QSO again, once the microphone is off. A player
+     of its own: the one above moves the QSO on when a line ends. */
+  const [replaying, setReplaying] = useState<string | null>(null);
+  const listen = useMemo(() => createPlayer({ onEnded: () => setReplaying(null) }), []);
+  useEffect(() => () => listen.destroy(), [listen]);
+  /** Your overs as recorded, by line, with the wait before each cut. Kept
+   *  in the browser too, so a reload can still play them. */
+  const yourAudio = useRef(new Map<number, Clip>());
+  /** Bumped when the overs kept come back after a reload, to show them. */
+  const [, setOversBack] = useState(0);
+  useEffect(() => {
+    // No log came back, so any overs kept belong to nothing.
+    if (!kept) {
+      void forgetQsoOvers();
+      return;
+    }
+    let live = true;
+    void recallQsoOvers().then((overs) => {
+      if (!live || overs.size === 0) return;
+      for (const [line, clip] of overs) if (!yourAudio.current.has(line)) yourAudio.current.set(line, clip);
+      setOversBack((n) => n + 1);
+    });
+    return () => {
+      live = false;
+    };
+    // Once, for the log the page opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* How loud the station plays: the practice page's listening level, kept in
      the same preference. */
   const [gainDb, setGainDbRaw] = useState(() => loadPrefs().gainDb ?? 0);
@@ -536,6 +579,7 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), gainDb: next });
   };
   useEffect(() => player.setGainDb(gainDb), [player, gainDb]);
+  useEffect(() => listen.setGainDb(gainDb), [listen, gainDb]);
 
   const quiet = useCallback(() => {
     if (timer.current !== null) clearTimeout(timer.current);
@@ -685,6 +729,7 @@ export function QsoScreen({
               mode: theirMode.current,
               locked: false,
               sentWpm: at,
+              toneHz: them.toneHz,
             },
           ]);
         }
@@ -804,7 +849,12 @@ export function QsoScreen({
       piecesStation.current = Math.random() < MIXED_PIECES;
     }
     const at = turn.qso.speed;
-    setLines((l) => [...l, sent]);
+    const clip = trimmed({ samples: recorder.since(0), rate: recorder.rate });
+    setLines((l) => {
+      yourAudio.current.set(l.length, clip);
+      void keepQsoOver(l.length, clip.samples, clip.rate);
+      return [...l, sent];
+    });
 
     if (turn.reply === null) {
       setNote("No answer. Call CQ again.");
@@ -836,6 +886,8 @@ export function QsoScreen({
   fresh.current = () => {
     setStopped(false);
     setLines([]);
+    yourAudio.current.clear();
+    void forgetQsoOvers();
     setNote("");
     setClosed([]);
     setPlaying(null);
@@ -852,6 +904,7 @@ export function QsoScreen({
     fresh.current();
   }, [recorder]);
   const start = () => {
+    listen.stop();
     player.wake();
     replayOnStart.current = false;
     freshOnStart.current = true;
@@ -861,6 +914,7 @@ export function QsoScreen({
 
   /** Go on with the QSO a reload brought back: the log and the QSO stay. */
   const resume = () => {
+    listen.stop();
     player.wake();
     freshOnStart.current = false;
     setStarting(true);
@@ -912,6 +966,107 @@ export function QsoScreen({
     setLines((l) => l.map((line, i) => (i === at ? { ...line, typed } : line)));
   const lock = (at: number) =>
     setLines((l) => l.map((line, i) => (i === at ? { ...line, locked: true } : line)));
+
+  /** Line `i` as the tape needs it, or null when its audio is gone: your
+   *  over after a reload. */
+  const tapeLineOf = (i: number): TapeLine | null => {
+    const line = lines[i];
+    if (!line) return null;
+    if (line.you) {
+      const clip = yourAudio.current.get(i);
+      return clip ? { you: true, clip } : null;
+    }
+    const at = line.sentWpm ?? theirSpeed;
+    return {
+      you: false,
+      text: line.text,
+      speed: { charWpm: at.charWpm, farnsworthWpm: at.farnsworthWpm },
+      toneHz: line.toneHz ?? DEFAULT_TONE_HZ,
+    };
+  };
+  /** The rate the tape is made at: your recording's, so it is not changed. */
+  const tapeRate = () => yourAudio.current.values().next().value?.rate ?? TAPE_RATE;
+  /** Play `clip` as `key`, or stop it when it is the one playing. */
+  const playClip = (key: string, clip: Clip) => {
+    if (replaying === key) {
+      listen.stop();
+      return;
+    }
+    listen.wake();
+    setReplaying(key);
+    void listen.playBuffer(encodeWavBuffer(clip.samples, clip.rate));
+  };
+  /** The lines of QSO `n`, as the tape needs them, or null when any of their
+   *  audio is gone. Cheap: the tape itself is made on a click. */
+  const qsoParts = (n: number): TapeLine[] | null => {
+    const parts: TapeLine[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i]!.qso !== n) continue;
+      const part = tapeLineOf(i);
+      if (!part) return null;
+      parts.push(part);
+    }
+    return parts.length ? parts : null;
+  };
+  /** Save QSO `n` as a WAV file named for the station. */
+  const download = (n: number, clip: Clip) => {
+    const who = lines.find((l) => l.qso === n && !l.you)?.who ?? "qso";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(encodeWav(clip.samples, clip.rate));
+    a.download = `qso-${who.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.wav`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
+  /** The play button at the end of line `i`. Off while the microphone is
+   *  on, and for an over whose recording is gone. */
+  const linePlay = (i: number): React.ReactElement => {
+    const part = tapeLineOf(i);
+    const key = `line ${i}`;
+    const on = replaying === key;
+    const why = recorder
+      ? "Plays once the microphone is off"
+      : part
+        ? null
+        : "This over's recording was not kept";
+    return (
+      <button
+        type="button"
+        className="iconbtn qsoplay"
+        data-testid="qso-line-play"
+        disabled={why !== null}
+        aria-label={on ? "Stop" : "Play this line"}
+        title={why ?? (on ? "Stop" : "Play this line")}
+        onClick={() => part && playClip(key, lineAudio(part, tapeRate()))}
+      >
+        {on ? <IconStop /> : <IconPlay />}
+      </button>
+    );
+  };
+
+  /** Play QSO and Download, under the last line of QSO `n` once it is over. */
+  const qsoTapeRow = (n: number): React.ReactElement | null => {
+    if (!closed.includes(n)) return null;
+    const parts = qsoParts(n);
+    if (!parts) return null;
+    const make = () => tape(parts, tapeRate());
+    const key = `qso ${n}`;
+    const on = replaying === key;
+    return (
+      <li className="qsotape" data-testid="qso-tape">
+        <button type="button" disabled={!!recorder} onClick={() => playClip(key, make())}>
+          <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
+          {on ? "Stop" : "Play QSO"}
+        </button>
+        <button type="button" onClick={() => download(n, make())}>
+          <i className="ico">
+            <IconDownload />
+          </i>
+          Download
+        </button>
+      </li>
+    );
+  };
 
   /** How one of the station's overs shows. Every choice applies to the
    *  overs already shown, but Copy: switched on mid-QSO, it does not turn
@@ -1277,15 +1432,21 @@ export function QsoScreen({
 
         <ol className="qsolog" data-testid="qso-log">
           {lines.map((line, i) => (
-            <li key={i} className={line.you ? "you" : "them"}>
-              {labelOf(line)}
-              {textOf(line, i)}
-              {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
-                <span className="lwpm" data-testid="qso-line-wpm">
-                  {wpmOf(line.sentWpm)}
+            <Fragment key={i}>
+              <li className={line.you ? "you" : "them"}>
+                {labelOf(line)}
+                {textOf(line, i)}
+                <span className="lend">
+                  {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
+                    <span className="lwpm" data-testid="qso-line-wpm">
+                      {wpmOf(line.sentWpm)}
+                    </span>
+                  )}
+                  {linePlay(i)}
                 </span>
-              )}
-            </li>
+              </li>
+              {lines[i + 1]?.qso !== line.qso && qsoTapeRow(line.qso)}
+            </Fragment>
           ))}
           {/* Not an over already answered: after a reply, the last one is
               still the copy until the recording starts over. */}

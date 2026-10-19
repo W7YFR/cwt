@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- On the **QSO** page, each line has a play button to hear it again while the microphone is off.
+- A QSO that is over has **Play QSO**, which plays both sides with the long pauses cut, and **Download**, which saves it as a WAV file.
+
 ## v1.12.0 — 2026-10-19
 
 ### Changed

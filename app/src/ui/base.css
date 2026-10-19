@@ -2438,6 +2438,24 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .lwpm { margin-left: auto; padding-left: 12px; color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
 /* Your speed in your blue, so whose speed is whose reads at a glance. */
 .qsolog .you .lwpm { color: var(--you); }
+/* The end of a row: the speed and the play button, centered together on the
+   row's first line of text, whatever the text below it wraps to. */
+.qsolog .lend {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 1.5em;
+  padding-left: 12px;
+}
+.qsolog .lend .lwpm { margin-left: 0; padding-left: 0; }
+.qsolog .qsoplay { width: 24px; height: 24px; font-size: 11px; }
+/* Play QSO and Download, under the last line of a QSO that is over, lined up
+   with the text. */
+.qsolog .qsotape { padding-left: calc(8ch + 12px); gap: 8px; }
+.qsolog .qsotape button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+.qsolog .qsotape .ico { margin-right: 6px; font-style: normal; }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }
