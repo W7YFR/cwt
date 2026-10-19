@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Development
+
+- The QSO browser tests are in five files, which run side by side.
+- CI runs the browser tests in their own `browser` job, beside `test`.
+
 ## v1.10.0 — 2026-10-18
 
 ### Added
