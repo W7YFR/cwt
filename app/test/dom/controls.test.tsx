@@ -153,6 +153,15 @@ function byId(id: string): HTMLElement {
 }
 const queryId = (id: string) => document.getElementById(id);
 
+/** What a setting says about itself: its question mark's box, in the
+ *  settings panels, or its tooltip elsewhere. */
+function about(el: Element | null): string {
+  if (!el) return "";
+  const tip = el.querySelector(".helpdot")?.getAttribute("aria-describedby");
+  if (tip) return document.getElementById(tip)?.textContent ?? "";
+  return el.getAttribute("title") ?? "";
+}
+
 describe("controls", () => {
   it("shows every reading padded to a constant width", () => {
     // The whole reason for the padding: the groups are sized by their content
@@ -557,11 +566,11 @@ describe("controls", () => {
     // Zen's: Plain has one of its own, below.
     const box = () => document.querySelector<HTMLInputElement>("#zen-grading")!;
     expect(box()).toBeDisabled();
-    expect(box().closest("label")!.getAttribute("title")).toMatch(/^Needs /);
+    expect(about(box().closest(".group"))).toMatch(/^Needs /);
 
     rerender(view({ zenMode: true, zenProgress: true }, onChange));
     expect(box()).toBeEnabled();
-    expect(box().closest("label")!.getAttribute("title")).not.toMatch(/^Needs /);
+    expect(about(box().closest(".group"))).not.toMatch(/^Needs /);
     await user.click(box());
     expect(onChange).toHaveBeenCalledWith({ zenGrading: true });
   });
@@ -704,7 +713,7 @@ describe("the Audio group", () => {
     );
   }
   const picker = () => screen.getByLabelText(/^calibration$/i) as HTMLSelectElement;
-  const why = (el: HTMLElement) => el.closest(".group")!.getAttribute("title") ?? "";
+  const why = (el: HTMLElement) => about(el.closest(".group"));
 
   it("bars the microphone when there is only one input", () => {
     const one = panel({ devices: [{ deviceId: "a", label: "one" }] });

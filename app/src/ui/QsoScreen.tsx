@@ -142,8 +142,8 @@ const LENGTH_HELP =
 const MIXED_PIECES = 1 / 3;
 
 const COPY_MODES: ReadonlyArray<Option<CopyMode>> = [
-  { value: "lenient", label: "Lenient", note: "It allows your own spacing, and a call one letter off." },
-  { value: "strict", label: "Strict", note: "It wants your set speed, and the call sent exactly." },
+  { value: "lenient", label: "Lenient", note: "Accepts your spacing and a call one letter off." },
+  { value: "strict", label: "Strict", note: "Wants your set speed and the exact call." },
 ];
 const COPY_HELP =
   "How the station reads your sending. Lenient reads it at your own spacing and takes a " +
@@ -153,7 +153,7 @@ const THEIR_TEXTS: ReadonlyArray<Option<TheirText>> = [
   { value: "before", label: "Whole", note: "Each line shows whole as soon as it starts." },
   { value: "sent", label: "As sent", note: "Each letter shows as it is sent." },
   { value: "hidden", label: "Blurred", note: "Each line shows blurred until the QSO ends." },
-  { value: "copy", label: "Copy", note: "A box to type what you hear, graded when the QSO ends." },
+  { value: "copy", label: "Copy", note: "Type what you hear, graded when the QSO ends." },
   { value: "none", label: "Off", note: "Nothing shows until the QSO ends." },
 ];
 const THEIR_TEXT_HELP =
@@ -1323,61 +1323,65 @@ export function QsoScreen({
                   />
                 </div>
               </Section>
-              <Section name="you" title="You">
-                <div className="panelgroups">
-                  <ChoiceGroup
-                    id="qso-copy"
-                    label="The station reads my sending"
-                    help={COPY_HELP}
-                    value={copyMode}
-                    options={COPY_MODES}
-                    onChange={(v) => setCopyMode(v as CopyMode)}
-                  />
-                  <ChoiceGroup
-                    id="qso-your-text"
-                    label="My lines show"
-                    help={YOUR_TEXT_HELP}
-                    value={yourText}
-                    options={YOUR_TEXTS}
-                    onChange={(v) => setYourText(v as YourText)}
-                  />
-                  <Check
-                    id="qso-show-speed"
-                    label="Show my speed on each line"
-                    help={SHOW_SPEED_HELP}
-                    checked={showSpeed}
-                    onChange={setShowSpeed}
-                  />
-                </div>
-              </Section>
-              <Section name="after" title="After a QSO">
-                <div className="panelgroups">
-                  <ChoiceGroup
-                    id="qso-playback"
-                    label="Play buttons"
-                    help={PLAYBACK_HELP}
-                    value={playback}
-                    options={PLAYBACKS}
-                    onChange={(v) => setPlayback(v as Playback)}
-                  />
-                  <Check
-                    id="qso-show-download"
-                    label="Show Download, to save it as audio"
-                    help={SHOW_DOWNLOAD_HELP}
-                    checked={showDownload}
-                    onChange={setShowDownload}
-                  />
-                  <SettingRow label="After a pause">
-                    <Check
-                      id="qso-replay"
-                      label="Continue plays the station's last line again"
-                      help={REPLAY_HELP}
-                      checked={replayOnContinue}
-                      onChange={setReplayOnContinue}
+              {/* You and After a QSO, one above the other beside The other
+                  station, which is as tall as both. */}
+              <div className="sectioncol">
+                <Section name="you" title="You">
+                  <div className="panelgroups">
+                    <ChoiceGroup
+                      id="qso-copy"
+                      label="The station reads my sending"
+                      help={COPY_HELP}
+                      value={copyMode}
+                      options={COPY_MODES}
+                      onChange={(v) => setCopyMode(v as CopyMode)}
                     />
-                  </SettingRow>
-                </div>
-              </Section>
+                    <ChoiceGroup
+                      id="qso-your-text"
+                      label="My lines show"
+                      help={YOUR_TEXT_HELP}
+                      value={yourText}
+                      options={YOUR_TEXTS}
+                      onChange={(v) => setYourText(v as YourText)}
+                    />
+                    <Check
+                      id="qso-show-speed"
+                      label="Show my speed on each line"
+                      help={SHOW_SPEED_HELP}
+                      checked={showSpeed}
+                      onChange={setShowSpeed}
+                    />
+                  </div>
+                </Section>
+                <Section name="after" title="After a QSO">
+                  <div className="panelgroups">
+                    <ChoiceGroup
+                      id="qso-playback"
+                      label="Play buttons"
+                      help={PLAYBACK_HELP}
+                      value={playback}
+                      options={PLAYBACKS}
+                      onChange={(v) => setPlayback(v as Playback)}
+                    />
+                    <Check
+                      id="qso-show-download"
+                      label="Show Download, to save it as audio"
+                      help={SHOW_DOWNLOAD_HELP}
+                      checked={showDownload}
+                      onChange={setShowDownload}
+                    />
+                    <SettingRow label="After a pause">
+                      <Check
+                        id="qso-replay"
+                        label="Continue plays the station's last line again"
+                        help={REPLAY_HELP}
+                        checked={replayOnContinue}
+                        onChange={setReplayOnContinue}
+                      />
+                    </SettingRow>
+                  </div>
+                </Section>
+              </div>
             </>
           }
         >
