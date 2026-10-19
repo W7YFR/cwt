@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.11.0 — 2026-10-19
+
 ### Added
 
 - **Restart** beside **Continue** on the **QSO** page clears the log and starts a new QSO with a new station.
