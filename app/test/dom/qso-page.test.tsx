@@ -119,8 +119,8 @@ describe("pausing and going on", () => {
 
     await click($('[data-testid="qso-pause"]'));
     expect($('[data-testid="qso-stop"]')).toBeNull();
-    expect($('[data-testid="qso-continue"]')?.textContent).toContain("Continue");
-    expect(status()).toBe("Press Continue to go on with the QSO.");
+    expect($('[data-testid="qso-continue"]')).not.toBeNull();
+    expect($('[data-testid="qso-restart"]')).not.toBeNull();
     expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual(["R", "Enter"]);
     // Paused, the QSO is not over: the station's call stays as it was.
     expect(note()).toBe("");
@@ -144,7 +144,7 @@ describe("pausing and going on", () => {
       const b = $<HTMLButtonElement>('[data-testid="qso-continue"]');
       return !!b && !b.disabled;
     });
-    expect(status()).toBe("Press Continue to go on with the QSO.");
+    expect($('[data-testid="qso-restart"]')).not.toBeNull();
     expect($('[data-testid="qso-guide"]')).toBeNull();
   });
 });

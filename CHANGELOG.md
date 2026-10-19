@@ -7,6 +7,21 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.11.0 — 2026-10-19
+
+### Added
+
+- **Restart** beside **Continue** on the **QSO** page clears the log and starts a new QSO with a new station.
+- **Replay on Continue** in the **QSO** settings sets whether **Continue** sends the station's last line again. It is on by default.
+
+### Fixed
+
+- On the **QSO** page, AGN or QRS after the station answers a question gets that answer again, not the line before it.
+- An item of the station's exchange sent back with a `?`, such as `SALEM OR ?`, gets it confirmed, and the station waits for you to go on. It no longer sends its last line again.
+- A question sent with more of your exchange gets its answer, and the station goes on in the same line. It no longer waits, or sends again a piece it gave as an answer.
+- When the station answers a question and still waits for a piece of your exchange, it asks for that piece in the same line.
+- Noise on the microphone input no longer reads as keying, on either page, or locks your **QSO** copy before you finish.
+
 ## v1.10.2 — 2026-10-19
 
 ### Development

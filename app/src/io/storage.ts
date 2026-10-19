@@ -431,6 +431,9 @@ export interface Prefs {
   /** Blurred station text blurs the station's call in the log too. Absent
    *  is off. */
   qsoBlurCall?: boolean;
+  /** Continue on the QSO page plays the station's last over again. Absent
+   *  is on. */
+  qsoReplay?: boolean;
   /** How your own overs show on the QSO page. Absent is as sent. */
   qsoYourText?: "sent" | "hidden" | "none";
   /** The QSO page's settings band was open. */
@@ -606,6 +609,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoLength: oneOf("full", "short", "pieces", "mixed"),
   qsoTheirText: oneOf("before", "sent", "hidden", "copy", "none"),
   qsoBlurCall: isBool,
+  qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
   qsoSettingsOpen: isBool,
   qsoLockCopy: isBool,
