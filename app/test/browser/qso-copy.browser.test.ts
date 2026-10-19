@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { act } from "react";
 import {
+  EXCHANGE,
   QSO_MS,
   $,
   $$,
@@ -32,7 +33,7 @@ describe("copying the station", () => {
     await showTheirs("Copy");
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
 
-    await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
+    await send(EXCHANGE);
     const boxes = () => $$<HTMLInputElement>('[data-testid="qso-type"]');
     expect(boxes()).toHaveLength(1);
     await act(async () => {

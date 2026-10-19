@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  EXCHANGE,
   QSO_MS,
   $,
   $$,
@@ -31,13 +32,13 @@ describe("a QSO from your CQ", () => {
     await until("the answer", () => theirs().length === 1);
     expect(status()).toBe("The other station is sending.");
     await until("the turn to come back", () => yourTurn());
-    const answered = theirs()[0]!;
-    const call = callIn(answered);
+    // It answers with its call.
+    callIn(theirs()[0]!);
     // Your over, as copied. Not the first word: under load a character of it
     // can be misread, and the station still finds the CQ.
     expect($$(".qsolog li.you .text")[0]!.textContent).toContain("DE W7YFR W7YFR K");
 
-    const exchange = await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
+    const exchange = await send(EXCHANGE);
     expect(exchange.textContent).toMatch(/ NAME | OP /);
     expect(note(), "no note while the QSO runs").toBe("");
 

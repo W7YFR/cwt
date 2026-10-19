@@ -7,10 +7,10 @@ import { userEvent } from "vitest/browser";
 import { act } from "react";
 import { type Prefs } from "@/io/storage";
 import {
+  EXCHANGE,
   QSO_MS,
   $,
   $$,
-  callIn,
   key,
   open,
   page,
@@ -75,9 +75,9 @@ describe("copy mode options", () => {
     // The exchange, which always opens with your call and DE. The answer to
     // the CQ has wordings that do not.
     await open({ qsoTheirText: "before", qsoLockedShows: "right" });
-    const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
+    await send("CQ CQ DE W7YFR W7YFR K");
     await showTheirs("Copy");
-    await send(`${call} DE W7YFR UR 599 NAME BOB QTH SALEM OR KN`);
+    await send(EXCHANGE);
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     await act(async () => {
       await userEvent.fill(box, "w7yfr de");

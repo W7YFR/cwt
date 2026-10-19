@@ -29,6 +29,12 @@ export const WPM = 45;
 /** Long enough for a whole QSO. */
 export const QSO_MS = 120_000;
 
+/** Your exchange, with no call in it. The station takes it as its own, since
+ *  nobody else is on the frequency. A call in it is a risk the tests do not
+ *  need: one character of it misread, as on a busy machine, and the station
+ *  puts its call right, or takes yours for another station. */
+export const EXCHANGE = "UR 599 NAME BOB QTH SALEM OR KN";
+
 /** A stream the test keys text into. */
 function keyer(): { key(text: string): Promise<void>; restore(): void } {
   const ctx = new AudioContext();
