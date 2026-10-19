@@ -14,7 +14,7 @@ nothing to the site. The next release carries them.
 - The QSO browser tests are in five files, which run side by side.
 - The QSO browser tests send their exchange without calls, so a misread call no longer fails them.
 - CI runs the browser tests in their own `browser` job, beside `test`.
-- The mic debug transcript also logs the audio track's settings, skipped audio, clicks and the level, each **QSO** over, and what the live copy decoded from how much audio, once a second. It and the last two minutes of over audio are kept in memory all the time, and `__cwtMicDebug(true)` in the console prints them and turns the transcript on for the tab, as `?micdebug` does. **Save log** and **Save audio** on the **QSO** page then save them.
+- The mic debug transcript also logs the audio track's settings, skipped audio, clicks, the level, each **QSO** over and the live copy's passes. It and the last two minutes of over audio are always kept in memory, and `__cwtMicDebug(true)` in the console, or `?micdebug`, prints them and shows **Save log** and **Save audio** on the **QSO** page.
 
 ## v1.10.0 — 2026-10-18
 
