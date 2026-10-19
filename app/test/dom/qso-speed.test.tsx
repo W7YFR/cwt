@@ -2,11 +2,10 @@
  * page-harness.ts for how the page is driven.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadSpeed } from "@/io/storage";
 import {
   WPM,
-  QSO_MS,
   $,
   $$,
   click,
@@ -15,11 +14,14 @@ import {
   send,
   slide,
   until,
-  useQsoPage,
+  useQsoRig,
   yourTurn,
-} from "./qso-page-harness";
+} from "../qso-rig";
 
-useQsoPage();
+vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
+vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
+
+useQsoRig();
 
 describe("your speed", () => {
   it("is the practice page's speed, on its sliders in the settings, and locks while a session runs", async () => {
@@ -50,7 +52,7 @@ describe("your speed", () => {
     expect(field("calibration").closest("[inert]"), "and its calibration").not.toBeNull();
     expect($('[data-testid="qso-length"]')!.closest("[inert]"), "the rest can still change").toBeNull();
     expect($('[data-testid="qso-their-text"]')!.closest("[inert]"), "and what shows").toBeNull();
-  }, QSO_MS);
+  });
 });
 
 describe("the station's speed on its lines", () => {
@@ -62,7 +64,7 @@ describe("the station's speed on its lines", () => {
     expect($('.qsolog li.you [data-testid="qso-line-wpm"]'), "yours stays off").toBeNull();
     await send("QRS K");
     expect(speeds()).toEqual([`${WPM} wpm`, `${WPM}/24 wpm`]);
-  }, QSO_MS);
+  });
 });
 
 describe("your speed on each line", () => {
@@ -73,5 +75,5 @@ describe("your speed on each line", () => {
     const wpm = Number(/^(\d+)/.exec(shown)?.[1]);
     expect(shown).toMatch(/ wpm$/);
     expect(Math.abs(wpm - WPM), `measured ${shown} for ${WPM}`).toBeLessThanOrEqual(3);
-  }, QSO_MS);
+  });
 });

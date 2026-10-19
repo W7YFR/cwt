@@ -1,30 +1,32 @@
 /* The page around a QSO: the listening level, the guide, and pausing. See
- * qso-page-harness.ts for how the page is driven.
+ * qso-rig.tsx for how the page is driven.
  */
 
-import { describe, expect, it } from "vitest";
-import { userEvent } from "vitest/browser";
+import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { loadPrefs } from "@/io/storage";
 import {
-  QSO_MS,
   $,
   $$,
   click,
   mount,
   note,
   open,
+  press,
   send,
   slide,
   status,
   unmount,
   until,
-  useQsoPage,
+  useQsoRig,
   wait,
   yourTurn,
-} from "./qso-page-harness";
+} from "../qso-rig";
 
-useQsoPage();
+vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
+vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
+
+useQsoRig();
 
 describe("the listening level", () => {
   it("is the practice page's, in the Audio settings", async () => {
@@ -67,9 +69,7 @@ describe("anatomy of a QSO", () => {
     const help = $('[data-testid="qso-help"]')!;
     expect(help.querySelector("#qsohelp-title")!.textContent).toBe("Anatomy of a QSO");
     expect(help.textContent).toContain("CQ CQ DE KD9XYZ K");
-    await act(async () => {
-      await userEvent.keyboard("{Escape}");
-    });
+    await press("Escape");
     expect($('[data-testid="qso-help"]')).toBeNull();
   });
 
@@ -96,10 +96,6 @@ describe("anatomy of a QSO", () => {
     }
     // The guide, then the running session: never one without the other.
     expect(seen).toEqual(["guide", "?+stop"]);
-    // The ? at the right end of its row.
-    const row = $(".qsocontrols")!.getBoundingClientRect();
-    const help = $('[data-testid="qso-help-open"]')!.getBoundingClientRect();
-    expect(Math.abs(row.right - help.right)).toBeLessThanOrEqual(1);
   });
 
   it("comes back after a session that sent nothing", async () => {
@@ -133,7 +129,7 @@ describe("pausing and going on", () => {
     await until("the last over to play again", () => status() === "The other station is sending.");
     await until("the turn to come back", () => yourTurn());
     expect(lines(), "played again, not added").toBe(before);
-  }, QSO_MS);
+  });
 
   it("comes back after a reload, to go on with", async () => {
     await open({ qsoTheirText: "before" });
@@ -150,5 +146,5 @@ describe("pausing and going on", () => {
     });
     expect(status()).toBe("Press Continue to go on with the QSO.");
     expect($('[data-testid="qso-guide"]')).toBeNull();
-  }, QSO_MS);
+  });
 });

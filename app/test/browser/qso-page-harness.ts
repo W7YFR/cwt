@@ -1,14 +1,14 @@
-/* The QSO page, end to end: what the qso-*.browser.test.ts files share.
+/* The QSO page, end to end, in real audio: what qso.browser.test.ts uses.
  *
  * The microphone is a keyer: a tone the test keys any text into while the
  * page runs. So a test can work a whole QSO the way a person does: call CQ,
  * read what the station sent, answer it, and look at the page at each turn.
  * The decoder worker, the script and the player are the real ones. The pure
- * tier tests the script's answers one over at a time. These are the tests
- * that they come together in the right order on the page.
+ * tier tests the script's answers one over at a time. This is the test that
+ * they come together in the right order on the page.
  *
- * A QSO plays in real time, so the tests are in several files. Vitest runs
- * files side by side, and the tests in one file one after another.
+ * A QSO here plays in real time. The other QSO tests use qso-rig.tsx, on a
+ * fake clock.
  */
 
 import { afterEach, beforeEach, expect } from "vitest";
@@ -29,11 +29,7 @@ export const WPM = 45;
 /** Long enough for a whole QSO. */
 export const QSO_MS = 120_000;
 
-/** Your exchange, with no call in it. The station takes it as its own, since
- *  nobody else is on the frequency. A call in it is a risk the tests do not
- *  need: one character of it misread, as on a busy machine, and the station
- *  puts its call right, or takes yours for another station. */
-export const EXCHANGE = "UR 599 NAME BOB QTH SALEM OR KN";
+export { EXCHANGE } from "../qso-rig";
 
 /** A stream the test keys text into. */
 function keyer(): { key(text: string): Promise<void>; restore(): void } {
@@ -72,15 +68,6 @@ let errors: string[];
 /** Key `text` into the microphone, and wait until it has played. */
 export const key = (text: string): Promise<void> => mic.key(text);
 
-/** The element the page is mounted in. */
-export const page = (): HTMLDivElement => host;
-
-/** The page goes, without a Stop, as on a reload. Mount it again after. */
-export function unmount(): void {
-  act(() => root.unmount());
-  root = createRoot(host);
-}
-
 /** Time passing, inside act, so the page's updates land in it. */
 export const wait = (ms: number) =>
   act(async () => {
@@ -108,39 +95,6 @@ export const yourTurn = () => status() === "Call CQ to make a contact." || statu
 export async function click(el: HTMLElement | null): Promise<void> {
   expect(el, "a control to click").not.toBeNull();
   await act(async () => el!.click());
-}
-
-/** Choose what shows of the station's overs, in the settings: one of the
- *  buttons, by its label. */
-export async function showTheirs(label: string): Promise<void> {
-  if ($('[data-testid="panel-toggle"]')?.getAttribute("aria-pressed") !== "true") {
-    await click($('[data-testid="panel-toggle"]'));
-  }
-  const button = $$<HTMLButtonElement>('[data-testid="qso-their-text"] button').find(
-    (b) => b.textContent === label,
-  );
-  await click(button ?? null);
-  expect(button!.getAttribute("aria-pressed")).toBe("true");
-}
-
-/** One row of a graded copy, as read: yours over the station's, each a
- *  column's text, words split where the columns are. */
-export function row(graded: Element, side: "yourcopy" | "sentcopy"): string {
-  return [...graded.querySelectorAll(".cword")]
-    .map((w) => [...w.querySelectorAll(`.${side}`)].map((c) => c.textContent).join(""))
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Move the slider `id` to `value`, as a drag would. */
-export async function slide(id: string, value: number): Promise<void> {
-  const el = $<HTMLInputElement>(`#${id}`)!;
-  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-  await act(async () => {
-    set.call(el, String(value));
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  });
 }
 
 /** Mount the page with these choices and press Start. */

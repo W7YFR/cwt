@@ -1,12 +1,14 @@
-/* A whole QSO from your CQ to 73, QRS, and what the page says at each turn.
- * See qso-page-harness.ts for how the page is driven.
+/* A whole QSO in real audio: the real microphone path, copy worker and
+ * player, on the real clock. The one QSO test that runs this way. The rest
+ * run on a fake clock with those three stood in for, in the dom tier and in
+ * qso-look.browser.test.ts. This one shows that the parts stood in for do
+ * their part. See qso-page-harness.ts for how the page is driven.
  */
 
 import { describe, expect, it } from "vitest";
 import {
   EXCHANGE,
   QSO_MS,
-  $,
   $$,
   callIn,
   key,
@@ -50,29 +52,5 @@ describe("a QSO from your CQ", () => {
     expect(note(), "no note while the last over plays").toBe("");
     await until("the turn to come back", () => yourTurn());
     expect(note()).toBe("The QSO is over. Call CQ for the next one.");
-  }, QSO_MS);
-
-  it("sends its last over again, slower, on QRS", async () => {
-    await open({ qsoTheirText: "before" });
-    const first = await send("CQ CQ DE W7YFR W7YFR K");
-    const again = await send("QRS K");
-    expect(again.querySelector(".text")!.textContent).toBe(first.querySelector(".text")!.textContent);
-    // Halfway from 45 down to the bottom step: 25, between 24 and 26, so 24.
-    expect($('[data-testid="qso-their-speed"]')?.textContent).toBe("The station sends at 45/24 wpm.");
-  }, QSO_MS);
-});
-
-describe("the session's own words", () => {
-  it("says to call CQ between QSOs, and that it is your turn during one", async () => {
-    await open({ qsoTheirText: "before" });
-    expect(status()).toBe("Call CQ to make a contact.");
-    // The keys, drawn as the practice page draws them.
-    expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual([
-      "R",
-      "Enter",
-      "Esc",
-    ]);
-    await send("CQ CQ DE W7YFR W7YFR K");
-    expect(status()).toBe("Your turn.");
   }, QSO_MS);
 });
