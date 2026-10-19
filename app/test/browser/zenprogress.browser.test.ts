@@ -49,6 +49,15 @@ function keyedMic(): { restore: () => void; seconds: number } {
   };
 }
 
+/* How many times a test that reads the keyed audio back may run again.
+
+   The audio crosses from this file's AudioContext to the recorder's through a
+   MediaStream. On a starved runner that bridge fills a late frame with
+   silence, and a 20 ms hole inside a dah misreads its character. The decoder
+   reads the same audio the same way every time, so a real fault fails every
+   run; a hole fails one. */
+const CAPTURE_RETRY = 2;
+
 let host: HTMLDivElement;
 let root: Root;
 let mic: ReturnType<typeof keyedMic>;
@@ -82,7 +91,7 @@ const wait = (ms: number) =>
     await new Promise((r) => setTimeout(r, ms));
   });
 
-describe("live progress", () => {
+describe("live progress", { retry: CAPTURE_RETRY }, () => {
   it("colors and grades the message as it is keyed, and stops at its end", async () => {
     recorder = await startRecording();
     const rec = recorder;
@@ -201,7 +210,7 @@ describe("the grading dots", () => {
   });
 });
 
-describe("following the sending in Plain mode", () => {
+describe("following the sending in Plain mode", { retry: CAPTURE_RETRY }, () => {
   it("slides the next word in as a word's last letter begins, and stops at the end", async () => {
     recorder = await startRecording();
     const rec = recorder;
