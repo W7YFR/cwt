@@ -7,6 +7,10 @@
  *
  * How much it says follows the length: full, short, or piece by piece, where
  * the exchange comes one item per over.
+ *
+ * A line in the middle of the QSO opens with both calls by the station's own
+ * habit, and most of the time when your last over did. Its first exchange
+ * and its sign-off always carry them.
  */
 
 import { pick, type Rand, type Station } from "./station";
@@ -24,6 +28,8 @@ export interface Say {
   /** The station's local hour, 0 to 23, for GM, GA or GE. */
   readonly hour: number;
   readonly length: Length;
+  /** Your last over opened with both calls, so the station mostly does too. */
+  readonly mirror: boolean;
 }
 
 /** The items of the exchange, in the order piece by piece sends them. */
@@ -44,6 +50,17 @@ function words(...parts: string[]): string {
 
 export function greeting(hour: number): string {
   return hour < 12 ? "GM" : hour < 18 ? "GA" : "GE";
+}
+
+/** How often a line opens with both calls when your last over did. Operators
+ *  match each other's style, most of the time. */
+const MIRROR = 0.8;
+
+/** Whether a line in the middle of the QSO opens with both calls: by the
+ *  station's own habit, and more often when your last over did. */
+function opens(s: Say): boolean {
+  const habit = s.them.habit ?? KEEP;
+  return s.rand() < (s.mirror ? Math.max(habit, MIRROR) : habit);
 }
 
 /** Your name, or OM when the station did not copy it. */
@@ -99,7 +116,8 @@ export function askCall(s: Say): string {
 /** It asks for your over again, when it could not read it. */
 export function askAgain(s: Say): string {
   const c = s.them.call;
-  return pick(s.rand, [`PSE AGN ${s.you} DE ${c} KN`, `AGN PSE ${s.you} DE ${c} KN`, `PSE AGN KN`]);
+  if (!opens(s)) return "PSE AGN KN";
+  return pick(s.rand, [`PSE AGN ${s.you} DE ${c} KN`, `AGN PSE ${s.you} DE ${c} KN`]);
 }
 
 /** Its report, with 599 sometimes sent as 5NN. Twice, or once when short. */
@@ -164,7 +182,7 @@ export function piece(s: Say, at: number, open: string): string {
   const c = s.them.call;
   const first = at === 0;
   const last = at === PIECES.length - 1;
-  const head = first || rand() < KEEP ? `${s.you} DE ${c}` : "";
+  const head = first || opens(s) ? `${s.you} DE ${c}` : "";
   const hello = first ? maybe(rand, `${greeting(s.hour)} ${to(s)}`) : "";
   const ask = last ? pick(rand, ["HW?", "HW CPY?", "SO HW?"]) : "";
   const end = pick(rand, ["KN", "BK", "K"]);
@@ -215,7 +233,7 @@ const LABEL: Readonly<Record<Piece, string>> = { report: "RST", name: "NAME", qt
 export function askFor(s: Say, missing: readonly Piece[], calls = true): string {
   const c = s.them.call;
   const labels = missing.map((p) => LABEL[p]);
-  const head = calls ? maybe(s.rand, `${s.you} DE ${c}`) : "";
+  const head = calls && opens(s) ? `${s.you} DE ${c}` : "";
   if (labels.length === 1) {
     const l = labels[0]!;
     return words(head, pick(s.rand, [`UR ${l}? KN`, `${l}? KN`, `PSE UR ${l}? KN`]));
