@@ -71,6 +71,8 @@ export const lastSent = (): string => {
 };
 /** Your turn to send: between QSOs it says to call CQ, during one it says
  *  it is your turn. */
+/** The session has stopped: Start is back, as at the end of a QSO. */
+export const ended = () => $('[data-testid="qso-start"]') !== null;
 export const yourTurn = () => status() === "Call CQ to make a contact." || status() === "Your turn.";
 
 export async function click(el: HTMLElement | null): Promise<void> {

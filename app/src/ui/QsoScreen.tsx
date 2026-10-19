@@ -85,6 +85,9 @@ const AFTER_REPLY_MS = 250;
  *  sending stays hidden. */
 const TYPING_QUIET_MS = 1200;
 
+/** What the page says once a QSO is over and your copy, if any, is graded. */
+const QSO_OVER = "The QSO is over. Press Start for a new one.";
+
 /** The tone a station line plays at when the log kept none. */
 const DEFAULT_TONE_HZ = 600;
 
@@ -159,6 +162,19 @@ const REPLAY_HELP =
 const BLUR_CALL_HELP =
   "While the station's text is blurred, a copy box or off, its call is blurred in the log " +
   "too, until the QSO ends.";
+
+/** When the play buttons show. */
+type Playback = "never" | "always" | "end";
+const PLAYBACKS: ReadonlyArray<Option<Playback>> = [
+  { value: "never", label: "Never" },
+  { value: "always", label: "Always" },
+  { value: "end", label: "At end" },
+];
+const PLAYBACK_HELP =
+  "When the play buttons show: on each line and as Play QSO under a QSO that is over. " +
+  "Always shows them on every line, and they play once the microphone is off. At end " +
+  "shows them once the QSO is over.";
+const SHOW_DOWNLOAD_HELP = "Under a QSO that is over, Download saves it as a WAV file.";
 
 const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
   { value: "sent", label: "As sent" },
@@ -391,7 +407,8 @@ function useOnOff(
     | "qsoShowSpeed"
     | "qsoShowTheirSpeed"
     | "qsoBlurCall"
-    | "qsoReplay",
+    | "qsoReplay"
+    | "qsoShowDownload",
   or: boolean,
 ): readonly [boolean, (next: boolean) => void] {
   const [value, setRaw] = useState<boolean>(() => loadPrefs()[key] ?? or);
@@ -474,6 +491,12 @@ export function QsoScreen({
   const [settingsOpen, setSettingsOpen] = useOnOff("qsoSettingsOpen", false);
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
   const [replayOnContinue, setReplayOnContinue] = useOnOff("qsoReplay", true);
+  const [showDownload, setShowDownload] = useOnOff("qsoShowDownload", true);
+  const [playback, setPlaybackRaw] = useState<Playback>(() => loadPrefs().qsoPlayback ?? "always");
+  const setPlayback = (next: Playback) => {
+    setPlaybackRaw(next);
+    savePrefs({ ...loadPrefs(), qsoPlayback: next });
+  };
   const [lockCopy, setLockCopy] = useOnOff("qsoLockCopy", true);
   const [lockedShows, setLockedShowsRaw] = useState<LockedShows>(
     () => loadPrefs().qsoLockedShows ?? "nothing",
@@ -499,6 +522,8 @@ export function QsoScreen({
   const [stopped, setStopped] = useState(() => kept?.stopped ?? true);
   /** Pause, not Stop, is ending the session now. */
   const pausing = useRef(false);
+  /** The end of a QSO, not Stop, is ending the session now. */
+  const ending = useRef(false);
   /** Continue was pressed with Replay on Continue on: once the microphone
    *  is open, the station's last over plays again. */
   const replayOnStart = useRef(false);
@@ -640,6 +665,12 @@ export function QsoScreen({
       return;
     }
     setStopped(true);
+    // Stopped because the QSO ended: it is closed already, or waits for your
+    // copy.
+    if (ending.current) {
+      ending.current = false;
+      return;
+    }
     close(qsoNo.current);
     if (finishedRef.current !== null) close(finishedRef.current);
   }, [recorder, quiet, close]);
@@ -679,23 +710,27 @@ export function QsoScreen({
   afterReply.current = () => {
     timer.current = setTimeout(() => {
       timer.current = null;
-      recorder?.restart();
-      setPhase("listening");
-      // The last over has played: now the QSO is over. With copy to grade,
-      // it waits for you to finish typing.
+      // A new station starts at your speed.
+      if (!qso.current.last) setTheirSpeed(speed);
+      // The last over has played: now the QSO is over, and the session stops,
+      // so it can be played back. With copy to grade, it waits for you to
+      // finish typing.
       if (closing.current !== null) {
         const n = closing.current;
         closing.current = null;
         if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
           setFinished(n);
-          setNote("The QSO is over. Finish your copy, then call CQ for the next one.");
+          setNote("The QSO is over. Finish your copy.");
         } else {
           close(n);
-          setNote("The QSO is over. Call CQ for the next one.");
+          setNote(QSO_OVER);
         }
+        ending.current = true;
+        void rec.discard();
+        return;
       }
-      // A new station starts at your speed.
-      if (!qso.current.last) setTheirSpeed(speed);
+      recorder?.restart();
+      setPhase("listening");
     }, AFTER_REPLY_MS);
   };
 
@@ -1020,7 +1055,9 @@ export function QsoScreen({
 
   /** The play button at the end of line `i`. Off while the microphone is
    *  on, and for an over whose recording is gone. */
-  const linePlay = (i: number): React.ReactElement => {
+  const linePlay = (i: number): React.ReactElement | null => {
+    if (playback === "never") return null;
+    if (playback === "end" && !closed.includes(lines[i]!.qso)) return null;
     const part = tapeLineOf(i);
     const key = `line ${i}`;
     const on = replaying === key;
@@ -1047,6 +1084,8 @@ export function QsoScreen({
   /** Play QSO and Download, under the last line of QSO `n` once it is over. */
   const qsoTapeRow = (n: number): React.ReactElement | null => {
     if (!closed.includes(n)) return null;
+    const play = playback !== "never";
+    if (!play && !showDownload) return null;
     const parts = qsoParts(n);
     if (!parts) return null;
     const make = () => tape(parts, tapeRate());
@@ -1054,16 +1093,20 @@ export function QsoScreen({
     const on = replaying === key;
     return (
       <li className="qsotape" data-testid="qso-tape">
-        <button type="button" disabled={!!recorder} onClick={() => playClip(key, make())}>
-          <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
-          {on ? "Stop" : "Play QSO"}
-        </button>
-        <button type="button" onClick={() => download(n, make())}>
-          <i className="ico">
-            <IconDownload />
-          </i>
-          Download
-        </button>
+        {play && (
+          <button type="button" disabled={!!recorder} onClick={() => playClip(key, make())}>
+            <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
+            {on ? "Stop" : "Play QSO"}
+          </button>
+        )}
+        {showDownload && (
+          <button type="button" onClick={() => download(n, make())}>
+            <i className="ico">
+              <IconDownload />
+            </i>
+            Download
+          </button>
+        )}
       </li>
     );
   };
@@ -1318,6 +1361,25 @@ export function QsoScreen({
                   />
                 </div>
               </Section>
+              <Section name="playback" title="Playback">
+                <div className="panelgroups">
+                  <ChoiceGroup
+                    id="qso-playback"
+                    label="Play buttons"
+                    help={PLAYBACK_HELP}
+                    value={playback}
+                    options={PLAYBACKS}
+                    onChange={(v) => setPlayback(v as Playback)}
+                  />
+                  <Check
+                    id="qso-show-download"
+                    label="Show Download"
+                    help={SHOW_DOWNLOAD_HELP}
+                    checked={showDownload}
+                    onChange={setShowDownload}
+                  />
+                </div>
+              </Section>
             </>
           }
         >
@@ -1480,7 +1542,7 @@ export function QsoScreen({
                   data-testid="qso-grade"
                   onClick={() => {
                     close(finished);
-                    setNote("The QSO is over. Call CQ for the next one.");
+                    setNote(QSO_OVER);
                   }}
                 >
                   Grade my copy

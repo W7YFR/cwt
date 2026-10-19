@@ -11,6 +11,7 @@ import {
   QSO_MS,
   $$,
   callIn,
+  ended,
   key,
   note,
   open,
@@ -50,7 +51,8 @@ describe("a QSO from your CQ", () => {
     await until("the last over to start", () => theirs().length > before);
     expect(status()).toBe("The other station is sending.");
     expect(note(), "no note while the last over plays").toBe("");
-    await until("the turn to come back", () => yourTurn());
-    expect(note()).toBe("The QSO is over. Call CQ for the next one.");
+    await until("the session to stop", ended);
+    expect(note(), "a note once the last over has played").not.toBe("");
+    expect($$('[data-testid="qso-tape"]'), "the QSO can be played back").toHaveLength(1);
   }, QSO_MS);
 });

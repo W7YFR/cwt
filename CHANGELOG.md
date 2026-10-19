@@ -11,6 +11,11 @@ nothing to the site. The next release carries them.
 
 - On the **QSO** page, each line has a play button to hear it again while the microphone is off.
 - A QSO that is over has **Play QSO**, which plays both sides with the long pauses cut, and **Download**, which saves it as a WAV file.
+- **Play buttons** in the **QSO** settings sets when the play buttons show: **Never**, **Always** or **At end**. **Show Download** shows or hides **Download**.
+
+### Changed
+
+- On the **QSO** page, the session stops when a QSO ends. **Start** begins the next one.
 
 ## v1.12.0 — 2026-10-19
 

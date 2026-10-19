@@ -440,6 +440,10 @@ export interface Prefs {
   qsoReplay?: boolean;
   /** How your own overs show on the QSO page. Absent is as sent. */
   qsoYourText?: "sent" | "hidden" | "none";
+  /** When the QSO page's play buttons show. Absent is always. */
+  qsoPlayback?: "never" | "always" | "end";
+  /** Download shows under a QSO that is over. Absent is on. */
+  qsoShowDownload?: boolean;
   /** The QSO page's settings band was open. */
   qsoSettingsOpen?: boolean;
   /** Copy mode: your copy locks when you start sending. Absent is on. */
@@ -615,6 +619,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoBlurCall: isBool,
   qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
+  qsoPlayback: oneOf("never", "always", "end"),
+  qsoShowDownload: isBool,
   qsoSettingsOpen: isBool,
   qsoLockCopy: isBool,
   qsoLockedShows: oneOf("nothing", "grade", "right"),
