@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { tokenize } from "@/morse";
 import { reviewTake, targetText } from "@/timing";
 import { buildJsonReport } from "@/io/report";
 import { MIC_SOURCE, type Take } from "@/types";
@@ -16,10 +17,8 @@ import { defaultSettings } from "@/timing";
 import { caseNamed, takeFrom, SLOPPY } from "../fixture";
 
 describe("targetText", () => {
-  it("joins the passes with the gap that separates words", () => {
-    // The same silence that is inside the message, because that is what a
-    // repeat sounds like. Anything longer is a rest and is not graded.
-    expect(targetText("CQ DE W7YFR", 3)).toBe("CQ DE W7YFR CQ DE W7YFR CQ DE W7YFR");
+  it("joins the passes with a break", () => {
+    expect(targetText("CQ DE W7YFR", 3)).toBe("CQ DE W7YFR | CQ DE W7YFR | CQ DE W7YFR");
   });
 
   it("leaves one alone", () => {
@@ -51,8 +50,6 @@ describe("a take sent more than once", () => {
       ...defaultSettings(take),
       expected: "CQ DE W7YFR",
       times,
-      // Passes joined by a word gap, which is what no repeat pause gives.
-      repeatPauseSec: 0,
     };
     return { settings, review: reviewTake(take, settings) };
   };
@@ -62,15 +59,14 @@ describe("a take sent more than once", () => {
     const three = at(3).review;
 
     expect(three.ideal.chars.length).toBe(one.ideal.chars.length * 3);
-    // The extra time is three passes plus the two word gaps between them.
-    const wordGap = one.ref.wordGapSec;
-    expect(three.ideal.duration).toBeCloseTo(one.ideal.duration * 3 + wordGap * 2, 6);
+    // The extra time is three passes plus the two breaks between them.
+    expect(three.ideal.duration).toBeCloseTo(one.ideal.duration * 3 + at(3).settings.breakSec * 2, 6);
 
     /* And what the decode is measured against grew with it — by the whole
        repeated text, joining gaps included, rather than by three times the
        message. */
-    expect(one.comparison!.nExpected).toBe(targetText("CQ DE W7YFR", 1).length);
-    expect(three.comparison!.nExpected).toBe(targetText("CQ DE W7YFR", 3).length);
+    expect(one.comparison!.nExpected).toBe(tokenize(targetText("CQ DE W7YFR", 1)).length);
+    expect(three.comparison!.nExpected).toBe(tokenize(targetText("CQ DE W7YFR", 3)).length);
   });
 
   it("leaves the message itself a single instance", () => {

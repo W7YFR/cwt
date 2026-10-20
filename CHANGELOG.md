@@ -7,6 +7,16 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.14.0 — 2026-10-20
+
+### Changed
+
+- With **Times** above 1, a break separates the passes, as a line break does in the message. The gap between passes is not graded, and the target holds it for **Rest at each break**.
+
+### Removed
+
+- The **Pause between repeats** setting.
+
 ## v1.13.1 — 2026-10-19
 
 ### Fixed

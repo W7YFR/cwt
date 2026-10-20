@@ -977,7 +977,6 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(Number(box("tol").value), "tolerance").toBe(30);
     expect(Number(box("times").value), "times").toBe(1);
     expect(Number(box("gain").value), "listening level").toBe(0);
-    expect(Number(box("repeat-pause").value), "repeat pause").toBe(5);
     expect(Number(box("break-sec").value), "break length").toBe(3);
     expect(Number(box("pace-lead").value), "delay start").toBe(3);
     const on = {

@@ -22,8 +22,6 @@ import { BREAK } from "@/morse";
 import {
   BREAK_MAX_SEC,
   BREAK_MIN_SEC,
-  REPEAT_PAUSE_MAX_SEC,
-  REPEAT_PAUSE_MIN_SEC,
 } from "@/timing/timeline";
 import {
   ADVANCED_GRADING_HELP,
@@ -48,7 +46,6 @@ import {
   PLAIN_GRADING_HELP,
   PACE_LEAD_HELP,
   BREAK_HELP,
-  REPEAT_PAUSE_HELP,
   ZOOM_HELP,
   CAL_FILE,
   CAL_HELP,
@@ -934,20 +931,6 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
 
       <Section name="target" title="The message">
         <div className="panelgroups">
-          <div className="group">
-            <NumberField
-              id="repeat-pause"
-              name="Pause between repeats"
-              unit="s"
-              spoken="seconds"
-              help={REPEAT_PAUSE_HELP}
-              value={s.repeatPauseSec}
-              min={REPEAT_PAUSE_MIN_SEC}
-              max={REPEAT_PAUSE_MAX_SEC}
-              step={1}
-              onChange={(v) => onChange({ repeatPauseSec: v })}
-            />
-          </div>
           <div className="group">
             <NumberField
               id="break-sec"

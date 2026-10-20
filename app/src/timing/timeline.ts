@@ -9,7 +9,7 @@
 
 import type { Block, BlockKind, Char, Segment, Timeline, Timing } from "@/types";
 import { median } from "@/dsp/segments";
-import { BREAK, CHAR_TO_MORSE, REPEAT, decodePattern, keyableSymbols } from "@/morse";
+import { BREAK, CHAR_TO_MORSE, decodePattern, keyableSymbols } from "@/morse";
 
 /** Does this character open a word?
  *
@@ -53,25 +53,14 @@ export const BREAK_DEFAULT_SEC = 3;
 export const BREAK_MIN_SEC = 1;
 export const BREAK_MAX_SEC = 30;
 
-/** Extra time the ideal timeline holds between passes, at each REPEAT. At
- *  zero a REPEAT is a word gap, and the sender's gap there is graded. Five
- *  seconds to start: time to breathe between passes, and not graded. */
-export const REPEAT_PAUSE_DEFAULT_SEC = 5;
-export const REPEAT_PAUSE_MIN_SEC = 0;
-export const REPEAT_PAUSE_MAX_SEC = 30;
-
 export interface Pauses {
   breakSec: number;
-  repeatSec: number;
 }
 
-const DEFAULT_PAUSES: Pauses = {
-  breakSec: BREAK_DEFAULT_SEC,
-  repeatSec: REPEAT_PAUSE_DEFAULT_SEC,
-};
+const DEFAULT_PAUSES: Pauses = { breakSec: BREAK_DEFAULT_SEC };
 
-/** Splits text on BREAK and REPEAT, and keeps each marker as its own part. */
-const MARKS = new RegExp(`([${BREAK}${REPEAT}])`);
+/** Splits text on BREAK, and keeps each BREAK as its own part. */
+const MARKS = new RegExp(`([${BREAK}])`);
 
 function block(
   t0: number,
@@ -213,7 +202,7 @@ export function idealTimeline(
   timing: Timing,
   pauses: Partial<Pauses> = {},
 ): Timeline {
-  const { breakSec, repeatSec } = { ...DEFAULT_PAUSES, ...pauses };
+  const { breakSec } = { ...DEFAULT_PAUSES, ...pauses };
   const u = timing.unitSec;
   const charGap = timing.charGapSec || 3 * u;
   const wordGap = timing.wordGapSec || 7 * u;
@@ -228,7 +217,6 @@ export function idealTimeline(
   let pauseSec = 0;
   for (const part of text.toUpperCase().split(MARKS)) {
     if (part === BREAK) pauseSec = Math.max(pauseSec, breakSec);
-    else if (part === REPEAT) pauseSec = Math.max(pauseSec, repeatSec);
     else {
       for (const word of part.split(/\s+/)) {
         if (!word) continue;
