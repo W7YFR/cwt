@@ -341,7 +341,6 @@ describe("controls", () => {
 
     const row = (name: string) => container.querySelector(`[data-panel='${name}']`)!;
     expect(row("target")).toContainElement(byId("break-sec"));
-    expect(row("target")).toContainElement(byId("repeat-pause"));
     expect(row("grading")).toContainElement(byId("ignore-construction"));
     // The three ways to record, together in a section of their own.
     for (const id of ["plain-follow", "plain-grading", "zen-progress", "zen-grading", "pace-absolute", "pace-lead"]) {
@@ -641,20 +640,6 @@ describe("controls", () => {
     await user.clear(box);
     await user.type(box, "99");
     expect(onChange).toHaveBeenLastCalledWith({ breakSec: BREAK_MAX_SEC });
-  });
-
-  it("always offers the repeat pause", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const { rerender } = renderView({ onChange, open: true });
-    const box = () => byId("repeat-pause") as HTMLInputElement;
-    rerender(view({ times: 1 }, onChange));
-    expect(document.querySelector("[data-panel='target']")).toContainElement(box());
-    expect(box()).toBeEnabled();
-    expect(box().value, "five seconds to start").toBe("5");
-    await user.clear(box());
-    await user.type(box(), "4");
-    expect(onChange).toHaveBeenLastCalledWith({ repeatPauseSec: 4 });
   });
 
   it("calls fit when the Fit button is pressed", async () => {

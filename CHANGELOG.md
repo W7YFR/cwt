@@ -7,6 +7,14 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- With **Times** above 1, each pass ends at a break, the same as a line break in the message. The gap between passes is never graded, and the target holds it for **Rest at each break**.
+
+### Removed
+
+- **Pause between repeats**. **Rest at each break** sets the gap between passes.
+
 ## v1.13.1 — 2026-10-19
 
 ### Fixed
