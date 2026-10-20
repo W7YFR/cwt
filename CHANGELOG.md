@@ -9,11 +9,11 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- With **Times** above 1, each pass ends at a break, the same as a line break in the message. The gap between passes is never graded, and the target holds it for **Rest at each break**.
+- With **Times** above 1, a break separates the passes, as a line break does in the message. The gap between passes is not graded, and the target holds it for **Rest at each break**.
 
 ### Removed
 
-- **Pause between repeats**. **Rest at each break** sets the gap between passes.
+- The **Pause between repeats** setting.
 
 ## v1.13.1 — 2026-10-19
 
