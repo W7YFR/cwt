@@ -3,8 +3,9 @@
  * Pure. The Copy page holds what these return.
  */
 
-import { CHAR_TO_MORSE, canonicalChar } from "@/morse";
+import { CHAR_TO_MORSE, canonicalChar, keyableSymbols } from "@/morse";
 import { gradeCopy } from "@/qso/show";
+import { idealTimeline, targetTiming } from "@/timing";
 import type { Over, RecChar, Recording } from "./decode";
 
 /** How you copy: in one box per line, or in a slot per character. */
@@ -30,6 +31,25 @@ export interface Attempt {
 /** A line not yet copied. */
 export function emptyCopy(over: Over): LineCopy {
   return { typed: "", slots: charsOf(over).map(() => ""), locked: false, kept: null };
+}
+
+/** A line sent from `text`, as an over, with each character where it falls
+ *  when sent at `charWpm` and `farnsworthWpm`. The QSO page's station sends
+ *  from text, so its lines have no decode. */
+export function overOfText(text: string, charWpm: number, farnsworthWpm: number): Over {
+  const timeline = idealTimeline(text, targetTiming(charWpm, farnsworthWpm));
+  let k = 0;
+  const words = timeline.text
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => ({
+      chars: keyableSymbols(word).map(() => {
+        const c = timeline.chars[k++]!;
+        return { char: c.char, t0: c.t0, t1: c.t1 };
+      }),
+    }))
+    .filter((w) => w.chars.length > 0);
+  return { sender: 0, words, text: words.map((w) => w.chars.map((c) => c.char).join("")).join(" "), t0: 0, t1: timeline.duration };
 }
 
 /** Every character of `over`, in order. */

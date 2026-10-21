@@ -24,12 +24,15 @@ export function Slots({
   label,
   onSlots,
   onLock,
+  onKey,
 }: {
   over: Over;
   copy: LineCopy;
   label: string;
   onSlots(slots: string[]): void;
   onLock(): void;
+  /** Any key in a slot, before the slot handles it. */
+  onKey?(): void;
 }): React.ReactElement {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const chars = charsOf(over);
@@ -58,6 +61,7 @@ export function Slots({
   const set = (i: number, v: string) => onSlots(copy.slots.map((s, k) => (k === i ? v : s)));
 
   const keyDown = (ev: React.KeyboardEvent<HTMLInputElement>, i: number) => {
+    onKey?.();
     if (ev.key === "Escape") {
       ev.preventDefault();
       ev.stopPropagation();

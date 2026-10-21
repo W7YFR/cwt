@@ -76,7 +76,7 @@ interface Option<T> {
 
 const INPUTS: ReadonlyArray<Option<CopyInput>> = [
   { value: "text", label: "Box", note: "Type each line in a box, as you hear it." },
-  { value: "slots", label: "Slots", note: "A slot for each character, so you see how long each word is." },
+  { value: "slots", label: "Slots", note: "A slot for each character." },
 ];
 const INPUT_HELP =
   "How you copy each line: in one box, or in a slot for each character. Slots show how " +
