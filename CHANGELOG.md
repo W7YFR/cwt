@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.15.0 — 2026-10-21
+
 ### Added
 
 - The **Copy** page plays a recording of CW for you to copy. Open or drop a file, and each over shows as a line, with a box to type in, as it plays.
