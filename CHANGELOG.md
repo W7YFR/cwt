@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.16.0 — 2026-10-21
+
 ### Added
 
 - On the **QSO** page, **Enter copy as** sets a box per line or a slot per character for the station's lines, while **Its lines show** is **Copy**.
