@@ -120,6 +120,17 @@ const EARLIER_HELP =
   "right and wrong, and each box starts with your last copy. None starts each attempt " +
   "clean. Every attempt is kept either way.";
 
+/** Where the page is, as its heading says in a word. */
+type CopyState = "reading" | "none" | "playing" | "over" | "paused" | "ready";
+const STATE_WORDS: Record<CopyState, string> = {
+  reading: "Reading",
+  none: "No recording",
+  playing: "Playing",
+  over: "Over",
+  paused: "Paused",
+  ready: "Ready",
+};
+
 /** What a reload brings back of your copy. */
 interface Kept {
   readonly v: 2;
@@ -778,19 +789,19 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
               : "Press Start to listen.";
 
   /** Where things are, in a word, over the sentence that says what to do. */
-  const state = reading
-    ? "Reading"
+  const state: CopyState | null = reading
+    ? "reading"
     : !rec
       ? recalling
-        ? ""
-        : "No recording"
+        ? null
+        : "none"
       : playing === "main"
-        ? "Playing"
+        ? "playing"
         : ended
-          ? "Over"
+          ? "over"
           : pos > 0
-            ? "Paused"
-            : "Ready";
+            ? "paused"
+            : "ready";
   /** This attempt has not played yet. */
   const fresh = !!kept && kept.reached === 0 && pos === 0;
 
@@ -928,8 +939,8 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
       <main className="panel qso copy" data-testid="copy">
         <div className="copyhead" role="status" aria-live="polite">
           {state && (
-            <span className="uplabel" data-testid="copy-state">
-              {state}
+            <span className="uplabel" data-testid="copy-state" data-state={state}>
+              {STATE_WORDS[state]}
               {kept && kept.attempts.length > 1 && <span data-testid="copy-attempt"> · Attempt {kept.attempts.length}</span>}
             </span>
           )}
