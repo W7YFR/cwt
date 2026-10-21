@@ -16,12 +16,13 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { CHANGELOG, added, entry, unreleased } from "./changelog.mjs";
-import { isReleaseSubject } from "./version.mjs";
+import { isReleaseSubject, isType } from "./version.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const VERSION = fileURLToPath(new URL("./version.mjs", import.meta.url));
 
 /** `[FEAT] v1.3.0`, or `[CHORE] Deploy Gap` for a branch with no version.
+ *  A branch whose prefix is not a type, as Dependabot's, is a chore.
  *
  * @param {string} branch
  * @param {string | null} version
@@ -29,7 +30,8 @@ const VERSION = fileURLToPath(new URL("./version.mjs", import.meta.url));
  * @returns {string} */
 export function title(branch, version, name = null) {
   const slash = branch.indexOf("/");
-  const type = slash < 0 ? "CHORE" : branch.slice(0, slash).replace(/!$/, "").toUpperCase();
+  const prefix = slash < 0 ? "" : branch.slice(0, slash).replace(/!$/, "");
+  const type = isType(prefix) ? prefix.toUpperCase() : "CHORE";
   if (version) return `[${type}] v${version}`;
   const words = (slash < 0 ? branch : branch.slice(slash + 1)).split(/[-_/]+/).filter(Boolean);
   return `[${type}] ${name ?? words.map((w) => w[0]?.toUpperCase() + w.slice(1)).join(" ")}`;

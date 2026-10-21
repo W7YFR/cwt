@@ -37,6 +37,16 @@ A branch that touches no build input releases no version and needs no bump.
 The contributor names its pull request with `make pr TITLE="..."`. The build
 inputs are `BUILD_INPUTS` in `scripts/version.mjs`.
 
+### Dependency updates
+
+Do not commit on a Dependabot branch. When Dependabot commits again, it can
+force-push over your commits, and its branch name gives no type. Take the
+update to a `chore/deps-<name>` branch from `main` instead. Cherry-pick the
+Dependabot commit, or run `npm install <name>@<version>`. Updates open at the
+same time can go on one branch. Write the Development entry, such as
+`- Vite is 6.4.5.`, then run `make pr`. Dependabot closes its own pull request
+when the update reaches `main`.
+
 ## Changelog
 
 Every branch adds an entry to `CHANGELOG.md`. The entry is also the pull
