@@ -1,0 +1,243 @@
+/* A line to copy as slots: one box per character, in words. The slots say how
+ * long each word is, so this is the easier way to copy.
+ *
+ * Typing fills a slot and moves to the next. Space goes to the next word, and
+ * Backspace in an empty slot goes back one. Enter locks the line, and Escape
+ * leaves it. On an attempt after the first, the slots you got right can stay
+ * as they were.
+ */
+
+import { useRef } from "react";
+import { CHAR_TO_MORSE } from "@/morse";
+import { charsOf, slotRight, slotText, type LineCopy } from "@/copy/lines";
+import type { Over } from "@/copy/decode";
+
+/** Where a character is in the audio, for a selection or a click to play. */
+function timeAttrs(c: { t0: number; t1: number }): Record<string, number> {
+  return { "data-t0": c.t0, "data-t1": c.t1 };
+}
+
+/** The line's slots, open to type in. */
+export function Slots({
+  over,
+  copy,
+  label,
+  onSlots,
+  onLock,
+}: {
+  over: Over;
+  copy: LineCopy;
+  label: string;
+  onSlots(slots: string[]): void;
+  onLock(): void;
+}): React.ReactElement {
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const chars = charsOf(over);
+  /** Where each word starts, by slot. */
+  const starts: number[] = [];
+  let n = 0;
+  for (const w of over.words) {
+    starts.push(n);
+    n += w.chars.length;
+  }
+  const open = (i: number) => !copy.kept?.[i];
+  const focus = (i: number | undefined) => {
+    if (i === undefined) return;
+    const el = refs.current[i];
+    el?.focus();
+    el?.select();
+  };
+  const nextOpen = (i: number) => {
+    for (let k = i + 1; k < chars.length; k++) if (open(k)) return k;
+    return undefined;
+  };
+  const prevOpen = (i: number) => {
+    for (let k = i - 1; k >= 0; k--) if (open(k)) return k;
+    return undefined;
+  };
+  const set = (i: number, v: string) => onSlots(copy.slots.map((s, k) => (k === i ? v : s)));
+
+  const keyDown = (ev: React.KeyboardEvent<HTMLInputElement>, i: number) => {
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.currentTarget.blur();
+    } else if (ev.key === "Enter") {
+      ev.preventDefault();
+      ev.stopPropagation();
+      onLock();
+    } else if (ev.key === "Backspace" && !ev.currentTarget.value) {
+      ev.preventDefault();
+      const p = prevOpen(i);
+      if (p !== undefined) {
+        set(p, "");
+        focus(p);
+      }
+    } else if (ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      focus(prevOpen(i));
+    } else if (ev.key === "ArrowRight") {
+      ev.preventDefault();
+      focus(nextOpen(i));
+    } else if (ev.key === " ") {
+      ev.preventDefault();
+      // At the start of a word with nothing typed, this is the next word.
+      if (starts.includes(i) && !ev.currentTarget.value) return;
+      const word = starts.find((s) => s > i);
+      if (word !== undefined) focus(open(word) ? word : nextOpen(word));
+    }
+  };
+
+  let first = true;
+  return (
+    <span className="text slots" role="group" aria-label={`Your copy of ${label}`} data-testid="copy-slots">
+      {over.words.map((w, wi) => (
+        <span key={wi} className="slotword">
+          {w.chars.map((c, ci) => {
+            const i = starts[wi]! + ci;
+            const want = slotText(c.char).length;
+            if (!open(i)) {
+              return (
+                <span key={ci} className="slot kept cright" {...timeAttrs(c)}>
+                  {copy.slots[i]}
+                </span>
+              );
+            }
+            const autoFocus = first;
+            first = false;
+            return (
+              <input
+                key={ci}
+                ref={(el) => {
+                  refs.current[i] = el;
+                }}
+                className={want > 1 ? "slot wide" : "slot"}
+                data-testid="copy-slot"
+                aria-label={`Character ${i + 1}`}
+                value={copy.slots[i] ?? ""}
+                autoFocus={autoFocus}
+                spellCheck={false}
+                autoComplete="off"
+                autoCapitalize="characters"
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={(e) => keyDown(e, i)}
+                onChange={(e) => {
+                  let v = e.target.value.toUpperCase().replace(/\s+/g, "");
+                  if (v.length > want) v = v.slice(-want);
+                  set(i, v);
+                  if (v.length >= want) focus(nextOpen(i));
+                }}
+              />
+            );
+          })}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** An earlier attempt at the line, in slots the size of the ones you type
+ *  in, so each sits over its slot: what you typed, a dot under it, blue if
+ *  right and red if not. */
+export function SlotsPast({ over, copy }: { over: Over; copy: LineCopy }): React.ReactElement {
+  let i = 0;
+  return (
+    <span className="text slots past" data-testid="copy-past-slots">
+      {over.words.map((w, wi) => (
+        <span key={wi} className="slotword">
+          {w.chars.map((c, ci) => {
+            const typed = copy.slots[i++] ?? "";
+            const want = slotText(c.char).length;
+            return (
+              <span
+                key={ci}
+                className={`slot${want > 1 ? " wide" : ""} ${slotRight(c.char, typed) ? "cright" : "cwrong"}`}
+              >
+                {typed || " "}
+              </span>
+            );
+          })}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** The line's slots, locked: what you typed in each, with a dot under it,
+ *  blue if right and red if not. With `sent`, what was sent under each, as
+ *  the graded copy shows it. */
+export function SlotsLocked({
+  over,
+  copy,
+  marks,
+  sent,
+  showCount = true,
+}: {
+  over: Over;
+  copy: LineCopy;
+  /** Dots under what you typed. */
+  marks: boolean;
+  sent: boolean;
+  /** The count under it. Off where the page shows the score itself. */
+  showCount?: boolean;
+}): React.ReactElement {
+  const chars = charsOf(over);
+  const keyed = chars.filter((c) => c.char in CHAR_TO_MORSE).length;
+  const right = chars.filter((c, i) => c.char in CHAR_TO_MORSE && slotRight(c.char, copy.slots[i] ?? "")).length;
+  let i = 0;
+  return (
+    <span className="text graded" data-testid="copy-slots-locked">
+      <span className="aligned">
+        {over.words.map((w, wi) => (
+          <span key={wi} className="cword">
+            {w.chars.map((c, ci) => {
+              const typed = copy.slots[i++] ?? "";
+              const ok = slotRight(c.char, typed);
+              return (
+                <span key={ci} className="ccol">
+                  <span className="yourcopy">
+                    <span className={marks ? (ok ? "cright" : "cwrong") : undefined}>{typed || " "}</span>
+                  </span>
+                  {sent && (
+                    <span className="sentcopy">
+                      <span className={ok ? undefined : "cwrong"} {...timeAttrs(c)}>
+                        {c.char}
+                      </span>
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </span>
+        ))}
+      </span>
+      {sent && showCount && (
+        <span className="copied">
+          {right} of {keyed} copied
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** What was sent, each character where it is in the audio. With `upTo`,
+ *  only the characters sent by then. */
+export function SentText({ over, upTo }: { over: Over; upTo?: number }): React.ReactElement {
+  const words = over.words
+    .map((w) => w.chars.filter((c) => upTo === undefined || c.t1 <= upTo))
+    .filter((w) => w.length > 0);
+  return (
+    <span className="text sent">
+      {words.map((w, wi) => (
+        <span key={wi}>
+          {wi > 0 && " "}
+          {w.map((c, ci) => (
+            <span key={ci} {...timeAttrs(c)}>
+              {c.char}
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}

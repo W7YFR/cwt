@@ -1,6 +1,6 @@
 /* Three screens and the state between them. */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadAudioFile } from "@/capture/file";
 import { NoKeyingError, isBlankTake } from "@/io/take";
 import {
@@ -30,6 +30,7 @@ import { LANDING_VERSION, Landing } from "./Landing";
 import { Settings, type ConfigTab } from "./Settings";
 import { UnsetNotesText, type UnsetNotes } from "./SlotMenu";
 import { ReviewScreen } from "./ReviewScreen";
+import { CopyScreen } from "./CopyScreen";
 import { QsoScreen } from "./QsoScreen";
 import type { Page } from "./PageSwitch";
 import { useFileDrop } from "./useFileDrop";
@@ -231,6 +232,8 @@ export function App(): React.ReactElement {
           ? "calibrate"
           : page === "qso"
             ? "qso"
+            : page === "copy"
+            ? "copy"
             : take.loaded && take.review
             ? "review"
             : "landing";
@@ -353,11 +356,15 @@ export function App(): React.ReactElement {
      button beside Record says that when it is closed; a drop just does
      nothing, rather than putting an error in front of somebody for a gesture
      they can simply repeat after clearing. */
-  const canOpenFile = !take.loaded || isBlankTake(take.loaded.take);
+  const canOpenFile = page === "copy" || !take.loaded || isBlankTake(take.loaded.take);
+
+  /* The Copy page opens a file of its own. */
+  const copyFile = useRef<((file: File) => void) | null>(null);
 
   const dropping = useFileDrop({
     onFile: (file) => {
-      if (canOpenFile) void openFile(file);
+      if (page === "copy" && !configuring && !calibrating) copyFile.current?.(file);
+      else if (canOpenFile) void openFile(file);
     },
     onError: setError,
     disabled: opening,
@@ -478,6 +485,16 @@ export function App(): React.ReactElement {
             setCalExample(undefined);
             take.adoptSavedSpeed();
           }}
+        />
+      ) : page === "copy" ? (
+        <CopyScreen
+          onError={setError}
+          onConfigure={() => {
+            setError(null);
+            setConfiguring(true);
+          }}
+          onPage={setPage}
+          fileTarget={copyFile}
         />
       ) : page === "qso" ? (
         <QsoScreen

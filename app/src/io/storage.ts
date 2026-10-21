@@ -24,10 +24,11 @@ const DB_NAME = "cwt";
  *  lower version — and the refusal is quiet here, because a failed open is
  *  swallowed by every caller, leaving an app that works perfectly while
  *  saving nothing. */
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const TAKES = "takes";
 const CALIBRATIONS = "calibrations";
 const QSO_OVERS = "qsoOvers";
+const COPY_FILE = "copyFile";
 
 export interface StoredTake {
   take: Take;
@@ -85,6 +86,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(QSO_OVERS)) {
         db.createObjectStore(QSO_OVERS, { keyPath: "line" });
+      }
+      if (!db.objectStoreNames.contains(COPY_FILE)) {
+        db.createObjectStore(COPY_FILE, { keyPath: "id" });
       }
     };
     /* Another tab holds the database open at an older version. The open
@@ -465,8 +469,8 @@ export interface Prefs {
   user?: Partial<UserInfo>;
   /** Drills the user wrote, in the order they were saved. */
   customDrills?: CustomDrill[];
-  /** Which page is open: practice or QSO. Absent is practice. */
-  page?: "practice" | "qso";
+  /** Which page is open: practice (Send), Copy or QSO. Absent is practice. */
+  page?: "practice" | "copy" | "qso";
   /** How the QSO page reads your sending. Absent is lenient. */
   qsoCopy?: "strict" | "lenient";
   /** How much the QSO page's station says in each over. Absent is full. */
@@ -496,6 +500,24 @@ export interface Prefs {
   qsoShowSpeed?: boolean;
   /** The station's lines show the speed it sent them at. Absent is off. */
   qsoShowTheirSpeed?: boolean;
+  /** The Copy page's settings band was open. */
+  copySettingsOpen?: boolean;
+  /** How you copy on the Copy page: in a box, or a slot per character.
+   *  Absent is a box. */
+  copyInput?: "text" | "slots";
+  /** What shows of a line on the Copy page as it plays. Absent is a box to
+   *  copy in. */
+  copyLines?: "copy" | "sent" | "before";
+  /** A line's copy locks a few seconds after the line ends. Absent is on. */
+  copyLock?: boolean;
+  /** What a locked copy shows on the Copy page. Absent is what you got
+   *  right. */
+  copyLockedShows?: "nothing" | "grade" | "right";
+  /** A station's call stays hidden until you copy it. Absent is on. */
+  copyHideCalls?: boolean;
+  /** Which earlier attempts show while you try again on the Copy page: all,
+   *  the last, or none, to go again clean. Absent is the last. */
+  copyEarlier?: "all" | "last" | "none";
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -652,7 +674,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   runSort: isStr,
   user: isUser,
   customDrills: isCustomDrills,
-  page: oneOf("practice", "qso"),
+  page: oneOf("practice", "copy", "qso"),
   qsoCopy: oneOf("strict", "lenient"),
   qsoLength: oneOf("full", "short", "pieces", "mixed"),
   qsoTheirText: oneOf("before", "sent", "hidden", "copy", "none"),
@@ -666,6 +688,13 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoLockedShows: oneOf("nothing", "grade", "right"),
   qsoShowSpeed: isBool,
   qsoShowTheirSpeed: isBool,
+  copySettingsOpen: isBool,
+  copyInput: oneOf("text", "slots"),
+  copyLines: oneOf("copy", "sent", "before"),
+  copyLock: isBool,
+  copyLockedShows: oneOf("nothing", "grade", "right"),
+  copyHideCalls: isBool,
+  copyEarlier: oneOf("all", "last", "none"),
 };
 
 export function loadPrefs(): Prefs {
@@ -970,6 +999,68 @@ export function rememberQso(log: unknown): void {
 export function recallQso(): unknown {
   try {
     const raw = localStorage.getItem(QSO_KEY);
+    return raw === null ? null : (JSON.parse(raw) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+/* ---- the Copy page's recording ------------------------------------------- */
+
+/* The recording the Copy page is on, so a reload comes back to it: the file
+ * as it was opened, and what the decoder read from it. One at a time. */
+
+export interface CopyFile {
+  readonly name: string;
+  /** The file's own bytes. */
+  readonly audio: Blob;
+  /** What the decoder read, as the page holds it. */
+  readonly recording: unknown;
+}
+
+/** Keep `file` as the Copy page's recording, in place of any before it. */
+export async function keepCopyFile(file: CopyFile): Promise<void> {
+  try {
+    const db = await openDb();
+    await txIn(db, COPY_FILE, "readwrite", (s) => s.put({ id: "current", ...file }));
+    db.close();
+  } catch {
+    /* nothing kept; the page still works until a reload */
+  }
+}
+
+/** The Copy page's recording, or null. */
+export async function recallCopyFile(): Promise<CopyFile | null> {
+  try {
+    const db = await openDb();
+    const row = await txIn<(CopyFile & { id: string }) | undefined>(db, COPY_FILE, "readonly", (s) =>
+      s.get("current"),
+    );
+    db.close();
+    return row && row.audio instanceof Blob && typeof row.name === "string" ? row : null;
+  } catch {
+    return null;
+  }
+}
+
+/* Your copy on the Copy page, so a reload comes back to it. Kept apart from
+   the recording: it changes with every key typed. */
+const COPY_KEY = "cwt:copy";
+
+/** Remember your copy on the Copy page, or forget it with null. */
+export function rememberCopy(progress: unknown): void {
+  try {
+    if (progress === null) localStorage.removeItem(COPY_KEY);
+    else localStorage.setItem(COPY_KEY, JSON.stringify(progress));
+  } catch {
+    /* nothing kept; the page still works */
+  }
+}
+
+/** Your copy on the Copy page as last remembered, unchecked, or null. */
+export function recallCopy(): unknown {
+  try {
+    const raw = localStorage.getItem(COPY_KEY);
     return raw === null ? null : (JSON.parse(raw) as unknown);
   } catch {
     return null;
