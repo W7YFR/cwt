@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Development
+
+- Vite is 6.4.5.
+
 ## v1.16.0 — 2026-10-21
 
 ### Added
