@@ -1556,7 +1556,7 @@ const showDownloads = () => tickSetting("show-downloads");
       expect(named(/your audio/i).disabled, "download yours").toBe(true);
       expect(named(/json report/i).disabled, "json").toBe(true);
       // And nothing left to clear.
-      expect(container.querySelector("[data-testid='clear-take']")).toBeNull();
+      expect(container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.disabled).toBe(true);
 
       // What still works is recording again.
       expect(named(/record another/i).disabled, "record").toBe(false);

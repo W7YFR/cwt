@@ -33,11 +33,14 @@ import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { lineAudio, tape, trimmed, type Clip, type TapeLine } from "@/qso/tape";
 import { revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
+import { charsOf, copyText, overOfText, type CopyInput, type LineCopy } from "@/copy/lines";
+import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconDownload, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
 import { DebugDownload } from "./DebugDownload";
 import { Graded, RightOnly } from "./Graded";
+import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
 import { QsoGuide, QsoHelp } from "./QsoHelp";
 import { PageSwitch, type Page } from "./PageSwitch";
@@ -79,9 +82,6 @@ const AFTER_REPLY_MS = 250;
  *  sending stays hidden. */
 const TYPING_QUIET_MS = 1200;
 
-/** What the page says once a QSO is over and your copy, if any, is graded. */
-const QSO_OVER = "The QSO is over. Press Start for a new one.";
-
 /** The tone a station line plays at when the log kept none. */
 const DEFAULT_TONE_HZ = 600;
 
@@ -105,6 +105,17 @@ function isSending(text: string): boolean {
 const MAX_OVER_SEC = 600;
 
 type Phase = "listening" | "waiting" | "playing";
+
+/** Where the page is, as its heading says in a word. */
+type QsoState = "ready" | "sending" | "waiting" | "receiving" | "paused" | "over";
+const STATE_WORDS: Record<QsoState, string> = {
+  ready: "Ready",
+  sending: "Sending",
+  waiting: "Waiting",
+  receiving: "Receiving",
+  paused: "Paused",
+  over: "Over",
+};
 
 type CopyMode = "strict" | "lenient";
 
@@ -153,6 +164,15 @@ const THEIR_TEXT_HELP =
   "What shows of the station's lines: whole as soon as one starts, each character as it is " +
   "sent, the same blurred, a box to type your copy in, or nothing. A change applies to the " +
   "lines already shown, and what you typed stays. All of it shows when the QSO ends.";
+const COPY_INPUTS: ReadonlyArray<Option<CopyInput>> = [
+  { value: "text", label: "Box", note: "Type each line in a box, as you hear it." },
+  { value: "slots", label: "Slots", note: "A slot for each character." },
+];
+const COPY_INPUT_HELP =
+  "How you copy the station's lines while they show as Copy: in one box, or in a slot for " +
+  "each character. Slots show how many characters each word has, so they are the easier " +
+  "way to copy.";
+
 const REPLAY_HELP =
   "When you press Continue, the station sends its last line again before your turn.";
 
@@ -190,6 +210,11 @@ interface Line {
   readonly qso: number;
   /** Your copy of it, for the station's overs. */
   readonly typed: string;
+  /** Your copy of it in slots, one per character, for the station's overs.
+   *  Absent in a log kept before slots were. */
+  readonly slots?: readonly string[];
+  /** Copy mode: whether you copy it in a box or in slots. Absent is a box. */
+  readonly input?: CopyInput;
   /** The station text it arrived under, for the station's overs. */
   readonly mode: TheirText;
   /** Copy mode: your copy can no longer change. */
@@ -377,6 +402,19 @@ export function QsoScreen({
   const setTheirText = (next: TheirText) => {
     setTheirTextRaw(next);
     savePrefs({ ...loadPrefs(), qsoTheirText: next });
+  };
+  const [copyInput, setCopyInputRaw] = useState<CopyInput>(() => loadPrefs().qsoCopyInput ?? "text");
+  /** For the timer that adds the station's over to the log. */
+  const copyInputRef = useRef(copyInput);
+  copyInputRef.current = copyInput;
+  /** A change applies to the lines you are still copying. A locked copy
+   *  keeps the way it was made. */
+  const setCopyInput = (next: CopyInput) => {
+    setCopyInputRaw(next);
+    savePrefs({ ...loadPrefs(), qsoCopyInput: next });
+    setLines((l) =>
+      l.map((line) => (!line.you && line.mode === "copy" && !line.locked ? { ...line, input: next } : line)),
+    );
   };
   const [yourText, setYourTextRaw] = useState<YourText>(() => loadPrefs().qsoYourText ?? "sent");
   const setYourText = (next: YourText) => {
@@ -615,10 +653,10 @@ export function QsoScreen({
         closing.current = null;
         if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
           setFinished(n);
-          setNote("The QSO is over. Finish your copy.");
+          setNote("Finish your copy.");
         } else {
           close(n);
-          setNote(QSO_OVER);
+          setNote("");
         }
         ending.current = true;
         void rec.discard();
@@ -656,6 +694,8 @@ export function QsoScreen({
               you: false,
               qso: n,
               typed: "",
+              slots: [],
+              input: copyInputRef.current,
               mode: theirMode.current,
               locked: false,
               sentWpm: at,
@@ -842,6 +882,14 @@ export function QsoScreen({
     void rec.start().finally(() => setStarting(false));
   };
 
+  /** Clear the log while no session runs: the page goes back to the guide. */
+  const clear = () => {
+    listen.stop();
+    pending.current = null;
+    fresh.current();
+    setStopped(true);
+  };
+
   /** Go on with the QSO a reload brought back: the log and the QSO stay. */
   const resume = () => {
     listen.stop();
@@ -894,6 +942,8 @@ export function QsoScreen({
 
   const setTyped = (at: number, typed: string) =>
     setLines((l) => l.map((line, i) => (i === at ? { ...line, typed } : line)));
+  const setSlots = (at: number, slots: string[]) =>
+    setLines((l) => l.map((line, i) => (i === at ? { ...line, slots } : line)));
   const lock = (at: number) =>
     setLines((l) => l.map((line, i) => (i === at ? { ...line, locked: true } : line)));
 
@@ -1016,13 +1066,34 @@ export function QsoScreen({
     return line.mode === "copy" ? "copy" : line.mode;
   };
 
+  /** One of the station's lines as an over, each character where it falls
+   *  at the speed it was sent. */
+  const overOf = (line: Line): Over => {
+    const at = line.sentWpm ?? theirSpeed;
+    return overOfText(line.text, at.charWpm, at.farnsworthWpm);
+  };
+  /** Your copy of one of the station's lines, as the slots take it: a slot
+   *  for each character of `over`. */
+  const lineCopyOf = (line: Line, over: Over): LineCopy => ({
+    typed: line.typed,
+    slots: charsOf(over).map((_, i) => line.slots?.[i] ?? ""),
+    locked: line.locked,
+    kept: null,
+  });
+  /** Your copy of one of the station's lines as text: the box, or the slots. */
+  const typedOf = (line: Line): string => {
+    if (line.input !== "slots") return line.typed;
+    const over = overOf(line);
+    return copyText(over, lineCopyOf(line, over), "slots");
+  };
+
   /** Whether you have the station's call in QSO `n`: the exact call in one
-   *  of your overs as copied, or in what you typed of one of its overs. */
+   *  of your overs as copied, or in your copy of one of its overs. */
   const identified = (n: number, call: string): boolean =>
     lines.some(
       (l) =>
         l.qso === n &&
-        (l.you ? l.text : l.typed).toUpperCase().replace(/\s+/g, "").includes(call),
+        (l.you ? l.text : typedOf(l)).toUpperCase().replace(/\s+/g, "").includes(call),
     );
 
   /** Who sent a line. The station's call shows only once you have it, when
@@ -1055,12 +1126,38 @@ export function QsoScreen({
   const textOf = (line: Line, at: number): React.ReactElement => {
     const over = closed.includes(line.qso);
     const mode = line.you ? yourText : theirModeOf(line);
+    const sent = !line.you && line.mode === "copy" && line.input === "slots" ? overOf(line) : null;
     // The grade is the record of a copy: it stays, whatever shows now.
-    if (over && !line.you && line.mode === "copy") return <Graded sent={line.text} typed={line.typed} />;
+    if (over && !line.you && line.mode === "copy") {
+      if (sent) return <SlotsLocked over={sent} copy={lineCopyOf(line, sent)} marks sent />;
+      return <Graded sent={line.text} typed={line.typed} />;
+    }
     if (over || mode === "before") {
       return <span className="text">{line.text || "(nothing copied)"}</span>;
     }
     if (mode === "none") return <span className="text off">not shown</span>;
+    if (mode === "copy" && sent) {
+      if (line.locked) {
+        return (
+          <SlotsLocked
+            over={sent}
+            copy={lineCopyOf(line, sent)}
+            marks={lockedShows !== "nothing"}
+            sent={lockedShows === "grade"}
+          />
+        );
+      }
+      return (
+        <Slots
+          over={sent}
+          copy={lineCopyOf(line, sent)}
+          label={whoOf(line)}
+          onSlots={(next) => setSlots(at, next)}
+          onLock={() => lock(at)}
+          onKey={typed}
+        />
+      );
+    }
     if (mode === "copy" && line.locked) {
       if (lockedShows === "grade") return <Graded sent={line.text} typed={line.typed} />;
       if (lockedShows === "right") return <RightOnly sent={line.text} typed={line.typed} />;
@@ -1104,15 +1201,33 @@ export function QsoScreen({
 
   const status = !recorder
     ? open
-      ? "Press Continue to go on with the QSO, or Restart for a new one."
-      : "Press Start, then call CQ."
+      ? "Press Continue to go on, or Restart for a new QSO."
+      : lines.length > 0
+        ? "Press Start for a new QSO."
+        : "Press Start, then call CQ."
     : phase === "listening"
       ? qso.current.stage === "cq"
         ? "Call CQ to make a contact."
-        : "Your turn."
+        : "Send your reply to the station."
       : phase === "waiting"
-        ? "Waiting for the other station."
-        : "The other station is sending.";
+        ? "The station is about to answer."
+        : theirText === "copy"
+          ? "Type what you hear."
+          : "Listen to the station.";
+
+  /** Where things are, in a word, beside the sentence that says what to do,
+   *  as the Copy page shows it. */
+  const state: QsoState = !recorder
+    ? open
+      ? "paused"
+      : lines.length > 0
+        ? "over"
+        : "ready"
+    : phase === "listening"
+      ? "sending"
+      : phase === "waiting"
+        ? "waiting"
+        : "receiving";
 
   return (
     <>
@@ -1123,6 +1238,16 @@ export function QsoScreen({
           </span>
         </h1>
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
+        {/* Always here, as on the other pages. Off while a session runs or
+            with nothing in the log. */}
+        <button
+          data-testid="qso-clear"
+          disabled={recorder !== null || starting || lines.length === 0}
+          title="Clear the log of every QSO"
+          onClick={clear}
+        >
+          Clear
+        </button>
         <div className="cornergroup">
           <button
             className="iconbtn cornerbtn"
@@ -1180,6 +1305,14 @@ export function QsoScreen({
                     value={theirText}
                     options={THEIR_TEXTS}
                     onChange={(v) => setTheirText(v as TheirText)}
+                  />
+                  <ChoiceGroup
+                    id="qso-copy-input"
+                    label="Enter copy as"
+                    help={COPY_INPUT_HELP}
+                    value={copyInput}
+                    options={COPY_INPUTS}
+                    onChange={(v) => setCopyInput(v as CopyInput)}
                   />
                   <Check
                     id="qso-blur-call"
@@ -1300,9 +1433,12 @@ export function QsoScreen({
       )}
 
       <main className="panel qso" data-testid="qso">
-        <p className="qsostatus" role="status" aria-live="polite">
-          {status}
-        </p>
+        <div className="copyhead" role="status" aria-live="polite">
+          <span className="uplabel" data-testid="qso-state" data-state={state}>
+            {STATE_WORDS[state]}
+          </span>
+          <span className="copysay qsostatus">{status}</span>
+        </div>
 
         <div className="qsocontrols">
           {rec.needAccess ? (
@@ -1435,7 +1571,7 @@ export function QsoScreen({
                   data-testid="qso-grade"
                   onClick={() => {
                     close(finished);
-                    setNote(QSO_OVER);
+                    setNote("");
                   }}
                 >
                   Grade my copy
