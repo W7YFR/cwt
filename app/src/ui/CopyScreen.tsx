@@ -93,7 +93,7 @@ const LINES_SHOW_HELP =
 
 const LOCK_HELP =
   "Your copy of a line can no longer change once the next line starts. The last line " +
-  "locks a few seconds after it ends. Enter in the box locks a line too.";
+  "locks 5 seconds after it ends. Enter in the box locks a line too.";
 
 const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
   { value: "nothing", label: "My copy", note: "Your copy as you typed it." },
@@ -953,17 +953,18 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
 
         {!rec && !recalling && !reading && (
           <div className="qsoguide prose" data-testid="copy-guide">
-            <p>
-              Open a recording of CW, such as a QSO, and copy it as it plays. The recording is read
-              first, so each line can be checked against what was sent.
-            </p>
+            <p>Open a recording of CW and copy it as it plays. Each line you copy is checked against what was sent.</p>
             <ul>
-              <li>Each over shows as a line as it starts. Type what you hear in its box.</li>
-              <li>A line locks when the next one starts, or when you press Enter, and shows what you got.</li>
-              <li>Copy again plays the whole recording once more. Your earlier attempts stay, so you see how you are getting on.</li>
-              <li>Select part of a graded line, or click a word in it, to hear that part again.</li>
+              <li>A new line appears each time a new station starts sending.</li>
+              <li>Type what you hear and press Enter when you finish a line.</li>
+              <li>Text entry locks when the next line starts, or 5 seconds after the recording ends.</li>
+              <li>
+                <b>Copy again</b> plays the whole recording from the start. Your earlier attempts stay on the page, so
+                you can see yourself improve.
+              </li>
+              <li>Click a word in a finished line, or select part of it, to hear it again.</li>
             </ul>
-            <p>The recording stays in this browser. Nothing is sent anywhere.</p>
+            <p>Your recording stays in this browser.</p>
             <div className="qsocontrols">
               <button className="primary" data-testid="copy-open-first" onClick={pickFile}>
                 <i className="ico">

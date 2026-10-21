@@ -14,6 +14,7 @@ nothing to the site. The next release carries them.
 ### Changed
 
 - The **QSO** page shows its state in a word over the log, as the **Copy** page does, with what to do next beside it.
+- The guide on the **Copy** page, before you open a recording, is shorter and plainer.
 
 ## v1.15.0 — 2026-10-21
 
