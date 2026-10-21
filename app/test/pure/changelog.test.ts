@@ -116,4 +116,9 @@ describe("the pull request title", () => {
     expect(title("chore/release-target", null)).toBe("[CHORE] Release Target");
     expect(title("chore/ships-unreadable-range", null, "Deploy Gap")).toBe("[CHORE] Deploy Gap");
   });
+
+  it("calls a branch whose prefix is not a type a chore, as Dependabot's", () => {
+    expect(title("dependabot/npm_and_yarn/npm_and_yarn-89011d1d99", "1.16.1")).toBe("[CHORE] v1.16.1");
+    expect(title("docs/guide", "1.0.1")).toBe("[DOCS] v1.0.1");
+  });
 });

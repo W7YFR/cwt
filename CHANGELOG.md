@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Development
+
+- `make pr` titles a branch whose prefix is not a type, such as a Dependabot branch, as `[CHORE]`.
+- `CLAUDE.md` says how to take a Dependabot update to a `chore/deps-<name>` branch.
+
 ## v1.16.1 — 2026-10-21
 
 ### Development

@@ -156,6 +156,15 @@ export function levelFor(text, major) {
   return LEVELS[/** @type {keyof typeof LEVELS} */ (t.type)] ?? "patch";
 }
 
+/** Whether `type` is one of the branch prefixes above, as `feat` or `chore`.
+ *  A bot's branch, as `dependabot/…`, is not.
+ *
+ * @param {string} type
+ * @returns {boolean} */
+export function isType(type) {
+  return Object.hasOwn(LEVELS, type.toLowerCase());
+}
+
 /** The next version after applying a bump.
  *
  * Lower fields reset, which is the whole difference between a version and three
