@@ -12,8 +12,10 @@ nothing to the site. The next release carries them.
 - The **Copy** page plays a recording of CW for you to copy. Open or drop a file, and each over shows as a line, with a box to type in, as it plays.
 - A line locks when the next line starts, or on Enter, and shows what you got right. **Show answers** shows what was sent under each line.
 - **Copy again** plays the whole recording once more as a new attempt. Each attempt stays, and **When I copy again, show** sets which earlier attempts show over each line.
-- Buttons skip back or on by a line, 15 s, 5 s or a word. Click a word of a graded line, or select part of one, to hear it again.
-- **Copy in** sets a box per line or a slot per character. With **Hide each call until I copy it**, a station shows as Station 1 or Station 2 until you copy its call.
+- Buttons skip back or on by a line, 15 s, 5 s or a word. Click a word of the answer, or select part of it, to hear it again.
+- Space plays or pauses, and the arrow keys skip a word. In a box, Enter locks the line and Esc leaves the box.
+- **Copy in** sets a box per line or a slot per character. **Its lines show** can show each line as sent or whole, to listen along.
+- With **Hide each call until I copy it**, a station shows as Station 1 or Station 2 until you copy its call.
 - The recording and your attempts stay in the browser across a reload.
 
 ### Changed
