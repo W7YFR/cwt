@@ -32,19 +32,12 @@ import type { Speed } from "@/qso/speed";
 import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { lineAudio, tape, trimmed, type Clip, type TapeLine } from "@/qso/tape";
-import {
-  gradeCopy,
-  revealed,
-  type Column,
-  type LockedShows,
-  type Mark,
-  type TheirText,
-  type YourText,
-} from "@/qso/show";
+import { revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconDownload, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
 import { DebugDownload } from "./DebugDownload";
+import { Graded, RightOnly } from "./Graded";
 import { keepDebugAudio, micLog } from "@/micdebug";
 import { QsoGuide, QsoHelp } from "./QsoHelp";
 import { PageSwitch, type Page } from "./PageSwitch";
@@ -299,108 +292,6 @@ function keepKeys(ev: React.KeyboardEvent, lock: () => void): void {
     ev.stopPropagation();
   }
   if (ev.key === "Enter") lock();
-}
-
-/** Marked characters: a dot under each one `dot` picks, blue if right, red
- *  if not. Spaces, gaps and the characters it does not pick have none. */
-function Marked({
-  marks,
-  dot,
-}: {
-  marks: readonly Mark[];
-  dot(ok: boolean): boolean;
-}): React.ReactElement {
-  return (
-    <>
-      {marks.map((m, i) => (
-        <span
-          key={i}
-          className={m.ok === null || !dot(m.ok) ? undefined : m.ok ? "cright" : "cwrong"}
-        >
-          {m.text}
-        </span>
-      ))}
-    </>
-  );
-}
-
-/** Your copy, with a blue dot under each character you got right and a red
- *  one under each you got wrong. A character you left out is a blank with a
- *  red dot, so a copy short of the line does not look whole. The station's
- *  characters are not shown, so nothing says what you missed. */
-function RightOnly({ line }: { line: Line }): React.ReactElement {
-  const grade = gradeCopy(line.text, line.typed);
-  if (!line.typed.trim()) {
-    return (
-      <span className="text rightonly" data-testid="qso-right-only">
-        (nothing copied)
-      </span>
-    );
-  }
-  const marks = grade.columns.flatMap((col): Mark[] =>
-    col.yours.length > 0
-      ? [...col.yours]
-      : col.sent.filter((m) => m.ok === false).map(() => ({ text: " ", ok: false })),
-  );
-  return (
-    <span className="text rightonly" data-testid="qso-right-only">
-      <Marked marks={marks} dot={() => true} />
-    </span>
-  );
-}
-
-/** Columns split at the spaces between words: a word keeps its columns on
- *  one line, and a long line breaks between words. */
-function wordsOf(columns: readonly Column[]): Column[][] {
-  const words: Column[][] = [[]];
-  for (const col of columns) {
-    if (col.sent[0]?.text === " " && col.yours[0]?.text === " ") words.push([]);
-    else words[words.length - 1]!.push(col);
-  }
-  return words.filter((w) => w.length > 0);
-}
-
-/** Your copy, graded: what you typed over what the station sent, lined up
- *  character by character. Blue under each character you got right, red
- *  under each you got wrong and under each you missed. Then the count. */
-function Graded({ line }: { line: Line }): React.ReactElement {
-  const grade = gradeCopy(line.text, line.typed);
-  // Nothing copied: the station's line alone, every character missed.
-  if (!line.typed.trim()) {
-    return (
-      <span className="text graded">
-        <span className="sentcopy" data-testid="qso-aligned">
-          <Marked marks={grade.sent} dot={(ok) => !ok} />
-        </span>
-        <span className="copied">
-          Nothing copied. {grade.right} of {grade.total} copied
-        </span>
-      </span>
-    );
-  }
-  return (
-    <span className="text graded">
-      <span className="aligned" data-testid="qso-aligned">
-        {wordsOf(grade.columns).map((word, w) => (
-          <span key={w} className="cword">
-            {word.map((col, c) => (
-              <span key={c} className="ccol">
-                <span className="yourcopy">
-                  <Marked marks={col.yours} dot={() => true} />
-                </span>
-                <span className="sentcopy">
-                  <Marked marks={col.sent} dot={(ok) => !ok} />
-                </span>
-              </span>
-            ))}
-          </span>
-        ))}
-      </span>
-      <span className="copied">
-        {grade.right} of {grade.total} copied
-      </span>
-    </span>
-  );
 }
 
 /** An on or off setting kept as a preference, with its default. */
@@ -1165,14 +1056,14 @@ export function QsoScreen({
     const over = closed.includes(line.qso);
     const mode = line.you ? yourText : theirModeOf(line);
     // The grade is the record of a copy: it stays, whatever shows now.
-    if (over && !line.you && line.mode === "copy") return <Graded line={line} />;
+    if (over && !line.you && line.mode === "copy") return <Graded sent={line.text} typed={line.typed} />;
     if (over || mode === "before") {
       return <span className="text">{line.text || "(nothing copied)"}</span>;
     }
     if (mode === "none") return <span className="text off">not shown</span>;
     if (mode === "copy" && line.locked) {
-      if (lockedShows === "grade") return <Graded line={line} />;
-      if (lockedShows === "right") return <RightOnly line={line} />;
+      if (lockedShows === "grade") return <Graded sent={line.text} typed={line.typed} />;
+      if (lockedShows === "right") return <RightOnly sent={line.text} typed={line.typed} />;
       return (
         <span className="text locked" data-testid="qso-locked">
           {line.typed.trim() ? line.typed.toUpperCase() : "(nothing copied)"}

@@ -1,9 +1,13 @@
-/* Practice or QSO: the two pages, one switch, in the header of each. */
+/* Send, Copy or QSO: the three pages, one switch, in the header of each.
+ *
+ * Send is "practice" in the code and in what is stored, as it was before it
+ * had a name of its own. */
 
-export type Page = "practice" | "qso";
+export type Page = "practice" | "copy" | "qso";
 
 const PAGES: ReadonlyArray<{ value: Page; label: string; help: string }> = [
-  { value: "practice", label: "Practice", help: "Send a message and see how you sent it" },
+  { value: "practice", label: "Send", help: "Send a message and see how you sent it" },
+  { value: "copy", label: "Copy", help: "Copy a recording of CW and see what you got" },
   { value: "qso", label: "QSO", help: "Call CQ and work the stations that answer" },
 ];
 

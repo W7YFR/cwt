@@ -7,6 +7,23 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- The **Copy** page plays a recording of CW for you to copy. Open or drop a file, and each over shows as a line, with a box to type in, as it plays.
+- A line locks when the next line starts, or on Enter, and shows what you got right. **Show answers** shows what was sent under each line.
+- **Copy again** plays the whole recording once more as a new attempt. Each attempt stays, and **When I copy again, show** sets which earlier attempts show over each line.
+- Buttons skip back or on by a line, 15 s, 5 s or a word. Click a word of a graded line, or select part of one, to hear it again.
+- **Copy in** sets a box per line or a slot per character. With **Hide each call until I copy it**, a station shows as Station 1 or Station 2 until you copy its call.
+- The recording and your attempts stay in the browser across a reload.
+
+### Changed
+
+- The **Practice** page is now **Send**. The pages are **Send**, **Copy** and **QSO**.
+
+### Fixed
+
+- On the **QSO** page, a graded copy no longer shows a gap in the station's line where you typed a space it did not send.
+
 ## v1.14.0 — 2026-10-20
 
 ### Changed

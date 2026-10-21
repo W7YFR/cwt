@@ -53,7 +53,8 @@ export interface Grade {
   /** What the station sent, each character copied or missed. */
   readonly sent: readonly Mark[];
   /** The two lined up, column by column, for drawing one over the other. A
-   *  space between words is a column of its own. */
+   *  space between words is a column of its own, with the space on each side
+   *  that had one. */
   readonly columns: readonly Column[];
   /** Characters of the station's you copied right. */
   readonly right: number;
@@ -146,10 +147,16 @@ export function gradeCopy(sent: string, typed: string): Grade {
     return false;
   };
   const push = (col: Column, takeA: number | null, takeB: number | null) => {
-    const before =
-      (takeA !== null && lastA >= 0 && spaced(a, lastA, takeA)) ||
-      (takeB !== null && lastB >= 0 && spaced(b, lastB, takeB));
-    if (before && columns.length > 0) columns.push(SPACE);
+    const sentSpace = takeA !== null && lastA >= 0 && spaced(a, lastA, takeA);
+    const typedSpace = takeB !== null && lastB >= 0 && spaced(b, lastB, takeB);
+    // A space on one side only is a column with the space on that side.
+    if ((sentSpace || typedSpace) && columns.length > 0) {
+      columns.push(
+        sentSpace && typedSpace
+          ? SPACE
+          : { yours: typedSpace ? SPACE.yours : [], sent: sentSpace ? SPACE.sent : [] },
+      );
+    }
     if (takeA !== null) lastA = takeA;
     if (takeB !== null) lastB = takeB;
     columns.push(col);

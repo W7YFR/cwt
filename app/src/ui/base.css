@@ -2325,6 +2325,8 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .modeswitch button + button { border-left-width: 0; }
 .modeswitch button:first-child { border-radius: 6px 0 0 6px; }
 .modeswitch button:last-child { border-radius: 0 6px 6px 0; }
+/* A choice with one button, such as Show answers: round on both sides. */
+.modeswitch button:only-child { border-radius: 6px; }
 .modeswitch button[aria-pressed="true"] {
   background: var(--you);
   border-color: var(--you);
@@ -2456,6 +2458,96 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .qsotape { padding-left: calc(8ch + 12px); gap: 8px; }
 .qsolog .qsotape button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
 .qsolog .qsotape .ico { margin-right: 6px; font-style: normal; }
+/* The Copy page: the QSO page's panel and log, with a transport over the
+   log. */
+.copy button .ico, .copyopen .ico { margin-right: 6px; font-style: normal; }
+.copy .copyplay { min-width: 96px; }
+.copyclock { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); white-space: nowrap; }
+.copy .copyscrub { flex: 1 1 200px; width: auto; min-width: 120px; }
+.copyskips .modeswitch button { white-space: nowrap; font-size: 13px; }
+/* Room for Station 1 and Station 2, which a call is shorter than. */
+.copylog .who { flex-basis: 10ch; }
+.copy .copyname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 40ch; }
+/* The line playing now: a bar in the margin, the color of the play button
+   behind it. */
+.copylog li { position: relative; }
+.copylog li.now::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 0.2em;
+  bottom: 0.2em;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--you);
+}
+/* What was sent plays when it is clicked or selected. */
+.copylog [data-t0] { cursor: pointer; }
+.copylog .sent [data-t0]:hover, .copylog .sentcopy [data-t0]:hover { color: var(--you); }
+/* A line's cell: earlier attempts over this one's copy. */
+.copylog .copycell { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* The box, with its text a set distance in, so an earlier copy over it can
+   start at the same place, character over character. */
+.copylog .qsotype {
+  padding: 2px 6px;
+  border: 1px solid var(--ink-faint);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  line-height: 1.4em;
+}
+.copylog .qsotype:focus { outline: none; border-color: var(--you); }
+.copylog .pastcopies { display: flex; flex-direction: column; gap: 10px; }
+/* A row of the cell, earlier or this attempt, with its score in one column
+   at the right, so each score sits on its row. */
+.copylog .copyrow { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.copylog .copyrow > .text, .copylog .copyrow > input { flex: 1; min-width: 0; }
+.copylog .rowscore {
+  flex: 0 0 auto;
+  min-width: 9ch;
+  text-align: right;
+  line-height: 1.5em;
+  color: var(--ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.copylog .pastcopy .yourmarks { white-space: pre; color: var(--ink-dim); }
+/* The answer, under your copy: what was sent, in the text's own color. */
+.copylog .sentmarks { white-space: pre-wrap; color: var(--ink); }
+/* Over a box, an earlier copy starts where the box's text does. */
+.copylog .copycell.boxed .pastcopy .yourmarks { padding-left: 7px; }
+.copylog .pastcopy .slots.past .slot { border-bottom-color: transparent; color: var(--ink-dim); }
+/* The page's state in a word, as the settings name a section, then what to
+   do next, quiet. */
+.copyhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-height: 18px; }
+.copyhead .uplabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.copyhead .copysay { font-size: 13px; color: var(--ink-faint); }
+.copyafter { display: flex; flex-direction: column; gap: 12px; }
+.copy .copyname { margin-left: 4px; }
+/* The page's keys, then a box's, a line each. */
+.copykeys { display: flex; flex-direction: column; gap: 4px; }
+.copykeys .legend { margin: 0; }
+/* A slot per character: a line under each, the width of a character, with
+   a space between words. */
+.copylog .slots { display: flex; flex-wrap: wrap; column-gap: 1.5ch; row-gap: 8px; }
+.copylog .slotword { display: inline-flex; gap: 2px; }
+.copylog .slot {
+  width: 1.6ch;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ink-faint);
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  text-transform: uppercase;
+  line-height: 1.4em;
+  height: 1.5em;
+}
+.copylog .slot.wide { width: 2.8ch; }
+.copylog .slot:focus { outline: none; border-bottom-color: var(--you); background: var(--panel-2); }
+.copylog .slot.kept { color: var(--ink-dim); border-bottom-color: transparent; }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }

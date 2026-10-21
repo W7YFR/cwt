@@ -1,0 +1,161 @@
+/* Your copy of a recording, line by line, and the moves around it.
+ *
+ * Pure. The Copy page holds what these return.
+ */
+
+import { CHAR_TO_MORSE, canonicalChar } from "@/morse";
+import { gradeCopy } from "@/qso/show";
+import type { Over, RecChar, Recording } from "./decode";
+
+/** How you copy: in one box per line, or in a slot per character. */
+export type CopyInput = "text" | "slots";
+
+/** Your copy of one line. */
+export interface LineCopy {
+  /** What you typed in the box. */
+  readonly typed: string;
+  /** What you typed in each slot, one per character of the line. */
+  readonly slots: readonly string[];
+  /** Your copy can no longer change. */
+  readonly locked: boolean;
+  /** The slots right in the attempt before, which stay as they are. */
+  readonly kept: readonly boolean[] | null;
+}
+
+/** One try at the whole recording: your copy of each line. */
+export interface Attempt {
+  readonly lines: readonly LineCopy[];
+}
+
+/** A line not yet copied. */
+export function emptyCopy(over: Over): LineCopy {
+  return { typed: "", slots: charsOf(over).map(() => ""), locked: false, kept: null };
+}
+
+/** Every character of `over`, in order. */
+export function charsOf(over: Over): RecChar[] {
+  return over.words.flatMap((w) => w.chars);
+}
+
+/** Prosigns as their letters: <KN> as KN. A box takes either, and this page
+ *  grades both as letters. */
+export function plain(text: string): string {
+  return text.toUpperCase().replace(/<([A-Z]+)>/g, "$1");
+}
+
+/** What `over` sent, as a box is graded against it. */
+export function sentText(over: Over): string {
+  return plain(over.text);
+}
+
+/** The character behind each character a box's grade counts, in order. A
+ *  prosign stands behind each of its letters. */
+export function keyedOf(over: Over): RecChar[] {
+  return charsOf(over).flatMap((c) =>
+    c.char in CHAR_TO_MORSE ? Array.from(slotText(c.char), () => c) : [],
+  );
+}
+
+/** What a slot wants typed: the character, or a prosign's letters. */
+export function slotText(char: string): string {
+  return char.replace(/[<>]/g, "");
+}
+
+/** Whether `typed` in a slot is `char`. */
+export function slotRight(char: string, typed: string): boolean {
+  const t = typed.trim().toUpperCase();
+  if (!t) return false;
+  if (t === slotText(char)) return true;
+  return canonicalChar(t) === canonicalChar(char);
+}
+
+export interface LineGrade {
+  readonly right: number;
+  readonly total: number;
+}
+
+/** How much of `over` your copy has right. */
+export function gradeLine(over: Over, copy: LineCopy, input: CopyInput): LineGrade {
+  if (input === "slots") {
+    const chars = charsOf(over);
+    const keyed = chars.filter((c) => c.char in CHAR_TO_MORSE);
+    const right = chars.filter((c, i) => c.char in CHAR_TO_MORSE && slotRight(c.char, copy.slots[i] ?? "")).length;
+    return { right, total: keyed.length };
+  }
+  const g = gradeCopy(sentText(over), plain(copy.typed));
+  return { right: g.right, total: g.total };
+}
+
+/** Your copy as text: the box, or the slots with a space between words and
+ *  a gap for each run of empty slots. */
+export function copyText(over: Over, copy: LineCopy, input: CopyInput): string {
+  if (input === "text") return copy.typed;
+  let k = 0;
+  return over.words
+    .map((w) =>
+      w.chars
+        .map(() => copy.slots[k++]?.trim().toUpperCase() || "..")
+        .join("")
+        .replace(/(\.\.)+/g, ".."),
+    )
+    .join(" ");
+}
+
+/** The line in your next attempt. From your last copy, it starts with what
+ *  you typed, and in slots with the slots you got right, which stay. A line
+ *  of slots all right is done, and locked. Clean, it starts empty. */
+export function nextCopy(over: Over, last: LineCopy, fromLast: boolean): LineCopy {
+  if (!fromLast) return emptyCopy(over);
+  const kept = charsOf(over).map((c, i) => slotRight(c.char, last.slots[i] ?? ""));
+  return {
+    typed: last.typed,
+    slots: last.slots.map((s, i) => (kept[i] ? s : "")),
+    locked: kept.every(Boolean),
+    kept,
+  };
+}
+
+/** Whether you have copied `call`: the call whole, as a word of any line. */
+export function heard(call: string, copies: readonly string[]): boolean {
+  return copies.some((t) => t.toUpperCase().split(/\s+/).includes(call));
+}
+
+/* ---- moving through the recording ---------------------------------------- */
+
+/** A skip back to a word's start goes to the word before when it is already
+ *  this close to the start of this one, so a press always moves. */
+const RESTART_SEC = 0.4;
+
+/** Where each word starts and ends, in order. */
+export function wordSpans(rec: Recording): [number, number][] {
+  return rec.overs.flatMap((o) => o.words.map((w): [number, number] => [w.chars[0]!.t0, w.chars.at(-1)!.t1]));
+}
+
+/** Where each line starts and ends, in order. */
+export function overSpans(rec: Recording): [number, number][] {
+  return rec.overs.map((o): [number, number] => [o.t0, o.t1]);
+}
+
+/** Where a skip from `at` lands: to the start of the span it is in, or the
+ *  one before, going back; to the start of the next, going on. Null where
+ *  there is none. */
+export function skipSpan(spans: readonly [number, number][], at: number, dir: -1 | 1): number | null {
+  if (dir > 0) return spans.find(([t0]) => t0 > at + 0.01)?.[0] ?? null;
+  let i = -1;
+  for (let k = 0; k < spans.length; k++) if (spans[k]![0] <= at) i = k;
+  if (i < 0) return null;
+  if (at - spans[i]![0] > RESTART_SEC) return spans[i]![0];
+  return i > 0 ? spans[i - 1]![0] : spans[0]![0];
+}
+
+/** The word at `t`, or the nearest one after it. */
+export function wordAt(rec: Recording, t: number): [number, number] | null {
+  const spans = wordSpans(rec);
+  return spans.find(([, t1]) => t1 >= t) ?? null;
+}
+
+/** m:ss, for the time on the page. */
+export function clock(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}

@@ -157,6 +157,16 @@ export function IconStop(): React.ReactElement {
   );
 }
 
+/* Two bars, as wide together as the square is. */
+export function IconPause(): React.ReactElement {
+  return (
+    <Icon name="pause">
+      <rect x="3.5" y="3" width="3" height="10" rx="0.8" />
+      <rect x="9.5" y="3" width="3" height="10" rx="0.8" />
+    </Icon>
+  );
+}
+
 /** Which way the readout folds. The only icon with a direction to be told. */
 export function IconChevron({ up = false }: { up?: boolean }): React.ReactElement {
   return (
