@@ -13,6 +13,7 @@ import {
   note,
   open,
   send,
+  state,
   status,
   theirs,
   until,
@@ -31,9 +32,9 @@ describe("a QSO from your CQ", () => {
 
     // Between your K and its first character, it says it is about to send.
     await key("CQ CQ DE W7YFR W7YFR K");
-    await until("the wait before the answer", () => status() === "Waiting for the other station.");
+    await until("the wait before the answer", () => state() === "waiting");
     await until("the answer", () => theirs().length === 1);
-    expect(status()).toBe("The other station is sending.");
+    expect(state()).toBe("receiving");
     await until("the turn to come back", () => yourTurn());
     // It answers with its call.
     callIn(theirs()[0]!);
@@ -49,10 +50,10 @@ describe("a QSO from your CQ", () => {
     const before = theirs().length;
     await key("R TNX 73 <SK>");
     await until("the last over to start", () => theirs().length > before);
-    expect(status()).toBe("The other station is sending.");
+    expect(state()).toBe("receiving");
     expect(note(), "no note while the last over plays").toBe("");
     await until("the session to stop", ended);
-    expect(note(), "a note once the last over has played").not.toBe("");
+    expect(state(), "over once the last over has played").toBe("over");
     expect($('[data-testid="qso-tape"]'), "the QSO can be played back").not.toBeNull();
   });
 
@@ -67,9 +68,11 @@ describe("a QSO from your CQ", () => {
 });
 
 describe("the session's own words", () => {
-  it("says to call CQ between QSOs, and that it is your turn during one", async () => {
+  it("says one thing to do between QSOs, and another during one", async () => {
     await open({ qsoTheirText: "before" });
-    expect(status()).toBe("Call CQ to make a contact.");
+    expect(state()).toBe("sending");
+    const between = status();
+    expect(between).not.toBe("");
     // The keys, drawn as the practice page draws them.
     expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual([
       "R",
@@ -77,6 +80,7 @@ describe("the session's own words", () => {
       "Esc",
     ]);
     await send("CQ CQ DE W7YFR W7YFR K");
-    expect(status()).toBe("Your turn.");
+    expect(state()).toBe("sending");
+    expect(status()).not.toBe(between);
   });
 });

@@ -477,6 +477,9 @@ export interface Prefs {
   qsoLength?: "full" | "short" | "pieces" | "mixed";
   /** How the station's overs show on the QSO page. Absent is whole. */
   qsoTheirText?: "before" | "sent" | "hidden" | "copy" | "none";
+  /** Copy mode: you type the station's lines in a box or in slots. Absent
+   *  is a box. */
+  qsoCopyInput?: "text" | "slots";
   /** Blurred station text blurs the station's call in the log too. Absent
    *  is off. */
   qsoBlurCall?: boolean;
@@ -678,6 +681,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoCopy: oneOf("strict", "lenient"),
   qsoLength: oneOf("full", "short", "pieces", "mixed"),
   qsoTheirText: oneOf("before", "sent", "hidden", "copy", "none"),
+  qsoCopyInput: oneOf("text", "slots"),
   qsoBlurCall: isBool,
   qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
@@ -1040,6 +1044,17 @@ export async function recallCopyFile(): Promise<CopyFile | null> {
     return row && row.audio instanceof Blob && typeof row.name === "string" ? row : null;
   } catch {
     return null;
+  }
+}
+
+/** Forget the Copy page's recording. */
+export async function forgetCopyFile(): Promise<void> {
+  try {
+    const db = await openDb();
+    await txIn(db, COPY_FILE, "readwrite", (s) => s.delete("current"));
+    db.close();
+  } catch {
+    /* nothing to forget */
   }
 }
 

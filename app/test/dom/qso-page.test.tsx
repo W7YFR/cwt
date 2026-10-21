@@ -15,7 +15,7 @@ import {
   press,
   send,
   slide,
-  status,
+  state,
   unmount,
   until,
   useQsoRig,
@@ -126,7 +126,7 @@ describe("pausing and going on", () => {
     expect(note()).toBe("");
 
     await click($('[data-testid="qso-continue"]'));
-    await until("the last over to play again", () => status() === "The other station is sending.");
+    await until("the last over to play again", () => state() === "receiving");
     await until("the turn to come back", () => yourTurn());
     expect(lines(), "played again, not added").toBe(before);
   });

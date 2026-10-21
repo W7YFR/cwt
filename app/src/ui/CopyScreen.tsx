@@ -36,6 +36,7 @@ import {
   type LineCopy,
 } from "@/copy/lines";
 import {
+  forgetCopyFile,
   keepCopyFile,
   loadPrefs,
   recallCopy,
@@ -76,7 +77,7 @@ interface Option<T> {
 
 const INPUTS: ReadonlyArray<Option<CopyInput>> = [
   { value: "text", label: "Box", note: "Type each line in a box, as you hear it." },
-  { value: "slots", label: "Slots", note: "A slot for each character, so you see how long each word is." },
+  { value: "slots", label: "Slots", note: "A slot for each character." },
 ];
 const INPUT_HELP =
   "How you copy each line: in one box, or in a slot for each character. Slots show how " +
@@ -93,7 +94,7 @@ const LINES_SHOW_HELP =
 
 const LOCK_HELP =
   "Your copy of a line can no longer change once the next line starts. The last line " +
-  "locks a few seconds after it ends. Enter in the box locks a line too.";
+  "locks 5 seconds after it ends. Enter in the box locks a line too.";
 
 const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
   { value: "nothing", label: "My copy", note: "Your copy as you typed it." },
@@ -512,6 +513,17 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
     setPos(0);
   };
 
+  /** Clear: the recording and every attempt go, back to the guide. */
+  const clear = () => {
+    player.stop();
+    cancelLastLock();
+    setFile(null);
+    setKept(null);
+    setPos(0);
+    rememberCopy(null);
+    void forgetCopyFile();
+  };
+
   /* ---- keys ---------------------------------------------------------------- */
 
   const log = useRef<HTMLOListElement>(null);
@@ -769,7 +781,9 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
   const state = reading
     ? "Reading"
     : !rec
-      ? ""
+      ? recalling
+        ? ""
+        : "No recording"
       : playing === "main"
         ? "Playing"
         : ended
@@ -809,26 +823,38 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
           </i>
           Open a recording
         </button>
-        {started && (
-          <button data-testid="copy-restart" title="Clear every attempt and go back to the start" onClick={restart}>
-            Start over
+        {/* Start over and Show answers are always here, so the header does
+            not move. Off until there is a copy to check. */}
+        <button
+          data-testid="copy-restart"
+          disabled={!started}
+          title="Clear every attempt and go back to the start"
+          onClick={restart}
+        >
+          Start over
+        </button>
+        {/* On or off, as the pages' other choices in the header are. */}
+        <div className="modeswitch" role="group" aria-label="Show answers">
+          <button
+            aria-pressed={!!kept?.revealed}
+            data-testid="copy-reveal"
+            disabled={!started || !kept}
+            title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
+            onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
+          >
+            Show answers
           </button>
-        )}
-        {/* On or off, as the pages' other choices in the header are. With
-            Start over, once there is a copy to check: the two come together,
-            so neither moves the other. */}
-        {started && kept && (
-          <div className="modeswitch" role="group" aria-label="Show answers">
-            <button
-              aria-pressed={kept.revealed}
-              data-testid="copy-reveal"
-              title={kept.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
-              onClick={() => setKept({ ...kept, revealed: !kept.revealed })}
-            >
-              Show answers
-            </button>
-          </div>
-        )}
+        </div>
+        {/* Always here, as on the other pages. Off while the recording plays
+            or before there is one. */}
+        <button
+          data-testid="copy-clear"
+          disabled={!rec || reading || playing !== null}
+          title="Close this recording and clear every attempt"
+          onClick={clear}
+        >
+          Clear
+        </button>
         <div className="cornergroup">
           <button className="iconbtn cornerbtn" aria-label="Configuration" title="Configuration" onClick={onConfigure}>
             <IconUser />
@@ -952,27 +978,31 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
         )}
 
         {!rec && !recalling && !reading && (
+          <div className="qsocontrols">
+            <button className="primary" data-testid="copy-open-first" onClick={pickFile}>
+              <i className="ico">
+                <IconUpload />
+              </i>
+              Open a recording
+            </button>
+            <span className="hint">or drop one on the page</span>
+          </div>
+        )}
+
+        {!rec && !recalling && !reading && (
           <div className="qsoguide prose" data-testid="copy-guide">
-            <p>
-              Open a recording of CW, such as a QSO, and copy it as it plays. The recording is read
-              first, so each line can be checked against what was sent.
-            </p>
+            <p>Open a recording of CW and copy it as it plays. Each line you copy is checked against what was sent.</p>
             <ul>
-              <li>Each over shows as a line as it starts. Type what you hear in its box.</li>
-              <li>A line locks when the next one starts, or when you press Enter, and shows what you got.</li>
-              <li>Copy again plays the whole recording once more. Your earlier attempts stay, so you see how you are getting on.</li>
-              <li>Select part of a graded line, or click a word in it, to hear that part again.</li>
+              <li>A new line appears each time a new station starts sending.</li>
+              <li>Type what you hear and press Enter when you finish a line.</li>
+              <li>Text entry locks when the next line starts, or 5 seconds after the recording ends.</li>
+              <li>
+                <b>Copy again</b> plays the whole recording from the start. Your earlier attempts stay on the page, so
+                you can see yourself improve.
+              </li>
+              <li>Click a word in a finished line, or select part of it, to hear it again.</li>
             </ul>
-            <p>The recording stays in this browser. Nothing is sent anywhere.</p>
-            <div className="qsocontrols">
-              <button className="primary" data-testid="copy-open-first" onClick={pickFile}>
-                <i className="ico">
-                  <IconUpload />
-                </i>
-                Open a recording
-              </button>
-              <span className="hint">or drop one on the page</span>
-            </div>
+            <p>Your recording stays in this browser.</p>
           </div>
         )}
 

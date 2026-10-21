@@ -9,6 +9,7 @@ import {
   gradeLine,
   heard,
   nextCopy,
+  overOfText,
   skipSpan,
   slotRight,
   type LineCopy,
@@ -184,5 +185,25 @@ describe("each station's call", () => {
     ]);
     const rec = decodeRecording(samples, RATE)!;
     expect(rec.senders.map((s) => s.call)).toEqual(["W3YNI", "NK0V"]);
+  });
+});
+
+describe("overOfText", () => {
+  it("makes a line sent from text, a word at a time, a prosign as one character", () => {
+    const over = overOfText("w1aw de k7abc <BK>", 25, 20);
+    expect(over.words.map((w) => w.chars.map((c) => c.char).join(""))).toEqual(["W1AW", "DE", "K7ABC", "<BK>"]);
+    expect(over.text).toBe("W1AW DE K7ABC <BK>");
+  });
+
+  it("puts each character after the one before, inside the line", () => {
+    const over = overOfText("TU 5NN", 25, 25);
+    const chars = over.words.flatMap((w) => w.chars);
+    for (let i = 1; i < chars.length; i++) expect(chars[i]!.t0).toBeGreaterThan(chars[i - 1]!.t1);
+    expect(chars[0]!.t0).toBe(0);
+    expect(over.t1).toBe(chars.at(-1)!.t1);
+  });
+
+  it("takes longer at a slower speed", () => {
+    expect(overOfText("CQ CQ", 15, 15).t1).toBeGreaterThan(overOfText("CQ CQ", 30, 30).t1);
   });
 });

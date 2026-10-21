@@ -2529,9 +2529,9 @@ header .modeswitch button { white-space: nowrap; }
 .copykeys .legend { margin: 0; }
 /* A slot per character: a line under each, the width of a character, with
    a space between words. */
-.copylog .slots { display: flex; flex-wrap: wrap; column-gap: 1.5ch; row-gap: 8px; }
-.copylog .slotword { display: inline-flex; gap: 2px; }
-.copylog .slot {
+.qsolog .slots { display: flex; flex-wrap: wrap; column-gap: 1.5ch; row-gap: 8px; }
+.qsolog .slotword { display: inline-flex; gap: 2px; }
+.qsolog .slot {
   width: 1.6ch;
   padding: 0;
   border: 0;
@@ -2545,9 +2545,9 @@ header .modeswitch button { white-space: nowrap; }
   line-height: 1.4em;
   height: 1.5em;
 }
-.copylog .slot.wide { width: 2.8ch; }
-.copylog .slot:focus { outline: none; border-bottom-color: var(--you); background: var(--panel-2); }
-.copylog .slot.kept { color: var(--ink-dim); border-bottom-color: transparent; }
+.qsolog .slot.wide { width: 2.8ch; }
+.qsolog .slot:focus { outline: none; border-bottom-color: var(--you); background: var(--panel-2); }
+.qsolog .slot.kept { color: var(--ink-dim); border-bottom-color: transparent; }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }
