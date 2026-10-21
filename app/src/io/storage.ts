@@ -1047,6 +1047,17 @@ export async function recallCopyFile(): Promise<CopyFile | null> {
   }
 }
 
+/** Forget the Copy page's recording. */
+export async function forgetCopyFile(): Promise<void> {
+  try {
+    const db = await openDb();
+    await txIn(db, COPY_FILE, "readwrite", (s) => s.delete("current"));
+    db.close();
+  } catch {
+    /* nothing to forget */
+  }
+}
+
 /* Your copy on the Copy page, so a reload comes back to it. Kept apart from
    the recording: it changes with every key typed. */
 const COPY_KEY = "cwt:copy";

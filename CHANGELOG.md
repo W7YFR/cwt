@@ -10,11 +10,14 @@ nothing to the site. The next release carries them.
 ### Added
 
 - On the **QSO** page, **Enter copy as** sets a box per line or a slot per character for the station's lines, while **Its lines show** is **Copy**.
+- **Clear** in the header of the **QSO** page clears the log, and on the **Copy** page it closes the recording and its attempts. It is off while a QSO or the recording runs.
 
 ### Changed
 
 - The **QSO** page shows its state in a word over the log, as the **Copy** page does, with what to do next beside it.
 - The guide on the **Copy** page, before you open a recording, is shorter and plainer.
+- On the **Copy** page, **Open a recording** now sits under the page's state, above the guide, as **Start** does on the **QSO** page.
+- **Clear** on the **Send** page, and **Start over** and **Show answers** on the **Copy** page, always show. Each is off until it can be used.
 
 ## v1.15.0 — 2026-10-21
 

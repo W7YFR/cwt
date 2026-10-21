@@ -882,6 +882,14 @@ export function QsoScreen({
     void rec.start().finally(() => setStarting(false));
   };
 
+  /** Clear the log while no session runs: the page goes back to the guide. */
+  const clear = () => {
+    listen.stop();
+    pending.current = null;
+    fresh.current();
+    setStopped(true);
+  };
+
   /** Go on with the QSO a reload brought back: the log and the QSO stay. */
   const resume = () => {
     listen.stop();
@@ -1230,6 +1238,16 @@ export function QsoScreen({
           </span>
         </h1>
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
+        {/* Always here, as on the other pages. Off while a session runs or
+            with nothing in the log. */}
+        <button
+          data-testid="qso-clear"
+          disabled={recorder !== null || starting || lines.length === 0}
+          title="Clear the log of every QSO"
+          onClick={clear}
+        >
+          Clear
+        </button>
         <div className="cornergroup">
           <button
             className="iconbtn cornerbtn"

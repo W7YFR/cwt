@@ -166,7 +166,7 @@ export interface RecordBarProps {
    *  when there is no cursor. */
   leadLeft: number | null;
   /** Throw the recording away and stay here. Absent when there is nothing to
-   *  throw away. */
+   *  throw away, and Clear is off. */
   onClear?: (() => void) | undefined;
   /** Start over at a new message and a new speed. */
   onNewSession?: (() => void) | undefined;
@@ -341,15 +341,16 @@ export function RecordBar({
         )}
         {onDrill && <DrillPicker drills={drills} onPick={onDrill} floating />}
         {mode && onMode && <ModeSwitch mode={mode} onMode={onMode} />}
-        {onClear && (
-          <button
-            onClick={onClear}
-            data-testid="clear-take"
-            title="Drop this recording and keep the message, the speeds and the settings"
-          >
-            Clear
-          </button>
-        )}
+        {/* Always here, as on the other pages, so the bar does not move. Off
+            with nothing to clear. */}
+        <button
+          onClick={onClear}
+          disabled={!onClear}
+          data-testid="clear-take"
+          title="Drop this recording and keep the message, the speeds and the settings"
+        >
+          Clear
+        </button>
       </div>
 
       {/* Nothing at all without `?micdebug` in the URL. */}

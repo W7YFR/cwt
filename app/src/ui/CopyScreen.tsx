@@ -36,6 +36,7 @@ import {
   type LineCopy,
 } from "@/copy/lines";
 import {
+  forgetCopyFile,
   keepCopyFile,
   loadPrefs,
   recallCopy,
@@ -512,6 +513,17 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
     setPos(0);
   };
 
+  /** Clear: the recording and every attempt go, back to the guide. */
+  const clear = () => {
+    player.stop();
+    cancelLastLock();
+    setFile(null);
+    setKept(null);
+    setPos(0);
+    rememberCopy(null);
+    void forgetCopyFile();
+  };
+
   /* ---- keys ---------------------------------------------------------------- */
 
   const log = useRef<HTMLOListElement>(null);
@@ -769,7 +781,9 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
   const state = reading
     ? "Reading"
     : !rec
-      ? ""
+      ? recalling
+        ? ""
+        : "No recording"
       : playing === "main"
         ? "Playing"
         : ended
@@ -809,26 +823,38 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
           </i>
           Open a recording
         </button>
-        {started && (
-          <button data-testid="copy-restart" title="Clear every attempt and go back to the start" onClick={restart}>
-            Start over
+        {/* Start over and Show answers are always here, so the header does
+            not move. Off until there is a copy to check. */}
+        <button
+          data-testid="copy-restart"
+          disabled={!started}
+          title="Clear every attempt and go back to the start"
+          onClick={restart}
+        >
+          Start over
+        </button>
+        {/* On or off, as the pages' other choices in the header are. */}
+        <div className="modeswitch" role="group" aria-label="Show answers">
+          <button
+            aria-pressed={!!kept?.revealed}
+            data-testid="copy-reveal"
+            disabled={!started || !kept}
+            title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
+            onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
+          >
+            Show answers
           </button>
-        )}
-        {/* On or off, as the pages' other choices in the header are. With
-            Start over, once there is a copy to check: the two come together,
-            so neither moves the other. */}
-        {started && kept && (
-          <div className="modeswitch" role="group" aria-label="Show answers">
-            <button
-              aria-pressed={kept.revealed}
-              data-testid="copy-reveal"
-              title={kept.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
-              onClick={() => setKept({ ...kept, revealed: !kept.revealed })}
-            >
-              Show answers
-            </button>
-          </div>
-        )}
+        </div>
+        {/* Always here, as on the other pages. Off while the recording plays
+            or before there is one. */}
+        <button
+          data-testid="copy-clear"
+          disabled={!rec || reading || playing !== null}
+          title="Close this recording and clear every attempt"
+          onClick={clear}
+        >
+          Clear
+        </button>
         <div className="cornergroup">
           <button className="iconbtn cornerbtn" aria-label="Configuration" title="Configuration" onClick={onConfigure}>
             <IconUser />
@@ -952,6 +978,18 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
         )}
 
         {!rec && !recalling && !reading && (
+          <div className="qsocontrols">
+            <button className="primary" data-testid="copy-open-first" onClick={pickFile}>
+              <i className="ico">
+                <IconUpload />
+              </i>
+              Open a recording
+            </button>
+            <span className="hint">or drop one on the page</span>
+          </div>
+        )}
+
+        {!rec && !recalling && !reading && (
           <div className="qsoguide prose" data-testid="copy-guide">
             <p>Open a recording of CW and copy it as it plays. Each line you copy is checked against what was sent.</p>
             <ul>
@@ -965,15 +1003,6 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
               <li>Click a word in a finished line, or select part of it, to hear it again.</li>
             </ul>
             <p>Your recording stays in this browser.</p>
-            <div className="qsocontrols">
-              <button className="primary" data-testid="copy-open-first" onClick={pickFile}>
-                <i className="ico">
-                  <IconUpload />
-                </i>
-                Open a recording
-              </button>
-              <span className="hint">or drop one on the page</span>
-            </div>
           </div>
         )}
 
