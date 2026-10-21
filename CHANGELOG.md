@@ -14,9 +14,9 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- The **QSO** page shows its state in a word over the log, as the **Copy** page does, with what to do next beside it.
+- The **QSO** page shows its state in a word, with plainer words beside it for what to do next.
 - The guide on the **Copy** page, before you open a recording, is shorter and plainer.
-- On the **Copy** page, **Open a recording** now sits under the page's state, above the guide, as **Start** does on the **QSO** page.
+- On the **Copy** page, **Open a recording** sits under the page's state, above the guide. The state reads **No recording** until you open one.
 - **Clear** on the **Send** page, and **Start over** and **Show answers** on the **Copy** page, always show. Each is off until it can be used.
 
 ## v1.15.0 — 2026-10-21
