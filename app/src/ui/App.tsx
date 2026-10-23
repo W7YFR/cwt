@@ -122,6 +122,14 @@ export function App(): React.ReactElement {
     },
     [take],
   );
+  /** Back to the start screen, from any page. The take goes, as it always
+   *  did from the practice page. */
+  const goHome = useCallback(() => {
+    take.clear();
+    rememberLandingAsked(true);
+    setRestored(false);
+    setPage("practice");
+  }, [take, setPage]);
 
   /* Which calibration is being applied, held here because it changes what the
      decoder does to every recording that follows. `null` is the default and a
@@ -494,6 +502,7 @@ export function App(): React.ReactElement {
             setConfiguring(true);
           }}
           onPage={setPage}
+          onHome={goHome}
           fileTarget={copyFile}
         />
       ) : page === "qso" ? (
@@ -513,6 +522,7 @@ export function App(): React.ReactElement {
             setConfiguring(true);
           }}
           onPage={setPage}
+          onHome={goHome}
         />
       ) : take.loaded && take.review ? (
         <ReviewScreen
@@ -570,12 +580,7 @@ export function App(): React.ReactElement {
             chooseProfile(id);
             await take.recalibrate(profiles.find((p) => p.id === id) ?? null);
           }}
-          onBack={() => {
-            take.clear();
-            rememberLandingAsked(true);
-            setRestored(false);
-            setError(null);
-          }}
+          onBack={goHome}
         />
       ) : (
         <Landing

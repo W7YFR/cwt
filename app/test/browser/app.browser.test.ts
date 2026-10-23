@@ -538,6 +538,21 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(onLanding()).toBe(true);
   });
 
+  it.each(["copy", "qso"])("gets you home from the name on the %s page", async (page) => {
+    await served();
+    await mount();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(`[data-testid='page'] [data-page='${page}']`)!.click();
+    });
+    const brand = container.querySelector<HTMLButtonElement>(".brandmark")!;
+    expect(brand.tagName).toBe("BUTTON");
+    expect(brand.disabled).toBe(false);
+    await act(async () => {
+      brand.click();
+    });
+    expect(onLanding()).toBe(true);
+  });
+
   /* Two tests rather than one with an unmount in the middle of it.
    *
    * They are two halves of one claim — a name earns header room and the word

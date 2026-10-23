@@ -59,8 +59,7 @@ import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
 import type { SentWpm } from "@/timing/live";
 import { useLiveCopy } from "./useLiveCopy";
 import { useRecorder } from "./useRecorder";
-import { APP_NAME, Brandmark } from "./Wordmark";
-import { visitWordmark } from "./wordmarks";
+import { HomeButton } from "./Wordmark";
 
 /** A speed as the app writes it: 25 wpm, or 25/16 wpm with Farnsworth. */
 function wpm(s: Speed): string {
@@ -351,6 +350,8 @@ export interface QsoScreenProps {
   onError(message: string): void;
   onConfigure(): void;
   onPage(page: Page): void;
+  /** Back to the start screen. */
+  onHome(): void;
 }
 
 export function QsoScreen({
@@ -363,6 +364,7 @@ export function QsoScreen({
   onError,
   onConfigure,
   onPage,
+  onHome,
 }: QsoScreenProps): React.ReactElement {
   /* Your speed: the one the practice page uses, read and written through the
      same pair. Set before a session, since the copy is read at it. */
@@ -1232,11 +1234,7 @@ export function QsoScreen({
   return (
     <>
       <header>
-        <h1 className="brand" aria-label={APP_NAME}>
-          <span className="brandmark">
-            <Brandmark art={visitWordmark()} />
-          </span>
-        </h1>
+        <HomeButton onHome={onHome} disabled={recorder !== null} />
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
         {/* Always here, as on the other pages. Off while a session runs or
             with nothing in the log. */}

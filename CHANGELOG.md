@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- On the Copy and QSO pages, the CWT logo now goes back to the start screen, as it does on the Send page.
+
 ## v1.16.2 — 2026-10-21
 
 ### Development

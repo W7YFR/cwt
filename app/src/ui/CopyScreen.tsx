@@ -52,8 +52,7 @@ import { IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsLocked, SlotsPast } from "./Slots";
-import { APP_NAME, Brandmark } from "./Wordmark";
-import { visitWordmark } from "./wordmarks";
+import { HomeButton } from "./Wordmark";
 
 /** How long after the last line ends its copy locks, when Lock is on. Every
  *  other line locks when the next one starts. */
@@ -226,11 +225,13 @@ export interface CopyScreenProps {
   onError(message: string): void;
   onConfigure(): void;
   onPage(page: Page): void;
+  /** Back to the start screen. */
+  onHome(): void;
   /** Where the app sends a file dropped on this page. */
   fileTarget: React.MutableRefObject<((file: File) => void) | null>;
 }
 
-export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScreenProps): React.ReactElement {
+export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }: CopyScreenProps): React.ReactElement {
   const [settingsOpen, setSettingsOpen] = useOnOff("copySettingsOpen", false);
   const [lock, setLock] = useOnOff("copyLock", true);
   const [hideCalls, setHideCalls] = useOnOff("copyHideCalls", true);
@@ -816,11 +817,7 @@ export function CopyScreen({ onError, onConfigure, onPage, fileTarget }: CopyScr
   return (
     <>
       <header>
-        <h1 className="brand" aria-label={APP_NAME}>
-          <span className="brandmark">
-            <Brandmark art={visitWordmark()} />
-          </span>
-        </h1>
+        <HomeButton onHome={onHome} />
         <PageSwitch page="copy" onPage={onPage} />
         <button
           className={rec ? "copyopen" : "copyopen primary"}
