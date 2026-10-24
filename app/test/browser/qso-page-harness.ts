@@ -130,6 +130,7 @@ export function mount(prefs: Prefs): void {
         onError: (m: string) => errors.push(m),
         onConfigure: () => {},
         onPage: () => {},
+        onHome: () => {},
       }),
     ),
   );

@@ -36,9 +36,8 @@ import { FollowSending } from "./FollowSending";
 import { RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
-import { APP_NAME, Brandmark } from "./Wordmark";
+import { HomeButton } from "./Wordmark";
 import { PageSwitch, type Page } from "./PageSwitch";
-import { visitWordmark } from "./wordmarks";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
 import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
 import { reviewTake } from "@/timing";
@@ -838,26 +837,9 @@ export function ReviewScreen({
   return (
     <>
       <header ref={headerRef}>
-        <h1 className="brand">
-          {/* The name is the way home. Nothing else on this screen is a
-              natural "start over", and a review you cannot leave is a dead
-              end — which is exactly what it was. */}
-          <button
-            className="brandmark"
-            onClick={onBack}
-            // Leaving mid-take would drop the recording on the floor.
-            disabled={recording}
-            title={`Back to the ${APP_NAME} start screen`}
-            // The drawing is decoration; the name is what this control is
-            // called, and it has to survive being unreadable at this size.
-            aria-label={APP_NAME}
-          >
-            {/* The same drawing the landing screen showed: the roll is per
-                visit, not per mount, so arriving here does not quietly change
-                the logo. */}
-            <Brandmark art={visitWordmark()} />
-          </button>
-        </h1>
+        {/* The name is the way home. Leaving mid-take would drop the
+            recording on the floor. */}
+        <HomeButton onHome={onBack} disabled={recording} />
         {onPage && <PageSwitch page="practice" onPage={onPage} disabled={recording} />}
         <RecordBar
           rec={rec}

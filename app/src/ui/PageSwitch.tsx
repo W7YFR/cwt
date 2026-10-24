@@ -25,6 +25,7 @@ export function PageSwitch({
       {PAGES.map((p) => (
         <button
           key={p.value}
+          data-page={p.value}
           aria-pressed={page === p.value}
           title={p.help}
           disabled={disabled}

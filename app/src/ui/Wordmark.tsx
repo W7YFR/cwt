@@ -1,7 +1,7 @@
 /* The name, in one place.
  *
  * Two forms of it: a big drawing on the landing screen, and the small word in
- * the review header that takes you back. Both come from here so they can never
+ * the page header that takes you back. Both come from here so they can never
  * drift apart, and so the name lives somewhere other than inside a heading in
  * the middle of a screen.
  *
@@ -19,7 +19,7 @@
  */
 
 import type { WordmarkArt } from "./wordmarks";
-import { wordmarkCols, wordmarkText } from "./wordmarks";
+import { visitWordmark, wordmarkCols, wordmarkText } from "./wordmarks";
 
 export const APP_NAME = "CWT";
 export const APP_LONG_NAME = "CW Trainer";
@@ -84,5 +84,27 @@ export function Brandmark({ art }: { art: WordmarkArt }): React.ReactElement {
     <span className="art" aria-hidden="true" data-art={art.id} style={sizing(art)}>
       {wordmarkText(art)}
     </span>
+  );
+}
+
+/** The name in a page header: the way back to the start screen.
+ *
+ * The same drawing the landing screen showed: the roll is per visit, not per
+ * mount, so arriving on a page does not quietly change the logo. */
+export function HomeButton({ onHome, disabled }: { onHome(): void; disabled?: boolean }): React.ReactElement {
+  return (
+    <h1 className="brand">
+      <button
+        className="brandmark"
+        onClick={onHome}
+        disabled={disabled}
+        title={`Back to the ${APP_NAME} start screen`}
+        // The drawing is decoration; the name is what this control is called,
+        // and it has to survive being unreadable at this size.
+        aria-label={APP_NAME}
+      >
+        <Brandmark art={visitWordmark()} />
+      </button>
+    </h1>
   );
 }
