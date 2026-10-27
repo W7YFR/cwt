@@ -9,26 +9,34 @@ export type SentAttrs = (k: number) => Record<string, string | number>;
 
 /** Marked characters: a dot under each one `dot` picks, blue if right, red
  *  if not. Spaces, gaps and the characters it does not pick have none.
- *  `attrs` takes each character's place in the line, from `first`. */
+ *  `attrs` takes each character's place in the line, from `first`, or with
+ *  `at`, the place of the character sent that each mark lines up with. */
 export function Marked({
   marks,
   dot,
   attrs,
   first = 0,
+  at,
 }: {
   marks: readonly Mark[];
   dot(ok: boolean): boolean;
   attrs?: SentAttrs | undefined;
   first?: number;
+  at?: readonly (number | null)[] | undefined;
 }): React.ReactElement {
   let k = first;
+  const attrsOf = (m: Mark, i: number) => {
+    if (!attrs) return {};
+    if (at) return at[i] == null ? {} : attrs(at[i]!);
+    return m.ok !== null ? attrs(k++) : {};
+  };
   return (
     <>
       {marks.map((m, i) => (
         <span
           key={i}
           className={m.ok === null || !dot(m.ok) ? undefined : m.ok ? "cright" : "cwrong"}
-          {...(attrs && m.ok !== null ? attrs(k++) : {})}
+          {...attrsOf(m, i)}
         >
           {m.text}
         </span>
@@ -44,10 +52,12 @@ export function Marked({
 export function RightOnly({
   sent,
   typed,
+  attrs,
   testId = "qso-right-only",
 }: {
   sent: string;
   typed: string;
+  attrs?: SentAttrs | undefined;
   testId?: string;
 }): React.ReactElement {
   const grade = gradeCopy(sent, typed);
@@ -58,14 +68,22 @@ export function RightOnly({
       </span>
     );
   }
-  const marks = grade.columns.flatMap((col): Mark[] =>
-    col.yours.length > 0
-      ? [...col.yours]
-      : col.sent.filter((m) => m.ok === false).map(() => ({ text: " ", ok: false })),
-  );
+  const places = columnPlaces(grade.columns);
+  const marks: Mark[] = [];
+  const at: (number | null)[] = [];
+  grade.columns.forEach((col, c) => {
+    const more =
+      col.yours.length > 0
+        ? col.yours
+        : col.sent.filter((m) => m.ok === false).map((): Mark => ({ text: " ", ok: false }));
+    for (const m of more) {
+      marks.push(m);
+      at.push(m.text === " " && m.ok === null ? null : places[c]!);
+    }
+  });
   return (
     <span className="text rightonly" data-testid={testId}>
-      <Marked marks={marks} dot={() => true} />
+      <Marked marks={marks} dot={() => true} attrs={attrs} at={at} />
     </span>
   );
 }
@@ -76,10 +94,12 @@ export function RightOnly({
 export function YourMarks({
   sent,
   typed,
+  attrs,
   testId,
 }: {
   sent: string;
   typed: string;
+  attrs?: SentAttrs | undefined;
   testId?: string;
 }): React.ReactElement {
   if (!typed.trim()) {
@@ -89,9 +109,37 @@ export function YourMarks({
       </span>
     );
   }
+  const grade = gradeCopy(sent, typed);
   return (
     <span className="text yourmarks" data-testid={testId}>
-      <Marked marks={gradeCopy(sent, typed).yours} dot={() => true} />
+      <Marked marks={grade.yours} dot={() => true} attrs={attrs} at={grade.yourSent} />
+    </span>
+  );
+}
+
+/** Your copy exactly as you typed it, with no marks. */
+export function YourCopy({
+  sent,
+  typed,
+  attrs,
+  testId,
+}: {
+  sent: string;
+  typed: string;
+  attrs?: SentAttrs | undefined;
+  testId?: string;
+}): React.ReactElement {
+  if (!typed.trim()) {
+    return (
+      <span className="text locked" data-testid={testId}>
+        (nothing copied)
+      </span>
+    );
+  }
+  const grade = gradeCopy(sent, typed);
+  return (
+    <span className="text locked" data-testid={testId}>
+      <Marked marks={grade.yours} dot={() => false} attrs={attrs} at={grade.yourSent} />
     </span>
   );
 }
@@ -133,6 +181,20 @@ function count(marks: readonly Mark[]): number {
   return marks.filter((m) => m.ok !== null).length;
 }
 
+/** For each column, the place of the character sent that it lines up with,
+ *  counted from 0. A column with nothing sent takes the place before it, or
+ *  the first. A space between words has none. */
+function columnPlaces(columns: readonly Column[]): (number | null)[] {
+  let k = 0;
+  return columns.map((col) => {
+    const n = count(col.sent);
+    if (n === 0 && col.yours.every((m) => m.text === " ")) return null;
+    const place = n > 0 ? k : Math.max(0, k - 1);
+    k += n;
+    return place;
+  });
+}
+
 /** Your copy, graded: what you typed over what was sent, lined up character
  *  by character. Blue under each character you got right, red under each you
  *  got wrong and under each you missed. Then the count. */
@@ -165,6 +227,8 @@ export function Graded({
     );
   }
   let k = 0;
+  const placeList = columnPlaces(grade.columns);
+  const places = new Map(grade.columns.map((col, c) => [col, placeList[c]!]));
   return (
     <span className="text graded">
       <span className="aligned" data-testid="qso-aligned">
@@ -176,7 +240,12 @@ export function Graded({
               return (
                 <span key={c} className="ccol">
                   <span className="yourcopy">
-                    <Marked marks={col.yours} dot={() => true} />
+                    <Marked
+                      marks={col.yours}
+                      dot={() => true}
+                      attrs={attrs}
+                      at={col.yours.map(() => places.get(col) ?? null)}
+                    />
                   </span>
                   <span className="sentcopy">
                     <Marked marks={col.sent} dot={(ok) => !ok} attrs={attrs} first={first} />

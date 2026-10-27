@@ -193,6 +193,7 @@ export function SlotsPast({ over, copy }: { over: Over; copy: LineCopy }): React
               <span
                 key={ci}
                 className={`slot${want > 1 ? " wide" : ""} ${slotRight(c.char, typed) ? "cright" : "cwrong"}`}
+                {...timeAttrs(c)}
               >
                 {typed || " "}
               </span>
@@ -237,7 +238,9 @@ export function SlotsLocked({
               return (
                 <span key={ci} className="ccol">
                   <span className="yourcopy">
-                    <span className={marks ? (ok ? "cright" : "cwrong") : undefined}>{typed || " "}</span>
+                    <span className={marks ? (ok ? "cright" : "cwrong") : undefined} {...timeAttrs(c)}>
+                      {typed || " "}
+                    </span>
                   </span>
                   {sent && (
                     <span className="sentcopy">

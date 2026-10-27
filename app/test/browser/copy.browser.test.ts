@@ -43,6 +43,7 @@ vi.mock("@/audio/player", async (real) => {
       return {
         async playBuffer(data, from = 0, to) {
           end("stopped");
+          (globalThis as { plays?: [number, number | undefined][] }).plays?.push([from, to]);
           const stop = to ?? lengthOf(data);
           let t = from;
           frame = setInterval(() => {
@@ -192,7 +193,12 @@ async function playTo(n: number): Promise<void> {
   expect(state()).toBe("paused");
 }
 
+/** What the player was asked to play: from, and to where it was given. */
+let plays: [number, number | undefined][];
+
 beforeEach(async () => {
+  plays = [];
+  (globalThis as { plays?: typeof plays }).plays = plays;
   localStorage.clear();
   await forgetCopyFile();
   errors = [];
@@ -335,6 +341,42 @@ describe("copying a line", () => {
     const seen = await playingSlots();
     await click(button("copy-play"));
     expect(seen.flat()).toEqual([]);
+  });
+});
+
+describe("a click on a locked line", () => {
+  it("plays the word clicked in your copy, in a box", async () => {
+    await open();
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    await enter(boxes()[0]!, true);
+    const chars = [...lines()[0]!.querySelectorAll('[data-testid="copy-right-only"] [data-t0]')];
+    expect(chars.length).toBeGreaterThan(0);
+    const before = plays.length;
+    await act(async () => {
+      chars.at(-1)!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    });
+    expect(plays.length).toBe(before + 1);
+    const [from, to] = plays.at(-1)!;
+    expect(to).toBeDefined();
+    expect(to! - from).toBeLessThan(2);
+  });
+
+  it("plays the word clicked in your copy, in slots", async () => {
+    await open({ copyInput: "slots" });
+    await playTo(1);
+    const slot = lines()[0]!.querySelector<HTMLInputElement>('[data-testid="copy-slot"]')!;
+    await fill(slot, "C");
+    await enter(slot, true);
+    const chars = [...lines()[0]!.querySelectorAll('[data-testid="copy-slots-locked"] .yourcopy [data-t0]')];
+    expect(chars).toHaveLength(keyed(QSO[0]!.text));
+    const before = plays.length;
+    await act(async () => {
+      chars.at(-1)!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    });
+    expect(plays.length).toBe(before + 1);
+    const [from, to] = plays.at(-1)!;
+    expect(to! - from).toBeLessThan(2);
   });
 });
 

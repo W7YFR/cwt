@@ -49,7 +49,7 @@ import {
 } from "@/io/storage";
 import type { LockedShows } from "@/qso/show";
 import { ChartSettingsButton, Check, ChoiceGroup, Section, SettingRow, SettingsBand, SettingsPanel } from "./Controls";
-import { Graded, RightOnly, SentMarks, YourMarks, type SentAttrs } from "./Graded";
+import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
 import { IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
@@ -743,7 +743,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               {input === "slots" ? (
                 <SlotsPast over={over} copy={copy} />
               ) : (
-                <YourMarks sent={sentText(over)} typed={plain(copy.typed)} />
+                <YourMarks sent={sentText(over)} typed={plain(copy.typed)} attrs={attrsOf(over)} />
               )}
               <span className="rowscore">
                 #{from + k + 1} · {g.right}/{g.total}
@@ -776,12 +776,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       if (lockedShows === "grade") {
         return <Graded sent={sentText(over)} typed={plain(copy.typed)} attrs={attrsOf(over)} showCount={false} />;
       }
-      if (lockedShows === "right") return <RightOnly sent={sentText(over)} typed={plain(copy.typed)} testId="copy-right-only" />;
-      return (
-        <span className="text locked" data-testid="copy-locked">
-          {copy.typed.trim() ? copy.typed.toUpperCase() : "(nothing copied)"}
-        </span>
-      );
+      if (lockedShows === "right") {
+        return <RightOnly sent={sentText(over)} typed={plain(copy.typed)} attrs={attrsOf(over)} testId="copy-right-only" />;
+      }
+      return <YourCopy sent={sentText(over)} typed={plain(copy.typed)} attrs={attrsOf(over)} testId="copy-locked" />;
     }
     if (input === "slots") {
       return (

@@ -25,6 +25,7 @@ nothing to the site. The next release carries them.
 
 - On the Copy page, a second **‹ Word** or **‹ Line** while the recording plays now goes back one more, however slowly you press it.
 - On the Copy page, a long line's earlier attempt no longer wraps at a different place from the line you type in.
+- On the Copy page, a click on a word in your locked copy or an earlier attempt now plays it, whatever **My locked copy shows**.
 
 ## v1.16.3 — 2026-10-23
 
