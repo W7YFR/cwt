@@ -20,12 +20,16 @@ nothing to the site. The next release carries them.
 - On the Copy page, Play puts you back in the slot or box you were copying in.
 - On the Copy page, Enter plays and pauses, in a box or slot too. Cmd+Enter on a Mac, or Ctrl+Enter elsewhere, locks the line.
 - On the Copy page, **Copy again** locks every line of the attempt, and is on once the recording ends.
+- On the Copy page, **Start over**, **Show answers** and **Copy again** sit together at the top of the panel, by the attempt they act on.
+- On the Copy page, **Copy again** stays after a perfect copy, and starts a fresh attempt.
 
 ### Fixed
 
 - On the Copy page, a second **‹ Word** or **‹ Line** while the recording plays now goes back one more, however slowly you press it.
 - On the Copy page, a long line's earlier attempt no longer wraps at a different place from the line you type in.
 - On the Copy page, a click on a word in your locked copy or an earlier attempt now plays it, whatever **My locked copy shows**.
+- On the Copy page, a change to **Copy in** no longer shows earlier attempts as empty. A change during an attempt takes effect at **Copy again**.
+- On the Copy page, earlier attempts over a line now look like your copy in that line, in slots or in the box, open or locked.
 
 ## v1.16.3 — 2026-10-23
 

@@ -12,6 +12,7 @@ import {
   overOfText,
   skipSpan,
   slotRight,
+  slotsOfTyped,
   type LineCopy,
 } from "@/copy/lines";
 import { targetTiming } from "@/timing/model";
@@ -151,6 +152,16 @@ describe("your copy", () => {
   it("has a call only when it is copied whole", () => {
     expect(heard("N1AK", ["CQ DE N1AK"])).toBe(true);
     expect(heard("N1AK", ["CQ DE N1A"])).toBe(false);
+  });
+});
+
+describe("slotsOfTyped", () => {
+  it("puts each character typed in the slot it lines up with", () => {
+    const over = overOfText("CQ DE <KN>", 20, 20);
+    // A wrong character takes its slot, a prosign's slot takes both letters,
+    // and a slot nothing lines up with stays empty.
+    expect(slotsOfTyped(over, "CQ XE KN")).toEqual(["C", "Q", "X", "E", "KN"]);
+    expect(slotsOfTyped(over, "CQ E")).toEqual(["C", "Q", "", "E", ""]);
   });
 });
 

@@ -2521,6 +2521,10 @@ header .modeswitch button { white-space: nowrap; }
 .copylog .pastcopy .slots.past .slot { border-bottom-color: transparent; color: var(--ink-dim); }
 /* The page's state in a word, as the settings name a section, then what to
    do next, quiet. */
+/* The page's state on the left, and what acts on your attempts on the
+   right of the same line. */
+.copytop { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.copyattempt { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .copyhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-height: 18px; }
 .copyhead .uplabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
 .copyhead .copysay { font-size: 13px; color: var(--ink-faint); }

@@ -31,6 +31,7 @@ import {
   plain,
   sentText,
   skipSpan,
+  slotsOfTyped,
   wordAt,
   wordSpans,
   type Attempt,
@@ -53,7 +54,7 @@ import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } fro
 import { IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
-import { SentText, Slots, SlotsLocked, SlotsPast } from "./Slots";
+import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
 import { HomeButton } from "./Wordmark";
 
 /** How long after the last line ends its copy locks, when Lock is on. Every
@@ -88,7 +89,8 @@ const INPUTS: ReadonlyArray<Option<CopyInput>> = [
 ];
 const INPUT_HELP =
   "How you copy each line: in one box, or in a slot for each character. Slots show how " +
-  "many characters each word has, so they are the easier way to copy.";
+  "many characters each word has, so they are the easier way to copy. A change during " +
+  "an attempt takes effect at Copy again.";
 
 const LINES_SHOW: ReadonlyArray<Option<LinesShow>> = [
   { value: "copy", label: "Copy", note: "Type what you hear, graded when the line locks." },
@@ -168,9 +170,15 @@ function keyOf(name: string, rec: Recording): string {
   return `${name}|${rec.durationSec.toFixed(2)}|${rec.overs.length}`;
 }
 
-/** A fresh copy of `rec`: one attempt, nothing typed and nothing played. */
-function freshKept(key: string, rec: Recording): Kept {
-  return { v: 2, key, attempts: [{ lines: rec.overs.map(emptyCopy) }], reached: 0, at: 0, revealed: false };
+/** A fresh copy of `rec`: one attempt, copied in `input`, nothing typed and
+ *  nothing played. */
+function freshKept(key: string, rec: Recording, input: CopyInput): Kept {
+  return { v: 2, key, attempts: [{ input, lines: rec.overs.map(emptyCopy) }], reached: 0, at: 0, revealed: false };
+}
+
+/** Whether nothing of `a` is copied yet: no line typed, filled or locked. */
+function blank(a: Attempt): boolean {
+  return a.lines.every((l) => !l.locked && !l.typed && !l.slots.some(Boolean));
 }
 
 /** One line as kept, checked against its over. */
@@ -187,17 +195,31 @@ function lineBack(l: Partial<LineCopy> | null | undefined, over: Over): LineCopy
   };
 }
 
+/** How an attempt kept before attempts knew it was copied: in slots if any
+ *  slot is filled, in the box if anything is typed, else in `or`. */
+function inputOf(lines: readonly LineCopy[], or: CopyInput): CopyInput {
+  if (lines.some((l) => l.slots.some(Boolean))) return "slots";
+  if (lines.some((l) => l.typed)) return "text";
+  return or;
+}
+
 /** Your copy as last kept, if it is of `rec`. A copy kept before attempts
- *  is its first attempt. */
-function recallKept(key: string, rec: Recording): Kept | null {
+ *  is its first attempt. An attempt with no input takes it from what it
+ *  holds, or `input`. */
+function recallKept(key: string, rec: Recording, input: CopyInput): Kept | null {
   const k = recallCopy() as
     | (Partial<Omit<Kept, "v">> & { v?: number; lines?: Partial<LineCopy>[] })
     | null;
   if (!k || k.key !== key || typeof k.reached !== "number" || typeof k.at !== "number") return null;
-  const raw = k.v === 1 ? [{ lines: k.lines }] : k.v === 2 ? k.attempts : null;
+  const raw: (Partial<Attempt> | null | undefined)[] | null | undefined =
+    k.v === 1 ? [{ lines: k.lines as LineCopy[] }] : k.v === 2 ? k.attempts : null;
   if (!Array.isArray(raw) || raw.length === 0) return null;
   if (!raw.every((a) => Array.isArray(a?.lines) && a.lines.length === rec.overs.length)) return null;
-  const attempts = raw.map((a) => ({ lines: a!.lines!.map((l, i) => lineBack(l, rec.overs[i]!)) }));
+  const attempts = raw.map((a): Attempt => {
+    const lines = a!.lines!.map((l, i) => lineBack(l, rec.overs[i]!));
+    const known = a!.input === "text" || a!.input === "slots" ? a!.input : null;
+    return { input: known ?? inputOf(lines, input), lines };
+  });
   return { v: 2, key, attempts, reached: k.reached, at: k.at, revealed: k.revealed === true };
 }
 
@@ -257,7 +279,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [follow, setFollow] = useOnOff("copyFollow", false);
   const [gradeTyping, setGradeTyping] = useOnOff("copyGradeTyping", false);
   const [seekSlot, setSeekSlot] = useOnOff("copySeekSlot", false);
-  const [input, setInput] = useChoice("copyInput", "text");
+  /** How the next attempt copies. The attempt under way keeps its own. */
+  const [inputPref, setInputPref] = useChoice("copyInput", "text");
   const [linesShow, setLinesShow] = useChoice("copyLines", "copy");
   const [lockedShows, setLockedShows] = useChoice("copyLockedShows", "right");
   const [earlier, setEarlier] = useChoice("copyEarlier", "last");
@@ -271,6 +294,18 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const rec = file?.rec ?? null;
   const attempt = kept ? kept.attempts.length - 1 : 0;
   const lines = kept?.attempts[attempt]?.lines ?? [];
+  /** How the attempt under way copies. */
+  const input = kept?.attempts[attempt]?.input ?? inputPref;
+  /** Copy in, from the settings. An attempt with nothing copied yet takes
+   *  it now; one under way keeps its own, and the next attempt takes it. */
+  const setInput = (next: CopyInput) => {
+    setInputPref(next);
+    setKept((k) => {
+      const at = k ? k.attempts.length - 1 : -1;
+      if (!k || at < 0 || !blank(k.attempts[at]!) || k.attempts[at]!.input === next) return k;
+      return { ...k, attempts: k.attempts.map((a, i) => (i === at ? { ...a, input: next } : a)) };
+    });
+  };
 
   /** Where the recording is: where it plays from, and where it is playing. */
   const [pos, setPos] = useState(0);
@@ -330,7 +365,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         if (!live) return;
         const r = stored.recording;
         const key = keyOf(stored.name, r);
-        const back = recallKept(key, r) ?? freshKept(key, r);
+        const back = recallKept(key, r, inputPref) ?? freshKept(key, r, inputPref);
         setFile({ name: stored.name, audio, rec: r });
         setKept(back);
         setPos(back.at);
@@ -365,7 +400,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         }
         const key = keyOf(loaded.name, r);
         setFile({ name: loaded.name, audio: loaded.data, rec: r });
-        setKept(freshKept(key, r));
+        setKept(freshKept(key, r, inputPref));
         setPos(0);
         void keepCopyFile({ name: loaded.name, audio: new Blob([loaded.data]), recording: r });
       } catch (e) {
@@ -491,7 +526,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       const at = k.attempts.length - 1;
       const next = change(k.attempts[at]!.lines);
       if (next === k.attempts[at]!.lines) return k;
-      return { ...k, attempts: k.attempts.map((a, i) => (i === at ? { lines: next } : a)) };
+      return { ...k, attempts: k.attempts.map((a, i) => (i === at ? { ...a, lines: next } : a)) };
     });
   const setLine = (i: number, patch: Partial<LineCopy>) =>
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -533,9 +568,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const copies = useMemo(
     () =>
       rec && kept
-        ? kept.attempts.flatMap((a) => a.lines.map((l, i) => copyText(rec.overs[i]!, l, input)))
+        ? kept.attempts.flatMap((a) => a.lines.map((l, i) => copyText(rec.overs[i]!, l, a.input)))
         : [],
-    [rec, kept, input],
+    [rec, kept],
   );
 
   /** The label of a line: the station's call once you have copied it, or
@@ -556,7 +591,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     let total = 0;
     a.lines.forEach((l, i) => {
       if (!l.locked || !rec) return;
-      const g = gradeLine(rec.overs[i]!, l, input);
+      const g = gradeLine(rec.overs[i]!, l, a.input);
       right += g.right;
       total += g.total;
     });
@@ -576,12 +611,16 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     !!kept &&
     (kept.attempts.length > 1 || kept.reached > 0 || pos > 0 || lines.some((l) => l.locked || l.typed || l.slots.some(Boolean)));
 
-  /** Copy again: this attempt locks, and the next starts from the top. Each
-   *  line starts from your last copy, or clean. */
+  /** Copy again: this attempt locks, and the next starts from the top, in
+   *  Copy in as the settings have it. Each line starts from your last copy,
+   *  or clean, as it does when the next attempt copies another way or the
+   *  last was perfect. */
   const again = () => {
     if (!rec || !kept) return;
-    const done: Attempt = { lines: lines.map((l) => (l.locked ? l : { ...l, locked: true })) };
-    const fresh: Attempt = { lines: lines.map((l, i) => nextCopy(rec.overs[i]!, l, earlier !== "none")) };
+    const done: Attempt = { input, lines: lines.map((l) => (l.locked ? l : { ...l, locked: true })) };
+    // After a perfect copy, nothing is left to keep: the next starts clean.
+    const fromLast = earlier !== "none" && inputPref === input && !perfect;
+    const fresh: Attempt = { input: inputPref, lines: lines.map((l, i) => nextCopy(rec.overs[i]!, l, fromLast)) };
     setKept({ ...kept, attempts: [...kept.attempts.slice(0, -1), done, fresh], reached: 0, revealed: false });
     setSelected(null);
     play(0);
@@ -591,7 +630,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     if (!rec || !kept) return;
     player.stop();
     cancelLastLock();
-    setKept(freshKept(kept.key, rec));
+    setKept(freshKept(kept.key, rec, inputPref));
     setSelected(null);
     setPos(0);
   };
@@ -727,8 +766,25 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   /* ---- a line ------------------------------------------------------------ */
 
+  /** An earlier attempt's copy of a line, drawn as your copy in the line
+   *  under it is, open or locked, in slots or in the box, however it was
+   *  copied. So the rows look alike, character over character. */
+  const pastRow = (over: Over, copy: LineCopy, was: CopyInput, shut: boolean): React.ReactElement => {
+    if (input === "slots") {
+      const asSlots = was === "slots" ? copy : { ...copy, slots: slotsOfTyped(over, copy.typed) };
+      if (shut) return <SlotsLocked over={over} copy={asSlots} marks sent={false} showCount={false} />;
+      return <SlotsPast over={over} copy={asSlots} />;
+    }
+    if (was === "slots") return <SlotsAsText over={over} copy={copy} />;
+    if (shut) {
+      return <RightOnly sent={sentText(over)} typed={plain(copy.typed)} attrs={attrsOf(over)} testId="copy-past-right" />;
+    }
+    return <YourMarks sent={sentText(over)} typed={plain(copy.typed)} attrs={attrsOf(over)} />;
+  };
+
   /** Your earlier attempts at line `i`, oldest first, as the setting picks
-   *  them. Not while the line shows what was sent instead. */
+   *  them, each graded as it was copied. Not while the line shows what was
+   *  sent instead. */
   const pastOf = (over: Over, i: number): React.ReactElement | null => {
     if (!kept || earlier === "none" || linesShow !== "copy" || attempt === 0) return null;
     const from = earlier === "all" ? 0 : attempt - 1;
@@ -737,14 +793,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       <span className="pastcopies">
         {past.map((a, k) => {
           const copy = a.lines[i]!;
-          const g = gradeLine(over, copy, input);
+          const g = gradeLine(over, copy, a.input);
           return (
             <span key={k} className="copyrow pastcopy" data-testid="copy-past">
-              {input === "slots" ? (
-                <SlotsPast over={over} copy={copy} />
-              ) : (
-                <YourMarks sent={sentText(over)} typed={plain(copy.typed)} attrs={attrsOf(over)} />
-              )}
+              {pastRow(over, copy, a.input, lines[i]!.locked || kept.revealed)}
               <span className="rowscore">
                 #{from + k + 1} · {g.right}/{g.total}
               </span>
@@ -887,17 +939,17 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         ? linesShow === "copy"
           ? "Type what you hear in each line."
           : "Listen along."
-        : ended
-          ? linesShow === "copy"
-            ? perfect
-              ? "You copied every line."
-              : "Copy again to go once more."
-            : "The recording is over."
-          : pos > 0
-            ? "Press Play to go on."
-            : linesShow === "copy"
-              ? "Press Start, then type what you hear."
-              : "Press Start to listen.";
+        : linesShow === "copy" && perfect
+          ? "You copied every line. Copy again starts a fresh attempt."
+          : ended
+            ? linesShow === "copy"
+              ? "Copy again to go once more."
+              : "The recording is over."
+            : pos > 0
+              ? "Press Play to go on."
+              : linesShow === "copy"
+                ? "Press Start, then type what you hear."
+                : "Press Start to listen.";
 
   /** Where things are, in a word, over the sentence that says what to do. */
   const state: CopyState | null = reading
@@ -960,28 +1012,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           </i>
           Open a recording
         </button>
-        {/* Start over and Show answers are always here, so the header does
-            not move. Off until there is a copy to check. */}
-        <button
-          data-testid="copy-restart"
-          disabled={!started}
-          title="Clear every attempt and go back to the start"
-          onClick={restart}
-        >
-          Start over
-        </button>
-        {/* On or off, as the pages' other choices in the header are. */}
-        <div className="modeswitch" role="group" aria-label="Show answers">
-          <button
-            aria-pressed={!!kept?.revealed}
-            data-testid="copy-reveal"
-            disabled={!started || !kept}
-            title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
-            onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
-          >
-            Show answers
-          </button>
-        </div>
         {/* Always here, as on the other pages. Off while the recording plays
             or before there is one. */}
         <button
@@ -1013,7 +1043,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     id="copy-input"
                     label="Copy in"
                     help={INPUT_HELP}
-                    value={input}
+                    value={inputPref}
                     options={INPUTS}
                     onChange={(v) => setInput(v as CopyInput)}
                   />
@@ -1086,14 +1116,54 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       </SettingsBand>
 
       <main className="panel qso copy" data-testid="copy">
-        <div className="copyhead" role="status" aria-live="polite">
-          {state && (
-            <span className="uplabel" data-testid="copy-state" data-state={state}>
-              {STATE_WORDS[state]}
-              {kept && kept.attempts.length > 1 && <span data-testid="copy-attempt"> · Attempt {kept.attempts.length}</span>}
-            </span>
+        <div className="copytop">
+          <div className="copyhead" role="status" aria-live="polite">
+            {state && (
+              <span className="uplabel" data-testid="copy-state" data-state={state}>
+                {STATE_WORDS[state]}
+                {kept && kept.attempts.length > 1 && <span data-testid="copy-attempt"> · Attempt {kept.attempts.length}</span>}
+              </span>
+            )}
+            <span className="copysay">{status}</span>
+          </div>
+          {/* What acts on your attempts, by the line that names the attempt:
+              Start over, Show answers, then Copy again, the next step.
+              Always here once there is a recording, so nothing moves. Off
+              until there is a copy to check. */}
+          {rec && (
+            <div className="copyattempt">
+              <button
+                data-testid="copy-restart"
+                disabled={!started}
+                title="Clear every attempt and go back to the start"
+                onClick={restart}
+              >
+                Start over
+              </button>
+              <div className="modeswitch" role="group" aria-label="Show answers">
+                <button
+                  aria-pressed={!!kept?.revealed}
+                  data-testid="copy-reveal"
+                  disabled={!started || !kept}
+                  title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
+                  onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
+                >
+                  Show answers
+                </button>
+              </div>
+              {linesShow === "copy" && (
+                <button
+                  className={(ended && locked) || perfect ? "primary" : undefined}
+                  data-testid="copy-again"
+                  disabled={!locked && !ended}
+                  title="Play the whole recording again and copy it once more"
+                  onClick={again}
+                >
+                  Copy again
+                </button>
+              )}
+            </div>
           )}
-          <span className="copysay">{status}</span>
         </div>
 
         {rec && (
@@ -1201,19 +1271,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               <p className="hint qsonote" data-testid="copy-score">
                 {current.right} of {current.total} copied in the lines locked so far.
               </p>
-            )}
-            {linesShow === "copy" && !perfect && (
-              <div className="qsocontrols copyactions">
-                <button
-                  className={ended && locked ? "primary" : undefined}
-                  data-testid="copy-again"
-                  disabled={!locked && !ended}
-                  title="Play the whole recording again and copy it once more"
-                  onClick={again}
-                >
-                  Copy again
-                </button>
-              </div>
             )}
           </div>
         )}

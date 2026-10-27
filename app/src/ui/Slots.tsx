@@ -205,6 +205,31 @@ export function SlotsPast({ over, copy }: { over: Over; copy: LineCopy }): React
   );
 }
 
+/** An earlier attempt made in slots, as text, the way an attempt made in the
+ *  box shows over a box: what you typed in each slot, a blank for an empty
+ *  one, a space between words, and a dot under each, blue if right and red
+ *  if not. */
+export function SlotsAsText({ over, copy }: { over: Over; copy: LineCopy }): React.ReactElement {
+  let i = 0;
+  return (
+    <span className="text yourmarks" data-testid="copy-past-slots-text">
+      {over.words.map((w, wi) => (
+        <span key={wi}>
+          {wi > 0 && " "}
+          {w.chars.map((c, ci) => {
+            const typed = copy.slots[i++]?.trim().toUpperCase() ?? "";
+            return (
+              <span key={ci} className={slotRight(c.char, typed) ? "cright" : "cwrong"} {...timeAttrs(c)}>
+                {typed || " ".repeat(slotText(c.char).length)}
+              </span>
+            );
+          })}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** The line's slots, locked: what you typed in each, with a dot under it,
  *  blue if right and red if not. With `sent`, what was sent under each, as
  *  the graded copy shows it. */

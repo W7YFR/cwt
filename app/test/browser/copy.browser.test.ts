@@ -409,6 +409,21 @@ describe("going again", () => {
     expect(saved.attempts[1]!.lines.some((l) => l.locked)).toBe(false);
   });
 
+  it("offers Copy again after a perfect copy, and starts the next attempt clean", async () => {
+    await open();
+    for (let n = 1; n <= QSO.length; n++) {
+      await playTo(n);
+      await fill(boxes().at(-1)!, QSO[n - 1]!.text);
+    }
+    await enter(boxes().at(-1)!, true);
+    await playThrough();
+    expect(button("copy-again").classList.contains("primary")).toBe(true);
+    await click(button("copy-again"));
+    await until("the first line again", () => boxes().length >= 1);
+    await click(button("copy-play"));
+    expect(boxes()[0]!.value).toBe("");
+  });
+
   it("shows what was sent under each line with Show answers", async () => {
     await open();
     expect(button("copy-reveal").disabled, "off before there is a copy").toBe(true);
@@ -458,6 +473,72 @@ describe("Clear", () => {
     await until("the page to settle", () => state() === "none");
     await wait(300);
     expect(state()).toBe("none");
+  });
+});
+
+describe("copying in another way", () => {
+  /** Pick Copy in from the settings: Box or Slots. */
+  async function copyIn(label: "Box" | "Slots"): Promise<void> {
+    const pick = $$<HTMLButtonElement>('[data-testid="copy-input"] button').find((b) => b.textContent === label);
+    await click(pick ?? null);
+  }
+  const slots = () => $$('[data-testid="copy-slot"]');
+
+  it("takes Copy in at once while nothing is copied", async () => {
+    await open({ copySettingsOpen: true });
+    await copyIn("Slots");
+    await playTo(1);
+    expect(boxes()).toHaveLength(0);
+    expect(slots().length).toBeGreaterThan(0);
+  });
+
+  it("keeps the attempt under way as it is, and copies the next attempt the new way", async () => {
+    await open({ copyInput: "slots", copySettingsOpen: true });
+    await playTo(1);
+    await fill(slots()[0] as HTMLInputElement, "C");
+    await copyIn("Box");
+    expect(boxes()).toHaveLength(0);
+    expect(slots().length).toBeGreaterThan(0);
+    await enter(slots()[0]!, true);
+    await playThrough();
+    await click(button("copy-again"));
+    await until("the first line again", () => lines().length >= 1);
+    await click(button("copy-play"));
+    expect(boxes()).toHaveLength(1);
+    // The attempt made in slots shows as text, as the box under it does.
+    expect(lines()[0]!.querySelector('.pastcopy [data-testid="copy-past-slots-text"]')).not.toBeNull();
+    expect(lines()[0]!.querySelector('.pastcopy .rowscore')!.textContent).toBe(`#1 · 1/${keyed(QSO[0]!.text)}`);
+  });
+
+  it("shows an attempt made in the box as slots over slots", async () => {
+    await open({ copySettingsOpen: true });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    await enter(boxes()[0]!, true);
+    await copyIn("Slots");
+    await playThrough();
+    await click(button("copy-again"));
+    await until("the first line again", () => lines().length >= 1);
+    await click(button("copy-play"));
+    const past = [...lines()[0]!.querySelectorAll('.pastcopy [data-testid="copy-past-slots"] .slot')];
+    expect(past.map((el) => el.textContent?.trim()).join("")).toBe("CQCQ");
+    expect(past.slice(0, 4).every((el) => el.classList.contains("cright"))).toBe(true);
+  });
+
+  it("brings back an attempt kept before attempts knew how they were copied, as it was copied", async () => {
+    await open({ copyInput: "slots" });
+    await playTo(1);
+    await fill(slots()[0] as HTMLInputElement, "C");
+    await wait(300);
+    act(() => root.unmount());
+    const saved = JSON.parse(localStorage.getItem("cwt:copy")!) as { attempts: { input?: string }[] };
+    for (const a of saved.attempts) delete a.input;
+    localStorage.setItem("cwt:copy", JSON.stringify(saved));
+    root = createRoot(host);
+    mount({ copyInput: "text" });
+    await until("the recording to come back", () => state() === "paused");
+    expect(boxes()).toHaveLength(0);
+    expect((slots()[0] as HTMLInputElement).value).toBe("C");
   });
 });
 

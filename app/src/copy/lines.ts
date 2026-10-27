@@ -23,8 +23,10 @@ export interface LineCopy {
   readonly kept: readonly boolean[] | null;
 }
 
-/** One try at the whole recording: your copy of each line. */
+/** One try at the whole recording: your copy of each line, and how you
+ *  copied it. */
 export interface Attempt {
+  readonly input: CopyInput;
   readonly lines: readonly LineCopy[];
 }
 
@@ -104,6 +106,27 @@ export function gradeLine(over: Over, copy: LineCopy, input: CopyInput): LineGra
   }
   const g = gradeCopy(sentText(over), plain(copy.typed));
   return { right: g.right, total: g.total };
+}
+
+/** What you typed in the box, put in slots: each character you typed in the
+ *  slot of the character sent it lines up with, as the grade lines them up.
+ *  A prosign's slot takes the letters typed for each of its letters. A slot
+ *  nothing lines up with stays empty. */
+export function slotsOfTyped(over: Over, typed: string): string[] {
+  const chars = charsOf(over);
+  const slotOf = keyedOf(over).map((c) => chars.indexOf(c));
+  const slots = chars.map(() => "");
+  let k = 0;
+  for (const col of gradeCopy(sentText(over), plain(typed)).columns) {
+    const sent = col.sent.filter((m) => m.ok !== null);
+    const yours = col.yours.filter((m) => m.ok !== null);
+    if (sent.length === 1 && yours.length === 1) {
+      const i = slotOf[k];
+      if (i !== undefined && i >= 0) slots[i] += yours[0]!.text;
+    }
+    k += sent.length;
+  }
+  return slots;
 }
 
 /** Your copy as text: the box, or the slots with a space between words and
