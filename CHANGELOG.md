@@ -7,6 +7,31 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.17.0 — 2026-10-27
+
+### Added
+
+- **Highlight the active slot**, a Copy page setting for Slots, highlights the slot of the character playing now.
+- **Grade slots as I type**, a Copy page setting, puts a dot under each slot you fill: blue if right, red if not.
+- **When paused, move to the slot I select**, a Copy page setting, moves the recording to the character of the slot you select.
+- **Letter** and **Word** buttons on the Copy page, and the ↓ and ↑ keys, play the selected slot's letter or word.
+- On the Copy page, hold Cmd on a Mac or Ctrl elsewhere to use the page's keys from inside a box.
+
+### Changed
+
+- On the Copy page, Play puts you back in the slot or box you were copying in.
+- On the Copy page, Enter plays and pauses, in a box or slot too. Cmd+Enter on a Mac, or Ctrl+Enter elsewhere, locks the line.
+- On the Copy page, **Copy again** locks every line of the attempt. It is on once the recording ends, and after a perfect copy it starts a fresh attempt.
+- On the Copy page, **Start over**, **Show answers** and **Copy again** sit together at the top of the panel, by the attempt they act on.
+
+### Fixed
+
+- On the Copy page, a second **‹ Word** or **‹ Line** while the recording plays now goes back one more, however slowly you press it.
+- On the Copy page, a skip by word or line no longer cuts off the start of the word.
+- On the Copy page, a click on a word in your locked copy or an earlier attempt now plays it, whatever **My locked copy shows**.
+- On the Copy page, a change to **Copy in** no longer shows earlier attempts as empty. A change during an attempt takes effect at **Copy again**.
+- On the Copy page, earlier attempts over a line now look like your copy in that line and wrap at the same place, in slots or in the box.
+
 ## v1.16.3 — 2026-10-23
 
 ### Fixed

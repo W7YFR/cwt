@@ -643,10 +643,16 @@ describe("showing an over", () => {
 
   it("grades a copy character by character, both ways", () => {
     const g = gradeCopy("UR RST 579", "ur rst 589");
+    expect(g.yourSent).toEqual([0, 1, null, 2, 3, 4, null, 5, 6, 7]);
     expect(g.total).toBe(8);
     expect(g.right).toBe(7);
     expect(pattern(g.yours)).toBe("++_+++_+x+");
     expect(pattern(g.sent)).toBe("++_+++_+x+");
+  });
+
+  it("says which character sent each of yours lines up with", () => {
+    // An added X takes the character before it; a space has none.
+    expect(gradeCopy("CQ CQ", "CQ XCQ").yourSent).toEqual([0, 1, null, 1, 2, 3]);
   });
 
   it("finds what you copied past a part you missed", () => {

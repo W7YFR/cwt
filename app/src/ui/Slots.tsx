@@ -2,9 +2,11 @@
  * long each word is, so this is the easier way to copy.
  *
  * Typing fills a slot and moves to the next. Space goes to the next word, and
- * Backspace in an empty slot goes back one. Enter locks the line, and Escape
- * leaves it. On an attempt after the first, the slots you got right can stay
- * as they were.
+ * Backspace in an empty slot goes back one. Enter locks the line, where
+ * the page takes `onLock`, and is the page's key where not. Escape leaves
+ * it. On an attempt after the first, the slots you got right can stay
+ * as they were. With `at`, the slot whose character is playing lights up.
+ * With `grade`, a dot under each filled slot says if it is right.
  */
 
 import { useRef } from "react";
@@ -17,25 +19,51 @@ function timeAttrs(c: { t0: number; t1: number }): Record<string, number> {
   return { "data-t0": c.t0, "data-t1": c.t1 };
 }
 
+/** The slot playing at `t`: from its character's start to the next
+ *  character's start in the same word, or to its end at a word's end. */
+function playingAt(over: Over, t: number | undefined): number {
+  if (t === undefined) return -1;
+  let i = 0;
+  for (const w of over.words) {
+    for (let k = 0; k < w.chars.length; k++, i++) {
+      const c = w.chars[k]!;
+      const until = w.chars[k + 1]?.t0 ?? c.t1;
+      if (t >= c.t0 && t < until) return i;
+    }
+  }
+  return -1;
+}
+
 /** The line's slots, open to type in. */
 export function Slots({
   over,
   copy,
   label,
+  at,
+  grade = false,
   onSlots,
+  onSelect,
   onLock,
   onKey,
 }: {
   over: Over;
   copy: LineCopy;
   label: string;
+  /** Where the audio is, to light up the slot playing. */
+  at?: number | undefined;
+  /** A dot under each filled slot, blue if right and red if not. */
+  grade?: boolean;
   onSlots(slots: string[]): void;
-  onLock(): void;
+  /** A slot is selected: its index in the line. */
+  onSelect?(i: number): void;
+  /** Enter locks the line. Without it, Enter goes on to the page. */
+  onLock?(): void;
   /** Any key in a slot, before the slot handles it. */
   onKey?(): void;
 }): React.ReactElement {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const chars = charsOf(over);
+  const lit = playingAt(over, at);
   /** Where each word starts, by slot. */
   const starts: number[] = [];
   let n = 0;
@@ -62,14 +90,16 @@ export function Slots({
 
   const keyDown = (ev: React.KeyboardEvent<HTMLInputElement>, i: number) => {
     onKey?.();
+    // With Cmd or Ctrl, a key is the page's.
+    if (ev.metaKey || ev.ctrlKey) return;
     if (ev.key === "Escape") {
       ev.preventDefault();
       ev.stopPropagation();
       ev.currentTarget.blur();
-    } else if (ev.key === "Enter") {
+    } else if (ev.key === "Enter" && onLock) {
       ev.preventDefault();
       ev.stopPropagation();
-      onLock();
+      onLock?.();
     } else if (ev.key === "Backspace" && !ev.currentTarget.value) {
       ev.preventDefault();
       const p = prevOpen(i);
@@ -100,38 +130,45 @@ export function Slots({
           {w.chars.map((c, ci) => {
             const i = starts[wi]! + ci;
             const want = slotText(c.char).length;
+            const playing = i === lit ? " playing" : "";
             if (!open(i)) {
               return (
-                <span key={ci} className="slot kept cright" {...timeAttrs(c)}>
+                <span key={ci} className={`slot kept cright${playing}`} {...timeAttrs(c)}>
                   {copy.slots[i]}
                 </span>
               );
             }
             const autoFocus = first;
             first = false;
+            const typed = copy.slots[i] ?? "";
+            const mark = grade && typed ? (slotRight(c.char, typed) ? " cright" : " cwrong") : "";
             return (
-              <input
-                key={ci}
-                ref={(el) => {
-                  refs.current[i] = el;
-                }}
-                className={want > 1 ? "slot wide" : "slot"}
-                data-testid="copy-slot"
-                aria-label={`Character ${i + 1}`}
-                value={copy.slots[i] ?? ""}
-                autoFocus={autoFocus}
-                spellCheck={false}
-                autoComplete="off"
-                autoCapitalize="characters"
-                onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => keyDown(e, i)}
-                onChange={(e) => {
-                  let v = e.target.value.toUpperCase().replace(/\s+/g, "");
-                  if (v.length > want) v = v.slice(-want);
-                  set(i, v);
-                  if (v.length >= want) focus(nextOpen(i));
-                }}
-              />
+              <span key={ci} className={`slotcell${mark}`}>
+                <input
+                  ref={(el) => {
+                    refs.current[i] = el;
+                  }}
+                  className={`slot${want > 1 ? " wide" : ""}${playing}`}
+                  data-testid="copy-slot"
+                  aria-label={`Character ${i + 1}`}
+                  value={copy.slots[i] ?? ""}
+                  autoFocus={autoFocus}
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  onFocus={(e) => {
+                    e.currentTarget.select();
+                    onSelect?.(i);
+                  }}
+                  onKeyDown={(e) => keyDown(e, i)}
+                  onChange={(e) => {
+                    let v = e.target.value.toUpperCase().replace(/\s+/g, "");
+                    if (v.length > want) v = v.slice(-want);
+                    set(i, v);
+                    if (v.length >= want) focus(nextOpen(i));
+                  }}
+                />
+              </span>
             );
           })}
         </span>
@@ -156,8 +193,34 @@ export function SlotsPast({ over, copy }: { over: Over; copy: LineCopy }): React
               <span
                 key={ci}
                 className={`slot${want > 1 ? " wide" : ""} ${slotRight(c.char, typed) ? "cright" : "cwrong"}`}
+                {...timeAttrs(c)}
               >
                 {typed || " "}
+              </span>
+            );
+          })}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** An earlier attempt made in slots, as text, the way an attempt made in the
+ *  box shows over a box: what you typed in each slot, a blank for an empty
+ *  one, a space between words, and a dot under each, blue if right and red
+ *  if not. */
+export function SlotsAsText({ over, copy }: { over: Over; copy: LineCopy }): React.ReactElement {
+  let i = 0;
+  return (
+    <span className="text yourmarks" data-testid="copy-past-slots-text">
+      {over.words.map((w, wi) => (
+        <span key={wi}>
+          {wi > 0 && " "}
+          {w.chars.map((c, ci) => {
+            const typed = copy.slots[i++]?.trim().toUpperCase() ?? "";
+            return (
+              <span key={ci} className={slotRight(c.char, typed) ? "cright" : "cwrong"} {...timeAttrs(c)}>
+                {typed || " ".repeat(slotText(c.char).length)}
               </span>
             );
           })}
@@ -200,7 +263,9 @@ export function SlotsLocked({
               return (
                 <span key={ci} className="ccol">
                   <span className="yourcopy">
-                    <span className={marks ? (ok ? "cright" : "cwrong") : undefined}>{typed || " "}</span>
+                    <span className={marks ? (ok ? "cright" : "cwrong") : undefined} {...timeAttrs(c)}>
+                      {typed || " "}
+                    </span>
                   </span>
                   {sent && (
                     <span className="sentcopy">

@@ -23,8 +23,10 @@ export interface LineCopy {
   readonly kept: readonly boolean[] | null;
 }
 
-/** One try at the whole recording: your copy of each line. */
+/** One try at the whole recording: your copy of each line, and how you
+ *  copied it. */
 export interface Attempt {
+  readonly input: CopyInput;
   readonly lines: readonly LineCopy[];
 }
 
@@ -106,6 +108,27 @@ export function gradeLine(over: Over, copy: LineCopy, input: CopyInput): LineGra
   return { right: g.right, total: g.total };
 }
 
+/** What you typed in the box, put in slots: each character you typed in the
+ *  slot of the character sent it lines up with, as the grade lines them up.
+ *  A prosign's slot takes the letters typed for each of its letters. A slot
+ *  nothing lines up with stays empty. */
+export function slotsOfTyped(over: Over, typed: string): string[] {
+  const chars = charsOf(over);
+  const slotOf = keyedOf(over).map((c) => chars.indexOf(c));
+  const slots = chars.map(() => "");
+  let k = 0;
+  for (const col of gradeCopy(sentText(over), plain(typed)).columns) {
+    const sent = col.sent.filter((m) => m.ok !== null);
+    const yours = col.yours.filter((m) => m.ok !== null);
+    if (sent.length === 1 && yours.length === 1) {
+      const i = slotOf[k];
+      if (i !== undefined && i >= 0) slots[i] += yours[0]!.text;
+    }
+    k += sent.length;
+  }
+  return slots;
+}
+
 /** Your copy as text: the box, or the slots with a space between words and
  *  a gap for each run of empty slots. */
 export function copyText(over: Over, copy: LineCopy, input: CopyInput): string {
@@ -146,6 +169,10 @@ export function heard(call: string, copies: readonly string[]): boolean {
  *  this close to the start of this one, so a press always moves. */
 const RESTART_SEC = 0.4;
 
+/** A skip to a word or a line lands this long before it, so its first
+ *  character is heard whole. */
+export const LEAD_SEC = 0.25;
+
 /** Where each word starts and ends, in order. */
 export function wordSpans(rec: Recording): [number, number][] {
   return rec.overs.flatMap((o) => o.words.map((w): [number, number] => [w.chars[0]!.t0, w.chars.at(-1)!.t1]));
@@ -158,14 +185,32 @@ export function overSpans(rec: Recording): [number, number][] {
 
 /** Where a skip from `at` lands: to the start of the span it is in, or the
  *  one before, going back; to the start of the next, going on. Null where
- *  there is none. */
-export function skipSpan(spans: readonly [number, number][], at: number, dir: -1 | 1): number | null {
+ *  there is none. `landed` is where the last skip back landed: still in
+ *  that span, a skip back goes to the one before. */
+export function skipSpan(
+  spans: readonly [number, number][],
+  at: number,
+  dir: -1 | 1,
+  landed: number | null = null,
+): number | null {
+  // In the lead-in before a span, a skip is from the span's start.
+  const next = spans.find(([t0]) => t0 > at);
+  if (next && at >= next[0] - LEAD_SEC - 0.01) at = next[0];
   if (dir > 0) return spans.find(([t0]) => t0 > at + 0.01)?.[0] ?? null;
   let i = -1;
   for (let k = 0; k < spans.length; k++) if (spans[k]![0] <= at) i = k;
   if (i < 0) return null;
-  if (at - spans[i]![0] > RESTART_SEC) return spans[i]![0];
+  const again = landed !== null && Math.abs(spans[i]![0] - landed) < 0.01 && at <= spans[i]![1];
+  if (!again && at - spans[i]![0] > RESTART_SEC) return spans[i]![0];
   return i > 0 ? spans[i - 1]![0] : spans[0]![0];
+}
+
+/** Where to play from for the span that starts at `t`: the lead-in before
+ *  it, but not into the span before. */
+export function leadIn(spans: readonly [number, number][], t: number): number {
+  let before = 0;
+  for (const [t0, t1] of spans) if (t0 < t && t1 <= t) before = Math.max(before, t1);
+  return Math.max(before, t - LEAD_SEC, 0);
 }
 
 /** The word at `t`, or the nearest one after it. */

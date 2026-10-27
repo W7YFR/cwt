@@ -8,10 +8,12 @@ import {
   emptyCopy,
   gradeLine,
   heard,
+  leadIn,
   nextCopy,
   overOfText,
   skipSpan,
   slotRight,
+  slotsOfTyped,
   type LineCopy,
 } from "@/copy/lines";
 import { targetTiming } from "@/timing/model";
@@ -154,6 +156,24 @@ describe("your copy", () => {
   });
 });
 
+describe("leadIn", () => {
+  it("plays from a little before a span, but not into the one before", () => {
+    expect(leadIn([[1, 2], [3, 4]], 3)).toBe(2.75);
+    expect(leadIn([[1, 2], [2.1, 3]], 2.1)).toBe(2);
+    expect(leadIn([[0.1, 1]], 0.1)).toBe(0);
+  });
+});
+
+describe("slotsOfTyped", () => {
+  it("puts each character typed in the slot it lines up with", () => {
+    const over = overOfText("CQ DE <KN>", 20, 20);
+    // A wrong character takes its slot, a prosign's slot takes both letters,
+    // and a slot nothing lines up with stays empty.
+    expect(slotsOfTyped(over, "CQ XE KN")).toEqual(["C", "Q", "X", "E", "KN"]);
+    expect(slotsOfTyped(over, "CQ E")).toEqual(["C", "Q", "", "E", ""]);
+  });
+});
+
 describe("skipSpan", () => {
   const spans: [number, number][] = [
     [1, 2],
@@ -167,6 +187,16 @@ describe("skipSpan", () => {
 
   it("goes back one more when it is at the start already", () => {
     expect(skipSpan(spans, 3.1, -1)).toBe(1);
+  });
+
+  it("goes back one more while still in the span the last skip back landed on", () => {
+    expect(skipSpan(spans, 3.8, -1, 3)).toBe(1);
+    expect(skipSpan(spans, 5.8, -1, 3)).toBe(5);
+  });
+
+  it("skips from a span's start when in the lead-in before it", () => {
+    expect(skipSpan(spans, 2.8, 1)).toBe(5);
+    expect(skipSpan(spans, 2.8, -1)).toBe(1);
   });
 
   it("goes on to the start of the next span", () => {

@@ -56,6 +56,10 @@ export interface Grade {
    *  space between words is a column of its own, with the space on each side
    *  that had one. */
   readonly columns: readonly Column[];
+  /** For each of `yours`, the station's character it lines up with, counted
+   *  from 0 among the characters sent. A character you added takes the one
+   *  before it, or the first. Null for a space or a gap. */
+  readonly yourSent: readonly (number | null)[];
   /** Characters of the station's you copied right. */
   readonly right: number;
   /** Characters the station sent. */
@@ -137,6 +141,7 @@ export function gradeCopy(sent: string, typed: string): Grade {
 
   const sentOk = new Array<boolean>(n).fill(false);
   const typedOk = new Array<boolean>(m).fill(false);
+  const yourSent = new Array<number | null>(b.length).fill(null);
   const columns: Column[] = [];
   /* A space goes in before a column when either side had one before the
      characters the column takes. */
@@ -184,6 +189,7 @@ export function gradeCopy(sent: string, typed: string): Grade {
       const ok = same(i, j);
       sentOk[i] = ok;
       typedOk[j] = ok;
+      yourSent[bi[j]!] = i;
       push({ yours: [typedMark(j, ok)], sent: [sentMark(i, ok)] }, ai[i]!, bi[j]!);
       i++;
       j++;
@@ -192,6 +198,7 @@ export function gradeCopy(sent: string, typed: string): Grade {
       i++;
     } else {
       push({ yours: [typedMark(j, false)], sent: [] }, null, bi[j]!);
+      if (n > 0) yourSent[bi[j]!] = Math.max(0, Math.min(n - 1, i - 1));
       j++;
     }
   }
@@ -204,6 +211,7 @@ export function gradeCopy(sent: string, typed: string): Grade {
     yours: marks(b, bi, typedOk),
     sent: marks(a, ai, sentOk),
     columns,
+    yourSent,
     right: sentOk.filter(Boolean).length,
     total: n,
   };
