@@ -169,6 +169,10 @@ export function heard(call: string, copies: readonly string[]): boolean {
  *  this close to the start of this one, so a press always moves. */
 const RESTART_SEC = 0.4;
 
+/** A skip to a word or a line lands this long before it, so its first
+ *  character is heard whole. */
+export const LEAD_SEC = 0.25;
+
 /** Where each word starts and ends, in order. */
 export function wordSpans(rec: Recording): [number, number][] {
   return rec.overs.flatMap((o) => o.words.map((w): [number, number] => [w.chars[0]!.t0, w.chars.at(-1)!.t1]));
@@ -189,6 +193,9 @@ export function skipSpan(
   dir: -1 | 1,
   landed: number | null = null,
 ): number | null {
+  // In the lead-in before a span, a skip is from the span's start.
+  const next = spans.find(([t0]) => t0 > at);
+  if (next && at >= next[0] - LEAD_SEC - 0.01) at = next[0];
   if (dir > 0) return spans.find(([t0]) => t0 > at + 0.01)?.[0] ?? null;
   let i = -1;
   for (let k = 0; k < spans.length; k++) if (spans[k]![0] <= at) i = k;
@@ -196,6 +203,14 @@ export function skipSpan(
   const again = landed !== null && Math.abs(spans[i]![0] - landed) < 0.01 && at <= spans[i]![1];
   if (!again && at - spans[i]![0] > RESTART_SEC) return spans[i]![0];
   return i > 0 ? spans[i - 1]![0] : spans[0]![0];
+}
+
+/** Where to play from for the span that starts at `t`: the lead-in before
+ *  it, but not into the span before. */
+export function leadIn(spans: readonly [number, number][], t: number): number {
+  let before = 0;
+  for (const [t0, t1] of spans) if (t0 < t && t1 <= t) before = Math.max(before, t1);
+  return Math.max(before, t - LEAD_SEC, 0);
 }
 
 /** The word at `t`, or the nearest one after it. */

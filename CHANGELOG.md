@@ -26,6 +26,7 @@ nothing to the site. The next release carries them.
 ### Fixed
 
 - On the Copy page, a second **‹ Word** or **‹ Line** while the recording plays now goes back one more, however slowly you press it.
+- On the Copy page, a skip by word or line no longer cuts off the start of the word.
 - On the Copy page, a long line's earlier attempt no longer wraps at a different place from the line you type in.
 - On the Copy page, a click on a word in your locked copy or an earlier attempt now plays it, whatever **My locked copy shows**.
 - On the Copy page, a change to **Copy in** no longer shows earlier attempts as empty. A change during an attempt takes effect at **Copy again**.

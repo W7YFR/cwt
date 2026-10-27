@@ -26,6 +26,7 @@ import {
   gradeLine,
   heard,
   keyedOf,
+  leadIn,
   nextCopy,
   overSpans,
   plain,
@@ -504,8 +505,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
    *  again while that word or line plays, back one more. */
   const skipBack = (spans: readonly [number, number][]) => {
     const to = skipSpan(spans, posRef.current, -1, lastBack.current);
-    seek(to);
+    seek(to === null ? null : leadIn(spans, to));
     lastBack.current = to;
+  };
+  /** On to the next word or line, a little before it. */
+  const skipOn = (spans: readonly [number, number][]) => {
+    const to = skipSpan(spans, posRef.current, 1);
+    seek(to === null ? null : leadIn(spans, to));
   };
   const back = (sec: number) => seek(posRef.current - sec);
   const on = (sec: number) => seek(posRef.current + sec);
@@ -681,7 +687,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       else skipBack(words);
     } else if (ev.key === "ArrowRight") {
       if (ev.shiftKey) on(5);
-      else seek(skipSpan(words, posRef.current, 1));
+      else skipOn(words);
     } else if (ev.key === "ArrowDown" && input === "slots" && selected) playLetter();
     else if (ev.key === "ArrowUp" && input === "slots" && selected) playWord();
     else return false;
@@ -1198,10 +1204,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 {skip("‹ Word", "Back a word", () => skipBack(words), "copy-back-word")}
               </div>
               <div className="modeswitch" role="group" aria-label="On">
-                {skip("Word ›", "On a word", () => seek(skipSpan(words, posRef.current, 1)), "copy-on-word")}
+                {skip("Word ›", "On a word", () => skipOn(words), "copy-on-word")}
                 {skip("5 s ›", "On 5 seconds", () => on(5), "copy-on-5")}
                 {skip("15 s ›", "On 15 seconds", () => on(15), "copy-on-15")}
-                {skip("Line ›", "On a line", () => seek(skipSpan(overs, posRef.current, 1)), "copy-on-line")}
+                {skip("Line ›", "On a line", () => skipOn(overs), "copy-on-line")}
               </div>
               {input === "slots" && (
                 <div className="modeswitch" role="group" aria-label="Play the selected slot">
