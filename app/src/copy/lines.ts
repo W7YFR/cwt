@@ -3,7 +3,7 @@
  * Pure. The Copy page holds what these return.
  */
 
-import { CHAR_TO_MORSE, canonicalChar, keyableSymbols } from "@/morse";
+import { canonicalChar, keyableSymbols, patternOf } from "@/morse";
 import { gradeCopy } from "@/qso/show";
 import { idealTimeline, targetTiming } from "@/timing";
 import type { Over, RecChar, Recording } from "./decode";
@@ -74,7 +74,7 @@ export function sentText(over: Over): string {
  *  prosign stands behind each of its letters. */
 export function keyedOf(over: Over): RecChar[] {
   return charsOf(over).flatMap((c) =>
-    c.char in CHAR_TO_MORSE ? Array.from(slotText(c.char), () => c) : [],
+    patternOf(c.char) ? Array.from(slotText(c.char), () => c) : [],
   );
 }
 
@@ -83,12 +83,13 @@ export function slotText(char: string): string {
   return char.replace(/[<>]/g, "");
 }
 
-/** Whether `typed` in a slot is `char`. */
+/** Whether `typed` in a slot is `char`. Letters typed in one slot are a
+ *  prosign, so any spelling that keys the same is right: IG for <UN>. */
 export function slotRight(char: string, typed: string): boolean {
   const t = typed.trim().toUpperCase();
   if (!t) return false;
   if (t === slotText(char)) return true;
-  return canonicalChar(t) === canonicalChar(char);
+  return canonicalChar(/^[A-Z]{2,}$/.test(t) ? `<${t}>` : t) === canonicalChar(char);
 }
 
 export interface LineGrade {
@@ -100,8 +101,8 @@ export interface LineGrade {
 export function gradeLine(over: Over, copy: LineCopy, input: CopyInput): LineGrade {
   if (input === "slots") {
     const chars = charsOf(over);
-    const keyed = chars.filter((c) => c.char in CHAR_TO_MORSE);
-    const right = chars.filter((c, i) => c.char in CHAR_TO_MORSE && slotRight(c.char, copy.slots[i] ?? "")).length;
+    const keyed = chars.filter((c) => patternOf(c.char));
+    const right = chars.filter((c, i) => patternOf(c.char) && slotRight(c.char, copy.slots[i] ?? "")).length;
     return { right, total: keyed.length };
   }
   const g = gradeCopy(sentText(over), plain(copy.typed));

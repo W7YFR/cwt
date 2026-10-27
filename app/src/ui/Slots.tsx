@@ -10,7 +10,7 @@
  */
 
 import { useRef } from "react";
-import { CHAR_TO_MORSE } from "@/morse";
+import { patternOf } from "@/morse";
 import { charsOf, slotRight, slotText, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 
@@ -249,8 +249,8 @@ export function SlotsLocked({
   showCount?: boolean;
 }): React.ReactElement {
   const chars = charsOf(over);
-  const keyed = chars.filter((c) => c.char in CHAR_TO_MORSE).length;
-  const right = chars.filter((c, i) => c.char in CHAR_TO_MORSE && slotRight(c.char, copy.slots[i] ?? "")).length;
+  const keyed = chars.filter((c) => patternOf(c.char)).length;
+  const right = chars.filter((c, i) => patternOf(c.char) && slotRight(c.char, copy.slots[i] ?? "")).length;
   let i = 0;
   return (
     <span className="text graded" data-testid="copy-slots-locked">

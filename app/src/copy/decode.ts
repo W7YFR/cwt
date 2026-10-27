@@ -15,6 +15,7 @@
  */
 
 import { TONE_MAX_HZ, TONE_MIN_HZ, decimate, detectTone, goertzelPower, segmentsFrom, tonePresence } from "@/dsp";
+import { UNKNOWN, spelled } from "@/morse";
 import { decodeSegments } from "@/timing";
 import type { Char } from "@/types";
 
@@ -52,7 +53,8 @@ const LINE_PAUSE_SEC = 1.5;
 
 /** One character, where it is in the recording. */
 export interface RecChar {
-  /** "L", "<SK>", or UNKNOWN when the pattern matched nothing. */
+  /** "L", "<SK>", or a pattern with no character spelled as a prosign:
+   *  ..--. as <UN>. */
   readonly char: string;
   readonly t0: number;
   readonly t1: number;
@@ -310,7 +312,8 @@ export function decodeRecording(samples: Float32Array, rate: number): Recording 
       });
     }
     const w = words[words.length - 1]!;
-    w.chars.push({ char: read.char.char, t0: read.char.t0, t1: read.char.t1 });
+    const char = read.char.char === UNKNOWN ? spelled(read.char.pattern) : read.char.char;
+    w.chars.push({ char, t0: read.char.t0, t1: read.char.t1 });
     w.senders.push(station[i]!);
   });
 

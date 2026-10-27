@@ -90,8 +90,33 @@ export const MORSE_TO_CHAR: Readonly<Record<string, string>> = (() => {
  * So comparison goes through here. Display does not: what you typed is what
  * you meant, and the chart still shows it. */
 export function canonicalChar(ch: string): string {
-  const pat = CHAR_TO_MORSE[ch];
-  return pat ? (MORSE_TO_CHAR[pat] ?? ch) : ch;
+  const pat = patternOf(ch);
+  return pat ? (MORSE_TO_CHAR[pat] ?? spelled(pat)) : ch;
+}
+
+/** The pattern `sym` keys as. A prosign the table does not hold keys as its
+ *  letters run together: <UN> as ..--. Undefined when `sym` has no Morse. */
+export function patternOf(sym: string): string | undefined {
+  const own = CHAR_TO_MORSE[sym];
+  if (own) return own;
+  const letters = /^<([A-Z]{2,})>$/.exec(sym)?.[1];
+  return letters ? Array.from(letters, (l) => BASE[l]!).join("") : undefined;
+}
+
+/** A pattern with no character, written as a prosign: the letters it runs
+ *  together, the longest letter first at each step. ..--. is <UN>. Every
+ *  spelling of a pattern keys the same, so `canonicalChar` matches them all. */
+export function spelled(pat: string): string {
+  let out = "";
+  let i = 0;
+  while (i < pat.length) {
+    let n = Math.min(4, pat.length - i);
+    while (n > 0 && !/^[A-Z]$/.test(MORSE_TO_CHAR[pat.slice(i, i + n)] ?? "")) n--;
+    if (n === 0) return UNKNOWN;
+    out += MORSE_TO_CHAR[pat.slice(i, i + n)];
+    i += n;
+  }
+  return `<${out}>`;
 }
 
 /** What a pattern with no character decodes to. It has no Morse pattern of
