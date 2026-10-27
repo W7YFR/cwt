@@ -3,7 +3,8 @@
  * You open a recording, and the decoder reads it whole before you start. What
  * it reads is the answer key. The recording plays, and each over shows as a
  * line as it starts, with a box to copy it in. A line locks when the next
- * line starts, or when you press Enter, and shows what you got.
+ * line starts, when you copy again, or on Cmd+Enter (Ctrl+Enter off a
+ * Mac), and shows what you got.
  *
  * Each try at the whole recording is an attempt. Copy again starts the next
  * one from the top, and the earlier ones can stay in view, so you see what
@@ -18,6 +19,7 @@ import { createPlayer } from "@/audio/player";
 import { ACCEPTED, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
 import {
+  charsOf,
   clock,
   copyText,
   emptyCopy,
@@ -62,6 +64,12 @@ const LAST_LOCK_SEC = 5;
  *  much after, so its first and last characters are heard whole. */
 const PART_PAD_SEC = 0.15;
 
+/** The key that takes the page's keys into a box: Cmd on a Mac, Ctrl
+ *  elsewhere. */
+const MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+const MOD = MAC ? "⌘" : "Ctrl";
+const modOf = (ev: KeyboardEvent) => (MAC ? ev.metaKey && !ev.ctrlKey : ev.ctrlKey && !ev.metaKey) && !ev.altKey;
+
 /** What shows of a line as it plays. */
 type LinesShow = "copy" | "sent" | "before";
 
@@ -93,7 +101,8 @@ const LINES_SHOW_HELP =
 
 const LOCK_HELP =
   "Your copy of a line can no longer change once the next line starts. The last line " +
-  "locks 5 seconds after it ends. Enter in the box locks a line too.";
+  "locks 5 seconds after it ends. With this off, your copy stays open until you press " +
+  `Copy again. ${MOD}+Enter in a box locks a line too.`;
 
 const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
   { value: "nothing", label: "My copy", note: "Your copy as you typed it." },
@@ -106,8 +115,14 @@ const LOCKED_SHOWS_HELP =
   "was sent under every line.";
 
 const FOLLOW_HELP =
-  "In Slots, the slot for the character playing now is highlighted, so you can see where " +
-  "the audio is in the line.";
+  "The slot for the character playing now is highlighted, so you can see where the audio " +
+  "is in the line.";
+
+const GRADE_TYPING_HELP =
+  "A dot under each slot you fill says if it is right: blue if right, red if not.";
+const SEEK_SLOT_HELP =
+  "While the recording is paused, it moves to the character of the slot you select. Play " +
+  "goes on from there.";
 
 const HIDE_CALLS_HELP =
   "Each station shows as Station 1 or Station 2 until you copy its call in one of your " +
@@ -186,7 +201,7 @@ function recallKept(key: string, rec: Recording): Kept | null {
   return { v: 2, key, attempts, reached: k.reached, at: k.at, revealed: k.revealed === true };
 }
 
-type OnOffKey = "copySettingsOpen" | "copyLock" | "copyHideCalls" | "copyFollow";
+type OnOffKey = "copySettingsOpen" | "copyLock" | "copyHideCalls" | "copyFollow" | "copyGradeTyping" | "copySeekSlot";
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean) => void] {
@@ -240,6 +255,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [lock, setLock] = useOnOff("copyLock", true);
   const [hideCalls, setHideCalls] = useOnOff("copyHideCalls", true);
   const [follow, setFollow] = useOnOff("copyFollow", false);
+  const [gradeTyping, setGradeTyping] = useOnOff("copyGradeTyping", false);
+  const [seekSlot, setSeekSlot] = useOnOff("copySeekSlot", false);
   const [input, setInput] = useChoice("copyInput", "text");
   const [linesShow, setLinesShow] = useChoice("copyLines", "copy");
   const [lockedShows, setLockedShows] = useChoice("copyLockedShows", "right");
@@ -382,12 +399,17 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     setPlaying("main");
     setPos(at);
     void player.playBuffer(file.audio, at);
+    requestAnimationFrame(backToSlot);
   };
   const pause = () => player.stop();
   const toggle = () => (mode.current === "main" ? pause() : play());
 
+  /** Where the last skip back landed, while nothing else has moved the
+   *  recording since. */
+  const lastBack = useRef<number | null>(null);
   /** Move to `t`: playing on from there if it was playing. */
   const seek = (t: number | null) => {
+    lastBack.current = null;
     if (t === null || !file) return;
     const at = Math.max(0, Math.min(duration, t));
     if (mode.current === "main") play(at);
@@ -406,8 +428,50 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     void player.playBuffer(file.audio, Math.max(0, from - PART_PAD_SEC), Math.min(duration, to + PART_PAD_SEC));
   };
 
+  /** The slot selected last: its line and its place in the line. */
+  const [selected, setSelected] = useState<{ line: number; slot: number } | null>(null);
+  /** The slot selected last, to go back to when the recording plays. */
+  const lastSlot = useRef<HTMLInputElement | null>(null);
+  /** The selected slot's character and its word. */
+  const selectedChar = () => {
+    if (!rec || !selected) return null;
+    const over = rec.overs[selected.line];
+    if (!over) return null;
+    let k = selected.slot;
+    for (const w of over.words) {
+      if (k < w.chars.length) return { char: w.chars[k]!, word: w };
+      k -= w.chars.length;
+    }
+    return null;
+  };
+  const playLetter = () => {
+    const at = selectedChar();
+    if (at) playPart(at.char.t0, at.char.t1);
+  };
+  const playWord = () => {
+    const at = selectedChar();
+    if (at) playPart(at.word.chars[0]!.t0, at.word.chars.at(-1)!.t1);
+  };
+  /** A slot is selected. Paused, with the setting on, the recording moves
+   *  to its character. */
+  const selectSlot = (line: number, slot: number) => {
+    setSelected({ line, slot });
+    if (document.activeElement instanceof HTMLInputElement) lastSlot.current = document.activeElement;
+    if (!seekSlot || mode.current !== null || !rec) return;
+    const over = rec.overs[line];
+    const c = over && charsOf(over)[slot];
+    if (c) setPos(Math.max(0, c.t0 - PART_PAD_SEC));
+  };
+
   const words = useMemo(() => (rec ? wordSpans(rec) : []), [rec]);
   const overs = useMemo(() => (rec ? overSpans(rec) : []), [rec]);
+  /** Back to the start of the word or line, or the one before. Pressed
+   *  again while that word or line plays, back one more. */
+  const skipBack = (spans: readonly [number, number][]) => {
+    const to = skipSpan(spans, posRef.current, -1, lastBack.current);
+    seek(to);
+    lastBack.current = to;
+  };
   const back = (sec: number) => seek(posRef.current - sec);
   const on = (sec: number) => seek(posRef.current + sec);
 
@@ -431,7 +495,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     });
   const setLine = (i: number, patch: Partial<LineCopy>) =>
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const lockLine = (i: number) => setLine(i, { locked: true });
 
   /* With Lock on, a line locks when the next line starts, and the last line
      a few seconds after it ends. Only lines that are boxes to copy in. */
@@ -513,12 +576,14 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     !!kept &&
     (kept.attempts.length > 1 || kept.reached > 0 || pos > 0 || lines.some((l) => l.locked || l.typed || l.slots.some(Boolean)));
 
-  /** Copy again: the next attempt, from the top. Each line starts from your
-   *  last copy, or clean. */
+  /** Copy again: this attempt locks, and the next starts from the top. Each
+   *  line starts from your last copy, or clean. */
   const again = () => {
     if (!rec || !kept) return;
+    const done: Attempt = { lines: lines.map((l) => (l.locked ? l : { ...l, locked: true })) };
     const fresh: Attempt = { lines: lines.map((l, i) => nextCopy(rec.overs[i]!, l, earlier !== "none")) };
-    setKept({ ...kept, attempts: [...kept.attempts, fresh], reached: 0, revealed: false });
+    setKept({ ...kept, attempts: [...kept.attempts.slice(0, -1), done, fresh], reached: 0, revealed: false });
+    setSelected(null);
     play(0);
   };
   /** Start over: every attempt goes, and nothing is played. */
@@ -527,6 +592,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     player.stop();
     cancelLastLock();
     setKept(freshKept(kept.key, rec));
+    setSelected(null);
     setPos(0);
   };
 
@@ -536,6 +602,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     cancelLastLock();
     setFile(null);
     setKept(null);
+    setSelected(null);
     setPos(0);
     rememberCopy(null);
     void forgetCopyFile();
@@ -557,14 +624,62 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     el?.focus();
   };
 
-  /* Outside a box: Space plays and pauses, Esc pauses, Enter goes back to the
-     box, and the arrows move by word, with Shift by five seconds. In a box,
-     Esc leaves it and Enter locks it; the rest is typing. */
+  /** Back to your slot as the recording plays: the one selected last, or
+   *  the box you were copying in. Not when you are in a box already. */
+  const backToSlot = () => {
+    if (isBox(document.activeElement)) return;
+    if (lastSlot.current?.isConnected) lastSlot.current.focus();
+    else focusBox();
+  };
+
+  /** The page's keys that move the recording: Space plays and pauses, the
+   *  arrows move by word, with Shift by five seconds, and in slots Down
+   *  plays the selected letter and Up its word. Whether it was one. */
+  const moveKey = (ev: KeyboardEvent): boolean => {
+    if (ev.key === " ") toggle();
+    else if (ev.key === "ArrowLeft") {
+      if (ev.shiftKey) back(5);
+      else skipBack(words);
+    } else if (ev.key === "ArrowRight") {
+      if (ev.shiftKey) on(5);
+      else seek(skipSpan(words, posRef.current, 1));
+    } else if (ev.key === "ArrowDown" && input === "slots" && selected) playLetter();
+    else if (ev.key === "ArrowUp" && input === "slots" && selected) playWord();
+    else return false;
+    ev.preventDefault();
+    return true;
+  };
+
+  /* With Cmd on a Mac or Ctrl elsewhere, the page's keys work in a box, and
+     Enter in a box locks its line. */
+  const modKey = (ev: KeyboardEvent): boolean => {
+    if (!modOf(ev)) return false;
+    if (ev.key === "Enter") {
+      const line = isBox(ev.target) ? ev.target.closest<HTMLElement>("li[data-line]")?.dataset.line : undefined;
+      if (line === undefined) return false;
+      ev.preventDefault();
+      setLine(Number(line), { locked: true });
+      return true;
+    }
+    return moveKey(ev);
+  };
+
+  /* Outside a box: Space or Enter plays and pauses, Esc pauses, and the
+     arrows move by word, with Shift by five seconds. In a box, Enter plays
+     and pauses, and Esc leaves it; the rest is typing. */
   const keyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
   keyRef.current = (ev) => {
-    if (!rec || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (!rec) return;
+    if (modKey(ev)) return;
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     const el = ev.target as HTMLElement | null;
-    if (isBox(el)) return;
+    if (isBox(el)) {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        toggle();
+      }
+      return;
+    }
     if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) return;
     if (ev.key === "Escape") {
       if (mode.current) {
@@ -574,21 +689,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       return;
     }
     if (el?.tagName === "BUTTON") return;
-    if (ev.key === " ") {
+    if (ev.key === "Enter") {
       ev.preventDefault();
       toggle();
-    } else if (ev.key === "Enter") {
-      ev.preventDefault();
-      focusBox();
-    } else if (ev.key === "ArrowLeft") {
-      ev.preventDefault();
-      if (ev.shiftKey) back(5);
-      else seek(skipSpan(words, posRef.current, -1));
-    } else if (ev.key === "ArrowRight") {
-      ev.preventDefault();
-      if (ev.shiftKey) on(5);
-      else seek(skipSpan(words, posRef.current, 1));
-    }
+    } else moveKey(ev);
   };
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => keyRef.current(ev);
@@ -686,8 +790,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           copy={copy}
           label={label}
           at={follow && nowAt !== null ? nowAt : undefined}
+          grade={gradeTyping}
           onSlots={(slots) => setLine(i, { slots })}
-          onLock={() => lockLine(i)}
+          onSelect={(slot) => selectSlot(i, slot)}
         />
       );
     }
@@ -708,12 +813,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           if (el.value) requestAnimationFrame(() => el.setSelectionRange(0, 0));
         }}
         onKeyDown={(ev) => {
+          // With Cmd or Ctrl, a key is the page's.
+          if (ev.metaKey || ev.ctrlKey) return;
           if (ev.key === "Escape") {
             ev.preventDefault();
             ev.currentTarget.blur();
-          } else if (ev.key === "Enter") {
-            ev.preventDefault();
-            lockLine(i);
           }
         }}
         onChange={(ev) => setLine(i, { typed: ev.target.value })}
@@ -733,11 +837,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         {pastOf(over, i)}
         <span className="copyrow">
           {copyOf(over, i, label)}
-          {g && (
+          {g ? (
             <span className="rowscore" data-testid="copy-line-score">
               {kept!.attempts.length > 1 && `#${attempt + 1} · `}
               {g.right}/{g.total}
             </span>
+          ) : (
+            <span className="rowscore" />
           )}
         </span>
         {kept!.revealed && input === "text" && lockedShows !== "grade" && (
@@ -818,6 +924,25 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     </button>
   );
 
+  /** A button that plays the selected slot's letter or word. A press keeps
+   *  you in the slot. */
+  const slotPlay = (label: string, title: string, run: () => void, testId: string) => (
+    <button
+      type="button"
+      aria-label={title}
+      title={title}
+      data-testid={testId}
+      disabled={!rec || !selected}
+      onMouseDown={(ev) => ev.preventDefault()}
+      onClick={run}
+    >
+      <i className="ico">
+        <IconPlay />
+      </i>
+      {label}
+    </button>
+  );
+
   const current = kept ? scoreOf(kept.attempts[attempt]!) : { right: 0, total: 0 };
 
   return (
@@ -894,13 +1019,29 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     options={INPUTS}
                     onChange={(v) => setInput(v as CopyInput)}
                   />
-                  <Check
-                    id="copy-follow"
-                    label="Highlight the active slot"
-                    help={FOLLOW_HELP}
-                    checked={follow}
-                    onChange={setFollow}
-                  />
+                  <SettingRow label="Slots">
+                    <Check
+                      id="copy-follow"
+                      label="Highlight the active slot"
+                      help={FOLLOW_HELP}
+                      checked={follow}
+                      onChange={setFollow}
+                    />
+                    <Check
+                      id="copy-grade-typing"
+                      label="Grade slots as I type"
+                      help={GRADE_TYPING_HELP}
+                      checked={gradeTyping}
+                      onChange={setGradeTyping}
+                    />
+                    <Check
+                      id="copy-seek-slot"
+                      label="When paused, move to the slot I select"
+                      help={SEEK_SLOT_HELP}
+                      checked={seekSlot}
+                      onChange={setSeekSlot}
+                    />
+                  </SettingRow>
                   <SettingRow label="When the next line starts">
                     <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />
                   </SettingRow>
@@ -983,10 +1124,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
             </div>
             <div className="qsocontrols copyskips">
               <div className="modeswitch" role="group" aria-label="Back">
-                {skip("‹ Line", "Back a line", () => seek(skipSpan(overs, posRef.current, -1)), "copy-back-line")}
+                {skip("‹ Line", "Back a line", () => skipBack(overs), "copy-back-line")}
                 {skip("‹ 15 s", "Back 15 seconds", () => back(15), "copy-back-15")}
                 {skip("‹ 5 s", "Back 5 seconds", () => back(5), "copy-back-5")}
-                {skip("‹ Word", "Back a word", () => seek(skipSpan(words, posRef.current, -1)), "copy-back-word")}
+                {skip("‹ Word", "Back a word", () => skipBack(words), "copy-back-word")}
               </div>
               <div className="modeswitch" role="group" aria-label="On">
                 {skip("Word ›", "On a word", () => seek(skipSpan(words, posRef.current, 1)), "copy-on-word")}
@@ -994,6 +1135,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 {skip("15 s ›", "On 15 seconds", () => on(15), "copy-on-15")}
                 {skip("Line ›", "On a line", () => seek(skipSpan(overs, posRef.current, 1)), "copy-on-line")}
               </div>
+              {input === "slots" && (
+                <div className="modeswitch" role="group" aria-label="Play the selected slot">
+                  {slotPlay("Letter", "Play the selected letter", playLetter, "copy-play-letter")}
+                  {slotPlay("Word", "Play the selected word", playWord, "copy-play-word")}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -1015,8 +1162,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
             <p>Open a recording of CW and copy it as it plays. Each line you copy is checked against what was sent.</p>
             <ul>
               <li>A new line appears each time a new station starts sending.</li>
-              <li>Type what you hear and press Enter when you finish a line.</li>
-              <li>Text entry locks when the next line starts, or 5 seconds after the recording ends.</li>
+              <li>Type what you hear in each line.</li>
+              <li>Your copy of a line locks when the next line starts, or 5 seconds after the recording ends.</li>
               <li>
                 <b>Copy again</b> plays the whole recording from the start. Your earlier attempts stay on the page, so
                 you can see yourself improve.
@@ -1036,6 +1183,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                   key={`${attempt}-${i}`}
                   className={i === nowLine ? "them now" : "them"}
                   data-sender={o.sender}
+                  data-line={i}
                   data-testid="copy-line"
                 >
                   <span className="who">{label}</span>
@@ -1061,7 +1209,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 <button
                   className={ended && locked ? "primary" : undefined}
                   data-testid="copy-again"
-                  disabled={!locked}
+                  disabled={!locked && !ended}
                   title="Play the whole recording again and copy it once more"
                   onClick={again}
                 >
@@ -1087,12 +1235,18 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         {rec && (
           <div className="copykeys">
             <p className="legend keys" data-testid="copy-hotkeys">
-              On the page: <kbd>Space</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause &nbsp;·&nbsp; <kbd>←</kbd>{" "}
-              <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5 s &nbsp;·&nbsp;{" "}
-              <kbd>Enter</kbd> back to the box
+              On the page: <kbd>Space</kbd> or <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause
+              &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5 s
+              {input === "slots" && (
+                <>
+                  {" "}
+                  &nbsp;·&nbsp; <kbd>↓</kbd> <kbd>↑</kbd> the selected letter or word
+                </>
+              )}
             </p>
             <p className="legend keys" data-testid="copy-box-keys">
-              In a box: <kbd>Enter</kbd> locks the line &nbsp;·&nbsp; <kbd>Esc</kbd> leaves the box
+              In a box: <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> lock the line
+              &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{MOD}</kbd> for the other keys
             </p>
           </div>
         )}

@@ -13,7 +13,7 @@ import { act, createElement, type MutableRefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { synthesize } from "@/audio/synth";
 import { encodeWavBuffer } from "@/audio/wav";
-import { forgetCopyFile, savePrefs, type Prefs } from "@/io/storage";
+import { forgetCopyFile, recallCopy, savePrefs, type Prefs } from "@/io/storage";
 import { targetTiming } from "@/timing/model";
 import { CopyScreen } from "@/ui/CopyScreen";
 import "@/ui/base.css";
@@ -138,10 +138,20 @@ async function fill(el: HTMLInputElement, text: string): Promise<void> {
   });
 }
 
-/** Press Enter in a box. */
-async function enter(el: HTMLElement): Promise<void> {
+/** Press Enter in a box. With `mod`, Cmd+Enter on a Mac, Ctrl+Enter
+ *  elsewhere. */
+async function enter(el: HTMLElement, mod = false): Promise<void> {
+  const mac = /Mac|iPhone|iPad/.test(navigator.userAgent);
   await act(async () => {
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        metaKey: mod && mac,
+        ctrlKey: mod && !mac,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   });
 }
 
@@ -231,13 +241,47 @@ describe("copying a line", () => {
     expect(first.querySelector('[data-testid="copy-line-score"]')!.textContent).toBe(`${keyed(QSO[0]!.text)}/${keyed(QSO[0]!.text)}`);
   });
 
-  it("locks a line on Enter in its box", async () => {
+  it("plays and pauses on Enter in its box, and leaves the line open", async () => {
     await open();
     await playTo(1);
     await fill(boxes()[0]!, "CQ CQ");
     await enter(boxes()[0]!);
+    expect(state()).toBe("playing");
+    await enter(boxes()[0]!);
+    expect(state()).toBe("paused");
+    expect(boxes()).toHaveLength(1);
+    expect(lines()[0]!.querySelector('[data-testid="copy-line-score"]')).toBeNull();
+  });
+
+  it("plays and pauses on Enter in a slot, and leaves the line open", async () => {
+    await open({ copyInput: "slots" });
+    await playTo(1);
+    const slot = lines()[0]!.querySelector<HTMLInputElement>('[data-testid="copy-slot"]')!;
+    await fill(slot, "C");
+    await enter(slot);
+    expect(state()).toBe("playing");
+    await enter(slot);
+    expect(state()).toBe("paused");
+    expect(lines()[0]!.querySelectorAll('[data-testid="copy-slot"]')).toHaveLength(keyed(QSO[0]!.text));
+  });
+
+  it("locks a line on Cmd or Ctrl+Enter in its box", async () => {
+    await open();
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    await enter(boxes()[0]!, true);
     expect(boxes()).toHaveLength(0);
     expect(lines()[0]!.querySelector('[data-testid="copy-line-score"]')!.textContent).toBe(`4/${keyed(QSO[0]!.text)}`);
+  });
+
+  it("locks a line on Cmd or Ctrl+Enter in a slot", async () => {
+    await open({ copyInput: "slots" });
+    await playTo(1);
+    const slot = lines()[0]!.querySelector<HTMLInputElement>('[data-testid="copy-slot"]')!;
+    await fill(slot, "C");
+    await enter(slot, true);
+    expect(lines()[0]!.querySelectorAll('[data-testid="copy-slot"]')).toHaveLength(0);
+    expect(lines()[0]!.querySelector('[data-testid="copy-line-score"]')).not.toBeNull();
   });
 
   it("names a station Station 1 until you copy its call", async () => {
@@ -255,6 +299,43 @@ describe("copying a line", () => {
     expect(boxes()).toHaveLength(0);
     expect(lines()[0]!.querySelectorAll('[data-testid="copy-slot"]')).toHaveLength(keyed(QSO[0]!.text));
   });
+
+  /** Which slots of line 1 are highlighted as playing, each time that
+   *  changes, until line 2 shows. */
+  async function playingSlots(): Promise<number[][]> {
+    const seen: number[][] = [];
+    const look = () => {
+      const line = lines()[0];
+      if (!line) return;
+      const slots = [...line.querySelectorAll(".slot")];
+      seen.push(slots.flatMap((el, i) => (el.classList.contains("playing") ? [i] : [])));
+    };
+    const watch = new MutationObserver(look);
+    watch.observe(host, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+    await click(button("copy-play"));
+    await until("line 2", () => lines().length >= 2);
+    watch.disconnect();
+    return seen;
+  }
+
+  it("highlights the slot playing, with Highlight the active slot", async () => {
+    await open({ copyInput: "slots", copyFollow: true });
+    const seen = await playingSlots();
+    expect(seen.every((s) => s.length <= 1), "one slot at a time").toBe(true);
+    const order = seen.flat();
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(new Set(order).size).toBeGreaterThan(keyed(QSO[0]!.text) / 2);
+    await click(button("copy-play"));
+    expect(state()).toBe("paused");
+    expect($$(".slot.playing")).toHaveLength(0);
+  });
+
+  it("highlights no slot without Highlight the active slot", async () => {
+    await open({ copyInput: "slots" });
+    const seen = await playingSlots();
+    await click(button("copy-play"));
+    expect(seen.flat()).toEqual([]);
+  });
 });
 
 describe("going again", () => {
@@ -263,12 +344,27 @@ describe("going again", () => {
     expect(button("copy-again").disabled, "off until a line is locked").toBe(true);
     await playTo(1);
     await fill(boxes()[0]!, "CQ CQ");
-    await enter(boxes()[0]!);
     await playThrough();
     await click(button("copy-again"));
     expect($('[data-testid="copy-attempt"]')).not.toBeNull();
     await until("the first line again", () => lines().length >= 1);
     expect(lines()[0]!.querySelector('[data-testid="copy-past"]')).not.toBeNull();
+  });
+
+  it("keeps each line open with Lock off, and locks the attempt with Copy again", async () => {
+    await open({ copyLock: false });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    expect(button("copy-again").disabled, "off before the end").toBe(true);
+    await playThrough();
+    expect(boxes()).toHaveLength(QSO.length);
+    expect(button("copy-again").disabled, "on at the end").toBe(false);
+    await click(button("copy-again"));
+    await click(button("copy-play"));
+    const saved = recallCopy() as { attempts: { lines: { locked: boolean }[] }[] };
+    expect(saved.attempts).toHaveLength(2);
+    expect(saved.attempts[0]!.lines.every((l) => l.locked)).toBe(true);
+    expect(saved.attempts[1]!.lines.some((l) => l.locked)).toBe(false);
   });
 
   it("shows what was sent under each line with Show answers", async () => {

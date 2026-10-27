@@ -2502,9 +2502,11 @@ header .modeswitch button { white-space: nowrap; }
    at the right, so each score sits on its row. */
 .copylog .copyrow { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .copylog .copyrow > .text, .copylog .copyrow > input { flex: 1; min-width: 0; }
+/* Wide enough for any score, and on every row, the one you type in too, so
+   every row wraps at the same place and its slots sit under each other. */
 .copylog .rowscore {
   flex: 0 0 auto;
-  min-width: 9ch;
+  width: 14ch;
   text-align: right;
   line-height: 1.5em;
   color: var(--ink-faint);
@@ -2548,6 +2550,8 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .slot.wide { width: 2.8ch; }
 .qsolog .slot:focus { outline: none; border-bottom-color: var(--you); background: var(--panel-2); }
 .qsolog .slot.kept { color: var(--ink-dim); border-bottom-color: transparent; }
+/* An open slot, in a cell that can carry the dot of its grade. */
+.qsolog .slotcell { display: inline-flex; }
 /* The slot whose character is playing. */
 .qsolog .slot.playing { border-bottom-color: var(--you); box-shadow: inset 0 -1px 0 var(--you); }
 @media (max-width: 700px) {

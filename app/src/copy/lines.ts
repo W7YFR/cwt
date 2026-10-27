@@ -158,13 +158,20 @@ export function overSpans(rec: Recording): [number, number][] {
 
 /** Where a skip from `at` lands: to the start of the span it is in, or the
  *  one before, going back; to the start of the next, going on. Null where
- *  there is none. */
-export function skipSpan(spans: readonly [number, number][], at: number, dir: -1 | 1): number | null {
+ *  there is none. `landed` is where the last skip back landed: still in
+ *  that span, a skip back goes to the one before. */
+export function skipSpan(
+  spans: readonly [number, number][],
+  at: number,
+  dir: -1 | 1,
+  landed: number | null = null,
+): number | null {
   if (dir > 0) return spans.find(([t0]) => t0 > at + 0.01)?.[0] ?? null;
   let i = -1;
   for (let k = 0; k < spans.length; k++) if (spans[k]![0] <= at) i = k;
   if (i < 0) return null;
-  if (at - spans[i]![0] > RESTART_SEC) return spans[i]![0];
+  const again = landed !== null && Math.abs(spans[i]![0] - landed) < 0.01 && at <= spans[i]![1];
+  if (!again && at - spans[i]![0] > RESTART_SEC) return spans[i]![0];
   return i > 0 ? spans[i - 1]![0] : spans[0]![0];
 }
 
