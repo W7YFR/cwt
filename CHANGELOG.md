@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.17.2 — 2026-10-27
+
 ### Fixed
 
 - On the Copy page, a character with no letter of its own shows as the letters it runs together, such as `<UN>`. Copying it that way is no longer graded wrong.
