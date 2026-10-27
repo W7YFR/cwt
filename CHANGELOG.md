@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.17.1 — 2026-10-27
+
 ### Development
 
 - Vitest is 5.0.5.
