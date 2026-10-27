@@ -2548,6 +2548,8 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .slot.wide { width: 2.8ch; }
 .qsolog .slot:focus { outline: none; border-bottom-color: var(--you); background: var(--panel-2); }
 .qsolog .slot.kept { color: var(--ink-dim); border-bottom-color: transparent; }
+/* The slot whose character is playing. */
+.qsolog .slot.playing { border-bottom-color: var(--you); box-shadow: inset 0 -1px 0 var(--you); }
 @media (max-width: 700px) {
   .panel.qso { margin: 16px; width: auto; padding: 20px 16px; }
 }

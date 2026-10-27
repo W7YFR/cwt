@@ -4,7 +4,7 @@
  * Typing fills a slot and moves to the next. Space goes to the next word, and
  * Backspace in an empty slot goes back one. Enter locks the line, and Escape
  * leaves it. On an attempt after the first, the slots you got right can stay
- * as they were.
+ * as they were. With `at`, the slot whose character is playing lights up.
  */
 
 import { useRef } from "react";
@@ -17,11 +17,27 @@ function timeAttrs(c: { t0: number; t1: number }): Record<string, number> {
   return { "data-t0": c.t0, "data-t1": c.t1 };
 }
 
+/** The slot playing at `t`: from its character's start to the next
+ *  character's start in the same word, or to its end at a word's end. */
+function playingAt(over: Over, t: number | undefined): number {
+  if (t === undefined) return -1;
+  let i = 0;
+  for (const w of over.words) {
+    for (let k = 0; k < w.chars.length; k++, i++) {
+      const c = w.chars[k]!;
+      const until = w.chars[k + 1]?.t0 ?? c.t1;
+      if (t >= c.t0 && t < until) return i;
+    }
+  }
+  return -1;
+}
+
 /** The line's slots, open to type in. */
 export function Slots({
   over,
   copy,
   label,
+  at,
   onSlots,
   onLock,
   onKey,
@@ -29,6 +45,8 @@ export function Slots({
   over: Over;
   copy: LineCopy;
   label: string;
+  /** Where the audio is, to light up the slot playing. */
+  at?: number | undefined;
   onSlots(slots: string[]): void;
   onLock(): void;
   /** Any key in a slot, before the slot handles it. */
@@ -36,6 +54,7 @@ export function Slots({
 }): React.ReactElement {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const chars = charsOf(over);
+  const lit = playingAt(over, at);
   /** Where each word starts, by slot. */
   const starts: number[] = [];
   let n = 0;
@@ -100,9 +119,10 @@ export function Slots({
           {w.chars.map((c, ci) => {
             const i = starts[wi]! + ci;
             const want = slotText(c.char).length;
+            const playing = i === lit ? " playing" : "";
             if (!open(i)) {
               return (
-                <span key={ci} className="slot kept cright" {...timeAttrs(c)}>
+                <span key={ci} className={`slot kept cright${playing}`} {...timeAttrs(c)}>
                   {copy.slots[i]}
                 </span>
               );
@@ -115,7 +135,7 @@ export function Slots({
                 ref={(el) => {
                   refs.current[i] = el;
                 }}
-                className={want > 1 ? "slot wide" : "slot"}
+                className={`slot${want > 1 ? " wide" : ""}${playing}`}
                 data-testid="copy-slot"
                 aria-label={`Character ${i + 1}`}
                 value={copy.slots[i] ?? ""}

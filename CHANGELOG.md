@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Highlight the active slot**, a Copy page setting for Slots, highlights the slot of the character playing now.
+
 ## v1.16.3 — 2026-10-23
 
 ### Fixed

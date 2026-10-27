@@ -105,6 +105,10 @@ const LOCKED_SHOWS_HELP =
   "right or wrong, or your copy graded against what was sent. Show answers shows what " +
   "was sent under every line.";
 
+const FOLLOW_HELP =
+  "In Slots, the slot for the character playing now is highlighted, so you can see where " +
+  "the audio is in the line.";
+
 const HIDE_CALLS_HELP =
   "Each station shows as Station 1 or Station 2 until you copy its call in one of your " +
   "lines. Hearing the call is part of copying.";
@@ -182,7 +186,7 @@ function recallKept(key: string, rec: Recording): Kept | null {
   return { v: 2, key, attempts, reached: k.reached, at: k.at, revealed: k.revealed === true };
 }
 
-type OnOffKey = "copySettingsOpen" | "copyLock" | "copyHideCalls";
+type OnOffKey = "copySettingsOpen" | "copyLock" | "copyHideCalls" | "copyFollow";
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean) => void] {
@@ -235,6 +239,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [settingsOpen, setSettingsOpen] = useOnOff("copySettingsOpen", false);
   const [lock, setLock] = useOnOff("copyLock", true);
   const [hideCalls, setHideCalls] = useOnOff("copyHideCalls", true);
+  const [follow, setFollow] = useOnOff("copyFollow", false);
   const [input, setInput] = useChoice("copyInput", "text");
   const [linesShow, setLinesShow] = useChoice("copyLines", "copy");
   const [lockedShows, setLockedShows] = useChoice("copyLockedShows", "right");
@@ -680,6 +685,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           over={over}
           copy={copy}
           label={label}
+          at={follow && nowAt !== null ? nowAt : undefined}
           onSlots={(slots) => setLine(i, { slots })}
           onLock={() => lockLine(i)}
         />
@@ -887,6 +893,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     value={input}
                     options={INPUTS}
                     onChange={(v) => setInput(v as CopyInput)}
+                  />
+                  <Check
+                    id="copy-follow"
+                    label="Highlight the active slot"
+                    help={FOLLOW_HELP}
+                    checked={follow}
+                    onChange={setFollow}
                   />
                   <SettingRow label="When the next line starts">
                     <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />

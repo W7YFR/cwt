@@ -518,6 +518,8 @@ export interface Prefs {
   copyLockedShows?: "nothing" | "grade" | "right";
   /** A station's call stays hidden until you copy it. Absent is on. */
   copyHideCalls?: boolean;
+  /** In slots on the Copy page, the slot playing lights up. Absent is off. */
+  copyFollow?: boolean;
   /** Which earlier attempts show while you try again on the Copy page: all,
    *  the last, or none, to go again clean. Absent is the last. */
   copyEarlier?: "all" | "last" | "none";
@@ -698,6 +700,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copyLock: isBool,
   copyLockedShows: oneOf("nothing", "grade", "right"),
   copyHideCalls: isBool,
+  copyFollow: isBool,
   copyEarlier: oneOf("all", "last", "none"),
 };
 
