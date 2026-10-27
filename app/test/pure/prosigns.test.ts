@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAR_TO_MORSE, MORSE_TO_CHAR, UNKNOWN, canonicalChar, decodePattern } from "@/morse";
+import { CHAR_TO_MORSE, MORSE_TO_CHAR, UNKNOWN, canonicalChar, decodePattern, patternOf, spelled } from "@/morse";
 import { compareText, idealTimeline, pair, targetTiming } from "@/timing";
 import type { Timeline } from "@/types";
 
@@ -26,6 +26,28 @@ describe("a pattern that decodes to nothing", () => {
     const got = compareText("?", actual.text);
     expect(got.accuracy).toBe(0);
     expect(got.diff).toBe(`[?\u2192${UNKNOWN}]`);
+  });
+});
+
+describe("a pattern with no character, spelled", () => {
+  it("runs its letters together, the longest letter first", () => {
+    expect(spelled("..--.")).toBe("<UN>");
+    expect(spelled("--------")).toBe("<OOM>");
+  });
+
+  it("keys any spelling as its letters", () => {
+    expect(patternOf("<UN>")).toBe("..--.");
+    expect(patternOf("<IG>")).toBe("..--.");
+    expect(patternOf("<KN>")).toBe(CHAR_TO_MORSE["<KN>"]);
+    expect(patternOf("<E>")).toBeUndefined();
+    expect(patternOf(UNKNOWN)).toBeUndefined();
+  });
+
+  it("matches every spelling of one pattern", () => {
+    expect(canonicalChar("<IG>")).toBe("<UN>");
+    expect(canonicalChar("<EP>")).toBe(canonicalChar("<UN>"));
+    expect(canonicalChar("<VA>")).toBe("<SK>");
+    expect(canonicalChar("<UN>")).not.toBe(canonicalChar("?"));
   });
 });
 

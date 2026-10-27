@@ -127,6 +127,15 @@ describe("your copy", () => {
     expect(slotRight("<KN>", "kn")).toBe(true);
   });
 
+  it("grades a character the table lacks by its pattern", () => {
+    const u = over("AIR<UN>");
+    expect(gradeLine(u, { ...emptyCopy(u), typed: "AIR<UN>" }, "text")).toEqual({ right: 5, total: 5 });
+    expect(gradeLine(u, { ...emptyCopy(u), typed: "AIRUN" }, "text")).toEqual({ right: 5, total: 5 });
+    expect(gradeLine(u, { ...emptyCopy(u), slots: ["A", "I", "R", "IG"] }, "slots")).toEqual({ right: 4, total: 4 });
+    expect(slotRight("<UN>", "<EP>")).toBe(true);
+    expect(slotRight("<UN>", "?")).toBe(false);
+  });
+
   it("writes slots as text, with a gap for empty slots", () => {
     const slots = ["C", "Q", "", "", "N", "", "A", "K", ""];
     expect(copyText(o, { ...emptyCopy(o), slots }, "slots")).toBe("CQ .. N..AK ..");

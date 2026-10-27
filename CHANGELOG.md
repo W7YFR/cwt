@@ -7,6 +7,14 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- On the Copy page, a character with no letter of its own shows as the letters it runs together, such as `<UN>`. Copying it that way is no longer graded wrong.
+
+### Development
+
+- Claude merges a pull request and runs `make release` when the contributor asks.
+
 ## v1.17.1 — 2026-10-27
 
 ### Development

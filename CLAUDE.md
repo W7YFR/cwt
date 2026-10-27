@@ -2,14 +2,19 @@
 
 ## Workflow
 
-The contributor runs the release steps, and may ask Claude to run `make pr`.
-Claude may create the branch, since starting a task starts there. Claude
-commits only when the contributor asks for a commit in that message, never on
-its own: every commit needs human review first. An earlier ask does not carry
-over. Claude runs `make pr` on the same terms: only when the contributor asks
-for it in that message. Otherwise Claude never pushes, and never opens, edits
-or merges a pull request. Claude never runs `make bump`, `make release` or
-`make tag`.
+The contributor runs the release steps, and may ask Claude to run `make pr`,
+merge the pull request or run `make release`. Claude may create the branch,
+since starting a task starts there. Claude commits only when the contributor
+asks for a commit in that message, never on its own: every commit needs human
+review first. An earlier ask does not carry over. Claude runs `make pr`,
+merges the pull request and runs `make release` on the same terms: only when
+the contributor asks for it in that message. Claude merges only when CI is
+green. Otherwise Claude never pushes, and never opens, edits or merges a pull
+request. Claude never runs `make bump` or `make tag`.
+
+`make release` asks to delete the local branch, and it cannot read an answer
+when Claude runs it. After it fails at that prompt, Claude deletes the merged
+branch with `git branch -d`.
 
 When asked, Claude stages work for review. Work on several changes at once
 can then be committed in parts: Claude stages the hunks for one part, and the
@@ -29,9 +34,10 @@ such as `fix: caption a matched prosign`. It has no body and no trailer.
 4. The contributor runs `make pr`, or asks Claude to. It bumps the version,
    pushes, and opens the pull request. The title is `[TYPE] vX.Y.Z`. The body
    is the branch's changelog entry. A second run updates the pull request.
-5. The contributor merges when CI is green.
-6. The contributor runs `make release`. It updates `main`, tags and pushes
-   the version with the entry as its notes, and deletes the merged branch.
+5. The contributor merges when CI is green, or asks Claude to.
+6. The contributor runs `make release`, or asks Claude to. It updates `main`,
+   tags and pushes the version with the entry as its notes, and deletes the
+   merged branch.
 
 A branch that touches no build input releases no version and needs no bump.
 The contributor names its pull request with `make pr TITLE="..."`. The build
