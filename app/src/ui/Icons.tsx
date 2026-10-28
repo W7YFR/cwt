@@ -186,3 +186,13 @@ export function IconHelp(): React.ReactElement {
     </Icon>
   );
 }
+
+/** A pencil: change something already set. */
+export function IconEdit(): React.ReactElement {
+  return (
+    <Icon name="edit" stroke>
+      <path d="M10.6 3.2 12.8 5.4 6 12.2l-2.9.7.7-2.9Z" />
+      <path d="M9.3 4.5l2.2 2.2" />
+    </Icon>
+  );
+}

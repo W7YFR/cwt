@@ -2080,7 +2080,8 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 }
 .drilltools { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .helpbtn { font-size: 16px; }
-.helpbtn[aria-expanded="true"] { border-color: var(--you); color: var(--you); }
+.helpbtn[aria-expanded="true"],
+.helpbtn[aria-pressed="true"] { border-color: var(--you); color: var(--you); }
 .drilltext {
   width: 100%;
   box-sizing: border-box;
@@ -2346,6 +2347,44 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .panel.qso { margin: 12px 20px; max-width: none; width: auto; }
 .qsostatus { margin: 0; font-size: 16px; }
 .qsocontrols { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+/* The QSO page fits the window: the panel stays where it starts, and the
+   log scrolls inside it, under the heading and controls. With the settings
+   open, or in a short window, the panel keeps room for a few lines and the
+   page scrolls instead. */
+.app:has(> .panel.qso) { height: 100vh; height: 100dvh; }
+.panel.qso { flex: 1 1 auto; min-height: 320px; }
+.qsotop { display: flex; flex-direction: column; gap: 16px; }
+.qsoguide { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+/* The log, and the examples beside it when the ? shows them. Each scrolls on
+   its own. */
+.qsobody { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.qsobody.side { grid-template-columns: minmax(0, 1fr) minmax(300px, 60ch); gap: 32px; }
+.qsomain { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; }
+.qsoside {
+  min-height: 0;
+  overflow-y: auto;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.qsoside p { color: var(--ink-dim); }
+/* Thin, quiet scrollbars, with room between the speeds and the bar. Room
+   for the bar is kept even when there is none, so lines do not shift when it
+   comes. */
+.qsomain, .qsoside, .qsoguide {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-faint) 45%, transparent) transparent;
+  scrollbar-gutter: stable;
+}
+.qsomain { padding-right: 16px; }
+.qsoside { padding-right: 8px; }
+/* The suggested reply, under the log. */
+.qsohint { margin: 0; font-size: 13px; color: var(--ink-dim); }
+/* One space of the reply's own font after the label, so the gap matches the
+   gaps between its words. */
+.qsohint code { margin-left: 1ch; font-family: var(--mono); font-size: 14px; color: var(--you); }
+.qsoside h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
 .qsocontrols .meter { flex: 0 0 120px; }
 /* The ? at the right end of the row, where it stays put whatever is left of it. */
 .qsocontrols .qsohelpbtn { margin-left: auto; }
@@ -2366,10 +2405,25 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .live .keying { color: var(--ink-faint); }
 .qsonote { margin: 0; }
 /* The guide on the page, before the first QSO: read as the help reads. */
-.qsoguide { max-width: 72ch; font-size: 13px; line-height: 1.6; }
+.qsoguide { font-size: 13px; line-height: 1.6; }
+/* What to send on the left, the examples on the right; one column on a
+   narrow screen. In the help dialog, always one column. */
+.qsoguide .qsoguidecols {
+  display: grid;
+  grid-template-columns: minmax(0, 62ch) minmax(0, 72ch);
+  gap: 16px 40px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .qsoguide .qsoguidecols { grid-template-columns: minmax(0, 72ch); }
+}
+.qsoguide .qsoexamples > h3:first-child { margin-top: 0; }
+.qsoexamples .modeswitch { margin: 0 0 10px; flex-wrap: wrap; }
+.qsoexamples code,
+.qsointro code { font-family: var(--mono); }
 .qsoguide p, .qsoguide ul { color: var(--ink-dim); }
 .qsoguide ul { padding-left: 18px; }
-.qsoguide h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
+.qsoguide h3, .qsohelp .qsoexamples h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
 /* The settings link in the guide: the theme's blue, inline in its sentence. */
 .qsoguide button.link,
 .qsohelp button.link { color: var(--you); padding: 0; font: inherit; vertical-align: baseline; }
@@ -2528,6 +2582,8 @@ header .modeswitch button { white-space: nowrap; }
 .copyhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-height: 18px; }
 .copyhead .uplabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
 .copyhead .copysay { font-size: 13px; color: var(--ink-faint); }
+/* A run's tally, at the right end of the QSO page's heading. */
+.copyhead .qsotally { margin-left: auto; font-size: 12px; }
 .copyafter { display: flex; flex-direction: column; gap: 12px; }
 .copy .copyname { margin-left: 4px; }
 /* The page's keys, then a box's, a line each. */

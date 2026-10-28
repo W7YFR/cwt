@@ -56,3 +56,16 @@ describe("a QSO from your CQ", () => {
     expect($$('[data-testid="qso-tape"]'), "the QSO can be played back").toHaveLength(1);
   }, QSO_MS);
 });
+
+describe("a run", () => {
+  it("works a CWT QSO, and the next station calls on its own", async () => {
+    await open({ qsoTheirText: "before" });
+    const call = callIn(await send("CQ CWT W7YFR"));
+    await send(`${call} BOB 1234`);
+    const before = theirs().length;
+    await key("TU W7YFR");
+    await until("the next station", () => theirs().length > before);
+    expect(ended(), "the session goes on").toBe(false);
+    expect($$('[data-testid="qso-tally"]')[0]?.dataset.made).toBe("1");
+  }, QSO_MS);
+});

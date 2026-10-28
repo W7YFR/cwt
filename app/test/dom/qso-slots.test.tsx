@@ -137,3 +137,40 @@ describe("Clear", () => {
     expect(localStorage.getItem("cwt:qso"), "a reload does not bring it back").toBeNull();
   });
 });
+
+describe("a slot copy put right after it locks", () => {
+  it("opens again with Edit, keeps what you typed, and locks again on Enter", async () => {
+    await slotsAnswer({ qsoAllowEdits: true });
+    await fill(slots()[0]!, "x");
+    await press("Enter");
+    expect(slots(), "locked").toHaveLength(0);
+
+    await click($('[data-testid="qso-line-edit"]'));
+    expect(slots().length).toBeGreaterThan(0);
+    expect(slots()[0]!.value).toBe("X");
+    expect($('[data-testid="qso-line-edit"]'), "no Edit on an open copy").toBeNull();
+    await fillRight();
+    await press("Enter");
+    expect(slots()).toHaveLength(0);
+  });
+});
+
+describe("grading slots as you type", () => {
+  it("marks each filled slot right or wrong, only when on", async () => {
+    await slotsAnswer({ qsoGradeTyping: true });
+    const want = wanted();
+    await fill(slots()[0]!, want[0]!);
+    await fill(slots()[1]!, want[1] === "Q" ? "X" : "Q");
+    // The mark is on the slot's cell, around the box.
+    const mark = (i: number) => slots()[i]!.parentElement!.className;
+    expect(mark(0)).toContain("cright");
+    expect(mark(1)).toContain("cwrong");
+    expect(mark(2)).not.toMatch(/cright|cwrong/);
+  });
+
+  it("leaves the slots unmarked when off", async () => {
+    await slotsAnswer();
+    await fill(slots()[0]!, wanted()[0]!);
+    expect(slots()[0]!.parentElement!.className).not.toMatch(/cright|cwrong/);
+  });
+});

@@ -19,6 +19,16 @@ export interface Station {
    *  0 to 1. Each operator has their own habit. Absent in a QSO kept before
    *  there was one. */
   readonly habit?: number;
+  /** In a CWT, its CWops number, or empty for a station that is not a
+   *  member and sends its region. */
+  readonly nr?: string;
+  /** In an MST, its serial number for this QSO. */
+  readonly serial?: number;
+}
+
+/** The state or province at the end of `qth`: OR, from SALEM OR. */
+export function regionOf(station: Station): string {
+  return station.qth.slice(station.qth.lastIndexOf(" ") + 1);
 }
 
 const NAMES = [
@@ -68,5 +78,19 @@ export function randomStation(rand: Rand, not = ""): Station {
     rst: pick(rand, RSTS),
     toneHz: 550 + Math.round(rand() * 20) * 10,
     habit: 0.05 + 0.3 * rand(),
+  };
+}
+
+/** How many CWT stations are CWops members. The rest send their region. */
+const MEMBERS = 0.8;
+
+/** A station that answers a CQ in a run: a new station, with a CWops number
+ *  most of the time and a serial number of its own. */
+export function randomCaller(rand: Rand, not = ""): Station {
+  const station = randomStation(rand, not);
+  return {
+    ...station,
+    nr: rand() < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : "",
+    serial: 1 + Math.floor(rand() * 150),
   };
 }

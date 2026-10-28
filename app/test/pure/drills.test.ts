@@ -19,6 +19,7 @@ const USER: UserInfo = {
   callsign: "W7YFR",
   age: "42",
   yearLicensed: "2024",
+  cwopsNumber: "",
   qthCity: "PORTLAND",
   qthRegionShort: "OR",
   qthRegionLong: "OREGON",

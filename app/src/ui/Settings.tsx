@@ -316,6 +316,13 @@ function UserSection({
           digits={4}
           onChange={(yearLicensed) => set({ yearLicensed })}
         />
+        <UserField
+          id="user-cwops"
+          label="CWops number"
+          value={user.cwopsNumber}
+          digits={5}
+          onChange={(cwopsNumber) => set({ cwopsNumber })}
+        />
         <fieldset className="usergroup">
           <legend>QTH</legend>
           <UserField

@@ -7,6 +7,24 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- On the QSO page, `CQ POTA`, `CQ SST`, `CQ MST` or `CQ CWT` starts a run: short QSOs in that format, one station after another, until you press Stop. Each station sends at its format's speed.
+- The QSO page's guide shows an example QSO of each kind. Choose one with **CQ**, **POTA**, **SST**, **MST** or **CWT**. The examples use your call and exchange from User.
+- On a wide screen, the ? on the QSO page shows the examples beside the log.
+- **Suggest my reply** on the QSO page shows one way to answer the station: **Off**, **Always**, or **Once copied**, after your copy of its line is right.
+- **Allow edits** on the QSO page puts an Edit button beside a locked copy, so you can fix a mistake.
+- **Grade slots as I type** on the QSO page, as on the Copy page.
+- **CWops number** in User. A CWT sends it, or your state when it is empty.
+
+### Changed
+
+- The QSO page fits the window. The log scrolls on its own, with a thin scroll bar, and keeps its newest line in view, so the heading and controls stay put.
+
+### Fixed
+
+- On the QSO page, the station reads a report keyed apart, as `5 NN`, and with **Lenient** one run into a word, as `UR5NN`. A name or QTH sent alone, after the station asks for it, no longer gets PSE AGN.
+
 ## v1.17.2 — 2026-10-27
 
 ### Fixed

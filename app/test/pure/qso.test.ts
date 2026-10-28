@@ -20,7 +20,7 @@ import {
 import { randomStation } from "@/qso/station";
 import { NO_SEARCH, STEPS, faster, qrq, qrs, setTo, slower, type Speed } from "@/qso/speed";
 import { gradeCopy, revealed } from "@/qso/show";
-import { examples } from "@/qso/examples";
+import { example } from "@/qso/examples";
 
 /** A fixed sequence, so the station is the same every run. */
 function seeded(seed = 1): () => number {
@@ -983,8 +983,7 @@ describe("copying an over through a calibration", () => {
 
 describe("the help's example QSO", () => {
   it("goes straight through to the station's 73, as the script answers it", () => {
-    const [ex] = examples();
-    const lines = ex!.lines;
+    const lines = example("cq");
     expect(lines.map((l) => l.you)).toEqual([true, false, true, false, true, false]);
     expect(lines[0]!.text).toBe("CQ CQ DE KD9XYZ K");
     expect(lines[1]!.text).toBe("DE K4ABC K");
@@ -1022,5 +1021,38 @@ describe("working the station without its call", () => {
     const t = answer(q, "N9ZZZ DE W7YFR UR 579 K", LENIENT);
     expect(t.qso.stage).toBe("called");
     expect(t.reply).toBe(`DE ${q.them.call} ${q.them.call} K`);
+  });
+});
+
+describe("bare answers and split reports", () => {
+  const ctx: Context = { rand: () => 0, hour: 20, length: "full" };
+  /** Work `overs` with {C} as the station's call; the replies. */
+  const work = (overs: readonly string[]): (string | null)[] => {
+    let q: Qso = newQso(() => 0.3);
+    return overs.map((o) => {
+      const t = answer(q, o.replace("{C}", q.them.call), ctx);
+      q = t.qso;
+      return t.reply;
+    });
+  };
+
+  it("takes a bare name or QTH as the answer to NAME? or QTH?", () => {
+    const named = work(["CQ CQ DE W7YFR K", "{C} DE W7YFR UR 599 QTH PORTLAND OR K", "TNX OM", "TNX ROB K"]);
+    expect(named[2]).toMatch(/NAME\?/);
+    expect(named[3]).not.toMatch(/NAME\?|PSE AGN/);
+  });
+
+  it("reads a report run into a word, with lenient copy", () => {
+    let q: Qso = newQso(() => 0.3);
+    q = answer(q, "CQ CQ DE W7YFR K", ctx).qso;
+    const lenient = { ...ctx, ear: { lenient: true, saved: "" } };
+    const t = answer(q, `${q.them.call} DE W7YFR UR5NN NAME ROB QTH PORTLAND OR K`, lenient);
+    expect(t.reply).toMatch(/TNX FER RPT/);
+  });
+
+  it("reads a report keyed apart", () => {
+    const replies = work(["CQ CQ DE W7YFR K", "{C} DE W7YFR UR 5 NN NAME ROB QTH PORTLAND OR K", "TNX 73 K"]);
+    expect(replies[1]).toMatch(/TNX FER RPT/);
+    expect(replies[2]).not.toMatch(/RST\?/);
   });
 });

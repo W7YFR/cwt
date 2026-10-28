@@ -187,7 +187,21 @@ const CLOSING_PAIRS = ["FER QSO", "FB QSO", "TNX QSO", "FOR QSO"];
 const CLOSING_RUN = ["73", "CUAGN", "FERQSO", "FBQSO", "TNXQSO"];
 
 /** A signal report: 599, 579, 5NN. */
-const REPORT_RE = /^[1-5][1-9N][1-9N]$/;
+export const REPORT_RE = /^[1-5][1-9N][1-9N]$/;
+
+/** A report inside a word, with no digit either side: the 5NN of UR5NN or
+ *  5NNWA, never part of 1234. */
+export const REPORT_IN = /(?<![0-9])[1-5][1-9N][1-9N](?![0-9])/;
+
+/** UR run into a report, as UR5NN: the shape of a call, but in a QSO it is
+ *  UR 5NN. */
+const UR_REPORT_RE = /^UR([1-5][1-9N][1-9N])$/;
+
+/** UR and a report run together, apart. */
+export function urApart(word: string): string[] {
+  const m = UR_REPORT_RE.exec(word);
+  return m ? ["UR", m[1]!] : [word];
+}
 
 /** Words that sit between a label and its value: NAME HR IS BOB. */
 const FILLER = new Set(["HR", "IS", "ES", "=", "<BT>"]);
@@ -256,7 +270,7 @@ const DE_STOP = new Set([
 
 /** Words that hand the turn over or name the stations, and say nothing
  *  else. */
-const TURN_WORDS = new Set(["DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "<BT>", "PSE"]);
+export const TURN_WORDS = new Set(["DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "<BT>", "PSE"]);
 
 /** Questions that are part of an exchange, not about what was sent. */
 const NOT_QUESTIONS = new Set(["HW?", "CPY?"]);
@@ -265,7 +279,7 @@ const NOT_QUESTIONS = new Set(["HW?", "CPY?"]);
 const NOT_CALL = new Set(["AGN", "QRZ", "HW", "CPY", "QRS", "QRQ", "PSE", "UR", "SRI"]);
 
 /** Words that may come with QRS or QRQ in an over that asks nothing else. */
-const ASK_WORDS = new Set(["QRS", "QRQ", "PSE", "DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "WPM"]);
+export const ASK_WORDS = new Set(["QRS", "QRQ", "PSE", "DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "WPM"]);
 
 /** The words of an over. A prosign stands alone even when keyed against a
  *  word. */
@@ -306,7 +320,7 @@ function joinQuestions(words: readonly string[]): string[] {
 }
 
 /** One over, as the station reads it. */
-class Over {
+export class Over {
   readonly words: string[];
   /** The over with its spaces taken out. */
   readonly joined: string;
@@ -315,7 +329,8 @@ class Over {
     heard: string,
     readonly ear: Ear,
   ) {
-    this.words = joinQuestions(erased(wordsOf(heard)));
+    const words = joinQuestions(erased(wordsOf(heard)));
+    this.words = ear.lenient ? words.flatMap(urApart) : words;
     this.joined = this.words.join("");
   }
 
@@ -590,9 +605,12 @@ class Over {
     return ok[word.length]!;
   }
 
-  /** Whether it holds a report. */
+  /** Whether it holds a report: 599, or one keyed apart, as 5 NN. When
+   *  lenient, one run into other words too, as UR5NN. */
   hasReport(): boolean {
-    return this.words.some((w) => REPORT_RE.test(w));
+    const { words } = this;
+    if (words.some((w, i) => REPORT_RE.test(w) || REPORT_RE.test(w + (words[i + 1] ?? "")))) return true;
+    return this.ear.lenient && words.some((w) => !isCall(w) && REPORT_IN.test(w));
   }
 
   /** Whether it asks if `call` is right: the call with a ? on it or right
@@ -616,7 +634,7 @@ class Over {
 }
 
 /** The pieces of its exchange the station has sent so far. */
-function sentPieces(qso: Qso): readonly wording.Piece[] {
+export function sentPieces(qso: Qso): readonly wording.Piece[] {
   if (qso.stage === "pieces") {
     return wording.PIECES.filter((p, i) => i < qso.piece || qso.told.includes(p));
   }
@@ -638,6 +656,68 @@ function end(qso: Qso, reply: string): Turn {
   return { qso: { ...qso, last: reply }, reply, ended: true };
 }
 
+/** What a station that sends at a speed holds. */
+export interface Paced {
+  readonly speed: Speed;
+  readonly search: Search;
+  /** Its last over, for AGN. */
+  readonly last: string;
+}
+
+/** QRS or QRQ in `over`, once the station has sent something: `qso` at the
+ *  new speed, and its reply when the request settles the over. QRS, or a
+ *  request with nothing else in it, gets the last over again at the new
+ *  speed. QRQ with more in the over is answered as usual, faster: no reply.
+ *  At the top or bottom step, a request alone gets `cannot`. Null when the
+ *  over asks neither. */
+export function pace<Q extends Paced>(
+  qso: Q,
+  over: Over,
+  cannot: (slower: boolean) => string,
+): { qso: Q; reply: string | null } | null {
+  const ask = qso.last ? over.speedAsk() : null;
+  if (!ask) return null;
+  const moved =
+    ask.wpm !== undefined
+      ? { speed: setTo(qso.speed, ask.wpm), search: NO_SEARCH }
+      : ask.slower
+        ? qrs(qso.speed, qso.search)
+        : qrq(qso.speed, qso.search);
+  const stuck =
+    moved.speed.charWpm === qso.speed.charWpm && moved.speed.farnsworthWpm === qso.speed.farnsworthWpm;
+  const next = { ...qso, ...moved };
+  if (stuck && over.onlyAsks()) return { qso: next, reply: cannot(ask.slower) };
+  if (ask.slower || over.onlyAsks()) return { qso: next, reply: next.last };
+  return { qso: next, reply: null };
+}
+
+/** Labels of your own exchange: an over with one of these says which piece
+ *  it sends. */
+const PIECE_LABELS = new Set(["UR", "RST", "RPT", "NAME", "OP", "NM", "QTH"]);
+
+/** The most words, past the turn words, of an over that is only an answer:
+ *  ROB ROB, or PORTLAND OR. */
+const ANSWER_WORDS = 3;
+
+/** Your over, read as the piece the station still waits for. With one piece
+ *  owed, not a report, a short over with no label of its own and no question
+ *  is that piece: ROB ROB is NAME ROB ROB. The label goes before the first
+ *  word the station does not know: TNX ROB is TNX NAME ROB. A report needs
+ *  no label. */
+function asAnswer(qso: Qso, heard: string): string {
+  if (qso.stage !== "pieces" && qso.stage !== "exchanged") return heard;
+  const owed = sentPieces(qso).filter((p) => !qso.got.includes(p));
+  if (owed.length !== 1 || owed[0] === "report") return heard;
+  // An over it cannot read is not an answer: it gets PSE AGN.
+  if (heard.includes(UNKNOWN)) return heard;
+  const words = wordsOf(heard);
+  if (words.some((w) => PIECE_LABELS.has(w) || w.endsWith("?") || w === "AGN")) return heard;
+  if (words.filter((w) => !TURN_WORDS.has(w)).length > ANSWER_WORDS) return heard;
+  const at = words.findIndex((w) => !KNOWN.has(w) && !isCall(w));
+  if (at < 0) return heard;
+  return [...words.slice(0, at), wording.LABEL[owed[0]!], ...words.slice(at)].join(" ");
+}
+
 /** The station's answer to one over you sent. */
 export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   const {
@@ -646,7 +726,7 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     hour = new Date().getHours(),
     length = "full",
   } = context;
-  const over = new Over(heard, ear);
+  const over = new Over(asAnswer(qso, heard), ear);
   const { them } = qso;
   const mirror = over.opensWithCalls(them.call);
   const voice = (q: Qso): wording.Say => ({
@@ -663,27 +743,9 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   const fixed = qso.stage === "cq" || qso.stage === "asking" ? null : over.deCall(them.call);
   if (fixed) qso = { ...qso, you: fixed };
 
-  // QRS or QRQ, once the station has sent something. QRS, or a request with
-  // nothing else in it, gets the last over again at the new speed. QRQ with
-  // more in the over is answered as usual, faster.
-  const ask = qso.last ? over.speedAsk() : null;
-  if (ask) {
-    const moved =
-      ask.wpm !== undefined
-        ? { speed: setTo(qso.speed, ask.wpm), search: NO_SEARCH }
-        : ask.slower
-          ? qrs(qso.speed, qso.search)
-          : qrq(qso.speed, qso.search);
-    const stuck =
-      moved.speed.charWpm === qso.speed.charWpm &&
-      moved.speed.farnsworthWpm === qso.speed.farnsworthWpm;
-    qso = { ...qso, ...moved };
-    // At the top or bottom step, a request alone gets SRI, not the same over.
-    if (stuck && over.onlyAsks()) {
-      return { qso, reply: wording.cannotChange(voice(qso), ask.slower), ended: false };
-    }
-    if (ask.slower || over.onlyAsks()) return { qso, reply: qso.last, ended: false };
-  }
+  const paced = pace(qso, over, (slower) => wording.cannotChange(voice(qso), slower));
+  if (paced?.reply) return { qso: paced.qso, reply: paced.reply, ended: false };
+  if (paced) qso = paced.qso;
 
   if (qso.stage !== "cq" && qso.stage !== "asking") {
     // Your name, and each piece of your exchange, whenever you send them.

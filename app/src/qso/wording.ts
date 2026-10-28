@@ -227,7 +227,8 @@ export function answers(
   return words(yes, ...parts, close ? pick(s.rand, ["K", "KN"]) : "");
 }
 
-const LABEL: Readonly<Record<Piece, string>> = { report: "RST", name: "NAME", qth: "QTH" };
+/** The word that names each piece, as the station asks for it: NAME?. */
+export const LABEL: Readonly<Record<Piece, string>> = { report: "RST", name: "NAME", qth: "QTH" };
 
 /** It asks for the pieces of your exchange it gave and has not had back.
  *  With `calls` false, it sends no calls first: the ask follows an answer
