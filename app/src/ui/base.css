@@ -2364,8 +2364,9 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 /* The QSO page fits the window: the panel stays where it starts, and the
    log scrolls inside it, under the heading and controls. With the settings
    open, or in a short window, the panel keeps room for a few lines and the
-   page scrolls instead. */
-.app:has(> .panel.qso) { height: 100vh; height: 100dvh; }
+   page scrolls instead. Not the Copy page: its log has no box of its own,
+   so the page scrolls. */
+.app:has(> .panel.qso:not(.copy)) { height: 100vh; height: 100dvh; }
 .panel.qso { flex: 1 1 auto; min-height: 320px; }
 .qsotop { display: flex; flex-direction: column; gap: 16px; }
 .qsoguide { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
@@ -2514,6 +2515,8 @@ header .modeswitch button { white-space: nowrap; }
 }
 .qsolog .lend .lwpm { margin-left: 0; padding-left: 0; }
 .qsolog .qsoplay { width: 24px; height: 24px; font-size: 11px; }
+/* The place of a button a line does not have, so the rest line up. */
+.qsolog .lspace { flex: 0 0 24px; width: 24px; height: 24px; }
 /* Play QSO and Download, under the last line of a QSO that is over, lined up
    with the text. */
 .qsolog .qsotape { padding-left: calc(8ch + 12px); gap: 8px; }
@@ -2858,3 +2861,11 @@ header .modeswitch button { white-space: nowrap; }
 /* Sections stacked in one column of the page's row, as You over After a QSO,
    so a short section does not sit alone beside a tall one. */
 .viewpanel .sectioncol { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+
+/* Sections side by side are one height: each box grows to match the one
+   beside it, so a row of the settings reads as a row. The settings in a box
+   stay at its top. In a column of two sections, the last one grows. */
+.viewpanel.formpanel,
+.viewpanel.formpanel .pagerow { align-items: stretch; }
+.viewpanel.formpanel .panelrow > .panelgroups:last-child { flex: 1 1 auto; }
+.viewpanel.formpanel .sectioncol > .panelrow:last-child { flex: 1 1 auto; }

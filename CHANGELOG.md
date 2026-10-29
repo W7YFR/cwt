@@ -7,6 +7,35 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.19.0 — 2026-10-29
+
+### Added
+
+- **New exchange** on the Copy page generates a QSO to copy: a standard **CQ** QSO, or a **POTA**, **SST**, **MST** or **CWT** run. Opening a recording stays beside it.
+- Settings for a generated QSO: **QSOs in a run**, **A standard QSO is**, **Between lines**, and **Speed**, where **Format** gives each station its own speed and **Mine** uses the sliders. A change of speed or gap keeps your copy.
+- **Allow edits** on the Copy page, as on the QSO page: an edit button beside a locked line opens it again, to fix a mistake.
+- **Cmd+.** (**Ctrl+.** off a Mac) on the Copy page plays the line again.
+- Each line of a generated QSO shows the speed it was sent at. **Show its speed on each line** turns it off.
+- **Wait** in **Between lines** stops a generated QSO after each line. **Enter** in the line's box locks your copy and goes on.
+
+### Changed
+
+- On every page, the settings sections side by side are one height.
+- On the Copy page, **The recording** sits beside **Audio** in the settings.
+- On the Copy page, the keys under the log show only what your settings use.
+- On the QSO page, **Cmd+.** (**Ctrl+.** off a Mac) plays the station's last line again, in place of **Cmd+Enter**. **Cmd+Enter** in a copy box now locks it, as on the Copy page.
+- On the QSO page, **Suggest my reply** and the station in a run word their lines more ways, as operators do.
+
+### Fixed
+
+- In a run, the station no longer asks `QTH?` again and again when your state is `GA`.
+- In a CWT or MST, the station no longer asks `NR?` again and again for a number such as `291` or `73`.
+- In a run, a name one character off the station's call, as `WALT` for `W9LT`, is now taken as your name.
+- At the end of a QSO, your QTH no longer takes in the word after it, as the `HW` of `SALEM OR HW CPY?`.
+- On the QSO page, a number of fives, such as `55`, is no longer read as the error sign.
+- On the Copy page, a long recording no longer runs out of its panel over the page's footer.
+- With **Allow edits** on, each line's speed and play button line up, with an edit button or without.
+
 ## v1.18.1 — 2026-10-29
 
 ### Added

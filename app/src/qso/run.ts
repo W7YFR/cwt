@@ -141,10 +141,19 @@ export const AROUND = new Set([
 ]);
 
 /** A number as sent: digits, with the cut letters T for 0 and N for 9 read
- *  as digits. At least one real digit, and never a report. */
+ *  as digits. At least one real digit. */
 function numberOf(word: string): string | null {
-  if (!/^[0-9TNO]{1,5}$/.test(word) || !/\d/.test(word) || REPORT_RE.test(word)) return null;
+  if (!/^[0-9TNO]{1,5}$/.test(word) || !/\d/.test(word)) return null;
   return word.replace(/[TO]/g, "0").replace(/N/g, "9");
+}
+
+/** The number in `words`. One with a report's shape, as 5NN, comes last:
+ *  TOM 5NN 1234 sends 1234. Alone, it is the number: 291 is a CWops number
+ *  as well as a report. */
+function numberIn(words: readonly string[]): string {
+  const plain = words.find((w) => numberOf(w) !== null && !REPORT_RE.test(w));
+  const any = plain ?? words.find((w) => numberOf(w) !== null);
+  return any === undefined ? "" : numberOf(any)!;
 }
 
 /** Read your exchange of `format` from `words`. With a name in it, the name
@@ -162,9 +171,22 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   if (at >= 0 && rest[at] === theirs && isName(rest[at + 1]) && !isRegion(rest[at + 1]!)) at++;
   const name = at >= 0 ? rest[at]! : "";
   const after = rest.slice(at + 1);
-  const number = after.map(numberOf).find((n) => n !== null) ?? "";
-  const region = regionIn(after, mine, lenient);
+  // A number that is also a word around an exchange, as 73, counts once
+  // nothing else does: TOM 73 sends CWops number 73.
+  const number = numberIn(after) || numberIn(words.slice(name ? words.indexOf(name) + 1 : 0).filter((w) => !isCall(w)));
+  // A region that is also a greeting, as GA, counts once it comes after
+  // the name, or after the report where there is no name.
+  const from = named ? (name ? words.indexOf(name) : -1) : words.findIndex((w) => REPORT_IN.test(w));
+  const region = regionIn(after, mine, lenient) || (from >= 0 ? greetingRegionIn(words.slice(from + 1)) : "");
   return { name, number, region, report };
+}
+
+/** Regions that are also greetings: GA is Georgia, or good afternoon. */
+const GREETING_REGIONS = new Set([...AROUND].filter((w) => REGIONS.has(w)));
+
+/** The first region in `words` that is also a greeting, or empty. */
+function greetingRegionIn(words: readonly string[]): string {
+  return words.find((w) => GREETING_REGIONS.has(w)) ?? "";
 }
 
 /** Words run together, apart, as lenient copy reads them: UR5NN is UR 5NN,
@@ -189,6 +211,12 @@ export function unglued(words: readonly string[]): string[] {
   return words.flatMap(apart);
 }
 
+/** Whether `word` is `call` a character off. With no digit in it, only at
+ *  five characters or more: NBMZA is N6MZA, but WALT is a name, not W9LT. */
+function offBy(word: string, call: string): boolean {
+  return nearly(word, call) && (/\d/.test(word) || word.length >= 5);
+}
+
 /** The words with a call keyed apart taken out: AK 3SD, when the call is
  *  AK3SD. One to four words that run together into one of `calls`, or one
  *  character off the station's call `theirs`, as NBMZA for N6MZA. What is
@@ -199,7 +227,7 @@ export function withoutCalls(words: readonly string[], calls: readonly string[],
     let taken = 0;
     for (let n = Math.min(4, words.length - i); n >= 1 && !taken; n--) {
       const run = words.slice(i, i + n).join("");
-      if (calls.includes(run) || nearly(run, theirs)) taken = n;
+      if (calls.includes(run) || offBy(run, theirs)) taken = n;
     }
     if (taken) i += taken - 1;
     else out.push(words[i]!);
@@ -213,7 +241,7 @@ function offCall(words: readonly string[], call: string): boolean {
   for (let i = 0; i < words.length; i++) {
     for (let n = 1; n <= 4 && i + n <= words.length; n++) {
       const run = words.slice(i, i + n).join("");
-      if (run !== call && run.length >= 4 && nearly(run, call)) return true;
+      if (run !== call && run.length >= 4 && offBy(run, call)) return true;
     }
   }
   return false;
@@ -252,9 +280,9 @@ function answerFor(item: Item, words: readonly string[], mine: string, lenient =
     case "name":
       return { ...NOTHING, name: rest.find((w) => /^[A-Z]{2,}$/.test(w)) ?? "" };
     case "number":
-      return { ...NOTHING, number: rest.map(numberOf).find((n) => n !== null) ?? "" };
+      return { ...NOTHING, number: numberIn(rest) || numberIn(words.filter((w) => !isCall(w))) };
     case "region":
-      return { ...NOTHING, region: regionIn(rest, mine, lenient) };
+      return { ...NOTHING, region: regionIn(rest, mine, lenient) || greetingRegionIn(words) };
     case "report":
       return { ...NOTHING, report: reportIn(words) };
   }
@@ -303,15 +331,36 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
   switch (qso.format) {
     case "cwt": {
       const nr = them.nr || st;
-      return pick(rand, [`TU ${name} ${nr}`, `R ${name} ${nr}`, `${name} ${nr}`, join("TU", yourName, name, nr)]);
+      return pick(rand, [
+        `TU ${name} ${nr}`,
+        `R ${name} ${nr}`,
+        `${name} ${nr}`,
+        join("TU", yourName, name, nr),
+        join(g, yourName, name, nr),
+        `TU ${name} ${nr} ${nr}`,
+      ]);
     }
     case "sst":
-      return pick(rand, [join(g, yourName, name, st), join("TU", yourName, name, st), `R ${name} ${st}`]);
-    case "mst":
-      return pick(rand, [`TU ${name} ${them.serial ?? 1}`, `R ${name} ${them.serial ?? 1}`, `${name} ${them.serial ?? 1}`]);
+      return pick(rand, [
+        join(g, yourName, name, st),
+        join("TU", yourName, name, st),
+        `R ${name} ${st}`,
+        `TU ${name} ${st}`,
+        join(g, yourName, "TU", name, st),
+      ]);
+    case "mst": {
+      const nr = String(them.serial ?? 1);
+      return pick(rand, [`TU ${name} ${nr}`, `R ${name} ${nr}`, `${name} ${nr}`, join("TU", yourName, name, nr), `TU ${name} ${nr} ${nr}`]);
+    }
     case "pota": {
       const r = cut(them.rst);
-      return pick(rand, [`BK TU UR ${r} ${r} ${st} ${st} BK`, `R R ${r} ${st} ${st} BK`, `${g} TU ${r} ${st} ${st} BK`]);
+      return pick(rand, [
+        `BK TU UR ${r} ${r} ${st} ${st} BK`,
+        `R R ${r} ${st} ${st} BK`,
+        `${g} TU ${r} ${st} ${st} BK`,
+        `BK ${g} OM UR ${r} ${r} ${st} ${st} BK`,
+        `TU UR ${r} ${st} BK`,
+      ]);
     }
   }
 }
@@ -343,7 +392,7 @@ function itemOf(qso: RunQso, item: Item): string | null {
 
 /** What the station sends after your TU, or null for nothing. */
 function lastWord(qso: RunQso, rand: Rand): string | null {
-  if (qso.format === "pota") return pick(rand, ["73 E E", "E E", "TU 73 E E"]);
+  if (qso.format === "pota") return pick(rand, ["73 E E", "E E", "TU 73 E E", "GL 73 E E", "TU 72 E E"]);
   if (qso.format === "sst") return rand() < 0.5 ? "73" : null;
   return null;
 }

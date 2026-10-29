@@ -536,9 +536,29 @@ export interface Prefs {
   /** On the Copy page, while paused, selecting a slot moves the recording to
    *  its character. Absent is off. */
   copySeekSlot?: boolean;
+  /** An Edit button beside a locked copy on the Copy page opens it again.
+   *  Absent is off. */
+  copyAllowEdits?: boolean;
+  /** A generated QSO's lines show the speed each was sent at. Absent is on. */
+  copyShowSpeed?: boolean;
   /** Which earlier attempts show while you try again on the Copy page: all,
    *  the last, or none, to go again clean. Absent is the last. */
   copyEarlier?: "all" | "last" | "none";
+  /** The kind of QSO New exchange generates on the Copy page. Absent is CQ. */
+  copyKind?: "cq" | "cwt" | "sst" | "mst" | "pota";
+  /** How many QSOs a generated run has. Absent is 3. */
+  copyRunQsos?: number;
+  /** How much each station says in a generated rag chew. Absent is full. */
+  copyChatLength?: "full" | "short" | "pieces";
+  /** Between two lines of a generated QSO: a silence of so many seconds, or
+   *  wait, which stops at the end of each line until Enter. Absent is 1. */
+  copyGap?: "1" | "2" | "3" | "5" | "wait";
+  /** A generated QSO's stations send at the speeds of its format, or all at
+   *  the Copy page's sliders. Absent is the format's. */
+  copySpeed?: "format" | "mine";
+  /** The Copy page's sliders, for a generated QSO. */
+  copyCharWpm?: number;
+  copyFarnsworthWpm?: number;
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -727,7 +747,16 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copyFollow: isBool,
   copyGradeTyping: isBool,
   copySeekSlot: isBool,
+  copyAllowEdits: isBool,
+  copyShowSpeed: isBool,
   copyEarlier: oneOf("all", "last", "none"),
+  copyKind: oneOf("cq", "cwt", "sst", "mst", "pota"),
+  copyRunQsos: isNum,
+  copyChatLength: oneOf("full", "short", "pieces"),
+  copyGap: oneOf("1", "2", "3", "5", "wait"),
+  copySpeed: oneOf("format", "mine"),
+  copyCharWpm: isNum,
+  copyFarnsworthWpm: isNum,
 };
 
 export function loadPrefs(): Prefs {
@@ -1041,7 +1070,8 @@ export function recallQso(): unknown {
 /* ---- the Copy page's recording ------------------------------------------- */
 
 /* The recording the Copy page is on, so a reload comes back to it: the file
- * as it was opened, and what the decoder read from it. One at a time. */
+ * as it was opened, and what the decoder read from it. One at a time. A
+ * generated QSO keeps its script too, so a change of speed can send it again. */
 
 export interface CopyFile {
   readonly name: string;
@@ -1049,6 +1079,8 @@ export interface CopyFile {
   readonly audio: Blob;
   /** What the decoder read, as the page holds it. */
   readonly recording: unknown;
+  /** A generated QSO's script. Absent for a recording opened. */
+  readonly script?: unknown;
 }
 
 /** Keep `file` as the Copy page's recording, in place of any before it. */

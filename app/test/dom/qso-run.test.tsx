@@ -155,27 +155,29 @@ describe("playing a line again during a session", () => {
   });
 });
 
-describe("playing the last line again with Cmd+Enter", () => {
-  it("plays on Ctrl+Enter in the box, without locking it", async () => {
+describe("playing the last line again with Cmd+.", () => {
+  /** Ctrl+. on `el`: Cmd+. off a Mac, as the tests run. */
+  const ctrlDot = (el: Element) =>
+    act(async () => {
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: ".", ctrlKey: true, bubbles: true }));
+    });
+
+  it("plays on Ctrl+. in the box, without locking it", async () => {
     await open({ qsoTheirText: "copy", qsoPlayback: "always" });
     await send("CQ CWT W7YFR");
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     box.focus();
-    await act(async () => {
-      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
-    });
+    await ctrlDot(box);
     expect(state(), "the microphone is not read while it plays").not.toBe("sending");
     await until("the line to end", () => yourTurn());
     expect($('[data-testid="qso-type"]'), "the box is still open").not.toBeNull();
   });
 
-  it("plays on Ctrl+Enter anywhere on the page, not just in a box", async () => {
+  it("plays on Ctrl+. anywhere on the page, not just in a box", async () => {
     await open({ qsoTheirText: "before", qsoPlayback: "always" });
     await send("CQ CWT W7YFR");
     (document.activeElement as HTMLElement | null)?.blur();
-    await act(async () => {
-      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
-    });
+    await ctrlDot(document.body);
     expect(state(), "the microphone is not read while it plays").not.toBe("sending");
     await until("the line to end", () => yourTurn());
   });
@@ -185,9 +187,19 @@ describe("playing the last line again with Cmd+Enter", () => {
     await send("CQ CWT W7YFR");
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     box.focus();
+    await ctrlDot(box);
+    expect(state()).toBe("sending");
+  });
+
+  it("locks the copy on Ctrl+Enter in the box, as on the Copy page", async () => {
+    await open({ qsoTheirText: "copy", qsoPlayback: "always" });
+    await send("CQ CWT W7YFR");
+    const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
+    box.focus();
     await act(async () => {
       box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
     });
+    expect($('[data-testid="qso-type"]'), "the box is locked").toBeNull();
     expect(state()).toBe("sending");
   });
 });

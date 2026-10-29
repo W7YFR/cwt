@@ -558,3 +558,160 @@ describe("a reload", () => {
     expect(boxes()[0]!.value).toBe("CQ CQ DE");
   });
 });
+
+describe("a generated QSO", () => {
+  /** The length shown in the clock, in seconds. */
+  const length = () => {
+    const [m, s] = $('[data-testid="copy-clock"]')!.textContent!.split("/")[1]!.trim().split(":");
+    return Number(m) * 60 + Number(s);
+  };
+
+  /** Mount the page and generate a QSO, as New exchange does. */
+  async function makeUp(prefs: Prefs = {}): Promise<void> {
+    mount(prefs);
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-new-first"));
+    await until("the QSO to be ready", () => state() === "ready");
+  }
+
+  it("is generated in the kind chosen, a line per over, the station that calls CQ first", async () => {
+    await makeUp({ copyKind: "sst", copyRunQsos: 1, copyGap: "1", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playThrough();
+    expect(lines().length).toBeGreaterThanOrEqual(5);
+    expect(lines()[0]!.dataset.sender).toBe("0");
+    expect(new Set(lines().map((l) => l.dataset.sender))).toEqual(new Set(["0", "1"]));
+  });
+
+  it("is sent again at a new speed, with your copy and the attempt kept", async () => {
+    await makeUp({ copyKind: "cwt", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CWT");
+    const before = length();
+    await click(button("panel-toggle"));
+    await fill($<HTMLInputElement>("#wpm")!, "15");
+    await until("the QSO to be sent again", () => length() > before);
+    expect(boxes()[0]!.value).toBe("CQ CWT");
+    expect(lines()).toHaveLength(1);
+  });
+
+  it("chooses Mine when a slider moves", async () => {
+    await makeUp({ copyKind: "pota", copyRunQsos: 1 });
+    await click(button("panel-toggle"));
+    const pressed = () => $('[data-testid="copy-speed"] [aria-pressed="true"]')?.textContent;
+    const was = pressed();
+    await fill($<HTMLInputElement>("#farns")!, "8");
+    expect(pressed()).not.toBe(was);
+  });
+
+  it("comes back after a reload, as it was sent", async () => {
+    await makeUp({ copyKind: "mst", copyRunQsos: 3, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ MST");
+    const was = length();
+    await wait(300);
+
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount({ copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await until("the QSO to come back", () => state() === "paused");
+    expect(length()).toBe(was);
+    expect(boxes()[0]!.value).toBe("CQ MST");
+  });
+});
+
+describe("Wait between lines", () => {
+  /** Mount the page and generate a QSO that stops after each line. */
+  async function locked(): Promise<void> {
+    mount({ copyKind: "cwt", copyRunQsos: 1, copyGap: "wait", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-new-first"));
+    await until("the QSO to be ready", () => state() === "ready");
+  }
+
+  it("stops after a line, and goes on to the next when Enter locks it", async () => {
+    await locked();
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    expect(lines()).toHaveLength(1);
+    await fill(boxes()[0]!, "CQ CWT");
+    await enter(boxes()[0]!);
+    expect(lines()[0]!.querySelector('[data-testid="copy-type"]'), "line 1 locked").toBeNull();
+    await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
+    await wait(200);
+    expect(state(), "it waits").toBe("paused");
+  });
+
+  it("goes on without locking the line on Play", async () => {
+    await locked();
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    await click(button("copy-play"));
+    await until("line 2", () => lines().length === 2);
+    await until("a stop", () => state() === "paused");
+    expect(lines()).toHaveLength(2);
+  });
+});
+
+describe("the keys the pages share", () => {
+  /** Cmd+. on a Mac, Ctrl+. elsewhere, on `el`. */
+  async function modDot(el: HTMLElement): Promise<void> {
+    const mac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+    await act(async () => {
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: ".", metaKey: mac, ctrlKey: !mac, bubbles: true, cancelable: true }));
+    });
+  }
+
+  it("plays the line of the box you are in again on Cmd or Ctrl+.", async () => {
+    await open();
+    await playTo(1);
+    const before = plays.length;
+    await modDot(boxes()[0]!);
+    expect(plays.length).toBe(before + 1);
+    const [, to] = plays[plays.length - 1]!;
+    expect(to, "one line, not the rest of the recording").toBeDefined();
+    expect(boxes()[0]!.value, "nothing typed").toBe("");
+  });
+
+  it("plays the last line heard again on Cmd or Ctrl+., outside a box", async () => {
+    await open();
+    await playTo(2);
+    (document.activeElement as HTMLElement | null)?.blur();
+    const before = plays.length;
+    await modDot(document.body);
+    expect(plays.length).toBe(before + 1);
+    expect(plays[plays.length - 1]![1]).toBeDefined();
+  });
+});
+
+describe("Allow edits", () => {
+  it("opens a locked line again, and locks it again on Cmd or Ctrl+Enter", async () => {
+    await open({ copyAllowEdits: true });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    await enter(boxes()[0]!, true);
+    expect(boxes()).toHaveLength(0);
+    await click(lines()[0]!.querySelector<HTMLElement>('[data-testid="copy-line-edit"]'));
+    expect(boxes()).toHaveLength(1);
+    expect(boxes()[0]!.value, "your copy as you left it").toBe("CQ CQ");
+    await fill(boxes()[0]!, "CQ CQ DE");
+    await enter(boxes()[0]!, true);
+    expect(boxes()).toHaveLength(0);
+    expect(lines()[0]!.querySelector('[data-testid="copy-line-score"]')!.textContent).toBe(`6/${keyed(QSO[0]!.text)}`);
+  });
+
+  it("locks an edited line again when the recording plays on", async () => {
+    await open({ copyAllowEdits: true });
+    await playTo(2);
+    expect(boxes()).toHaveLength(1);
+    await click(lines()[0]!.querySelector<HTMLElement>('[data-testid="copy-line-edit"]'));
+    expect(boxes()).toHaveLength(2);
+    await click(button("copy-play"));
+    await until("line 1 to lock again", () => !lines()[0]!.querySelector('[data-testid="copy-type"]'));
+  });
+
+  it("shows no Edit unless allowed", async () => {
+    await open();
+    await playTo(2);
+    expect($('[data-testid="copy-line-edit"]')).toBeNull();
+  });
+});

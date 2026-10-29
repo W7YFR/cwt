@@ -29,8 +29,9 @@ import {
 } from "@/io/storage";
 import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
+import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
-import { hint, meOf } from "@/qso/hint";
+import { hint, meOf, seededVoice } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
@@ -68,10 +69,6 @@ import { useLiveCopy } from "./useLiveCopy";
 import { useRecorder } from "./useRecorder";
 import { HomeButton } from "./Wordmark";
 
-/** A speed as the app writes it: 25 wpm, or 25/16 wpm with Farnsworth. */
-function wpm(s: Speed): string {
-  return s.charWpm === s.farnsworthWpm ? `${s.charWpm} wpm` : `${s.charWpm}/${s.farnsworthWpm} wpm`;
-}
 
 function same(a: Speed, b: Speed): boolean {
   return a.charWpm === b.charWpm && a.farnsworthWpm === b.farnsworthWpm;
@@ -366,7 +363,7 @@ function recallKept(): Kept | null {
 
 /** A measured speed as the log writes it: 23 wpm, or 23/17 wpm. */
 function wpmOf(s: SentWpm): string {
-  return wpm({ charWpm: Math.round(s.charWpm), farnsworthWpm: Math.round(s.farnsworthWpm) });
+  return fmtSpeed({ charWpm: Math.round(s.charWpm), farnsworthWpm: Math.round(s.farnsworthWpm) });
 }
 
 const LOCK_HELP =
@@ -385,10 +382,9 @@ const SHOW_SPEED_HELP = "Each of your lines shows the speed you sent it at.";
 const SHOW_THEIR_SPEED_HELP = "Each of the station's lines shows the speed it sent it at.";
 
 /** Enter and Escape in a copy box are not the recorder's: it listens on the
- *  document, and these keys would stop the session. Enter locks the copy. */
+ *  document, and these keys would stop the session. Enter locks the copy,
+ *  and so does Cmd+Enter, or Ctrl+Enter, as on the Copy page. */
 function keepKeys(ev: React.KeyboardEvent, lock: () => void): void {
-  // Cmd+Enter, or Ctrl+Enter, is the log's: it plays the station's line.
-  if (ev.key === "Enter" && modOf(ev)) return;
   if (ev.key === "Enter" || ev.key === "Escape") {
     ev.preventDefault();
     ev.stopPropagation();
@@ -1144,9 +1140,10 @@ export function QsoScreen({
 
   /** Edit, on a locked copy of a QSO still under way. */
   const lineEdit = (line: Line, i: number): React.ReactElement | null => {
-    if (!allowEdits || line.you || !line.locked || theirModeOf(line) !== "copy" || closed.includes(line.qso)) {
-      return null;
-    }
+    if (!allowEdits || closed.includes(line.qso)) return null;
+    // Its place kept on a line that cannot be edited, so every line's speed
+    // and play button line up.
+    if (line.you || !line.locked || theirModeOf(line) !== "copy") return <span className="lspace" aria-hidden="true" />;
     return (
       <button
         type="button"
@@ -1202,8 +1199,9 @@ export function QsoScreen({
     const now = qso.current;
     if (isRun(now) && now.stage === "waiting") waitForNext();
   };
-  /** Cmd+Enter anywhere on the page, or Ctrl+Enter: the station's last line
-   *  plays again, with the play buttons on every line. Again stops it. */
+  /** Cmd+. anywhere on the page, or Ctrl+.: the station's last line plays
+   *  again, with the play buttons on every line, as Cmd+. plays the line
+   *  again on the Copy page. */
   const replayLast = () => {
     if (playback !== "always") return;
     let i = lines.length - 1;
@@ -1216,7 +1214,7 @@ export function QsoScreen({
   replayKey.current = replayLast;
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key !== "Enter" || ev.repeat || !modOf(ev)) return;
+      if (ev.key !== "." || ev.repeat || !modOf(ev)) return;
       ev.preventDefault();
       ev.stopPropagation();
       replayKey.current();
@@ -1519,7 +1517,12 @@ export function QsoScreen({
   };
   const suggestion =
     recorder && phase === "listening" && (hints === "always" || (hints === "copied" && copiedRight()))
-      ? hint(qso.current, meOf(loadUser()), guideKind === "cq" ? null : guideKind)
+      ? hint(
+          qso.current,
+          meOf(loadUser()),
+          guideKind === "cq" ? null : guideKind,
+          seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+        )
       : null;
 
   /* A new line, or more of one, keeps the end of the log in view: unless you
@@ -1866,7 +1869,7 @@ export function QsoScreen({
                 and the guide says so. */}
             {!same(theirSpeed, speed) && (
               <span className="hint" data-testid="qso-their-speed">
-                The station sends at {wpm(theirSpeed)}.
+                The station sends at {fmtSpeed(theirSpeed)}.
               </span>
             )}
             {/* The guide, when it is not on the page: last in the row, at its
@@ -1994,7 +1997,7 @@ export function QsoScreen({
                 {playback === "always" && (
                   <>
                     {" "}
-                    &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> play its last line again
+                    &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>.</kbd> play its last line again
                   </>
                 )}
               </p>
