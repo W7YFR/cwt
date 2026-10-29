@@ -10,7 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **New exchange** on the Copy page generates a QSO to copy: a standard **CQ** QSO, or a **POTA**, **SST**, **MST** or **CWT** run. Opening a recording stays beside it.
-- Settings for a generated QSO: **QSOs in a run**, **A standard QSO is**, **Between lines**, and **Speed**. **Format** sends each station at its own speed, and **Mine** sends every station at the sliders. A change of speed or gap applies to the QSO on the page and keeps your copy.
+- Settings for a generated QSO: **QSOs in a run**, **A standard QSO is**, **Between lines**, and **Speed**, where **Format** gives each station its own speed and **Mine** uses the sliders. A change of speed or gap keeps your copy.
 - **Allow edits** on the Copy page, as on the QSO page: an edit button beside a locked line opens it again, to fix a mistake.
 - **Cmd+.** (**Ctrl+.** off a Mac) on the Copy page plays the line again.
 - Each line of a generated QSO shows the speed it was sent at. **Show its speed on each line** turns it off.
