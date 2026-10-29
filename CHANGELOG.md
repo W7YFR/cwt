@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- A link to CWT shared in a chat app or on a social site shows a preview card with its name and picture.
+
 ## v1.18.0 — 2026-10-29
 
 ### Added
