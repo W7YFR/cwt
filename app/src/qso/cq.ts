@@ -121,22 +121,25 @@ const DIT_WORDS = new Set(["HI", "HIS", "SHE"]);
 /** Dits in each character keyed with dits alone. */
 const DITS: Readonly<Record<string, number>> = { E: 1, I: 2, S: 3, H: 4, "5": 5 };
 
+/** A number of fives alone, as 55: keyed whole, a number, not dits. */
+const FIVES = /^5+$/;
+
 /** Whether `word` is the error sign: <HH>, or a run of dits read as letters.
  *  Eight dits keyed unevenly read as EEE, or as HH, or as 5 and S. Three E,
  *  or six dits or more, counts. A word keyed with dits alone does not: HI,
- *  HIS, SHE. */
+ *  HIS, SHE. Nor do fives alone, as the CWops number 55. */
 export function isErrorSign(word: string): boolean {
   if (word === "<HH>" || /^E{3,}$/.test(word)) return true;
-  if (DIT_WORDS.has(word) || !/^[EISH5]+$/.test(word)) return false;
+  if (DIT_WORDS.has(word) || FIVES.test(word) || !/^[EISH5]+$/.test(word)) return false;
   let dits = 0;
   for (const ch of word) dits += DITS[ch]!;
   return dits >= 6;
 }
 
 /** Whether `word` is keyed with dits alone and could be part of a run of
- *  them: E, EE, I, S, 5. Words such as HI are not. */
+ *  them: E, EE, I, S. Words such as HI are not, nor fives alone. */
 function ditsOnly(word: string): boolean {
-  return /^[EISH5]+$/.test(word) && !DIT_WORDS.has(word);
+  return /^[EISH5]+$/.test(word) && !DIT_WORDS.has(word) && !FIVES.test(word);
 }
 
 function ditCount(word: string): number {

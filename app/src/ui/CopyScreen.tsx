@@ -1,7 +1,8 @@
-/* The Copy page: play a recording of CW and copy it.
+/* The Copy page: play a QSO in CW and copy it.
  *
- * You open a recording, and the decoder reads it whole before you start. What
- * it reads is the answer key. The recording plays, and each over shows as a
+ * New exchange generates a QSO: two stations, in a kind you choose, sent from
+ * text, so the text is the answer key. Or you open a recording, and the
+ * decoder reads it whole before you start, and what it reads is the key. The recording plays, and each over shows as a
  * line as it starts, with a box to copy it in. A line locks when the next
  * line starts, when you copy again, or on Cmd+Enter (Ctrl+Enter off a
  * Mac), and shows what you got.
@@ -16,8 +17,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
+import { encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
+import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
 import {
   charsOf,
   clock,
@@ -43,14 +46,27 @@ import {
   forgetCopyFile,
   keepCopyFile,
   loadPrefs,
+  loadSpeed,
   recallCopy,
   recallCopyFile,
   rememberCopy,
   savePrefs,
   type Prefs,
 } from "@/io/storage";
+import { FORMATS } from "@/qso/formats";
 import type { LockedShows } from "@/qso/show";
-import { ChartSettingsButton, Check, ChoiceGroup, Section, SettingRow, SettingsBand, SettingsPanel } from "./Controls";
+import type { Speed } from "@/qso/speed";
+import type { Length } from "@/qso/wording";
+import {
+  ChartSettingsButton,
+  Check,
+  ChoiceGroup,
+  Section,
+  SettingRow,
+  SettingsBand,
+  SettingsPanel,
+  SpeedSliders,
+} from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
 import { IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
@@ -137,11 +153,57 @@ const EARLIER_HELP =
   "right and wrong, and each box starts with your last copy. None starts each attempt " +
   "clean. Every attempt is kept either way.";
 
+const KINDS: ReadonlyArray<Option<Kind>> = [
+  { value: "cq", label: "CQ", note: "A standard QSO: two stations swap reports, names and QTHs, then 73." },
+  { value: "pota", label: "POTA", note: "A park activator works one hunter after another: reports and states." },
+  { value: "sst", label: "SST", note: "A slow speed run: names and states." },
+  { value: "mst", label: "MST", note: "A medium speed run: names and serial numbers." },
+  { value: "cwt", label: "CWT", note: "A fast CWops run: names and CWops numbers." },
+];
+const KIND_HELP =
+  "The kind of QSO New exchange generates, as on the QSO page. CQ is a standard QSO between two " +
+  "stations. The others are runs: one station calls CQ and works one station after another.";
+
+const RUN_QSOS: ReadonlyArray<Option<string>> = [
+  { value: "1", label: "1" },
+  { value: "3", label: "3" },
+  { value: "5", label: "5" },
+  { value: "10", label: "10" },
+];
+const RUN_QSOS_HELP = "How many stations call in a generated POTA, SST, MST or CWT run.";
+
+const CHAT_LENGTHS: ReadonlyArray<Option<Length>> = [
+  { value: "full", label: "Full", note: "Each report, name and QTH in one line, sent twice." },
+  { value: "short", label: "Short", note: "Each report, name and QTH in one line, sent once." },
+  { value: "pieces", label: "Piece by piece", note: "The station that answers sends its report, name and QTH a line each." },
+];
+const CHAT_LENGTH_HELP = "How much each station says in a generated standard QSO, as on the QSO page.";
+
+const GAPS: ReadonlyArray<Option<string>> = [
+  { value: "0.5", label: "0.5 s" },
+  { value: "1", label: "1 s" },
+  { value: "2", label: "2 s" },
+  { value: "3", label: "3 s" },
+];
+const GAP_HELP = "The silence between one station's line and the next. A change applies to the QSO on the page.";
+
+type SpeedChoice = "format" | "mine";
+const SPEEDS: ReadonlyArray<Option<SpeedChoice>> = [
+  { value: "format", label: "Format", note: "Each station at a speed of its own, in its format's range." },
+  { value: "mine", label: "Mine", note: "Every station at the speeds below." },
+];
+const SPEED_HELP =
+  "How fast a generated QSO is sent. Format: each station at its own speed, as on the air: " +
+  `POTA ${FORMATS.pota.wpm.join(" to ")}, SST ${FORMATS.sst.wpm.join(" to ")}, ` +
+  `MST ${FORMATS.mst.wpm.join(" to ")}, CWT ${FORMATS.cwt.wpm.join(" to ")}, and a standard QSO 15 to 25 wpm. ` +
+  "Mine: every station at the sliders. A change applies to the QSO on the page, and keeps your copy. " +
+  "Moving a slider chooses Mine.";
+
 /** Where the page is, as its heading says in a word. */
 type CopyState = "reading" | "none" | "playing" | "over" | "paused" | "ready";
 const STATE_WORDS: Record<CopyState, string> = {
   reading: "Reading",
-  none: "No recording",
+  none: "Nothing to copy",
   playing: "Playing",
   over: "Over",
   paused: "Paused",
@@ -162,9 +224,10 @@ interface Kept {
   readonly revealed: boolean;
 }
 
-/** Which recording `rec` is, so a copy kept for another is not put on it. */
-function keyOf(name: string, rec: Recording): string {
-  return `${name}|${rec.durationSec.toFixed(2)}|${rec.overs.length}`;
+/** Which recording `rec` is, so a copy kept for another is not put on it.
+ *  A generated QSO keeps its key when sent again at another speed. */
+function keyOf(name: string, rec: Recording, made = false): string {
+  return made ? `${name}|made|${rec.overs.length}` : `${name}|${rec.durationSec.toFixed(2)}|${rec.overs.length}`;
 }
 
 /** A fresh copy of `rec`: one attempt, copied in `input`, nothing typed and
@@ -233,7 +296,18 @@ function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean
 }
 
 /** A choice kept as a preference, with its default. */
-function useChoice<K extends "copyInput" | "copyLines" | "copyLockedShows" | "copyEarlier">(
+function useChoice<
+  K extends
+    | "copyInput"
+    | "copyLines"
+    | "copyLockedShows"
+    | "copyEarlier"
+    | "copyKind"
+    | "copyRunQsos"
+    | "copyChatLength"
+    | "copyGapSec"
+    | "copySpeed",
+>(
   key: K,
   or: NonNullable<Prefs[K]>,
 ): readonly [NonNullable<Prefs[K]>, (next: NonNullable<Prefs[K]>) => void] {
@@ -281,9 +355,33 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [linesShow, setLinesShow] = useChoice("copyLines", "copy");
   const [lockedShows, setLockedShows] = useChoice("copyLockedShows", "right");
   const [earlier, setEarlier] = useChoice("copyEarlier", "last");
+  const [kind, setKind] = useChoice("copyKind", "cq");
+  const [runQsos, setRunQsos] = useChoice("copyRunQsos", 3);
+  const [chatLength, setChatLength] = useChoice("copyChatLength", "full");
+  const [gapSec, setGapSec] = useChoice("copyGapSec", 1);
+  const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
+  const [mine, setMineRaw] = useState<Speed>(() => {
+    const p = loadPrefs();
+    const or = loadSpeed() ?? { charWpm: 20, farnsworthWpm: 20 };
+    const charWpm = p.copyCharWpm ?? or.charWpm;
+    return { charWpm, farnsworthWpm: Math.min(p.copyFarnsworthWpm ?? or.farnsworthWpm, charWpm) };
+  });
+  /** A slider moved: every station at the sliders from now on. */
+  const setMine = (patch: Partial<Speed>) => {
+    const charWpm = patch.charWpm ?? mine.charWpm;
+    const next = { charWpm, farnsworthWpm: Math.min(patch.farnsworthWpm ?? mine.farnsworthWpm, charWpm) };
+    setMineRaw(next);
+    savePrefs({ ...loadPrefs(), copyCharWpm: next.charWpm, copyFarnsworthWpm: next.farnsworthWpm });
+    if (speedChoice !== "mine") setSpeedChoice("mine");
+  };
+  /** How a generated QSO is sent, from the settings. */
+  const sending = { gapSec, speed: speedChoice === "mine" ? mine : undefined };
 
-  /** The recording: its name, its own bytes to play, and what was read. */
-  const [file, setFile] = useState<{ name: string; audio: ArrayBuffer; rec: Recording } | null>(null);
+  /** The recording: its name, its own bytes to play, and what was read. A
+   *  generated QSO has its script too. */
+  const [file, setFile] = useState<{ name: string; audio: ArrayBuffer; rec: Recording; script?: Script | undefined } | null>(
+    null,
+  );
   /** The recording kept from before is coming back. */
   const [recalling, setRecalling] = useState(true);
   const [reading, setReading] = useState(false);
@@ -361,9 +459,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         const audio = await stored.audio.arrayBuffer();
         if (!live) return;
         const r = stored.recording;
-        const key = keyOf(stored.name, r);
+        const script = isScript(stored.script) ? stored.script : undefined;
+        const key = keyOf(stored.name, r, !!script);
         const back = recallKept(key, r, inputPref) ?? freshKept(key, r, inputPref);
-        setFile({ name: stored.name, audio, rec: r });
+        setFile({ name: stored.name, audio, rec: r, script });
         setKept(back);
         setPos(back.at);
       })
@@ -408,6 +507,51 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     },
     [player, onError],
   );
+  /** New exchange: a QSO generated in the kind chosen, in place of what was
+   *  on the page. */
+  const makeExchange = () => {
+    player.stop();
+    cancelLastLock();
+    const script = makeScript({ kind, length: chatLength, qsos: runQsos });
+    const sent = sendScript(script, sending);
+    const audio = encodeWavBuffer(sent.samples, sent.rate);
+    const name = nameOf(script);
+    setFile({ name, audio, rec: sent.rec, script });
+    setKept(freshKept(keyOf(name, sent.rec, true), sent.rec, inputPref));
+    setSelected(null);
+    setPos(0);
+    void keepCopyFile({ name, audio: new Blob([audio]), recording: sent.rec, script });
+  };
+
+  /* A generated QSO sent again when its speed or gap changes, with your copy
+     and where you are in it kept. A slider moves in steps, so this waits
+     for it to settle. */
+  const sendKey = `${gapSec}|${speedChoice}|${mine.charWpm}|${mine.farnsworthWpm}`;
+  const sentWith = useRef(sendKey);
+  useEffect(() => {
+    if (!file?.script || sentWith.current === sendKey) return;
+    const t = setTimeout(() => {
+      sentWith.current = sendKey;
+      const was = file.rec;
+      const sent = sendScript(file.script!, sending);
+      const audio = encodeWavBuffer(sent.samples, sent.rate);
+      player.stop();
+      cancelLastLock();
+      setFile({ ...file, audio, rec: sent.rec });
+      setPos((p) => timeIn(was, sent.rec, p));
+      setKept((k) => (k ? { ...k, reached: timeIn(was, sent.rec, k.reached), at: timeIn(was, sent.rec, k.at) } : k));
+      void keepCopyFile({ name: file.name, audio: new Blob([audio]), recording: sent.rec, script: file.script });
+    }, 250);
+    return () => clearTimeout(t);
+    // Sent again on a change of how it is sent, not on each new file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sendKey]);
+  /* A new or recalled generated QSO is sent as the settings are now. */
+  useEffect(() => {
+    sentWith.current = sendKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file?.script]);
+
   useEffect(() => {
     fileTarget.current = (f) => void openFile(f);
     return () => {
@@ -936,7 +1080,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     : !rec
       ? recalling
         ? ""
-        : "Open a recording of CW to copy."
+        : "Generate a QSO to copy, or open a recording of CW."
       : playing === "main"
         ? linesShow === "copy"
           ? "Type what you hear in each line."
@@ -946,7 +1090,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           : ended
             ? linesShow === "copy"
               ? "Copy again to go once more."
-              : "The recording is over."
+              : file?.script
+                ? "The QSO is over."
+                : "The recording is over."
             : pos > 0
               ? "Press Play to go on."
               : linesShow === "copy"
@@ -1003,23 +1149,32 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         <HomeButton onHome={onHome} />
         <PageSwitch page="copy" onPage={onPage} />
         <button
-          className={rec ? "copyopen" : "copyopen primary"}
+          className={rec ? undefined : "primary"}
+          data-testid="copy-new"
+          disabled={reading || playing !== null}
+          title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
+          onClick={makeExchange}
+        >
+          New exchange
+        </button>
+        {/* Icon only, after New exchange: a recording is the rarer way in,
+            as on the Send page. */}
+        <button
+          className="iconbtn copyopen"
           data-testid="copy-open"
           disabled={reading}
+          aria-label="Open a recording"
           title="Open a recording of CW to copy, or drop one on the page"
           onClick={pickFile}
         >
-          <i className="ico">
-            <IconUpload />
-          </i>
-          Open a recording
+          <IconUpload />
         </button>
         {/* Always here, as on the other pages. Off while the recording plays
             or before there is one. */}
         <button
           data-testid="copy-clear"
           disabled={!rec || reading || playing !== null}
-          title="Close this recording and clear every attempt"
+          title="Close this QSO and clear every attempt"
           onClick={clear}
         >
           Clear
@@ -1091,6 +1246,51 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     options={EARLIERS}
                     onChange={(v) => setEarlier(v as Earlier)}
                   />
+                </div>
+              </Section>
+              <Section name="make" title="Generated QSOs">
+                <div className="panelgroups">
+                  <ChoiceGroup
+                    id="copy-kind"
+                    label="Kind"
+                    help={KIND_HELP}
+                    value={kind}
+                    options={KINDS}
+                    onChange={(v) => setKind(v as Kind)}
+                  />
+                  <ChoiceGroup
+                    id="copy-run-qsos"
+                    label="QSOs in a run"
+                    help={RUN_QSOS_HELP}
+                    value={String(runQsos)}
+                    options={RUN_QSOS}
+                    onChange={(v) => setRunQsos(Number(v))}
+                  />
+                  <ChoiceGroup
+                    id="copy-chat-length"
+                    label="A standard QSO is"
+                    help={CHAT_LENGTH_HELP}
+                    value={chatLength}
+                    options={CHAT_LENGTHS}
+                    onChange={(v) => setChatLength(v as Length)}
+                  />
+                  <ChoiceGroup
+                    id="copy-gap"
+                    label="Between lines"
+                    help={GAP_HELP}
+                    value={String(gapSec)}
+                    options={GAPS}
+                    onChange={(v) => setGapSec(Number(v))}
+                  />
+                  <ChoiceGroup
+                    id="copy-speed"
+                    label="Speed"
+                    help={SPEED_HELP}
+                    value={speedChoice}
+                    options={SPEEDS}
+                    onChange={(v) => setSpeedChoice(v as SpeedChoice)}
+                  />
+                  <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
                 </div>
               </Section>
               <Section name="lines" title="The recording">
@@ -1216,20 +1416,30 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         )}
 
         {!rec && !recalling && !reading && (
-          <div className="qsocontrols">
-            <button className="primary" data-testid="copy-open-first" onClick={pickFile}>
-              <i className="ico">
-                <IconUpload />
-              </i>
-              Open a recording
+          <div className="qsocontrols copyfirst">
+            <div className="modeswitch" role="group" aria-label="Kind" data-testid="copy-kind-first">
+              {KINDS.map((k) => (
+                <button key={k.value} aria-pressed={kind === k.value} title={k.note} onClick={() => setKind(k.value)}>
+                  {k.label}
+                </button>
+              ))}
+            </div>
+            <button className="primary" data-testid="copy-new-first" onClick={makeExchange}>
+              New exchange
             </button>
-            <span className="hint">or drop one on the page</span>
+            <span className="hint">
+              or{" "}
+              <button type="button" className="link" data-testid="copy-open-first" onClick={pickFile}>
+                open a recording
+              </button>
+              , or drop one on the page
+            </span>
           </div>
         )}
 
         {!rec && !recalling && !reading && (
           <div className="qsoguide prose" data-testid="copy-guide">
-            <p>Open a recording of CW and copy it as it plays. Each line you copy is checked against what was sent.</p>
+            <p>Copy a QSO in CW as it plays, and see what you got right.</p>
             <ul>
               <li>A new line appears each time a new station starts sending.</li>
               <li>Type what you hear in each line.</li>
@@ -1240,7 +1450,17 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               </li>
               <li>Click a word in a finished line, or select part of it, to hear it again.</li>
             </ul>
-            <p>Your recording stays in this browser.</p>
+            {settingsOpen ? (
+              <p>Change the speed of a generated QSO and the pause between its lines in the settings panel.</p>
+            ) : (
+              <p>
+                Open the{" "}
+                <button type="button" className="link" data-testid="copy-guide-settings" onClick={() => setSettingsOpen(true)}>
+                  settings
+                </button>{" "}
+                to change the speed of a generated QSO and the pause between its lines.
+              </p>
+            )}
           </div>
         )}
 

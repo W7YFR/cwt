@@ -1,9 +1,9 @@
-/* A QSO made up for the Copy page: both sides as text, then as sound.
+/* A QSO generated for the Copy page: both sides as text, then as sound.
  *
- * Two made-up stations work each other through the QSO page's own script.
+ * Two generated stations work each other through the QSO page's own script.
  * One calls CQ and sends what a suggested reply would (qso/hint.ts), in a
  * wording picked at random. The other answers as the QSO page's station
- * does (qso/run.ts). So a made-up QSO reads as a QSO on the QSO page does,
+ * does (qso/run.ts). So a generated QSO reads as a QSO on the QSO page does,
  * in every format, and the station never has to ask again.
  *
  * A format is a run: the station that called CQ works one caller after
@@ -28,10 +28,10 @@ import { targetTiming } from "@/timing";
 import type { Over, Recording } from "./decode";
 import { overOfText } from "./lines";
 
-/** What a made-up QSO is: a rag chew from a plain CQ, or a run of a format. */
+/** What a generated QSO is: a rag chew from a plain CQ, or a run of a format. */
 export type Kind = GuideId;
 
-/** One station of a made-up QSO. */
+/** One station of a generated QSO. */
 export interface ScriptStation {
   readonly call: string;
   readonly toneHz: number;
@@ -46,7 +46,7 @@ export interface ScriptLine {
   readonly text: string;
 }
 
-/** A made-up QSO as text. The station that called CQ is the first. */
+/** A generated QSO as text. The station that called CQ is the first. */
 export interface Script {
   readonly kind: Kind;
   readonly stations: readonly ScriptStation[];
@@ -71,7 +71,7 @@ export const RAG_CHEW_WPM: readonly [number, number] = [15, 25];
 /** The closest two stations' pitches may be, in Hz. */
 export const PITCH_APART_HZ = 40;
 
-/** The most overs a made-up QSO may take. Far more than any needs. */
+/** The most overs a generated QSO may take. Far more than any needs. */
 const MOST_OVERS = 200;
 
 function wpmIn(rand: Rand, [lo, hi]: readonly [number, number]): Speed {
@@ -93,7 +93,7 @@ function meOf(s: Station): Me {
   return { call: s.call, name: s.name, qth: s.qth, region: regionOf(s), nr: s.nr ?? "", rst: s.rst };
 }
 
-/** A made-up QSO of `kind`, both sides, start to finish. */
+/** A generated QSO of `kind`, both sides, start to finish. */
 export function makeScript(options: MakeOptions): Script {
   const { kind, rand = Math.random, length = "full", qsos = 3 } = options;
   const hour = options.hour ?? Math.floor(rand() * 24);
@@ -135,7 +135,7 @@ export function makeScript(options: MakeOptions): Script {
     lines.push({ station: placeOf(qso), text: call.reply! });
   }
   const last = lines.slice(-6).map((l) => l.text).join(" / ");
-  throw new Error(`A made-up ${kind} QSO did not end: ${last}`);
+  throw new Error(`A generated ${kind} QSO did not end: ${last}`);
 }
 
 /** How a script is sent. */
@@ -143,7 +143,7 @@ export interface SendOptions {
   /** The silence between two lines, in seconds. */
   readonly gapSec: number;
   /** One speed for every station, in place of each one's own. */
-  readonly speed?: Speed;
+  readonly speed?: Speed | undefined;
   readonly rate?: number;
 }
 
@@ -192,4 +192,46 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
       overs,
     },
   };
+}
+
+/** What a generated QSO is called on the page: A generated POTA run of 3 QSOs. */
+export function nameOf(script: Script): string {
+  if (script.kind === "cq") return "A generated standard QSO";
+  const qsos = script.stations.length - 1;
+  return `A generated ${FORMATS[script.kind].word} run of ${qsos} QSO${qsos === 1 ? "" : "s"}`;
+}
+
+const KINDS: readonly string[] = ["cq", "cwt", "sst", "mst", "pota"];
+
+function isSpeed(v: unknown): v is Speed {
+  const s = v as Speed | null;
+  return !!s && typeof s.charWpm === "number" && s.charWpm > 0 && typeof s.farnsworthWpm === "number" && s.farnsworthWpm > 0;
+}
+
+/** Whether `v` is a script, as one kept in the browser comes back. */
+export function isScript(v: unknown): v is Script {
+  const s = v as Script | null;
+  if (!s || !KINDS.includes(s.kind) || !Array.isArray(s.stations) || !Array.isArray(s.lines)) return false;
+  const stations = s.stations.every((x) => typeof x?.call === "string" && typeof x.toneHz === "number" && isSpeed(x.speed));
+  return (
+    stations &&
+    s.stations.length > 0 &&
+    s.lines.every((l) => typeof l?.text === "string" && Number.isInteger(l.station) && l.station >= 0 && l.station < s.stations.length)
+  );
+}
+
+/** Where time `t` of `from` falls in `to`, the same script sent again at
+ *  another speed or gap: as far into the same line, or into the gap after
+ *  it. */
+export function timeIn(from: Recording, to: Recording, t: number): number {
+  if (t <= 0) return 0;
+  if (t >= from.durationSec) return to.durationSec;
+  let i = -1;
+  for (let k = 0; k < from.overs.length && from.overs[k]!.t0 <= t; k++) i = k;
+  const first = to.overs[0];
+  if (i < 0 || !first) return Math.min(t, first?.t0 ?? to.durationSec);
+  const a = from.overs[i]!;
+  const b = to.overs[i]!;
+  if (t <= a.t1) return b.t0 + ((t - a.t0) * (b.t1 - b.t0)) / Math.max(a.t1 - a.t0, 1e-9);
+  return Math.min(b.t1 + (t - a.t1), to.overs[i + 1]?.t0 ?? to.durationSec);
 }

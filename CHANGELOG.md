@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **New exchange** on the Copy page generates a QSO to copy: a standard **CQ** QSO, or a **POTA**, **SST**, **MST** or **CWT** run. Opening a recording stays beside it.
+- Settings for a generated QSO: **QSOs in a run**, **A standard QSO is**, **Between lines**, and **Speed**. **Format** sends each station at its own speed, and **Mine** sends every station at the sliders. A change of speed or gap applies to the QSO on the page and keeps your copy.
+
 ### Changed
 
 - On the QSO page, **Suggest my reply** and the station in a run word their lines more ways, as operators do.
@@ -17,6 +22,8 @@ nothing to the site. The next release carries them.
 - In a CWT or MST, the station no longer asks `NR?` again and again for a number such as `291` or `73`.
 - In a run, a name one character off the station's call, as `WALT` for `W9LT`, is now taken as your name.
 - At the end of a QSO, your QTH no longer takes in the word after it, as the `HW` of `SALEM OR HW CPY?`.
+- On the QSO page, a number of fives, such as `55`, is no longer read as the error sign.
+- On the Copy page, a long recording no longer runs out of its panel over the page's footer.
 
 ## v1.18.1 — 2026-10-29
 

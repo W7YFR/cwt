@@ -1,4 +1,4 @@
-/* A made-up QSO for the Copy page: its script, and the sound and answer key
+/* A generated QSO for the Copy page: its script, and the sound and answer key
  * sent from it. */
 
 import { describe, expect, it } from "vitest";
@@ -14,7 +14,7 @@ function seeded(seed: number): () => number {
   };
 }
 
-describe("a made-up QSO", () => {
+describe("a generated QSO", () => {
   it("runs to its end, for every kind", () => {
     for (const kind of GUIDE_IDS) {
       for (let seed = 1; seed <= 40; seed++) {
@@ -56,7 +56,7 @@ describe("a made-up QSO", () => {
   });
 });
 
-describe("a made-up QSO, sent", () => {
+describe("a generated QSO, sent", () => {
   const script = makeScript({ kind: "pota" as Kind, rand: seeded(11), qsos: 2 });
   const sent = sendScript(script, { gapSec: 1 });
 

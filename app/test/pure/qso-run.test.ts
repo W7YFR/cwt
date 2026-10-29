@@ -137,6 +137,7 @@ describe("a QSO in each format", () => {
     expect(work(called("cwt"), ["K4ABC TOM 73"]).qso.got?.number).toBe("73");
     expect(work(called("cwt"), ["K4ABC TOM 5NN 1234"]).qso.got?.number).toBe("1234");
     expect(work(called("mst"), ["K4ABC TOM", "155 155"]).qso.got?.number).toBe("155");
+    expect(work(called("cwt"), ["K4ABC TOM 55"]).qso.got).toMatchObject({ name: "TOM", number: "55" });
   });
 
   it("takes a name a character off its call as a name", () => {

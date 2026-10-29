@@ -2364,8 +2364,9 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 /* The QSO page fits the window: the panel stays where it starts, and the
    log scrolls inside it, under the heading and controls. With the settings
    open, or in a short window, the panel keeps room for a few lines and the
-   page scrolls instead. */
-.app:has(> .panel.qso) { height: 100vh; height: 100dvh; }
+   page scrolls instead. Not the Copy page: its log has no box of its own,
+   so the page scrolls. */
+.app:has(> .panel.qso:not(.copy)) { height: 100vh; height: 100dvh; }
 .panel.qso { flex: 1 1 auto; min-height: 320px; }
 .qsotop { display: flex; flex-direction: column; gap: 16px; }
 .qsoguide { flex: 0 1 auto; min-height: 0; overflow-y: auto; }

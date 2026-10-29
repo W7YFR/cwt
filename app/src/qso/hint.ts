@@ -8,7 +8,7 @@
  *
  * Your call, name, QTH and CWops number come from User. What User leaves
  * empty shows as a note in brackets, as (YOUR NAME), for you to fill in as
- * you send. The Copy page sends a made-up station's this way too.
+ * you send. The Copy page's generated QSOs send the station that calls CQ this way too.
  *
  * Pure.
  */

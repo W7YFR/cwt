@@ -558,3 +558,63 @@ describe("a reload", () => {
     expect(boxes()[0]!.value).toBe("CQ CQ DE");
   });
 });
+
+describe("a generated QSO", () => {
+  /** The length shown in the clock, in seconds. */
+  const length = () => {
+    const [m, s] = $('[data-testid="copy-clock"]')!.textContent!.split("/")[1]!.trim().split(":");
+    return Number(m) * 60 + Number(s);
+  };
+
+  /** Mount the page and generate a QSO, as New exchange does. */
+  async function makeUp(prefs: Prefs = {}): Promise<void> {
+    mount(prefs);
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-new-first"));
+    await until("the QSO to be ready", () => state() === "ready");
+  }
+
+  it("is generated in the kind chosen, a line per over, the station that calls CQ first", async () => {
+    await makeUp({ copyKind: "sst", copyRunQsos: 1, copyGapSec: 0.5, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playThrough();
+    expect(lines().length).toBeGreaterThanOrEqual(5);
+    expect(lines()[0]!.dataset.sender).toBe("0");
+    expect(new Set(lines().map((l) => l.dataset.sender))).toEqual(new Set(["0", "1"]));
+  });
+
+  it("is sent again at a new speed, with your copy and the attempt kept", async () => {
+    await makeUp({ copyKind: "cwt", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CWT");
+    const before = length();
+    await click(button("panel-toggle"));
+    await fill($<HTMLInputElement>("#wpm")!, "15");
+    await until("the QSO to be sent again", () => length() > before);
+    expect(boxes()[0]!.value).toBe("CQ CWT");
+    expect(lines()).toHaveLength(1);
+  });
+
+  it("chooses Mine when a slider moves", async () => {
+    await makeUp({ copyKind: "pota", copyRunQsos: 1 });
+    await click(button("panel-toggle"));
+    const pressed = () => $('[data-testid="copy-speed"] [aria-pressed="true"]')?.textContent;
+    const was = pressed();
+    await fill($<HTMLInputElement>("#farns")!, "8");
+    expect(pressed()).not.toBe(was);
+  });
+
+  it("comes back after a reload, as it was sent", async () => {
+    await makeUp({ copyKind: "mst", copyRunQsos: 3, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ MST");
+    const was = length();
+    await wait(300);
+
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount({ copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await until("the QSO to come back", () => state() === "paused");
+    expect(length()).toBe(was);
+    expect(boxes()[0]!.value).toBe("CQ MST");
+  });
+});

@@ -124,7 +124,7 @@ describe("reading an over", () => {
 
   it("knows the error sign, keyed cleanly or not", () => {
     for (const w of ["<HH>", "EEE", "EEEEEEEE", "HH", "H5", "SSS", "5S"]) expect(isErrorSign(w)).toBe(true);
-    for (const w of ["E", "EE", "I", "S", "H", "5", "IS", "ES", "HE", "HI", "HIS", "SHE", "SEE"]) {
+    for (const w of ["E", "EE", "I", "S", "H", "5", "55", "555", "IS", "ES", "HE", "HI", "HIS", "SHE", "SEE"]) {
       expect(isErrorSign(w)).toBe(false);
     }
   });
@@ -133,6 +133,7 @@ describe("reading an over", () => {
     expect(erased(wordsOf("DE W7YR EEE W7YFR K"))).toEqual(["DE", "W7YFR", "K"]);
     expect(erased(wordsOf("<HH> CQ"))).toEqual(["CQ"]);
     expect(erased(wordsOf("TU 73 E E"))).toEqual(["TU", "73", "E", "E"]);
+    expect(erased(wordsOf("TOM 55 E E"))).toEqual(["TOM", "55", "E", "E"]);
   });
 
   it("splits a prosign keyed against a word", () => {
