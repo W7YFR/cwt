@@ -29,7 +29,7 @@ export const FORMATS: Readonly<Record<FormatId, Format>> = {
   cwt: { id: "cwt", word: "CWT", yours: ["name", "number"], wpm: [26, 32] },
   sst: { id: "sst", word: "SST", yours: ["name", "region"], wpm: [14, 20] },
   mst: { id: "mst", word: "MST", yours: ["name", "number"], wpm: [20, 25] },
-  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 22] },
+  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 25] },
 };
 
 export const FORMAT_IDS = Object.keys(FORMATS) as FormatId[];

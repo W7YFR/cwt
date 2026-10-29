@@ -69,6 +69,39 @@ describe("a run", () => {
   });
 });
 
+describe("a run after a reload", () => {
+  it("comes back with its QSOs, their reports and its count, to go on with", async () => {
+    await open({ qsoTheirText: "before" });
+    const call = callIn(await send("CQ CWT W7YFR"));
+    await send(`${call} BOB 1234`);
+    const before = theirs().length;
+    await key("TU W7YFR");
+    await until("the next station", () => theirs().length > before);
+    await until("your turn", () => yourTurn());
+
+    // The page goes, without a Stop, and comes back.
+    unmount();
+    mount({ qsoTheirText: "before" });
+    expect($('[data-testid="qso-report"]'), "the report of the QSO before").not.toBeNull();
+    expect(tally()?.dataset.format).toBe("cwt");
+    expect(tally()?.dataset.made).toBe("1");
+    await until("the Continue button", () => {
+      const b = $<HTMLButtonElement>('[data-testid="qso-continue"]');
+      return !!b && !b.disabled;
+    });
+    await click($('[data-testid="qso-continue"]'));
+    await until("your turn", () => yourTurn());
+
+    // The run goes on: the station that called takes your exchange.
+    const next = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso as { format?: string; them: { call: string } };
+    expect(next.format).toBe("cwt");
+    const n = theirs().length;
+    await send(`${next.them.call} BOB 1234`);
+    expect(theirs().length).toBeGreaterThan(n);
+    expect(JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso.stage).toBe("exchanged");
+  });
+});
+
 describe("the report at the end of a QSO", () => {
   const rows = () => $$('[data-testid="qso-report"] tbody tr:not(.side)');
 

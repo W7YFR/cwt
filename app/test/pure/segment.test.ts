@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { join } from "node:path";
 import { readWords, type Spaced } from "@/timing/segment";
-import { sentSymbols } from "@/timing/live";
+import { LiveCopy, sentSymbols } from "@/timing/live";
 import { targetTiming } from "@/timing/model";
 import { vocabulary } from "@/qso/vocabulary";
 import { readWav } from "../wav";
@@ -66,5 +66,21 @@ describe("the author's keying, wide letter gaps and a short word gap", () => {
     const timing = targetTiming(25, 20);
     expect(sentSymbols(wav.samples, wav.rate, timing, undefined, true).text).toBe("TA EEETUW7YFR");
     expect(sentSymbols(wav.samples, wav.rate, timing, undefined, true, undefined, WORDS).text).toBe("TA EEETU W7YFR");
+  });
+});
+
+describe("the live copy, given the words of the QSO", () => {
+  it("reads by them with lenient copy, and leaves strict alone", () => {
+    const wav = readWav(join(__dirname, "../data/tu-w7yfr-wide-letters.wav"));
+    const timing = targetTiming(25, 20);
+    const read = (measure: boolean, words?: ReadonlySet<string>) => {
+      const copy = new LiveCopy(wav.rate, timing, measure, undefined, words);
+      copy.push(wav.samples);
+      return copy.step().text;
+    };
+    expect(read(true, WORDS)).toBe("TA EEETU W7YFR");
+    expect(read(true)).toBe("TA EEETUW7YFR");
+    // Strict reads at your set speed, and the words change nothing.
+    expect(read(false, WORDS)).toBe(read(false));
   });
 });
