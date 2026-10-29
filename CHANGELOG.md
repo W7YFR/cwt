@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.19.0 — 2026-10-29
+
 ### Added
 
 - **New exchange** on the Copy page generates a QSO to copy: a standard **CQ** QSO, or a **POTA**, **SST**, **MST** or **CWT** run. Opening a recording stays beside it.
