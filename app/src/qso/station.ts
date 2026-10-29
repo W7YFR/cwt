@@ -81,6 +81,15 @@ export function randomStation(rand: Rand, not = ""): Station {
   };
 }
 
+/** A CWops number. Never all fives, as 55: keyed, that is a run of dits
+ *  the station reads as the error sign. */
+function memberNumber(rand: Rand): string {
+  for (;;) {
+    const nr = String(1 + Math.floor(rand() * 4200));
+    if (!/^5+$/.test(nr)) return nr;
+  }
+}
+
 /** How many CWT stations are CWops members. The rest send their region. */
 const MEMBERS = 0.8;
 
@@ -90,7 +99,7 @@ export function randomCaller(rand: Rand, not = ""): Station {
   const station = randomStation(rand, not);
   return {
     ...station,
-    nr: rand() < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : "",
+    nr: rand() < MEMBERS ? memberNumber(rand) : "",
     serial: 1 + Math.floor(rand() * 150),
   };
 }

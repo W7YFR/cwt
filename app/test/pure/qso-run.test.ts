@@ -125,6 +125,26 @@ describe("a QSO in each format", () => {
     expect(replies).toEqual(["TU JIM 23"]);
   });
 
+  it("reads GA after your name or report as Georgia, not good afternoon", () => {
+    expect(work(called("sst"), ["K4ABC TOM GA"]).qso.got?.region).toBe("GA");
+    expect(work(called("sst"), ["GA JIM TOM GA"]).qso.got).toMatchObject({ name: "TOM", region: "GA" });
+    expect(work(called("pota"), ["K4ABC UR 5NN GA GA BK"]).qso.got?.region).toBe("GA");
+    expect(work(called("sst"), ["K4ABC TOM", "GA GA"]).qso.got?.region).toBe("GA");
+  });
+
+  it("reads a number shaped like a report or a 73, unless another comes with it", () => {
+    expect(work(called("cwt"), ["K4ABC TOM 291"]).qso.got?.number).toBe("291");
+    expect(work(called("cwt"), ["K4ABC TOM 73"]).qso.got?.number).toBe("73");
+    expect(work(called("cwt"), ["K4ABC TOM 5NN 1234"]).qso.got?.number).toBe("1234");
+    expect(work(called("mst"), ["K4ABC TOM", "155 155"]).qso.got?.number).toBe("155");
+  });
+
+  it("takes a name a character off its call as a name", () => {
+    const { qso, replies } = work(called("sst", { ...JIM, call: "W9LT" }), ["W9LT WALT OK"]);
+    expect(qso.got).toMatchObject({ name: "WALT", region: "OK" });
+    expect(replies[0]).toMatch(/WALT/);
+  });
+
   it("takes your region from User as one, outside the list", () => {
     const { replies } = work(called("sst"), ["K4ABC TOM DL"], { ...FIRST, region: "DL" });
     expect(replies).toEqual(["GE TOM JIM GA"]);

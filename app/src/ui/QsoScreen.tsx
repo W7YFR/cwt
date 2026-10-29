@@ -30,7 +30,7 @@ import {
 import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
-import { hint, meOf } from "@/qso/hint";
+import { hint, meOf, seededVoice } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
@@ -1519,7 +1519,12 @@ export function QsoScreen({
   };
   const suggestion =
     recorder && phase === "listening" && (hints === "always" || (hints === "copied" && copiedRight()))
-      ? hint(qso.current, meOf(loadUser()), guideKind === "cq" ? null : guideKind)
+      ? hint(
+          qso.current,
+          meOf(loadUser()),
+          guideKind === "cq" ? null : guideKind,
+          seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+        )
       : null;
 
   /* A new line, or more of one, keeps the end of the log in view: unless you

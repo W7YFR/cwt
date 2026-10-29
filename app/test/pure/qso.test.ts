@@ -7,6 +7,8 @@ import { targetTiming } from "@/timing";
 import { LiveCopy, overEnded, sentSymbols } from "@/timing/live";
 import type { Calibration } from "@/dsp";
 import {
+  Over,
+  STRICT,
   answer,
   erased,
   isCall,
@@ -135,6 +137,13 @@ describe("reading an over", () => {
 
   it("splits a prosign keyed against a word", () => {
     expect(wordsOf("73<SK> ee")).toEqual(["73", "<SK>", "EE"]);
+  });
+
+  it("reads your QTH to the next item, and a region that is also a greeting", () => {
+    const qth = (heard: string) => new Over(heard, STRICT).qthSent();
+    expect(qth("UR 599 QTH ATLANTA GA NAME BOB K")).toBe("ATLANTA GA");
+    expect(qth("QTH SALEM OR HW CPY? K")).toBe("SALEM OR");
+    expect(qth("QTH SALEM OR OP BOB BOB K")).toBe("SALEM OR");
   });
 });
 

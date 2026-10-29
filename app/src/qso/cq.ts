@@ -44,6 +44,7 @@
  */
 
 import { UNKNOWN } from "@/morse";
+import { REGIONS } from "./formats";
 import { NO_SEARCH, qrq, qrs, setTo, type Search, type Speed } from "./speed";
 import { randomStation, type Rand, type Station } from "./station";
 import * as wording from "./wording";
@@ -561,7 +562,12 @@ export class Over {
     for (let j = at + 1; j < this.words.length && out.length < 3; j++) {
       const w = this.words[j]!;
       if (FILLER.has(w) && out.length === 0) continue;
-      if (DE_STOP.has(w) || TURN_WORDS.has(w) || w === "ES" || w === "NAME" || w.endsWith("?")) break;
+      // A region after the city, as the GA of ATLANTA GA, is no greeting.
+      if (out.length === 1 && REGIONS.has(w)) {
+        out.push(w);
+        continue;
+      }
+      if (DE_STOP.has(w) || TURN_WORDS.has(w) || ["ES", "NAME", "OP", "NM", "HW"].includes(w) || w.endsWith("?")) break;
       out.push(w);
     }
     return out.join(" ");

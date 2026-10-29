@@ -7,6 +7,17 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- On the QSO page, **Suggest my reply** and the station in a run word their lines more ways, as operators do.
+
+### Fixed
+
+- In a run, the station no longer asks `QTH?` again and again when your state is `GA`.
+- In a CWT or MST, the station no longer asks `NR?` again and again for a number such as `291` or `73`.
+- In a run, a name one character off the station's call, as `WALT` for `W9LT`, is now taken as your name.
+- At the end of a QSO, your QTH no longer takes in the word after it, as the `HW` of `SALEM OR HW CPY?`.
+
 ## v1.18.1 — 2026-10-29
 
 ### Added
