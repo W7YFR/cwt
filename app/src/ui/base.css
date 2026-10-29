@@ -2515,6 +2515,8 @@ header .modeswitch button { white-space: nowrap; }
 }
 .qsolog .lend .lwpm { margin-left: 0; padding-left: 0; }
 .qsolog .qsoplay { width: 24px; height: 24px; font-size: 11px; }
+/* The place of a button a line does not have, so the rest line up. */
+.qsolog .lspace { flex: 0 0 24px; width: 24px; height: 24px; }
 /* Play QSO and Download, under the last line of a QSO that is over, lined up
    with the text. */
 .qsolog .qsotape { padding-left: calc(8ch + 12px); gap: 8px; }

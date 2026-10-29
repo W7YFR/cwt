@@ -54,6 +54,7 @@ import {
   type Prefs,
 } from "@/io/storage";
 import { FORMATS } from "@/qso/formats";
+import { fmtSpeed } from "./format";
 import type { LockedShows } from "@/qso/show";
 import type { Speed } from "@/qso/speed";
 import type { Length } from "@/qso/wording";
@@ -68,7 +69,7 @@ import {
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
-import { IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
+import { IconEdit, IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
@@ -129,6 +130,10 @@ const LOCKED_SHOWS_HELP =
   "right or wrong, or your copy graded against what was sent. Show answers shows what " +
   "was sent under every line.";
 
+const ALLOW_EDITS_HELP =
+  "An Edit button beside a locked copy opens it again, so you can fix a mistake. " +
+  `It locks again when it plays on, or on ${MOD}+Enter.`;
+
 const FOLLOW_HELP =
   "The slot for the character playing now is highlighted, so you can see where the audio " +
   "is in the line.";
@@ -138,6 +143,8 @@ const GRADE_TYPING_HELP =
 const SEEK_SLOT_HELP =
   "While the recording is paused, it moves to the character of the slot you select. Play " +
   "goes on from there.";
+
+const SHOW_SPEED_HELP = "Each line of a generated QSO shows the speed it was sent at.";
 
 const HIDE_CALLS_HELP =
   "Each station shows as Station 1 or Station 2 until you copy its call in one of your " +
@@ -295,7 +302,15 @@ function recallKept(key: string, rec: Recording, input: CopyInput): Kept | null 
   return { v: 2, key, attempts, reached: k.reached, at: k.at, revealed: k.revealed === true };
 }
 
-type OnOffKey = "copySettingsOpen" | "copyLock" | "copyHideCalls" | "copyFollow" | "copyGradeTyping" | "copySeekSlot";
+type OnOffKey =
+  | "copySettingsOpen"
+  | "copyLock"
+  | "copyHideCalls"
+  | "copyFollow"
+  | "copyGradeTyping"
+  | "copySeekSlot"
+  | "copyAllowEdits"
+  | "copyShowSpeed";
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean) => void] {
@@ -362,6 +377,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [follow, setFollow] = useOnOff("copyFollow", false);
   const [gradeTyping, setGradeTyping] = useOnOff("copyGradeTyping", false);
   const [seekSlot, setSeekSlot] = useOnOff("copySeekSlot", false);
+  const [allowEdits, setAllowEdits] = useOnOff("copyAllowEdits", false);
+  const [showSpeed, setShowSpeed] = useOnOff("copyShowSpeed", true);
   /** How the next attempt copies. The attempt under way keeps its own. */
   const [inputPref, setInputPref] = useChoice("copyInput", "text");
   const [linesShow, setLinesShow] = useChoice("copyLines", "copy");
@@ -868,6 +885,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
      Enter in a box locks its line. */
   const modKey = (ev: KeyboardEvent): boolean => {
     if (!modOf(ev)) return false;
+    if (ev.key === ".") {
+      ev.preventDefault();
+      if (!ev.repeat) replayLine(isBox(ev.target) ? ev.target : null);
+      return true;
+    }
     if (ev.key === "Enter") {
       const line = isBox(ev.target) ? ev.target.closest<HTMLElement>("li[data-line]")?.dataset.line : undefined;
       if (line === undefined) return false;
@@ -1108,6 +1130,53 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     );
   };
 
+  /** The speed line `i` of a generated QSO was sent at, as the QSO page
+   *  shows a line's speed. None for a recording. */
+  const lineSpeed = (i: number): React.ReactElement | null => {
+    const line = file?.script?.lines[i];
+    if (!showSpeed || !line) return null;
+    const speed = sending.speed ?? file!.script!.stations[line.station]!.speed;
+    return (
+      <span className="lwpm" data-testid="copy-line-wpm">
+        {fmtSpeed(speed)}
+      </span>
+    );
+  };
+
+  /** Edit, on a locked copy of the attempt under way. */
+  const lineEdit = (i: number): React.ReactElement | null => {
+    if (!allowEdits || linesShow !== "copy") return null;
+    // Its place kept on a line that cannot be edited, so every line's speed
+    // and play button line up.
+    if (!lines[i]?.locked) return <span className="lspace" aria-hidden="true" />;
+    return (
+      <button
+        type="button"
+        className="iconbtn qsoplay"
+        data-testid="copy-line-edit"
+        aria-label="Edit my copy"
+        title="Edit my copy"
+        onClick={() => setLine(i, { locked: false })}
+      >
+        <IconEdit />
+      </button>
+    );
+  };
+
+  /** Cmd+. or Ctrl+.: the line plays again. The line of the box you are in,
+   *  or else the line playing, or the last one heard. As the QSO page's
+   *  Cmd+. plays the station's last line. Again while it plays stops it. */
+  const replayLine = (box: HTMLElement | null) => {
+    if (!rec) return;
+    const inBox = box?.closest<HTMLElement>("li[data-line]")?.dataset.line;
+    const heardLast = rec.overs.reduce((last, o, i) => (o.t0 <= reached + 0.05 ? i : last), -1);
+    const i = inBox !== undefined ? Number(inBox) : nowLine >= 0 ? nowLine : heardLast;
+    const over = rec.overs[i];
+    if (!over) return;
+    if (typeof playing === "object" && playing?.from === over.t0) player.stop();
+    else playPart(over.t0, over.t1);
+  };
+
   /** The line playing now: the one the recording is in, or the part. */
   const nowAt = mode.current === "part" ? partAt : mode.current === "main" ? pos : null;
   const nowLine =
@@ -1284,6 +1353,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     options={LOCKED_SHOWS}
                     onChange={(v) => setLockedShows(v as LockedShows)}
                   />
+                  <Check
+                    id="copy-allow-edits"
+                    label="Allow edits"
+                    help={ALLOW_EDITS_HELP}
+                    checked={allowEdits}
+                    onChange={setAllowEdits}
+                  />
                   <ChoiceGroup
                     id="copy-earlier"
                     label="When I copy again, show"
@@ -1359,6 +1435,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 help={HIDE_CALLS_HELP}
                 checked={hideCalls}
                 onChange={setHideCalls}
+              />
+              <Check
+                id="copy-show-speed"
+                label="Show its speed on each line"
+                help={SHOW_SPEED_HELP}
+                checked={showSpeed}
+                onChange={setShowSpeed}
               />
             </div>
           </Section>
@@ -1527,7 +1610,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                   <span className="who">{label}</span>
                   {textOf(o, i, label)}
                   <span className="lend">
-                    {linePlay(o, i)}
+                    {lineSpeed(i)}
+                  {lineEdit(i)}
+                  {linePlay(o, i)}
                   </span>
                 </li>
               );
@@ -1561,6 +1646,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           <div className="copykeys">
             <p className="legend keys" data-testid="copy-hotkeys">
               On the page: <kbd>Space</kbd> or <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause
+              &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>.</kbd> play the line again
               &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5s
               {input === "slots" && (
                 <>
@@ -1569,10 +1655,23 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 </>
               )}
             </p>
-            <p className="legend keys" data-testid="copy-box-keys">
-              In a box: <kbd>Enter</kbd> {waits ? "lock the line and go on, or play or pause" : "play or pause"} &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> lock the line
-              &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{MOD}</kbd> for the other keys
-            </p>
+            {/* Only the keys the settings use: none in a box with no boxes,
+                and with Wait, Enter is the lock. */}
+            {linesShow === "copy" && (
+              <p className="legend keys" data-testid="copy-box-keys">
+                In a box:{" "}
+                {waits ? (
+                  <>
+                    <kbd>Enter</kbd> lock the line and go on
+                  </>
+                ) : (
+                  <>
+                    <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> lock the line
+                  </>
+                )}
+                &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{MOD}</kbd> for the other keys
+              </p>
+            )}
           </div>
         )}
       </main>

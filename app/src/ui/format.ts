@@ -21,6 +21,11 @@ export function fmtWpm(v: number): string {
   return `${pad(Math.round(v), 2)} wpm`;
 }
 
+/** A speed as the app writes it: 25 wpm, or 25/16 wpm with Farnsworth. */
+export function fmtSpeed(s: { charWpm: number; farnsworthWpm: number }): string {
+  return s.charWpm === s.farnsworthWpm ? `${s.charWpm} wpm` : `${s.charWpm}/${s.farnsworthWpm} wpm`;
+}
+
 export function fmtTolerance(frac: number): string {
   return `${pad(Math.round(frac * 100), 2)}%`;
 }

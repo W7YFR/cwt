@@ -536,6 +536,11 @@ export interface Prefs {
   /** On the Copy page, while paused, selecting a slot moves the recording to
    *  its character. Absent is off. */
   copySeekSlot?: boolean;
+  /** An Edit button beside a locked copy on the Copy page opens it again.
+   *  Absent is off. */
+  copyAllowEdits?: boolean;
+  /** A generated QSO's lines show the speed each was sent at. Absent is on. */
+  copyShowSpeed?: boolean;
   /** Which earlier attempts show while you try again on the Copy page: all,
    *  the last, or none, to go again clean. Absent is the last. */
   copyEarlier?: "all" | "last" | "none";
@@ -742,6 +747,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copyFollow: isBool,
   copyGradeTyping: isBool,
   copySeekSlot: isBool,
+  copyAllowEdits: isBool,
+  copyShowSpeed: isBool,
   copyEarlier: oneOf("all", "last", "none"),
   copyKind: oneOf("cq", "cwt", "sst", "mst", "pota"),
   copyRunQsos: isNum,

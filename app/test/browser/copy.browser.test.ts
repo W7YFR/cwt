@@ -651,3 +651,67 @@ describe("Wait between lines", () => {
     expect(lines()).toHaveLength(2);
   });
 });
+
+describe("the keys the pages share", () => {
+  /** Cmd+. on a Mac, Ctrl+. elsewhere, on `el`. */
+  async function modDot(el: HTMLElement): Promise<void> {
+    const mac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+    await act(async () => {
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: ".", metaKey: mac, ctrlKey: !mac, bubbles: true, cancelable: true }));
+    });
+  }
+
+  it("plays the line of the box you are in again on Cmd or Ctrl+.", async () => {
+    await open();
+    await playTo(1);
+    const before = plays.length;
+    await modDot(boxes()[0]!);
+    expect(plays.length).toBe(before + 1);
+    const [, to] = plays[plays.length - 1]!;
+    expect(to, "one line, not the rest of the recording").toBeDefined();
+    expect(boxes()[0]!.value, "nothing typed").toBe("");
+  });
+
+  it("plays the last line heard again on Cmd or Ctrl+., outside a box", async () => {
+    await open();
+    await playTo(2);
+    (document.activeElement as HTMLElement | null)?.blur();
+    const before = plays.length;
+    await modDot(document.body);
+    expect(plays.length).toBe(before + 1);
+    expect(plays[plays.length - 1]![1]).toBeDefined();
+  });
+});
+
+describe("Allow edits", () => {
+  it("opens a locked line again, and locks it again on Cmd or Ctrl+Enter", async () => {
+    await open({ copyAllowEdits: true });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    await enter(boxes()[0]!, true);
+    expect(boxes()).toHaveLength(0);
+    await click(lines()[0]!.querySelector<HTMLElement>('[data-testid="copy-line-edit"]'));
+    expect(boxes()).toHaveLength(1);
+    expect(boxes()[0]!.value, "your copy as you left it").toBe("CQ CQ");
+    await fill(boxes()[0]!, "CQ CQ DE");
+    await enter(boxes()[0]!, true);
+    expect(boxes()).toHaveLength(0);
+    expect(lines()[0]!.querySelector('[data-testid="copy-line-score"]')!.textContent).toBe(`6/${keyed(QSO[0]!.text)}`);
+  });
+
+  it("locks an edited line again when the recording plays on", async () => {
+    await open({ copyAllowEdits: true });
+    await playTo(2);
+    expect(boxes()).toHaveLength(1);
+    await click(lines()[0]!.querySelector<HTMLElement>('[data-testid="copy-line-edit"]'));
+    expect(boxes()).toHaveLength(2);
+    await click(button("copy-play"));
+    await until("line 1 to lock again", () => !lines()[0]!.querySelector('[data-testid="copy-type"]'));
+  });
+
+  it("shows no Edit unless allowed", async () => {
+    await open();
+    await playTo(2);
+    expect($('[data-testid="copy-line-edit"]')).toBeNull();
+  });
+});

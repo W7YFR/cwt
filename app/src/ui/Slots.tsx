@@ -90,8 +90,9 @@ export function Slots({
 
   const keyDown = (ev: React.KeyboardEvent<HTMLInputElement>, i: number) => {
     onKey?.();
-    // With Cmd or Ctrl, a key is the page's.
-    if (ev.metaKey || ev.ctrlKey) return;
+    // With Cmd or Ctrl, a key is the page's, but for Cmd+Enter, or
+    // Ctrl+Enter, which locks the copy where the slots take `onLock`.
+    if ((ev.metaKey || ev.ctrlKey) && !(ev.key === "Enter" && onLock)) return;
     if (ev.key === "Escape") {
       ev.preventDefault();
       ev.stopPropagation();
