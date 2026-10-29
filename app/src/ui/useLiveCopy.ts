@@ -42,13 +42,15 @@ const NONE: OverCopy = { text: "", keying: null, over: false, sentWpm: null, tur
 const LOG_EVERY_MS = 1000;
 
 /** With `lenient`, the over is read at the sender's own timing once there is
- *  enough of it to measure. With `calibration`, its edges are corrected for
- *  the microphone path. Either takes effect at the next over. */
+ *  enough of it to measure, and a gap near the cut between letters and words
+ *  by what makes `words`. With `calibration`, its edges are corrected for
+ *  the microphone path. Each takes effect at the next over. */
 export function useLiveCopy(
   source: LiveSource | null,
   listening: boolean,
   lenient: boolean,
   calibration: Calibration | null = null,
+  words: readonly string[] = [],
 ): OverCopy {
   const [copy, setCopy] = useState<OverCopy>(NONE);
   const recorder = source?.recorder ?? null;
@@ -61,6 +63,8 @@ export function useLiveCopy(
   loose.current = lenient;
   const correction = useRef(calibration);
   correction.current = calibration;
+  const vocabulary = useRef(words);
+  vocabulary.current = words;
 
   useEffect(() => {
     setCopy(NONE);
@@ -98,6 +102,7 @@ export function useLiveCopy(
         farnsworthWpm,
         lenient: loose.current,
         calibration: correction.current,
+        ...(loose.current && vocabulary.current.length ? { words: vocabulary.current } : {}),
       };
       worker.postMessage(start);
     };

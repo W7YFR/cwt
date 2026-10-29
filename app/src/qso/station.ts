@@ -31,7 +31,7 @@ export function regionOf(station: Station): string {
   return station.qth.slice(station.qth.lastIndexOf(" ") + 1);
 }
 
-const NAMES = [
+export const NAMES = [
   "AL", "ANN", "BILL", "BOB", "CHUCK", "DAN", "DAVE", "ED", "FRED", "GARY",
   "JIM", "JOE", "JOHN", "KEN", "LEE", "MARK", "MIKE", "PAT", "PETE", "RICK",
   "RON", "SAM", "SUE", "TOM", "WALT",

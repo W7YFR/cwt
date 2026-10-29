@@ -57,6 +57,7 @@ import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
 import { HomeButton } from "./Wordmark";
+import { MOD, modOf } from "./modKey";
 
 /** How long after the last line ends its copy locks, when Lock is on. Every
  *  other line locks when the next one starts. */
@@ -66,11 +67,6 @@ const LAST_LOCK_SEC = 5;
  *  much after, so its first and last characters are heard whole. */
 const PART_PAD_SEC = 0.15;
 
-/** The key that takes the page's keys into a box: Cmd on a Mac, Ctrl
- *  elsewhere. */
-const MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
-const MOD = MAC ? "⌘" : "Ctrl";
-const modOf = (ev: KeyboardEvent) => (MAC ? ev.metaKey && !ev.ctrlKey : ev.ctrlKey && !ev.metaKey) && !ev.altKey;
 
 /** What shows of a line as it plays. */
 type LinesShow = "copy" | "sent" | "before";

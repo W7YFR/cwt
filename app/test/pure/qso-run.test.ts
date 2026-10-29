@@ -157,6 +157,33 @@ describe("the station asks again", () => {
     expect(work(called("pota"), ["K4ABC UR5NN WA WA BK"]).replies).toEqual(["RST?"]);
   });
 
+  it("puts a state keyed apart back together, with lenient copy", () => {
+    const LENIENT: RunContext = { ...FIRST, ear: { lenient: true, saved: "" } };
+    expect(work(called("sst"), ["K4ABC TOM W A"], LENIENT).replies).toEqual(["GE TOM JIM GA"]);
+    expect(work(called("sst"), ["K4ABC TOM", "W A W A"], LENIENT).replies).toEqual(["QTH?", "GE TOM JIM GA"]);
+    expect(work(called("sst"), ["K4ABC TOM W A"]).replies).toEqual(["QTH?"]);
+  });
+
+  it("leaves a call keyed apart out of the exchange, with lenient copy", () => {
+    const LENIENT: RunContext = { ...FIRST, ear: { lenient: true, saved: "" } };
+    // AK 3SD is the station's call, not a name or a state.
+    const ak = { ...JIM, call: "AK3SD" };
+    expect(work(called("sst", ak), ["AK 3SD RM EEE R OB WA"], LENIENT).replies).toEqual(["GE OB JIM GA"]);
+    expect(work(called("sst"), ["K4 ABC TOM NE"], LENIENT).replies).toEqual(["GE TOM JIM GA"]);
+  });
+
+  it("puts its call right when sent a character off, and keeps your exchange", () => {
+    const LENIENT: RunContext = { ...FIRST, ear: { lenient: true, saved: "" } };
+    const n6 = { ...JIM, call: "N6MZA" };
+    // A 6 keyed with a dit short is a B. Not your name: its call, sent wrong.
+    for (const context of [FIRST, LENIENT]) {
+      expect(work(called("sst", n6), ["NBMZA ROB WA", "N6MZA"], context).replies).toEqual([
+        "N6MZA N6MZA",
+        "GE ROB JIM GA",
+      ]);
+    }
+  });
+
   it("parts only what was run together", () => {
     expect(unglued(["UR5NN", "5NNWA", "TOM1234", "WAWA", "K7YGJ", "1234", "5NN", "OR", "TOM"])).toEqual([
       "UR", "5NN", "5NN", "WA", "TOM", "1234", "WA", "WA", "K7YGJ", "1234", "5NN", "OR", "TOM",

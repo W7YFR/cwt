@@ -31,6 +31,8 @@ import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
 import { hint, meOf } from "@/qso/hint";
+import { exchangeReport } from "@/qso/report";
+import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import type { Station } from "@/qso/station";
@@ -42,6 +44,7 @@ import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
+import { MOD, modOf } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { Graded, RightOnly } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
@@ -129,10 +132,25 @@ function useWide(): boolean {
   return wide;
 }
 
+/** The lines of the log in their QSOs, in order: each QSO's number and
+ *  where its lines are. */
+function qsoGroups(lines: readonly { qso: number }[]): { qso: number; at: number[] }[] {
+  const out: { qso: number; at: number[] }[] = [];
+  lines.forEach((line, i) => {
+    const last = out[out.length - 1];
+    if (last && last.qso === line.qso) last.at.push(i);
+    else out.push({ qso: line.qso, at: [i] });
+  });
+  return out;
+}
+
 /** The longest one over may run. The recording starts over at each over. */
 const MAX_OVER_SEC = 600;
 
-type Phase = "listening" | "waiting" | "playing";
+/** Your turn, the wait before the station answers, its answer playing, or
+ *  a line you chose playing again. The microphone is read on your turn
+ *  alone. */
+type Phase = "listening" | "waiting" | "playing" | "replaying";
 
 /** Where the page is, as its heading says in a word. */
 type QsoState = "ready" | "sending" | "waiting" | "receiving" | "paused" | "over";
@@ -212,12 +230,13 @@ const BLUR_CALL_HELP =
 type Playback = "never" | "always" | "end";
 const PLAYBACKS: ReadonlyArray<Option<Playback>> = [
   { value: "never", label: "Never", note: "No buttons to play lines again." },
-  { value: "always", label: "Always", note: "On every line. They play once the microphone is off." },
+  { value: "always", label: "Always", note: "On every line. During a QSO, they play on your turn." },
   { value: "end", label: "At end", note: "On every line once the QSO is over, with Play QSO." },
 ];
 const PLAYBACK_HELP =
   "When the play buttons show: on each line and as Play QSO under a QSO that is over. " +
-  "Always shows them on every line, and they play once the microphone is off. At end " +
+  "Always shows them on every line. During a QSO they play on your turn, before you start " +
+  "sending, and the microphone is not copied while they play. At end " +
   "shows them once the QSO is over.";
 const SHOW_DOWNLOAD_HELP = "Under a QSO that is over, Download saves it as a WAV file.";
 
@@ -293,6 +312,9 @@ interface Kept {
   readonly stopped: boolean;
   /** A reply due but not yet in the log when the page went. */
   readonly pending: Pending | null;
+  /** Each QSO that is over, as it ended, for its report. Absent in a log
+   *  kept before there were reports. */
+  readonly ends?: Readonly<Record<number, AnyQso>>;
 }
 
 /** A reply the station is about to send, before it goes in the log. */
@@ -337,6 +359,7 @@ function recallKept(): Kept | null {
         : finished === null && !k.lines.some((l) => l.qso === qsoNo && !closed.includes(l.qso)),
     piecesStation: k.piecesStation === true,
     pending: typeof k.pending?.reply === "string" ? k.pending : null,
+    ends: typeof k.ends === "object" && k.ends !== null ? k.ends : {},
     note: typeof k.note === "string" ? k.note : "",
   };
 }
@@ -364,6 +387,8 @@ const SHOW_THEIR_SPEED_HELP = "Each of the station's lines shows the speed it se
 /** Enter and Escape in a copy box are not the recorder's: it listens on the
  *  document, and these keys would stop the session. Enter locks the copy. */
 function keepKeys(ev: React.KeyboardEvent, lock: () => void): void {
+  // Cmd+Enter, or Ctrl+Enter, is the log's: it plays the station's line.
+  if (ev.key === "Enter" && modOf(ev)) return;
   if (ev.key === "Enter" || ev.key === "Escape") {
     ev.preventDefault();
     ev.stopPropagation();
@@ -522,6 +547,8 @@ export function QsoScreen({
   const qsoNo = useRef(kept?.qsoNo ?? 0);
   /** The QSOs that are over. Their overs all show. */
   const [closed, setClosed] = useState<readonly number[]>(() => kept?.closed ?? []);
+  /** Each QSO that is over, as it ended, for its report. */
+  const [ends, setEnds] = useState<Readonly<Record<number, AnyQso>>>(() => kept?.ends ?? {});
   /** A QSO that ends once the reply now playing ends. */
   const closing = useRef<number | null>(null);
   /** A QSO that has ended with your copy not yet graded. It closes when you
@@ -579,7 +606,18 @@ export function QsoScreen({
   /* Playing a line or a whole QSO again, once the microphone is off. A player
      of its own: the one above moves the QSO on when a line ends. */
   const [replaying, setReplaying] = useState<string | null>(null);
-  const listen = useMemo(() => createPlayer({ onEnded: () => setReplaying(null) }), []);
+  /** What happens when a line played again ends. */
+  const replayEnded = useRef<() => void>(() => {});
+  const listen = useMemo(
+    () =>
+      createPlayer({
+        onEnded: () => {
+          setReplaying(null);
+          replayEnded.current();
+        },
+      }),
+    [],
+  );
   useEffect(() => () => listen.destroy(), [listen]);
   /** Your overs as recorded, by line, with the wait before each cut. Kept
    *  in the browser too, so a reload can still play them. */
@@ -684,7 +722,11 @@ export function QsoScreen({
       ending.current = false;
       return;
     }
-    close(qsoNo.current);
+    // Stopped mid-QSO: its report is of the QSO as far as it went.
+    const now = qso.current;
+    const n = qsoNo.current;
+    setEnds((e) => (e[n] ? e : { ...e, [n]: now }));
+    close(n);
     if (finishedRef.current !== null) close(finishedRef.current);
   }, [recorder, quiet, close]);
 
@@ -698,7 +740,15 @@ export function QsoScreen({
     const profile = profileForSource(profiles.find((p) => p.id === profileId) ?? null, true);
     return profile ? calibrationOf(profile) : null;
   }, [profiles, profileId]);
-  const copy = useLiveCopy(source, phase === "listening", lenient, calibration);
+  /* The words your next over may hold, to read your spacing by: yours from
+     User, and the station's call and name. */
+  const user = loadUser();
+  const them = qso.current.them;
+  const words = useMemo(
+    () => vocabulary([user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name]),
+    [user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name],
+  );
+  const copy = useLiveCopy(source, phase === "listening", lenient, calibration, words);
   /* You are typing in a copy box. Nothing is dropped and nothing starts over:
      what the decoder reads still counts, in case you are sending as well.
      Only the line that shows your sending hides, so noise on the input does
@@ -765,6 +815,12 @@ export function QsoScreen({
     setNote("");
     recorder?.restart();
     setPhase("listening");
+    waitForNext();
+  };
+
+  /** In a run between QSOs, the next station calls in a few seconds unless
+   *  you send first. */
+  const waitForNext = () => {
     const [lo, hi] = NEXT_CALL_SEC;
     if (nextCall.current !== null) clearTimeout(nextCall.current);
     nextCall.current = setTimeout(
@@ -784,6 +840,8 @@ export function QsoScreen({
     if (isSending(copy.text)) return;
     const turn = callIn(now);
     qso.current = turn.qso;
+    // The QSO before is done with: its copy is graded, and its report shows.
+    if (finishedRef.current !== null) close(finishedRef.current);
     setNote("");
     sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
   };
@@ -939,6 +997,8 @@ export function QsoScreen({
 
     qso.current = turn.ended ? following(turn.qso, Math.random, speed) : turn.qso;
     if (turn.ended) {
+      const done = turn.qso;
+      setEnds((e) => ({ ...e, [n]: done }));
       qsoNo.current++;
       piecesStation.current = Math.random() < MIXED_PIECES;
     }
@@ -989,6 +1049,7 @@ export function QsoScreen({
     void forgetQsoOvers();
     setNote("");
     setClosed([]);
+    setEnds({});
     setPlaying(null);
     qsoNo.current = 0;
     closing.current = null;
@@ -1059,10 +1120,11 @@ export function QsoScreen({
             note,
             stopped,
             pending: pending.current,
+            ends,
           },
     );
     // The phase, for a reply that is due: it is kept as soon as it is.
-  }, [lines, closed, finished, theirSpeed, note, stopped, phase]);
+  }, [lines, closed, finished, theirSpeed, note, stopped, phase, ends]);
 
   /** Paused, or a reload came back to a session under way: Continue goes
    *  on with it, where Start would clear the log. */
@@ -1126,7 +1188,49 @@ export function QsoScreen({
     }
     listen.wake();
     setReplaying(key);
+    // In a session, the microphone is not read while the line plays, so the
+    // line is not copied as your sending.
+    if (recorder) setPhase("replaying");
     void listen.playBuffer(encodeWavBuffer(clip.samples, clip.rate));
+  };
+  /* The line has played: in a session, your turn starts over, clear of it.
+     In a run between QSOs, the next station waits a few seconds more. */
+  replayEnded.current = () => {
+    if (!recorder || phase !== "replaying") return;
+    recorder.restart();
+    setPhase("listening");
+    const now = qso.current;
+    if (isRun(now) && now.stage === "waiting") waitForNext();
+  };
+  /** Cmd+Enter anywhere on the page, or Ctrl+Enter: the station's last line
+   *  plays again, with the play buttons on every line. Again stops it. */
+  const replayLast = () => {
+    if (playback !== "always") return;
+    let i = lines.length - 1;
+    while (i >= 0 && lines[i]!.you) i--;
+    const part = i >= 0 ? tapeLineOf(i) : null;
+    if (!part || cannotPlay() !== null) return;
+    playClip(`line ${i}`, lineAudio(part, tapeRate()));
+  };
+  const replayKey = useRef(replayLast);
+  replayKey.current = replayLast;
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Enter" || ev.repeat || !modOf(ev)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      replayKey.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+  /** Why a line cannot play now, or null when it can. In a session, it plays
+   *  on your turn before you start sending. */
+  const cannotPlay = (): string | null => {
+    if (!recorder || replaying !== null) return null;
+    if (phase !== "listening") return "Plays on your turn";
+    if (sending) return "Plays before you start sending";
+    return null;
   };
   /** The lines of QSO `n`, as the tape needs them, or null when any of their
    *  audio is gone. Cheap: the tape itself is made on a click. */
@@ -1158,11 +1262,7 @@ export function QsoScreen({
     const part = tapeLineOf(i);
     const key = `line ${i}`;
     const on = replaying === key;
-    const why = recorder
-      ? "Plays once the microphone is off"
-      : part
-        ? null
-        : "This over's recording was not kept";
+    const why = part ? cannotPlay() : "This over's recording was not kept";
     return (
       <button
         type="button"
@@ -1179,6 +1279,57 @@ export function QsoScreen({
   };
 
   /** Play QSO and Download, under the last line of QSO `n` once it is over. */
+  /** Under a QSO that is over: each item of the exchange as one side sent
+   *  it and the other copied it, with what went wrong marked. */
+  const qsoReport = (n: number): React.ReactElement | null => {
+    const done = ends[n];
+    if (!closed.includes(n) || !done) return null;
+    const theirLines = lines.filter((l) => l.qso === n && !l.you);
+    if (theirLines.length === 0) return null;
+    const user = loadUser();
+    const city = user.qthCity.trim();
+    const region = user.qthRegionShort.trim();
+    const rows = exchangeReport(
+      done,
+      theirLines.map((l) => ({ text: l.text, typed: l.mode === "copy" ? typedOf(l) : null })),
+      {
+        call: user.callsign.trim(),
+        name: user.name.trim(),
+        qth: [city, region].filter(Boolean).join(" "),
+        region,
+        nr: user.cwopsNumber.trim(),
+      },
+    );
+    const call = done.them.call;
+    const group = (from: "them" | "you", sent: string, copied: string) => (
+      <>
+        <tr className="side">
+          <th scope="col" />
+          <th scope="col">{sent}</th>
+          <th scope="col">{copied}</th>
+        </tr>
+        {rows
+          .filter((r) => r.from === from)
+          .map((r) => (
+            <tr key={`${from} ${r.label}`} className={r.ok === false ? "bad" : undefined} data-ok={String(r.ok)}>
+              <th scope="row">{r.label}</th>
+              <td>{r.sent || "—"}</td>
+              <td>{r.copied === null ? "—" : r.copied || "(missed)"}</td>
+            </tr>
+          ))}
+      </>
+    );
+    return (
+      <div className="qsoreport" data-testid="qso-report">
+        <table>
+          <tbody>
+            {group("them", `${call} sent`, "You copied")}
+            {group("you", "You sent", `${call} copied`)}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
   const qsoTapeRow = (n: number): React.ReactElement | null => {
     if (!closed.includes(n)) return null;
     const play = playback !== "never";
@@ -1191,7 +1342,12 @@ export function QsoScreen({
     return (
       <li className="qsotape" data-testid="qso-tape">
         {play && (
-          <button type="button" disabled={!!recorder} onClick={() => playClip(key, make())}>
+          <button
+            type="button"
+            disabled={cannotPlay() !== null}
+            title={cannotPlay() ?? undefined}
+            onClick={() => playClip(key, make())}
+          >
             <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
             {on ? "Stop" : "Play QSO"}
           </button>
@@ -1747,22 +1903,35 @@ export function QsoScreen({
             }}
           >
             <ol className="qsolog" data-testid="qso-log">
-              {lines.map((line, i) => (
-                <Fragment key={i}>
-                  <li className={line.you ? "you" : "them"}>
-                    {labelOf(line)}
-                    {textOf(line, i)}
-                    <span className="lend">
-                      {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
-                        <span className="lwpm" data-testid="qso-line-wpm">
-                          {wpmOf(line.sentWpm)}
-                        </span>
-                      )}
-                      {lineEdit(line, i)}
-                      {linePlay(i)}
-                    </span>
+              {/* Each QSO: its lines, and its report beside them once it is
+                  over. A line divides one QSO from the next. */}
+              {qsoGroups(lines).map((group, g, all) => (
+                <Fragment key={group.at[0]}>
+                  <li className="qsogroup">
+                    <ol className="qsolines">
+                      {group.at.map((i) => {
+                        const line = lines[i]!;
+                        return (
+                          <li key={i} className={line.you ? "you" : "them"}>
+                            {labelOf(line)}
+                            {textOf(line, i)}
+                            <span className="lend">
+                              {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
+                                <span className="lwpm" data-testid="qso-line-wpm">
+                                  {wpmOf(line.sentWpm)}
+                                </span>
+                              )}
+                              {lineEdit(line, i)}
+                              {linePlay(i)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                      {qsoTapeRow(group.qso)}
+                    </ol>
+                    {qsoReport(group.qso)}
                   </li>
-                  {lines[i + 1]?.qso !== line.qso && qsoTapeRow(line.qso)}
+                  {g < all.length - 1 && <li className="qsodivider" role="separator" data-testid="qso-divider" />}
                 </Fragment>
               ))}
               {/* Not an over already answered: after a reply, the last one is
@@ -1822,6 +1991,12 @@ export function QsoScreen({
               <p className="legend keys" data-testid="qso-hotkeys">
                 <kbd>R</kbd> restart your turn &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
                 <kbd>Esc</kbd> stop
+                {playback === "always" && (
+                  <>
+                    {" "}
+                    &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> play its last line again
+                  </>
+                )}
               </p>
             )}
           </div>

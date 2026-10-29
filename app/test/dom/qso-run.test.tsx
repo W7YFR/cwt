@@ -2,8 +2,9 @@
  * See qso-rig.tsx for how the page is driven.
  */
 
+import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { $, $$, callIn, click, ended, key, mount, open, press, send, theirs, unmount, until, useQsoRig, yourTurn } from "../qso-rig";
+import { $, $$, callIn, click, ended, fill, key, mount, open, press, send, state, theirs, unmount, until, useQsoRig, yourTurn } from "../qso-rig";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -65,6 +66,96 @@ describe("a run", () => {
     await click($('[data-testid="qso-help-open"]'));
     expect($('[data-testid="qso-examples"]')?.dataset.shown).toBe("pota");
     await press("Escape");
+  });
+});
+
+describe("the report at the end of a QSO", () => {
+  const rows = () => $$('[data-testid="qso-report"] tbody tr:not(.side)');
+
+  it("shows each item both ways once the QSO is over", async () => {
+    await open({ qsoTheirText: "before", user: { callsign: "W7YFR", name: "BOB" } });
+    const call = callIn(await send("CQ CWT W7YFR"));
+    expect($('[data-testid="qso-report"]'), "none while the QSO runs").toBeNull();
+    await send(`${call} BOB 1234`);
+    await key("TU W7YFR");
+    await until("the report", () => $('[data-testid="qso-report"]') !== null);
+    // Call, name and number from the station; call, name and number from you.
+    expect(rows()).toHaveLength(6);
+    expect(rows().some((r) => r.dataset.ok === "false"), "nothing wrong").toBe(false);
+  });
+
+  it("shows in a run with copy once the next station calls, under a divider", async () => {
+    await open({ qsoTheirText: "copy", qsoLockCopy: false });
+    await send("CQ CWT W7YFR");
+    const call = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso?.them?.call as string;
+    await send(`${call} BOB 1234`);
+    const before = theirs().length;
+    await key("TU W7YFR");
+    await until("the next station", () => theirs().length > before);
+    expect($('[data-testid="qso-report"]')).not.toBeNull();
+    expect($$('[data-testid="qso-divider"]')).toHaveLength(1);
+  });
+
+  it("marks your copy of an item wrong", async () => {
+    await open({ qsoTheirText: "copy", qsoLockCopy: false });
+    await send("CQ CWT W7YFR");
+    const box = () => $$<HTMLInputElement>('[data-testid="qso-type"]');
+    await fill(box()[0]!, "w1aw");
+    await click($('[data-testid="qso-stop"]'));
+    await until("the report", () => $('[data-testid="qso-report"]') !== null);
+    const callRow = rows()[0]!;
+    expect(callRow.dataset.ok).toBe("false");
+  });
+});
+
+describe("playing a line again during a session", () => {
+  it("plays on your turn, with the microphone not read, then your turn starts over", async () => {
+    await open({ qsoTheirText: "before", qsoPlayback: "always" });
+    await send("CQ CWT W7YFR");
+    const play = $$<HTMLButtonElement>('[data-testid="qso-line-play"]');
+    const theirPlay = play[play.length - 1]!;
+    expect(theirPlay.disabled).toBe(false);
+    await click(theirPlay);
+    expect(state(), "the microphone is not read while it plays").not.toBe("sending");
+    await until("the line to end", () => yourTurn());
+    expect(theirs()).toHaveLength(1);
+  });
+});
+
+describe("playing the last line again with Cmd+Enter", () => {
+  it("plays on Ctrl+Enter in the box, without locking it", async () => {
+    await open({ qsoTheirText: "copy", qsoPlayback: "always" });
+    await send("CQ CWT W7YFR");
+    const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
+    box.focus();
+    await act(async () => {
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
+    });
+    expect(state(), "the microphone is not read while it plays").not.toBe("sending");
+    await until("the line to end", () => yourTurn());
+    expect($('[data-testid="qso-type"]'), "the box is still open").not.toBeNull();
+  });
+
+  it("plays on Ctrl+Enter anywhere on the page, not just in a box", async () => {
+    await open({ qsoTheirText: "before", qsoPlayback: "always" });
+    await send("CQ CWT W7YFR");
+    (document.activeElement as HTMLElement | null)?.blur();
+    await act(async () => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
+    });
+    expect(state(), "the microphone is not read while it plays").not.toBe("sending");
+    await until("the line to end", () => yourTurn());
+  });
+
+  it("does nothing without the play buttons on every line", async () => {
+    await open({ qsoTheirText: "copy", qsoPlayback: "end" });
+    await send("CQ CWT W7YFR");
+    const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
+    box.focus();
+    await act(async () => {
+      box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
+    });
+    expect(state()).toBe("sending");
   });
 });
 

@@ -36,6 +36,7 @@ import {
   TURN_WORDS,
   answer,
   isCall,
+  nearly,
   newQso,
   pace,
   type Context,
@@ -133,7 +134,7 @@ function say(qso: RunQso, reply: string, stage: RunStage = qso.stage): RunTurn {
 }
 
 /** Words around an exchange that are not part of it. */
-const AROUND = new Set([
+export const AROUND = new Set([
   ...TURN_WORDS, "TU", "TNX", "R", "RR", "QSL", "GM", "GA", "GE", "GN", "UR", "NAME", "OP",
   "NR", "QTH", "ST", "RST", "5NN", "599", "73", "72", "EE", "E", "FB", "ES", "HR", "IS", "CQ",
   "TEST", "QRZ", "BK", "<BK>", "AGN", "PSE", "SRI", "QRS", "QRQ", "WPM", "CALL",
@@ -151,7 +152,7 @@ function numberOf(word: string): string | null {
  *  `mine` is your own region, which counts as one. The station's own name
  *  `theirs`, as in GE JIM TOM OR, is a greeting, not your name, when
  *  another name comes after it. */
-function heardIn(format: FormatId, words: readonly string[], mine: string, theirs: string): Heard {
+function heardIn(format: FormatId, words: readonly string[], mine: string, theirs: string, lenient = false): Heard {
   const isRegion = (w: string) => REGIONS.has(w) || (mine !== "" && w === mine);
   const rest = words.filter((w) => !AROUND.has(w) && !isCall(w) && !w.endsWith("?") && formatNamed(w) === null);
   const report = reportIn(words);
@@ -162,7 +163,7 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   const name = at >= 0 ? rest[at]! : "";
   const after = rest.slice(at + 1);
   const number = after.map(numberOf).find((n) => n !== null) ?? "";
-  const region = after.find(isRegion) ?? "";
+  const region = regionIn(after, mine, lenient);
   return { name, number, region, report };
 }
 
@@ -188,6 +189,50 @@ export function unglued(words: readonly string[]): string[] {
   return words.flatMap(apart);
 }
 
+/** The words with a call keyed apart taken out: AK 3SD, when the call is
+ *  AK3SD. One to four words that run together into one of `calls`, or one
+ *  character off the station's call `theirs`, as NBMZA for N6MZA. What is
+ *  left is the exchange. */
+export function withoutCalls(words: readonly string[], calls: readonly string[], theirs: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    let taken = 0;
+    for (let n = Math.min(4, words.length - i); n >= 1 && !taken; n--) {
+      const run = words.slice(i, i + n).join("");
+      if (calls.includes(run) || nearly(run, theirs)) taken = n;
+    }
+    if (taken) i += taken - 1;
+    else out.push(words[i]!);
+  }
+  return out;
+}
+
+/** Whether `words` hold `call` a character off: one word, or two to four
+ *  keyed apart. */
+function offCall(words: readonly string[], call: string): boolean {
+  for (let i = 0; i < words.length; i++) {
+    for (let n = 1; n <= 4 && i + n <= words.length; n++) {
+      const run = words.slice(i, i + n).join("");
+      if (run !== call && run.length >= 4 && nearly(run, call)) return true;
+    }
+  }
+  return false;
+}
+
+/** A region: one of the list, or your own. With `lenient`, also two single
+ *  letters keyed apart that make one: W A is WA. */
+function regionIn(words: readonly string[], mine: string, lenient: boolean): string {
+  const isRegion = (w: string) => REGIONS.has(w) || (mine !== "" && w === mine);
+  const whole = words.find(isRegion);
+  if (whole || !lenient) return whole ?? "";
+  for (let i = 0; i + 1 < words.length; i++) {
+    const a = words[i]!;
+    const b = words[i + 1]!;
+    if (/^[A-Z]$/.test(a) && /^[A-Z]$/.test(b) && isRegion(a + b)) return a + b;
+  }
+  return "";
+}
+
 /** A report: 5NN, or one keyed apart, as 5 NN. */
 function reportIn(words: readonly string[]): string {
   const whole = words.find((w) => REPORT_RE.test(w));
@@ -201,7 +246,7 @@ function reportIn(words: readonly string[]): string {
 
 /** Your answer to the station asking for `item`: that item, wherever it is
  *  in the over. WA WA after QTH? is a region, not a name. */
-function answerFor(item: Item, words: readonly string[], mine: string): Heard {
+function answerFor(item: Item, words: readonly string[], mine: string, lenient = false): Heard {
   const rest = words.filter((w) => !AROUND.has(w) && !isCall(w) && !w.endsWith("?"));
   switch (item) {
     case "name":
@@ -209,7 +254,7 @@ function answerFor(item: Item, words: readonly string[], mine: string): Heard {
     case "number":
       return { ...NOTHING, number: rest.map(numberOf).find((n) => n !== null) ?? "" };
     case "region":
-      return { ...NOTHING, region: rest.find((w) => REGIONS.has(w) || (mine !== "" && w === mine)) ?? "" };
+      return { ...NOTHING, region: regionIn(rest, mine, lenient) };
     case "report":
       return { ...NOTHING, report: reportIn(words) };
   }
@@ -349,14 +394,22 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
         return asked && bare.length >= 2 && c.includes(bare) && !(bare in ASKED);
       });
       if (checks) return say(qso, `${c} ${c}`);
-      if (!exact && calls.length > 0) return say(qso, `${c} ${c}`);
       // After it asked for one item, your over is read as that item.
-      // Lenient copy reads words run together apart.
-      const words = ear.lenient ? unglued(over.words) : over.words;
+      // Lenient copy reads words run together apart. Its call, and yours,
+      // are not part of the exchange, keyed apart or a character off.
+      const mine = [c, qso.you, ear.saved].filter(Boolean);
+      const words = withoutCalls(ear.lenient ? unglued(over.words) : over.words, mine, c);
       const asked = (Object.keys(ASK) as Item[]).find((item) => ASK[item] === qso.last);
-      const fresh = asked ? answerFor(asked, words, region) : heardIn(qso.format, words, region, them.name);
+      const fresh = asked
+        ? answerFor(asked, words, region, ear.lenient)
+        : heardIn(qso.format, words, region, them.name, ear.lenient);
       const had = qso.got ?? NOTHING;
       const got = merged(had, fresh);
+      // Its call sent wrong: another call, or its own a character off, as
+      // NBMZA for N6MZA. It puts you right, and keeps the rest of your
+      // exchange, so its call alone next time goes on.
+      const off = !exact && (calls.length > 0 || offCall(over.words, c));
+      if (off) return say({ ...qso, got }, `${c} ${c}`);
       const missing = lacking(qso.format, got);
       const before = { ...qso, got };
       if (missing.length > 0) {

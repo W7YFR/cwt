@@ -15,11 +15,15 @@ nothing to the site. The next release carries them.
 - **Suggest my reply** on the QSO page shows one way to answer the station: **Off**, **Always**, or **Once copied**, after your copy of its line is right.
 - **Allow edits** on the QSO page puts an Edit button beside a locked copy, so you can fix a mistake.
 - **Grade slots as I type** on the QSO page, as on the Copy page.
+- At the end of each QSO, the QSO page shows each part of the exchange beside it, as one side sent it and the other copied it. A wrong copy shows in red, and a line divides one QSO from the next.
 - **CWops number** in User. A CWT sends it, or your state when it is empty.
 
 ### Changed
 
-- The QSO page fits the window. The log scrolls on its own, with a thin scroll bar, and keeps its newest line in view, so the heading and controls stay put.
+- Scroll bars are thin on every page.
+- During a QSO, a line's play button plays it on your turn, and Cmd+Enter (Ctrl+Enter off a Mac) plays the station's last line. The microphone is not copied while it plays.
+- With **Lenient**, the QSO page reads a gap that could be between letters or between words as whichever makes words, as a person copying would.
+- The QSO page fits the window. The log scrolls on its own and keeps its newest line in view, so the heading and controls stay put.
 
 ### Fixed
 

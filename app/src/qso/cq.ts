@@ -57,6 +57,10 @@ export interface Qso {
   readonly you: string;
   /** Your name, as the station copied it. Empty until it has. */
   readonly yourName: string;
+  /** Your report and QTH, as the station copied them, for the report at the
+   *  end. Absent until it has, and in a QSO kept before there were these. */
+  readonly yourReport?: string;
+  readonly yourQth?: string;
   /** The station's last over, for AGN. */
   readonly last: string;
   /** How fast the station sends. */
@@ -247,7 +251,7 @@ const ASKS_FOR: Readonly<Record<string, wording.Question>> = {
 
 /** Words the station knows, for telling an over it can read from one it
  *  cannot. Calls, reports, numbers and its own name and QTH count too. */
-const KNOWN = new Set([
+export const KNOWN = new Set([
   "R", "RR", "RRR", "QSL", "TU", "TNX", "TKS", "FER", "FOR", "UR", "RST", "RPT", "NAME",
   "OP", "NM", "QTH", "HR", "IS", "ES", "AND", "FB", "OM", "YL", "GM", "GA", "GE", "GN", "HW",
   "CPY", "K", "KN", "BK", "AR", "SK", "DE", "CQ", "73", "88", "OK", "SOLID", "ALL", "GUD",
@@ -531,6 +535,38 @@ export class Over {
 
   /** Whether a QTH came with it: sent, begun with nothing it can read
    *  after it, or not at all. */
+  /** The report it holds, as sent: 599, 5NN, or one keyed apart, read
+   *  whole. Empty when none. */
+  reportSent(): string {
+    const { words } = this;
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i]!;
+      if (REPORT_RE.test(w)) return w;
+      const two = w + (words[i + 1] ?? "");
+      if (REPORT_RE.test(two)) return two;
+      if (this.ear.lenient && !isCall(w)) {
+        const m = REPORT_IN.exec(w);
+        if (m) return m[0];
+      }
+    }
+    return "";
+  }
+
+  /** The QTH it holds: up to three words after QTH, to the next word that
+   *  starts something else. Empty when none. */
+  qthSent(): string {
+    if (this.qth() !== "sent") return "";
+    const at = this.words.indexOf("QTH");
+    const out: string[] = [];
+    for (let j = at + 1; j < this.words.length && out.length < 3; j++) {
+      const w = this.words[j]!;
+      if (FILLER.has(w) && out.length === 0) continue;
+      if (DE_STOP.has(w) || TURN_WORDS.has(w) || w === "ES" || w === "NAME" || w.endsWith("?")) break;
+      out.push(w);
+    }
+    return out.join(" ");
+  }
+
   private qth(): "sent" | "botched" | "none" {
     const at = this.words.indexOf("QTH");
     if (at < 0) return "none";
@@ -751,6 +787,10 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     // Your name, and each piece of your exchange, whenever you send them.
     const name = over.yourName();
     if (name) qso = { ...qso, yourName: name };
+    const report = over.reportSent();
+    if (report) qso = { ...qso, yourReport: report };
+    const where = over.qthSent();
+    if (where) qso = { ...qso, yourQth: where };
     const got = over.pieces().filter((p) => !qso.got.includes(p));
     if (got.length) qso = { ...qso, got: [...qso.got, ...got] };
     // A question about one thing gets that thing, and an item of its
