@@ -22,10 +22,11 @@
  * runs under Node against real recordings.
  */
 
-import type { Segment, Timing } from "@/types";
+import type { Char, Segment, Timing } from "@/types";
 import { segmentsFrom, type Calibration } from "@/dsp";
 import { CHAR_TO_MORSE, SYMBOL_RE, canonicalChar } from "@/morse";
 import { estimateTiming } from "./estimate";
+import { readWords } from "./segment";
 import { buildTimeline, opensWord } from "./timeline";
 
 /** The rate the live decode works at, or the nearest above it that the
@@ -116,6 +117,15 @@ function measured(segments: readonly Segment[], timing: Timing): Timing {
  *  dBFS. A sender keys well above it. */
 export const MIN_KEYING_PEAK = 0.001;
 
+/** The gap before `c` as a share of the cut between a letter gap and a word
+ *  gap, for `readWords`. A pause is past any cut. */
+function shareOfCut(c: Char, timing: Timing): number {
+  const gap = c.leadGap;
+  if (!gap) return 0;
+  if (gap.kind === "pause") return Infinity;
+  return gap.units / (timing.charWordSplit / timing.unitSec);
+}
+
 /** Decode what has been keyed so far.
  *
  * Give `toneHz` once it is known. Finding the tone is most of the cost of a
@@ -134,6 +144,7 @@ export function sentSymbols(
   toneHz?: number,
   measure = false,
   calibration?: Calibration,
+  words?: ReadonlySet<string>,
 ): Sent {
   const none = { symbols: [], text: "", keying: null, quietSec: 0, toneHz: toneHz ?? 0, segments: [] };
   if (samples.length === 0) return none;
@@ -154,7 +165,8 @@ export function sentSymbols(
     ...(calibration ? { calibration } : {}),
   });
   const { segments } = found;
-  const { chars } = buildTimeline(segments, measure ? measured(segments, timing) : timing);
+  const read = measure ? measured(segments, timing) : timing;
+  const { chars } = buildTimeline(segments, read);
   const last = chars[chars.length - 1];
   if (!last) return { ...none, toneHz: found.toneHz, segments };
 
@@ -165,7 +177,10 @@ export function sentSymbols(
   const kept = done ? chars : chars.slice(0, -1);
   return {
     symbols: kept.map((c) => c.char),
-    text: kept.map((c, i) => (i > 0 && opensWord(c) ? ` ${c.char}` : c.char)).join(""),
+    text:
+      measure && words
+        ? readWords(kept.map((c, i) => ({ char: c.char, gap: i === 0 ? null : shareOfCut(c, read) })), words)
+        : kept.map((c, i) => (i > 0 && opensWord(c) ? ` ${c.char}` : c.char)).join(""),
     keying: done ? null : last.pattern,
     quietSec,
     toneHz: found.toneHz,
@@ -437,15 +452,24 @@ export class LiveCopy {
   private readonly measure: boolean;
   private readonly calibration: Calibration | undefined;
   private toneHz: number | undefined;
+  private readonly words: ReadonlySet<string> | undefined;
 
   /** With `measure`, the over is read at the sender's own timing. With
-   *  `calibration`, its edges are corrected for the microphone path. See
-   *  `sentSymbols`. */
-  constructor(rate: number, timing: Timing, measure = false, calibration?: Calibration) {
+   *  `calibration`, its edges are corrected for the microphone path. With
+   *  `words` as well, a gap near the cut between letters and words is read
+   *  as whichever makes words of them. See `sentSymbols`. */
+  constructor(
+    rate: number,
+    timing: Timing,
+    measure = false,
+    calibration?: Calibration,
+    words?: ReadonlySet<string>,
+  ) {
     this.audio = new Decimator(rate);
     this.timing = timing;
     this.measure = measure;
     this.calibration = calibration;
+    this.words = words;
   }
 
   push(samples: Float32Array): void {
@@ -468,6 +492,7 @@ export class LiveCopy {
       this.toneHz,
       this.measure,
       this.calibration,
+      this.words,
     );
     if (this.toneHz === undefined && sent.symbols.length >= TONE_LOCK_CHARS) {
       this.toneHz = sent.toneHz;

@@ -13,6 +13,7 @@ import {
   key,
   lastSent,
   open,
+  press,
   row,
   send,
   showTheirs,
@@ -72,5 +73,31 @@ describe("copying the station", () => {
     // Stop ends the QSO, and its call shows.
     await click($('[data-testid="qso-stop"]'));
     expect(label()).toMatch(/^[A-Z0-9]?[A-Z]\d[A-Z]+$/);
+  });
+});
+
+describe("a copy put right after it locks", () => {
+  it("has no Edit unless edits are allowed", async () => {
+    await open({ qsoTheirText: "copy" });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    await fill($<HTMLInputElement>('[data-testid="qso-type"]')!, "k9um");
+    await press("Enter");
+    expect($('[data-testid="qso-locked"]')).not.toBeNull();
+    expect($('[data-testid="qso-line-edit"]')).toBeNull();
+  });
+
+  it("opens the box again with Edit, with what you typed in it", async () => {
+    await open({ qsoTheirText: "copy", qsoAllowEdits: true });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const box = () => $<HTMLInputElement>('[data-testid="qso-type"]');
+    await fill(box()!, "k9um");
+    await press("Enter");
+    expect(box(), "locked").toBeNull();
+
+    await click($('[data-testid="qso-line-edit"]'));
+    expect(box()!.value).toBe("k9um");
+    await fill(box()!, "k4um");
+    await press("Enter");
+    expect($('[data-testid="qso-locked"]')?.textContent).toBe("K4UM");
   });
 });

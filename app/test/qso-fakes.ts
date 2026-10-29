@@ -124,6 +124,9 @@ const FRAME_MS = 16;
 
 /** `@/audio/player` with a player that plays nothing, on the fake clock. It
  *  plays only the station's replies: the QSO page plays no recording. */
+/** How long a line played again runs, in seconds. */
+const REPLAY_SEC = 1;
+
 export function fakePlayer<T extends object>(real: T) {
   return {
     ...real,
@@ -140,8 +143,13 @@ export function fakePlayer<T extends object>(real: T) {
       };
       let gainDb = 0;
       return {
+        // A line played again: a second on the fake clock, whatever it holds.
         async playBuffer() {
-          throw new Error("the QSO page plays no recording");
+          teardown();
+          const start = now();
+          frame = setInterval(() => {
+            if (now() - start >= REPLAY_SEC) finish("done");
+          }, FRAME_MS);
         },
         playTarget(timeline, options) {
           teardown();

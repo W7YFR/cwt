@@ -74,10 +74,14 @@ describe("the session's own words", () => {
     const between = status();
     expect(between).not.toBe("");
     // The keys, drawn as the practice page draws them.
+    // With the play buttons on every line, Cmd or Ctrl and Enter plays the
+    // station's last line.
     expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual([
       "R",
       "Enter",
       "Esc",
+      "Ctrl",
+      "Enter",
     ]);
     await send("CQ CQ DE W7YFR W7YFR K");
     expect(state()).toBe("sending");

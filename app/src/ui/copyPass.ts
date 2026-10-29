@@ -22,6 +22,8 @@ export interface CopyStart {
   readonly lenient: boolean;
   /** The microphone path's correction, when one is chosen. */
   readonly calibration: Calibration | null;
+  /** Words the over may hold, to read a gap near the cut by. Lenient only. */
+  readonly words?: readonly string[];
 }
 
 /** Audio captured since the last of these. */
@@ -64,6 +66,7 @@ export function copyPasses(post: (read: CopyRead) => void): (msg: CopyStart | Co
         targetTiming(msg.charWpm, msg.farnsworthWpm),
         msg.lenient,
         msg.calibration ?? undefined,
+        msg.words ? new Set(msg.words) : undefined,
       );
       fresh = false;
       return;

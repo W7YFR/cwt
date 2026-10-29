@@ -27,22 +27,29 @@ import {
   savePrefs,
   saveSpeed,
 } from "@/io/storage";
-import { DEFAULT_SPEED, answer, newQso, type Qso } from "@/qso/cq";
+import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
+import { FORMATS } from "@/qso/formats";
+import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
+import { hint, meOf } from "@/qso/hint";
+import { exchangeReport } from "@/qso/report";
+import { vocabulary } from "@/qso/vocabulary";
+import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { lineAudio, tape, trimmed, type Clip, type TapeLine } from "@/qso/tape";
-import { revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
+import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
 import { charsOf, copyText, overOfText, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconDownload, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
+import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
+import { MOD, modOf } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { Graded, RightOnly } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
-import { QsoGuide, QsoHelp } from "./QsoHelp";
+import { QsoExamples, QsoGuide, QsoHelp } from "./QsoHelp";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
 import {
@@ -100,10 +107,50 @@ function isSending(text: string): boolean {
   return chars.length >= 2 || (chars.length === 1 && chars !== "E" && chars !== "T");
 }
 
+/** How long, in seconds, the next station in a run waits for you before it
+ *  calls. */
+const NEXT_CALL_SEC = [2, 4] as const;
+
+/** How near the end of the log counts as at the end, in pixels: it keeps
+ *  following new lines from there. */
+const END_SLACK_PX = 48;
+
+/** Wide enough for the examples beside the log. The guide's two columns
+ *  start at the same width, in base.css. */
+const WIDE_QUERY = "(min-width: 1000px)";
+
+/** Whether the window is wide enough for the examples beside the log. */
+function useWide(): boolean {
+  const [wide, setWide] = useState(() => window.matchMedia?.(WIDE_QUERY).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(WIDE_QUERY);
+    if (!mq) return;
+    const on = () => setWide(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return wide;
+}
+
+/** The lines of the log in their QSOs, in order: each QSO's number and
+ *  where its lines are. */
+function qsoGroups(lines: readonly { qso: number }[]): { qso: number; at: number[] }[] {
+  const out: { qso: number; at: number[] }[] = [];
+  lines.forEach((line, i) => {
+    const last = out[out.length - 1];
+    if (last && last.qso === line.qso) last.at.push(i);
+    else out.push({ qso: line.qso, at: [i] });
+  });
+  return out;
+}
+
 /** The longest one over may run. The recording starts over at each over. */
 const MAX_OVER_SEC = 600;
 
-type Phase = "listening" | "waiting" | "playing";
+/** Your turn, the wait before the station answers, its answer playing, or
+ *  a line you chose playing again. The microphone is read on your turn
+ *  alone. */
+type Phase = "listening" | "waiting" | "playing" | "replaying";
 
 /** Where the page is, as its heading says in a word. */
 type QsoState = "ready" | "sending" | "waiting" | "receiving" | "paused" | "over";
@@ -183,12 +230,13 @@ const BLUR_CALL_HELP =
 type Playback = "never" | "always" | "end";
 const PLAYBACKS: ReadonlyArray<Option<Playback>> = [
   { value: "never", label: "Never", note: "No buttons to play lines again." },
-  { value: "always", label: "Always", note: "On every line. They play once the microphone is off." },
+  { value: "always", label: "Always", note: "On every line. During a QSO, they play on your turn." },
   { value: "end", label: "At end", note: "On every line once the QSO is over, with Play QSO." },
 ];
 const PLAYBACK_HELP =
   "When the play buttons show: on each line and as Play QSO under a QSO that is over. " +
-  "Always shows them on every line, and they play once the microphone is off. At end " +
+  "Always shows them on every line. During a QSO they play on your turn, before you start " +
+  "sending, and the microphone is not copied while they play. At end " +
   "shows them once the QSO is over.";
 const SHOW_DOWNLOAD_HELP = "Under a QSO that is over, Download saves it as a WAV file.";
 
@@ -199,6 +247,28 @@ const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
 ];
 const YOUR_TEXT_HELP =
   "What shows of your own lines as you send them: each character, the same blurred, or nothing.";
+
+const ALLOW_EDITS_HELP =
+  "An Edit button beside a locked copy opens it again, so you can fix a mistake. " +
+  "It locks again when you next start sending, or on Enter. Not once the QSO is over.";
+const GRADE_TYPING_HELP =
+  "A dot under each slot you fill says if it is right: blue if right, red if not.";
+
+/** When a suggested reply shows. */
+type Hints = "off" | "always" | "copied";
+const HINTS: ReadonlyArray<Option<Hints>> = [
+  { value: "off", label: "Off", note: "No suggested reply." },
+  { value: "always", label: "Always", note: "A suggested reply shows on each of your turns." },
+  {
+    value: "copied",
+    label: "Once copied",
+    note: "A suggested reply shows once you copy the station's line right.",
+  },
+];
+const HINTS_HELP =
+  "A suggested reply under the log: one way to answer the station, with your details from User. " +
+  "Once copied waits until your copy of the station's line is all right. " +
+  "When its lines are not for copying, it shows once the line has played.";
 
 interface Line {
   readonly who: string;
@@ -233,7 +303,7 @@ interface Kept {
   readonly lines: Line[];
   readonly closed: number[];
   readonly finished: number | null;
-  readonly qso: Qso;
+  readonly qso: AnyQso;
   readonly qsoNo: number;
   readonly theirSpeed: Speed;
   readonly piecesStation: boolean;
@@ -242,6 +312,9 @@ interface Kept {
   readonly stopped: boolean;
   /** A reply due but not yet in the log when the page went. */
   readonly pending: Pending | null;
+  /** Each QSO that is over, as it ended, for its report. Absent in a log
+   *  kept before there were reports. */
+  readonly ends?: Readonly<Record<number, AnyQso>>;
 }
 
 /** A reply the station is about to send, before it goes in the log. */
@@ -275,7 +348,9 @@ function recallKept(): Kept | null {
   return {
     ...(k as Kept),
     // A QSO kept before `told` was added.
-    qso: { ...(k.qso as Qso), told: Array.isArray(k.qso.told) ? k.qso.told : [] },
+    qso: isRun(k.qso as AnyQso)
+      ? (k.qso as AnyQso)
+      : { ...(k.qso as Qso), told: Array.isArray((k.qso as Qso).told) ? (k.qso as Qso).told : [] },
     finished,
     closed,
     stopped:
@@ -284,6 +359,7 @@ function recallKept(): Kept | null {
         : finished === null && !k.lines.some((l) => l.qso === qsoNo && !closed.includes(l.qso)),
     piecesStation: k.piecesStation === true,
     pending: typeof k.pending?.reply === "string" ? k.pending : null,
+    ends: typeof k.ends === "object" && k.ends !== null ? k.ends : {},
     note: typeof k.note === "string" ? k.note : "",
   };
 }
@@ -311,6 +387,8 @@ const SHOW_THEIR_SPEED_HELP = "Each of the station's lines shows the speed it se
 /** Enter and Escape in a copy box are not the recorder's: it listens on the
  *  document, and these keys would stop the session. Enter locks the copy. */
 function keepKeys(ev: React.KeyboardEvent, lock: () => void): void {
+  // Cmd+Enter, or Ctrl+Enter, is the log's: it plays the station's line.
+  if (ev.key === "Enter" && modOf(ev)) return;
   if (ev.key === "Enter" || ev.key === "Escape") {
     ev.preventDefault();
     ev.stopPropagation();
@@ -327,7 +405,10 @@ function useOnOff(
     | "qsoShowTheirSpeed"
     | "qsoBlurCall"
     | "qsoReplay"
-    | "qsoShowDownload",
+    | "qsoShowDownload"
+    | "qsoSideGuide"
+    | "qsoGradeTyping"
+    | "qsoAllowEdits",
   or: boolean,
 ): readonly [boolean, (next: boolean) => void] {
   const [value, setRaw] = useState<boolean>(() => loadPrefs()[key] ?? or);
@@ -418,6 +499,14 @@ export function QsoScreen({
       l.map((line) => (!line.you && line.mode === "copy" && !line.locked ? { ...line, input: next } : line)),
     );
   };
+  /** The kind of QSO the guide's examples show. A first suggested CQ is for
+   *  it. */
+  const [guideKind, setGuideKind] = useState<GuideId>(() => loadPrefs().qsoGuide ?? "cq");
+  const [hints, setHintsRaw] = useState<Hints>(() => loadPrefs().qsoHints ?? "off");
+  const setHints = (next: Hints) => {
+    setHintsRaw(next);
+    savePrefs({ ...loadPrefs(), qsoHints: next });
+  };
   const [yourText, setYourTextRaw] = useState<YourText>(() => loadPrefs().qsoYourText ?? "sent");
   const setYourText = (next: YourText) => {
     setYourTextRaw(next);
@@ -433,6 +522,8 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoPlayback: next });
   };
   const [lockCopy, setLockCopy] = useOnOff("qsoLockCopy", true);
+  const [gradeTyping, setGradeTyping] = useOnOff("qsoGradeTyping", false);
+  const [allowEdits, setAllowEdits] = useOnOff("qsoAllowEdits", false);
   const [lockedShows, setLockedShowsRaw] = useState<LockedShows>(
     () => loadPrefs().qsoLockedShows ?? "nothing",
   );
@@ -443,11 +534,21 @@ export function QsoScreen({
   const [showSpeed, setShowSpeed] = useOnOff("qsoShowSpeed", false);
   const [showTheirSpeed, setShowTheirSpeed] = useOnOff("qsoShowTheirSpeed", false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const qso = useRef<Qso>(kept?.qso ?? newQso(Math.random, "", speed));
+  /** The examples beside the log, chosen with the ?. Only where there is
+   *  room: on a narrow screen the ? opens the guide over the page. */
+  const [sideGuide, setSideGuide] = useOnOff("qsoSideGuide", false);
+  const wide = useWide();
+  /** The log's scroll box. It keeps the newest line in view, unless you
+   *  have scrolled up to read. */
+  const logBox = useRef<HTMLDivElement>(null);
+  const atEnd = useRef(true);
+  const qso = useRef<AnyQso>(kept?.qso ?? newQso(Math.random, "", speed));
   /** Which QSO of the session is running, counted from 0. */
   const qsoNo = useRef(kept?.qsoNo ?? 0);
   /** The QSOs that are over. Their overs all show. */
   const [closed, setClosed] = useState<readonly number[]>(() => kept?.closed ?? []);
+  /** Each QSO that is over, as it ended, for its report. */
+  const [ends, setEnds] = useState<Readonly<Record<number, AnyQso>>>(() => kept?.ends ?? {});
   /** A QSO that ends once the reply now playing ends. */
   const closing = useRef<number | null>(null);
   /** A QSO that has ended with your copy not yet graded. It closes when you
@@ -505,7 +606,18 @@ export function QsoScreen({
   /* Playing a line or a whole QSO again, once the microphone is off. A player
      of its own: the one above moves the QSO on when a line ends. */
   const [replaying, setReplaying] = useState<string | null>(null);
-  const listen = useMemo(() => createPlayer({ onEnded: () => setReplaying(null) }), []);
+  /** What happens when a line played again ends. */
+  const replayEnded = useRef<() => void>(() => {});
+  const listen = useMemo(
+    () =>
+      createPlayer({
+        onEnded: () => {
+          setReplaying(null);
+          replayEnded.current();
+        },
+      }),
+    [],
+  );
   useEffect(() => () => listen.destroy(), [listen]);
   /** Your overs as recorded, by line, with the wait before each cut. Kept
    *  in the browser too, so a reload can still play them. */
@@ -541,9 +653,13 @@ export function QsoScreen({
   useEffect(() => player.setGainDb(gainDb), [player, gainDb]);
   useEffect(() => listen.setGainDb(gainDb), [listen, gainDb]);
 
+  /** The next station in a run, about to call. */
+  const nextCall = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quiet = useCallback(() => {
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
+    if (nextCall.current !== null) clearTimeout(nextCall.current);
+    nextCall.current = null;
     player.stop();
     setPhase("listening");
   }, [player]);
@@ -606,7 +722,11 @@ export function QsoScreen({
       ending.current = false;
       return;
     }
-    close(qsoNo.current);
+    // Stopped mid-QSO: its report is of the QSO as far as it went.
+    const now = qso.current;
+    const n = qsoNo.current;
+    setEnds((e) => (e[n] ? e : { ...e, [n]: now }));
+    close(n);
     if (finishedRef.current !== null) close(finishedRef.current);
   }, [recorder, quiet, close]);
 
@@ -620,7 +740,15 @@ export function QsoScreen({
     const profile = profileForSource(profiles.find((p) => p.id === profileId) ?? null, true);
     return profile ? calibrationOf(profile) : null;
   }, [profiles, profileId]);
-  const copy = useLiveCopy(source, phase === "listening", lenient, calibration);
+  /* The words your next over may hold, to read your spacing by: yours from
+     User, and the station's call and name. */
+  const user = loadUser();
+  const them = qso.current.them;
+  const words = useMemo(
+    () => vocabulary([user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name]),
+    [user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name],
+  );
+  const copy = useLiveCopy(source, phase === "listening", lenient, calibration, words);
   /* You are typing in a copy box. Nothing is dropped and nothing starts over:
      what the decoder reads still counts, in case you are sending as well.
      Only the line that shows your sending hides, so noise on the input does
@@ -645,8 +773,17 @@ export function QsoScreen({
   afterReply.current = () => {
     timer.current = setTimeout(() => {
       timer.current = null;
-      // A new station starts at your speed.
+      // A new station has not sent yet, so no speed of its own shows. Its
+      // first over sets it.
       if (!qso.current.last) setTheirSpeed(speed);
+      // The last over of a QSO in a run has played: the QSO is over, and the
+      // run goes on.
+      if (closing.current !== null && isRun(qso.current)) {
+        const n = closing.current;
+        closing.current = null;
+        endInRun(n);
+        return;
+      }
       // The last over has played: now the QSO is over, and the session stops,
       // so it can be played back. With copy to grade, it waits for you to
       // finish typing.
@@ -667,6 +804,46 @@ export function QsoScreen({
       recorder?.restart();
       setPhase("listening");
     }, AFTER_REPLY_MS);
+  };
+
+  /** QSO `n` of a run is over. Its copy is graded now, or when you start
+   *  your next over if there is copy to finish. You go on sending, and the
+   *  next station calls in a few seconds unless you send first. */
+  const endInRun = (n: number) => {
+    if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) setFinished(n);
+    else close(n);
+    setNote("");
+    recorder?.restart();
+    setPhase("listening");
+    waitForNext();
+  };
+
+  /** In a run between QSOs, the next station calls in a few seconds unless
+   *  you send first. */
+  const waitForNext = () => {
+    const [lo, hi] = NEXT_CALL_SEC;
+    if (nextCall.current !== null) clearTimeout(nextCall.current);
+    nextCall.current = setTimeout(
+      () => {
+        nextCall.current = null;
+        callNext.current();
+      },
+      (lo + Math.random() * (hi - lo)) * 1000,
+    );
+  };
+
+  /** The next station in a run calls, if you have not begun to send. */
+  const callNext = useRef<() => void>(() => {});
+  callNext.current = () => {
+    const now = qso.current;
+    if (!recorder || phase !== "listening" || !isRun(now) || now.stage !== "waiting") return;
+    if (isSending(copy.text)) return;
+    const turn = callIn(now);
+    qso.current = turn.qso;
+    // The QSO before is done with: its copy is graded, and its report shows.
+    if (finishedRef.current !== null) close(finishedRef.current);
+    setNote("");
+    sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
   };
 
   /** The station's over: after a short wait, it goes in the log and plays.
@@ -791,8 +968,11 @@ export function QsoScreen({
       recorder.restart();
       return;
     }
-    const turn = answer(qso.current, heard, {
-      ear: { lenient, saved: loadUser().callsign },
+    const user = loadUser();
+    const turn = respond(qso.current, heard, {
+      ear: { lenient, saved: user.callsign },
+      region: user.qthRegionShort,
+      speed,
       length:
         length !== "mixed"
           ? length
@@ -815,8 +995,10 @@ export function QsoScreen({
       sentWpm: copy.sentWpm,
     };
 
-    qso.current = turn.ended ? newQso(Math.random, turn.qso.you, speed) : turn.qso;
+    qso.current = turn.ended ? following(turn.qso, Math.random, speed) : turn.qso;
     if (turn.ended) {
+      const done = turn.qso;
+      setEnds((e) => ({ ...e, [n]: done }));
       qsoNo.current++;
       piecesStation.current = Math.random() < MIXED_PIECES;
     }
@@ -829,6 +1011,11 @@ export function QsoScreen({
     });
 
     if (turn.reply === null) {
+      // Your TU ended a QSO in a run, and the station sends nothing back.
+      if (turn.ended) {
+        endInRun(n);
+        return;
+      }
       setNote("No answer. Call CQ again.");
       recorder.restart();
       return;
@@ -862,6 +1049,7 @@ export function QsoScreen({
     void forgetQsoOvers();
     setNote("");
     setClosed([]);
+    setEnds({});
     setPlaying(null);
     qsoNo.current = 0;
     closing.current = null;
@@ -932,10 +1120,11 @@ export function QsoScreen({
             note,
             stopped,
             pending: pending.current,
+            ends,
           },
     );
     // The phase, for a reply that is due: it is kept as soon as it is.
-  }, [lines, closed, finished, theirSpeed, note, stopped, phase]);
+  }, [lines, closed, finished, theirSpeed, note, stopped, phase, ends]);
 
   /** Paused, or a reload came back to a session under way: Continue goes
    *  on with it, where Start would clear the log. */
@@ -948,6 +1137,29 @@ export function QsoScreen({
     setLines((l) => l.map((line, i) => (i === at ? { ...line, slots } : line)));
   const lock = (at: number) =>
     setLines((l) => l.map((line, i) => (i === at ? { ...line, locked: true } : line)));
+  /** Open a locked copy again, to put a mistake right. It locks again when
+   *  you next start sending, or on Enter. */
+  const unlock = (at: number) =>
+    setLines((l) => l.map((line, i) => (i === at ? { ...line, locked: false } : line)));
+
+  /** Edit, on a locked copy of a QSO still under way. */
+  const lineEdit = (line: Line, i: number): React.ReactElement | null => {
+    if (!allowEdits || line.you || !line.locked || theirModeOf(line) !== "copy" || closed.includes(line.qso)) {
+      return null;
+    }
+    return (
+      <button
+        type="button"
+        className="iconbtn qsoplay"
+        data-testid="qso-line-edit"
+        aria-label="Edit my copy"
+        title="Edit my copy"
+        onClick={() => unlock(i)}
+      >
+        <IconEdit />
+      </button>
+    );
+  };
 
   /** Line `i` as the tape needs it, or null when its audio is gone: your
    *  over after a reload. */
@@ -976,7 +1188,49 @@ export function QsoScreen({
     }
     listen.wake();
     setReplaying(key);
+    // In a session, the microphone is not read while the line plays, so the
+    // line is not copied as your sending.
+    if (recorder) setPhase("replaying");
     void listen.playBuffer(encodeWavBuffer(clip.samples, clip.rate));
+  };
+  /* The line has played: in a session, your turn starts over, clear of it.
+     In a run between QSOs, the next station waits a few seconds more. */
+  replayEnded.current = () => {
+    if (!recorder || phase !== "replaying") return;
+    recorder.restart();
+    setPhase("listening");
+    const now = qso.current;
+    if (isRun(now) && now.stage === "waiting") waitForNext();
+  };
+  /** Cmd+Enter anywhere on the page, or Ctrl+Enter: the station's last line
+   *  plays again, with the play buttons on every line. Again stops it. */
+  const replayLast = () => {
+    if (playback !== "always") return;
+    let i = lines.length - 1;
+    while (i >= 0 && lines[i]!.you) i--;
+    const part = i >= 0 ? tapeLineOf(i) : null;
+    if (!part || cannotPlay() !== null) return;
+    playClip(`line ${i}`, lineAudio(part, tapeRate()));
+  };
+  const replayKey = useRef(replayLast);
+  replayKey.current = replayLast;
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Enter" || ev.repeat || !modOf(ev)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      replayKey.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+  /** Why a line cannot play now, or null when it can. In a session, it plays
+   *  on your turn before you start sending. */
+  const cannotPlay = (): string | null => {
+    if (!recorder || replaying !== null) return null;
+    if (phase !== "listening") return "Plays on your turn";
+    if (sending) return "Plays before you start sending";
+    return null;
   };
   /** The lines of QSO `n`, as the tape needs them, or null when any of their
    *  audio is gone. Cheap: the tape itself is made on a click. */
@@ -1008,11 +1262,7 @@ export function QsoScreen({
     const part = tapeLineOf(i);
     const key = `line ${i}`;
     const on = replaying === key;
-    const why = recorder
-      ? "Plays once the microphone is off"
-      : part
-        ? null
-        : "This over's recording was not kept";
+    const why = part ? cannotPlay() : "This over's recording was not kept";
     return (
       <button
         type="button"
@@ -1029,6 +1279,57 @@ export function QsoScreen({
   };
 
   /** Play QSO and Download, under the last line of QSO `n` once it is over. */
+  /** Under a QSO that is over: each item of the exchange as one side sent
+   *  it and the other copied it, with what went wrong marked. */
+  const qsoReport = (n: number): React.ReactElement | null => {
+    const done = ends[n];
+    if (!closed.includes(n) || !done) return null;
+    const theirLines = lines.filter((l) => l.qso === n && !l.you);
+    if (theirLines.length === 0) return null;
+    const user = loadUser();
+    const city = user.qthCity.trim();
+    const region = user.qthRegionShort.trim();
+    const rows = exchangeReport(
+      done,
+      theirLines.map((l) => ({ text: l.text, typed: l.mode === "copy" ? typedOf(l) : null })),
+      {
+        call: user.callsign.trim(),
+        name: user.name.trim(),
+        qth: [city, region].filter(Boolean).join(" "),
+        region,
+        nr: user.cwopsNumber.trim(),
+      },
+    );
+    const call = done.them.call;
+    const group = (from: "them" | "you", sent: string, copied: string) => (
+      <>
+        <tr className="side">
+          <th scope="col" />
+          <th scope="col">{sent}</th>
+          <th scope="col">{copied}</th>
+        </tr>
+        {rows
+          .filter((r) => r.from === from)
+          .map((r) => (
+            <tr key={`${from} ${r.label}`} className={r.ok === false ? "bad" : undefined} data-ok={String(r.ok)}>
+              <th scope="row">{r.label}</th>
+              <td>{r.sent || "—"}</td>
+              <td>{r.copied === null ? "—" : r.copied || "(missed)"}</td>
+            </tr>
+          ))}
+      </>
+    );
+    return (
+      <div className="qsoreport" data-testid="qso-report">
+        <table>
+          <tbody>
+            {group("them", `${call} sent`, "You copied")}
+            {group("you", "You sent", `${call} copied`)}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
   const qsoTapeRow = (n: number): React.ReactElement | null => {
     if (!closed.includes(n)) return null;
     const play = playback !== "never";
@@ -1041,7 +1342,12 @@ export function QsoScreen({
     return (
       <li className="qsotape" data-testid="qso-tape">
         {play && (
-          <button type="button" disabled={!!recorder} onClick={() => playClip(key, make())}>
+          <button
+            type="button"
+            disabled={cannotPlay() !== null}
+            title={cannotPlay() ?? undefined}
+            onClick={() => playClip(key, make())}
+          >
             <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
             {on ? "Stop" : "Play QSO"}
           </button>
@@ -1156,6 +1462,7 @@ export function QsoScreen({
           label={whoOf(line)}
           onSlots={(next) => setSlots(at, next)}
           onLock={() => lock(at)}
+          grade={gradeTyping}
           onKey={typed}
         />
       );
@@ -1201,6 +1508,27 @@ export function QsoScreen({
      sent nothing. Behind the ? the rest of the time. */
   const guideShown = !recorder && lines.length === 0;
 
+  /* A suggested reply, on your turn. Once copied, it waits for your copy of
+     the station's last line to be all right. A line not for copying has
+     played by the time it is your turn. */
+  const lastTheirs = [...lines].reverse().find((l) => l.qso === qsoNo.current && !l.you);
+  const copiedRight = (): boolean => {
+    if (!lastTheirs || theirModeOf(lastTheirs) !== "copy") return true;
+    const grade = gradeCopy(lastTheirs.text, typedOf(lastTheirs));
+    return grade.right === grade.total;
+  };
+  const suggestion =
+    recorder && phase === "listening" && (hints === "always" || (hints === "copied" && copiedRight()))
+      ? hint(qso.current, meOf(loadUser()), guideKind === "cq" ? null : guideKind)
+      : null;
+
+  /* A new line, or more of one, keeps the end of the log in view: unless you
+     scrolled up, in which case the log stays where you are reading. */
+  useLayoutEffect(() => {
+    const box = logBox.current;
+    if (box && atEnd.current) box.scrollTop = box.scrollHeight;
+  }, [lines, playing, copy.text, note, finished, suggestion]);
+
   const status = !recorder
     ? open
       ? "Press Continue to go on, or Restart for a new QSO."
@@ -1210,12 +1538,26 @@ export function QsoScreen({
     : phase === "listening"
       ? qso.current.stage === "cq"
         ? "Call CQ to make a contact."
-        : "Send your reply to the station."
+        : qso.current.stage === "waiting"
+          ? "Call CQ, or wait for the next station."
+          : "Send your reply to the station."
       : phase === "waiting"
         ? "The station is about to answer."
         : theirText === "copy"
           ? "Type what you hear."
           : "Listen to the station.";
+
+  /** The format of the run under way, for the guide to show. */
+  const runFormat = isRun(qso.current) ? qso.current.format : undefined;
+  const side = sideGuide && wide && !guideShown;
+
+  /* A run under way: its format, the QSOs made, and in an MST the serial
+     number you send next. */
+  const run = isRun(qso.current) && lines.length > 0 ? qso.current : null;
+  const tally = run
+    ? `${FORMATS[run.format].word}: ${run.made} ${run.made === 1 ? "QSO" : "QSOs"}` +
+      (run.format === "mst" ? `. Your next number is ${run.made + 1}.` : "")
+    : null;
 
   /** Where things are, in a word, beside the sentence that says what to do,
    *  as the Copy page shows it. */
@@ -1313,6 +1655,13 @@ export function QsoScreen({
                     onChange={(v) => setCopyInput(v as CopyInput)}
                   />
                   <Check
+                    id="qso-grade-typing"
+                    label="Grade slots as I type"
+                    help={GRADE_TYPING_HELP}
+                    checked={gradeTyping}
+                    onChange={setGradeTyping}
+                  />
+                  <Check
                     id="qso-blur-call"
                     label="Hide its call while I copy"
                     help={BLUR_CALL_HELP}
@@ -1343,6 +1692,13 @@ export function QsoScreen({
                     options={LOCKED_SHOWS}
                     onChange={(v) => setLockedShows(v as LockedShows)}
                   />
+                  <Check
+                    id="qso-allow-edits"
+                    label="Allow edits"
+                    help={ALLOW_EDITS_HELP}
+                    checked={allowEdits}
+                    onChange={setAllowEdits}
+                  />
                 </div>
               </Section>
               {/* You and After a QSO, one above the other beside The other
@@ -1365,6 +1721,14 @@ export function QsoScreen({
                       value={yourText}
                       options={YOUR_TEXTS}
                       onChange={(v) => setYourText(v as YourText)}
+                    />
+                    <ChoiceGroup
+                      id="qso-hints"
+                      label="Suggest my reply"
+                      help={HINTS_HELP}
+                      value={hints}
+                      options={HINTS}
+                      onChange={(v) => setHints(v as Hints)}
                     />
                     <Check
                       id="qso-show-speed"
@@ -1424,6 +1788,8 @@ export function QsoScreen({
 
       {helpOpen && (
         <QsoHelp
+          initial={runFormat}
+          onShown={setGuideKind}
           onClose={() => setHelpOpen(false)}
           onSettings={() => setSettingsOpen(true)}
           settingsOpen={settingsOpen}
@@ -1431,165 +1797,216 @@ export function QsoScreen({
       )}
 
       <main className="panel qso" data-testid="qso">
-        <div className="copyhead" role="status" aria-live="polite">
-          <span className="uplabel" data-testid="qso-state" data-state={state}>
-            {STATE_WORDS[state]}
-          </span>
-          <span className="copysay qsostatus">{status}</span>
-        </div>
-
-        <div className="qsocontrols">
-          {rec.needAccess ? (
-            <button className="primary" disabled={rec.blocked} onClick={() => void rec.grantAccess()}>
-              Allow the microphone
-            </button>
-          ) : !recorder ? (
-            <>
-              <button
-                className="primary"
-                data-testid={open ? "qso-continue" : "qso-start"}
-                disabled={rec.probing || rec.blocked || rec.busy || starting}
-                onClick={open ? resume : start}
-              >
-                <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
-              </button>
-              {/* Restart clears the log and starts a new QSO with a new
-                  station, as Start does when there is nothing to go on with. */}
-              {open && !starting && (
-                <button
-                  data-testid="qso-restart"
-                  disabled={rec.probing || rec.blocked || rec.busy}
-                  onClick={start}
-                >
-                  Restart
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <button data-testid="qso-pause" onClick={pause}>
-                Pause
-              </button>
-              <button data-testid="qso-stop" onClick={() => void rec.discard()}>
-                Stop
-              </button>
-              <LevelMeter level={rec.level} />
-            </>
-          )}
-          <DebugDownload
-            current={() =>
-              recorder
-                ? {
-                    label: `in progress: ${copy.text || "(nothing)"}${copy.keying ? ` [${copy.keying}]` : ""}`,
-                    samples: recorder.since(0),
-                    rate: recorder.rate,
-                  }
-                : null
-            }
-          />
-          {/* Your speed does two jobs: your sending is copied at it, and each
-              new station answers at it. QRS and QRQ change the station's speed
-              alone. */}
-          {/* Only once QRS or QRQ has moved it: a station starts at your speed,
-              and the guide says so. */}
-          {!same(theirSpeed, speed) && (
-            <span className="hint" data-testid="qso-their-speed">
-              The station sends at {wpm(theirSpeed)}.
+        <div className="qsotop">
+          <div className="copyhead" role="status" aria-live="polite">
+            <span className="uplabel" data-testid="qso-state" data-state={state}>
+              {STATE_WORDS[state]}
             </span>
-          )}
-          {/* The guide, when it is not on the page: last in the row, at its
-              right end. */}
-          {!guideShown && (
-            <button
-              type="button"
-              className="iconbtn helpbtn qsohelpbtn"
-              data-testid="qso-help-open"
-              aria-label="Anatomy of a QSO"
-              title="Anatomy of a QSO"
-              onClick={() => setHelpOpen(true)}
-            >
-              <IconHelp />
-            </button>
-          )}
+            <span className="copysay qsostatus">{status}</span>
+            {run && tally && (
+              <span className="hint qsotally" data-testid="qso-tally" data-format={run.format} data-made={run.made}>
+                {tally}
+              </span>
+            )}
+          </div>
+
+          <div className="qsocontrols">
+            {rec.needAccess ? (
+              <button className="primary" disabled={rec.blocked} onClick={() => void rec.grantAccess()}>
+                Allow the microphone
+              </button>
+            ) : !recorder ? (
+              <>
+                <button
+                  className="primary"
+                  data-testid={open ? "qso-continue" : "qso-start"}
+                  disabled={rec.probing || rec.blocked || rec.busy || starting}
+                  onClick={open ? resume : start}
+                >
+                  <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
+                </button>
+                {/* Restart clears the log and starts a new QSO with a new
+                    station, as Start does when there is nothing to go on with. */}
+                {open && !starting && (
+                  <button
+                    data-testid="qso-restart"
+                    disabled={rec.probing || rec.blocked || rec.busy}
+                    onClick={start}
+                  >
+                    Restart
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button data-testid="qso-pause" onClick={pause}>
+                  Pause
+                </button>
+                <button data-testid="qso-stop" onClick={() => void rec.discard()}>
+                  Stop
+                </button>
+                <LevelMeter level={rec.level} />
+              </>
+            )}
+            <DebugDownload
+              current={() =>
+                recorder
+                  ? {
+                      label: `in progress: ${copy.text || "(nothing)"}${copy.keying ? ` [${copy.keying}]` : ""}`,
+                      samples: recorder.since(0),
+                      rate: recorder.rate,
+                    }
+                  : null
+              }
+            />
+            {/* Your speed does two jobs: your sending is copied at it, and each
+                new station answers at it. QRS and QRQ change the station's speed
+                alone. */}
+            {/* Only once QRS or QRQ has moved it: a station starts at your speed,
+                and the guide says so. */}
+            {!same(theirSpeed, speed) && (
+              <span className="hint" data-testid="qso-their-speed">
+                The station sends at {wpm(theirSpeed)}.
+              </span>
+            )}
+            {/* The guide, when it is not on the page: last in the row, at its
+                right end. */}
+            {!guideShown && (
+              <button
+                type="button"
+                className="iconbtn helpbtn qsohelpbtn"
+                data-testid="qso-help-open"
+                aria-label="Anatomy of a QSO"
+                title="Anatomy of a QSO"
+                aria-pressed={wide ? side : undefined}
+                onClick={() => (wide ? setSideGuide(!sideGuide) : setHelpOpen(true))}
+              >
+                <IconHelp />
+              </button>
+            )}
+          </div>
         </div>
 
         {guideShown && (
           <div className="qsoguide prose" data-testid="qso-guide">
-            <QsoGuide onSettings={() => setSettingsOpen(true)} settingsOpen={settingsOpen} />
+            <QsoGuide onSettings={() => setSettingsOpen(true)} settingsOpen={settingsOpen} onShown={setGuideKind} />
           </div>
         )}
 
-        <ol className="qsolog" data-testid="qso-log">
-          {lines.map((line, i) => (
-            <Fragment key={i}>
-              <li className={line.you ? "you" : "them"}>
-                {labelOf(line)}
-                {textOf(line, i)}
-                <span className="lend">
-                  {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
-                    <span className="lwpm" data-testid="qso-line-wpm">
-                      {wpmOf(line.sentWpm)}
-                    </span>
-                  )}
-                  {linePlay(i)}
-                </span>
-              </li>
-              {lines[i + 1]?.qso !== line.qso && qsoTapeRow(line.qso)}
-            </Fragment>
-          ))}
-          {/* Not an over already answered: after a reply, the last one is
-              still the copy until the recording starts over. */}
-          {recorder &&
-            phase === "listening" &&
-            !typing &&
-            copy.turn !== answered.current &&
-            yourText !== "none" &&
-            (copy.text || copy.keying) && (
-            <li className="you live">
-              <span className="who">{qso.current.you || "You"}</span>
-              <span
-                className={yourText === "hidden" ? "text blurred" : "text"}
-                aria-hidden={yourText === "hidden"}
-              >
-                {copy.text}
-                {copy.keying && <span className="keying"> {copy.keying}</span>}
-              </span>
-            </li>
-          )}
-        </ol>
+        <div className={side ? "qsobody side" : "qsobody"}>
+          <div
+            className="qsomain"
+            ref={logBox}
+            onScroll={(e) => {
+              const box = e.currentTarget;
+              atEnd.current = box.scrollHeight - box.scrollTop - box.clientHeight < END_SLACK_PX;
+            }}
+          >
+            <ol className="qsolog" data-testid="qso-log">
+              {/* Each QSO: its lines, and its report beside them once it is
+                  over. A line divides one QSO from the next. */}
+              {qsoGroups(lines).map((group, g, all) => (
+                <Fragment key={group.at[0]}>
+                  <li className="qsogroup">
+                    <ol className="qsolines">
+                      {group.at.map((i) => {
+                        const line = lines[i]!;
+                        return (
+                          <li key={i} className={line.you ? "you" : "them"}>
+                            {labelOf(line)}
+                            {textOf(line, i)}
+                            <span className="lend">
+                              {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
+                                <span className="lwpm" data-testid="qso-line-wpm">
+                                  {wpmOf(line.sentWpm)}
+                                </span>
+                              )}
+                              {lineEdit(line, i)}
+                              {linePlay(i)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                      {qsoTapeRow(group.qso)}
+                    </ol>
+                    {qsoReport(group.qso)}
+                  </li>
+                  {g < all.length - 1 && <li className="qsodivider" role="separator" data-testid="qso-divider" />}
+                </Fragment>
+              ))}
+              {/* Not an over already answered: after a reply, the last one is
+                  still the copy until the recording starts over. */}
+              {recorder &&
+                phase === "listening" &&
+                !typing &&
+                copy.turn !== answered.current &&
+                yourText !== "none" &&
+                (copy.text || copy.keying) && (
+                <li className="you live">
+                  <span className="who">{qso.current.you || "You"}</span>
+                  <span
+                    className={yourText === "hidden" ? "text blurred" : "text"}
+                    aria-hidden={yourText === "hidden"}
+                  >
+                    {copy.text}
+                    {copy.keying && <span className="keying"> {copy.keying}</span>}
+                  </span>
+                </li>
+              )}
+            </ol>
 
-        {note && (
-          <p className="hint qsonote">
-            {note}
-            {finished !== null && (
-              <>
-                {" "}
-                <button
-                  className="link"
-                  data-testid="qso-grade"
-                  onClick={() => {
-                    close(finished);
-                    setNote("");
-                  }}
-                >
-                  Grade my copy
-                </button>
-              </>
+            {suggestion && (
+              <p className="qsohint" data-testid="qso-hint">
+                Suggested reply:<code>{suggestion}</code>
+              </p>
             )}
-          </p>
-        )}
 
-        {open && (
-          <p className="legend keys" data-testid="qso-hotkeys">
-            <kbd>R</kbd> or <kbd>Enter</kbd> continue
-          </p>
-        )}
-        {recorder && (
-          <p className="legend keys" data-testid="qso-hotkeys">
-            <kbd>R</kbd> restart your turn &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
-            <kbd>Esc</kbd> stop
-          </p>
-        )}
+            {note && (
+              <p className="hint qsonote">
+                {note}
+                {finished !== null && (
+                  <>
+                    {" "}
+                    <button
+                      className="link"
+                      data-testid="qso-grade"
+                      onClick={() => {
+                        close(finished);
+                        setNote("");
+                      }}
+                    >
+                      Grade my copy
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
+
+            {open && (
+              <p className="legend keys" data-testid="qso-hotkeys">
+                <kbd>R</kbd> or <kbd>Enter</kbd> continue
+              </p>
+            )}
+            {recorder && (
+              <p className="legend keys" data-testid="qso-hotkeys">
+                <kbd>R</kbd> restart your turn &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
+                <kbd>Esc</kbd> stop
+                {playback === "always" && (
+                  <>
+                    {" "}
+                    &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> play its last line again
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+          {side && (
+            <aside className="qsoside prose" data-testid="qso-side">
+              {/* A new run's format shows when the run starts. */}
+              <QsoExamples key={runFormat ?? "cq"} initial={runFormat} onShown={setGuideKind} />
+            </aside>
+          )}
+        </div>
       </main>
     </>
   );

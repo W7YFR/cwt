@@ -480,6 +480,10 @@ export interface Prefs {
   /** Copy mode: you type the station's lines in a box or in slots. Absent
    *  is a box. */
   qsoCopyInput?: "text" | "slots";
+  /** The kind of QSO the QSO page's guide shows. */
+  qsoGuide?: "cq" | "cwt" | "sst" | "mst" | "pota";
+  /** The QSO page shows the examples beside the log, on a wide screen. */
+  qsoSideGuide?: boolean;
   /** Blurred station text blurs the station's call in the log too. Absent
    *  is off. */
   qsoBlurCall?: boolean;
@@ -488,6 +492,12 @@ export interface Prefs {
   qsoReplay?: boolean;
   /** How your own overs show on the QSO page. Absent is as sent. */
   qsoYourText?: "sent" | "hidden" | "none";
+  /** When the QSO page suggests your next reply. */
+  qsoHints?: "off" | "always" | "copied";
+  /** The QSO page grades each slot as you type it. */
+  qsoGradeTyping?: boolean;
+  /** A locked copy on the QSO page can be opened again with Edit. */
+  qsoAllowEdits?: boolean;
   /** When the QSO page's play buttons show. Absent is always. */
   qsoPlayback?: "never" | "always" | "end";
   /** Download shows under a QSO that is over. Absent is on. */
@@ -543,6 +553,8 @@ export interface UserInfo {
   callsign: string;
   age: string;
   yearLicensed: string;
+  /** Your CWops member number, for the CWT. Empty if you are not a member. */
+  cwopsNumber: string;
   qthCity: string;
   /** State, province or country, abbreviated: "OR". */
   qthRegionShort: string;
@@ -560,6 +572,7 @@ export const EMPTY_USER: UserInfo = {
   callsign: "",
   age: "",
   yearLicensed: "",
+  cwopsNumber: "",
   qthCity: "",
   qthRegionShort: "",
   qthRegionLong: "",
@@ -690,9 +703,14 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoLength: oneOf("full", "short", "pieces", "mixed"),
   qsoTheirText: oneOf("before", "sent", "hidden", "copy", "none"),
   qsoCopyInput: oneOf("text", "slots"),
+  qsoGuide: oneOf("cq", "cwt", "sst", "mst", "pota"),
+  qsoSideGuide: isBool,
   qsoBlurCall: isBool,
   qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
+  qsoHints: oneOf("off", "always", "copied"),
+  qsoGradeTyping: isBool,
+  qsoAllowEdits: isBool,
   qsoPlayback: oneOf("never", "always", "end"),
   qsoShowDownload: isBool,
   qsoSettingsOpen: isBool,

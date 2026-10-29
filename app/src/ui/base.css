@@ -71,6 +71,20 @@
    is symmetric, and the page stays centered on the window. Where scrollbars
    overlay the page and take no room, this does nothing. */
 html { scrollbar-gutter: stable both-edges; }
+/* Thin, quiet scrollbars everywhere: the page, the QSO log, the drill list,
+   the dialogs. The color is inherited, so it is set once here; the width is
+   not, so every element takes it. */
+html { scrollbar-color: color-mix(in srgb, var(--ink-faint) 45%, transparent) transparent; }
+* { scrollbar-width: thin; }
+/* Each box that scrolls up and down keeps room for its bar, so nothing in it
+   moves when the bar comes, and the reading in it keeps clear of the bar. A
+   message set in the middle keeps the same room on both sides, so it stays in
+   the middle. */
+.dialog, .drilllist, .micdebug, .soundpath .prose, .qsohelp .prose, .qsomain, .qsoside, .qsoguide {
+  scrollbar-gutter: stable;
+}
+.zenmessage { scrollbar-gutter: stable both-edges; }
+.soundpath .prose, .qsohelp .prose { padding-right: 12px; }
 
 body {
   margin: 0;
@@ -2080,7 +2094,8 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 }
 .drilltools { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .helpbtn { font-size: 16px; }
-.helpbtn[aria-expanded="true"] { border-color: var(--you); color: var(--you); }
+.helpbtn[aria-expanded="true"],
+.helpbtn[aria-pressed="true"] { border-color: var(--you); color: var(--you); }
 .drilltext {
   width: 100%;
   box-sizing: border-box;
@@ -2346,6 +2361,37 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .panel.qso { margin: 12px 20px; max-width: none; width: auto; }
 .qsostatus { margin: 0; font-size: 16px; }
 .qsocontrols { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+/* The QSO page fits the window: the panel stays where it starts, and the
+   log scrolls inside it, under the heading and controls. With the settings
+   open, or in a short window, the panel keeps room for a few lines and the
+   page scrolls instead. */
+.app:has(> .panel.qso) { height: 100vh; height: 100dvh; }
+.panel.qso { flex: 1 1 auto; min-height: 320px; }
+.qsotop { display: flex; flex-direction: column; gap: 16px; }
+.qsoguide { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+/* The log, and the examples beside it when the ? shows them. Each scrolls on
+   its own. */
+.qsobody { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.qsobody.side { grid-template-columns: minmax(0, 1fr) minmax(300px, 60ch); gap: 32px; }
+.qsomain { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; }
+.qsoside {
+  min-height: 0;
+  overflow-y: auto;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.qsoside p { color: var(--ink-dim); }
+/* Room between the speeds and the scrollbar. */
+.qsomain { padding-right: 16px; }
+.qsoside { padding-right: 8px; }
+/* The suggested reply, under the log. */
+.qsohint { margin: 0; font-size: 13px; color: var(--ink-dim); }
+/* One space of the reply's own font after the label, so the gap matches the
+   gaps between its words. */
+.qsohint code { margin-left: 1ch; font-family: var(--mono); font-size: 14px; color: var(--you); }
+.qsoside h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
 .qsocontrols .meter { flex: 0 0 120px; }
 /* The ? at the right end of the row, where it stays put whatever is left of it. */
 .qsocontrols .qsohelpbtn { margin-left: auto; }
@@ -2366,10 +2412,25 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .live .keying { color: var(--ink-faint); }
 .qsonote { margin: 0; }
 /* The guide on the page, before the first QSO: read as the help reads. */
-.qsoguide { max-width: 72ch; font-size: 13px; line-height: 1.6; }
+.qsoguide { font-size: 13px; line-height: 1.6; }
+/* What to send on the left, the examples on the right; one column on a
+   narrow screen. In the help dialog, always one column. */
+.qsoguide .qsoguidecols {
+  display: grid;
+  grid-template-columns: minmax(0, 62ch) minmax(0, 72ch);
+  gap: 16px 40px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .qsoguide .qsoguidecols { grid-template-columns: minmax(0, 72ch); }
+}
+.qsoguide .qsoexamples > h3:first-child { margin-top: 0; }
+.qsoexamples .modeswitch { margin: 0 0 10px; flex-wrap: wrap; }
+.qsoexamples code,
+.qsointro code { font-family: var(--mono); }
 .qsoguide p, .qsoguide ul { color: var(--ink-dim); }
 .qsoguide ul { padding-left: 18px; }
-.qsoguide h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
+.qsoguide h3, .qsohelp .qsoexamples h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--you); }
 /* The settings link in the guide: the theme's blue, inline in its sentence. */
 .qsoguide button.link,
 .qsohelp button.link { color: var(--you); padding: 0; font: inherit; vertical-align: baseline; }
@@ -2456,6 +2517,47 @@ header .modeswitch button { white-space: nowrap; }
 /* Play QSO and Download, under the last line of a QSO that is over, lined up
    with the text. */
 .qsolog .qsotape { padding-left: calc(8ch + 12px); gap: 8px; }
+/* Where one QSO ends and the next begins. */
+.qsolog .qsodivider { height: 0; margin: 6px 0; border-top: 1px solid var(--line); }
+/* A QSO in the log: its lines, and its report to their right. With room, every
+   QSO keeps the report's column, so the lines end in one place whether or not
+   a QSO has its report yet. Without room, the report goes under. */
+.qsolog { container-type: inline-size; }
+.qsolog > li.qsogroup { display: flex; flex-direction: column; gap: 12px; }
+.qsolog .qsoreport { padding-left: calc(8ch + 12px); min-width: 0; }
+@container (min-width: 42rem) {
+  .qsolog > li.qsogroup { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; column-gap: 32px; align-items: start; }
+  .qsolog > li.live { margin-right: calc(20rem + 32px); }
+  .qsolog .qsoreport { padding-left: 24px; border-left: 1px solid var(--line); }
+}
+.qsolines {
+  min-width: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* The exchange at the end of a QSO, both ways. A wrong copy in red. Its
+   place, under the lines or beside them, is set with the QSO's above. */
+.qsoreport tr.side:first-child th { padding-top: 0; }
+/* Not the practice page's tables: sized to its words, no rules between rows. */
+.qsoreport table { width: auto; border-collapse: collapse; font-size: 13px; }
+.qsoreport th, .qsoreport td {
+  padding: 2px 16px 2px 0;
+  border-bottom: 0;
+  text-align: left;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+}
+/* A heading may take two lines, as K5RAY copied, so the table fits its
+   column without scrolling. */
+.qsoreport tr.side th { padding-top: 8px; color: var(--ink-faint); font-size: 12px; white-space: normal; vertical-align: bottom; }
+.qsoreport tbody th[scope="row"] { color: var(--ink-dim); }
+.qsoreport td { font-family: var(--mono); color: var(--ink); }
+.qsoreport tr.bad td:last-child { color: var(--bad); }
 .qsolog .qsotape button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
 .qsolog .qsotape .ico { margin-right: 6px; font-style: normal; }
 /* The Copy page: the QSO page's panel and log, with a transport over the
@@ -2528,6 +2630,8 @@ header .modeswitch button { white-space: nowrap; }
 .copyhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-height: 18px; }
 .copyhead .uplabel { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
 .copyhead .copysay { font-size: 13px; color: var(--ink-faint); }
+/* A run's tally, at the right end of the QSO page's heading. */
+.copyhead .qsotally { margin-left: auto; font-size: 12px; }
 .copyafter { display: flex; flex-direction: column; gap: 12px; }
 .copy .copyname { margin-left: 4px; }
 /* The page's keys, then a box's, a line each. */

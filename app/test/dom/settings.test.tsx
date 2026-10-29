@@ -172,6 +172,7 @@ describe("the user section", () => {
     await user.type(screen.getByLabelText("Callsign"), "w7yfr");
     await user.type(screen.getByLabelText("Age"), "4x2");
     await user.type(screen.getByLabelText("Year licensed"), "20245");
+    await user.type(screen.getByLabelText("CWops number"), "3x0012");
     await user.type(screen.getByLabelText("City"), "Portland");
     await user.type(screen.getByLabelText("Region, short"), "or");
     await user.type(screen.getByLabelText("Region, long"), "Oregon");
@@ -184,6 +185,7 @@ describe("the user section", () => {
       callsign: "W7YFR",
       age: "42",
       yearLicensed: "2024",
+      cwopsNumber: "30012",
       qthCity: "PORTLAND",
       qthRegionShort: "OR",
       qthRegionLong: "OREGON",
