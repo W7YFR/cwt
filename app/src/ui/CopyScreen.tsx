@@ -179,13 +179,25 @@ const CHAT_LENGTHS: ReadonlyArray<Option<Length>> = [
 ];
 const CHAT_LENGTH_HELP = "How much each station says in a generated standard QSO, as on the QSO page.";
 
-const GAPS: ReadonlyArray<Option<string>> = [
-  { value: "0.5", label: "0.5 s" },
-  { value: "1", label: "1 s" },
-  { value: "2", label: "2 s" },
-  { value: "3", label: "3 s" },
+type Gap = "1" | "2" | "3" | "5" | "wait";
+const GAPS: ReadonlyArray<Option<Gap>> = [
+  { value: "1", label: "1s" },
+  { value: "2", label: "2s" },
+  { value: "3", label: "3s" },
+  { value: "5", label: "5s" },
+  { value: "wait", label: "Wait", note: "It stops after each line, and goes on when you press Enter in its box." },
 ];
-const GAP_HELP = "The silence between one station's line and the next. A change applies to the QSO on the page.";
+const GAP_HELP =
+  "The silence between one station's line and the next. A change applies to the QSO on the page. " +
+  "Wait stops after each line until you type what you heard and press Enter, which locks the line " +
+  "and goes on. Play goes on without locking it.";
+
+/** The silence between lines with Wait, for when you play on. */
+const WAIT_GAP_SEC = 1;
+
+/** With Wait, how far past the end of its line the QSO stops, so the line's
+ *  last character is heard whole. */
+const HOLD_PAD_SEC = 0.2;
 
 type SpeedChoice = "format" | "mine";
 const SPEEDS: ReadonlyArray<Option<SpeedChoice>> = [
@@ -305,7 +317,7 @@ function useChoice<
     | "copyKind"
     | "copyRunQsos"
     | "copyChatLength"
-    | "copyGapSec"
+    | "copyGap"
     | "copySpeed",
 >(
   key: K,
@@ -358,7 +370,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [kind, setKind] = useChoice("copyKind", "cq");
   const [runQsos, setRunQsos] = useChoice("copyRunQsos", 3);
   const [chatLength, setChatLength] = useChoice("copyChatLength", "full");
-  const [gapSec, setGapSec] = useChoice("copyGapSec", 1);
+  const [gap, setGap] = useChoice("copyGap", "1");
+  const gapSec = gap === "wait" ? WAIT_GAP_SEC : Number(gap);
   const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
   const [mine, setMineRaw] = useState<Speed>(() => {
     const p = loadPrefs();
@@ -410,6 +423,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [playing, setPlaying] = useState<"main" | { from: number; to: number } | null>(null);
   const mode = useRef<"main" | "part" | null>(null);
   const [partAt, setPartAt] = useState<number | null>(null);
+  /** With Wait, where the QSO playing now stops: the end of a line not yet
+   *  locked. Null when it plays to the end. */
+  const holdAt = useRef<number | null>(null);
   /** At the end of the recording, run once the page has rendered. */
   const atEnd = useRef<() => void>(() => {});
   /** Locks the last line a few seconds after the recording ends. */
@@ -432,7 +448,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           mode.current = null;
           setPlaying(null);
           setPartAt(null);
-          if (was === "main" && reason === "done") atEnd.current();
+          const hold = holdAt.current;
+          holdAt.current = null;
+          if (was === "main" && reason === "done") {
+            if (hold === null) atEnd.current();
+            else setPos(hold);
+          }
         },
         onError,
       }),
@@ -563,10 +584,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   const duration = rec?.durationSec ?? 0;
   const ended = rec !== null && pos >= duration - 0.05;
+  /** Wait between lines: a generated QSO stops after each line you copy,
+   *  until you press Enter in its box. */
+  const waits = gap === "wait" && !!file?.script && linesShow === "copy";
 
   /* ---- playing ---------------------------------------------------------- */
 
-  const play = (from = posRef.current) => {
+  const play = (from = posRef.current, unlocked = lines) => {
     if (!file) return;
     const at = from >= duration - 0.05 ? 0 : Math.max(0, from);
     cancelLastLock();
@@ -574,7 +598,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     mode.current = "main";
     setPlaying("main");
     setPos(at);
-    void player.playBuffer(file.audio, at);
+    // With Wait, it stops at the end of the next line still open. Starting
+    // from the stop, that line is behind it, and it goes on to the next.
+    const hold = waits && rec ? rec.overs.findIndex((o, i) => o.t1 + HOLD_PAD_SEC > at + 0.01 && !unlocked[i]?.locked) : -1;
+    const to = hold >= 0 && hold < rec!.overs.length - 1 ? Math.min(rec!.overs[hold]!.t1 + HOLD_PAD_SEC, duration) : null;
+    holdAt.current = to;
+    void player.playBuffer(file.audio, at, to ?? undefined);
     requestAnimationFrame(backToSlot);
   };
   const pause = () => player.stop();
@@ -861,6 +890,15 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     if (isBox(el)) {
       if (ev.key === "Enter") {
         ev.preventDefault();
+        // With Wait, Enter while stopped locks the box's line and goes on.
+        const line = el.closest<HTMLElement>("li[data-line]")?.dataset.line;
+        if (waits && mode.current !== "main" && line !== undefined && !lines[Number(line)]?.locked) {
+          const i = Number(line);
+          const next = lines.map((l, j) => (j === i ? { ...l, locked: true } : l));
+          setLine(i, { locked: true });
+          if (!ended) play(posRef.current, next);
+          return;
+        }
         toggle();
       }
       return;
@@ -1075,6 +1113,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const nowLine =
     rec && nowAt !== null ? rec.overs.findIndex((o, i) => nowAt >= o.t0 - 0.05 && nowAt < (rec.overs[i + 1]?.t0 ?? Infinity)) : -1;
 
+  /** With Wait, the line it stopped after, waiting for Enter, or -1. */
+  const heldLine =
+    waits && rec && playing === null
+      ? rec.overs.findIndex((o, i) => !lines[i]?.locked && pos >= o.t1 - 0.05 && pos <= o.t1 + HOLD_PAD_SEC + 0.1)
+      : -1;
+
   const status = reading
     ? "Reading the recording…"
     : !rec
@@ -1085,19 +1129,21 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         ? linesShow === "copy"
           ? "Type what you hear in each line."
           : "Listen along."
-        : linesShow === "copy" && perfect
-          ? "You copied every line. Copy again starts a fresh attempt."
-          : ended
-            ? linesShow === "copy"
-              ? "Copy again to go once more."
-              : file?.script
-                ? "The QSO is over."
-                : "The recording is over."
-            : pos > 0
-              ? "Press Play to go on."
-              : linesShow === "copy"
-                ? "Press Start, then type what you hear."
-                : "Press Start to listen.";
+        : heldLine >= 0
+          ? "Type what you heard, then press Enter to go on."
+          : linesShow === "copy" && perfect
+            ? "You copied every line. Copy again starts a fresh attempt."
+            : ended
+              ? linesShow === "copy"
+                ? "Copy again to go once more."
+                : file?.script
+                  ? "The QSO is over."
+                  : "The recording is over."
+              : pos > 0
+                ? "Press Play to go on."
+                : linesShow === "copy"
+                  ? "Press Start, then type what you hear."
+                  : "Press Start to listen.";
 
   /** Where things are, in a word, over the sentence that says what to do. */
   const state: CopyState | null = reading
@@ -1278,9 +1324,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     id="copy-gap"
                     label="Between lines"
                     help={GAP_HELP}
-                    value={String(gapSec)}
+                    value={gap}
                     options={GAPS}
-                    onChange={(v) => setGapSec(Number(v))}
+                    onChange={(v) => setGap(v as Gap)}
                   />
                   <ChoiceGroup
                     id="copy-speed"
@@ -1293,28 +1339,30 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                   <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
                 </div>
               </Section>
-              <Section name="lines" title="The recording">
-                <div className="panelgroups">
-                  <ChoiceGroup
-                    id="copy-lines"
-                    label="Its lines show"
-                    help={LINES_SHOW_HELP}
-                    value={linesShow}
-                    options={LINES_SHOW}
-                    onChange={(v) => setLinesShow(v as LinesShow)}
-                  />
-                  <Check
-                    id="copy-hide-calls"
-                    label="Hide each call until I copy it"
-                    help={HIDE_CALLS_HELP}
-                    checked={hideCalls}
-                    onChange={setHideCalls}
-                  />
-                </div>
-              </Section>
             </>
           }
-        />
+        >
+          {/* Beside Audio, as Speed is on the QSO page. */}
+          <Section name="lines" title="The recording">
+            <div className="panelgroups">
+              <ChoiceGroup
+                id="copy-lines"
+                label="Its lines show"
+                help={LINES_SHOW_HELP}
+                value={linesShow}
+                options={LINES_SHOW}
+                onChange={(v) => setLinesShow(v as LinesShow)}
+              />
+              <Check
+                id="copy-hide-calls"
+                label="Hide each call until I copy it"
+                help={HIDE_CALLS_HELP}
+                checked={hideCalls}
+                onChange={setHideCalls}
+              />
+            </div>
+          </Section>
+        </SettingsPanel>
       </SettingsBand>
 
       <main className="panel qso copy" data-testid="copy">
@@ -1395,14 +1443,14 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
             <div className="qsocontrols copyskips">
               <div className="modeswitch" role="group" aria-label="Back">
                 {skip("‹ Line", "Back a line", () => skipBack(overs), "copy-back-line")}
-                {skip("‹ 15 s", "Back 15 seconds", () => back(15), "copy-back-15")}
-                {skip("‹ 5 s", "Back 5 seconds", () => back(5), "copy-back-5")}
+                {skip("‹ 15s", "Back 15 seconds", () => back(15), "copy-back-15")}
+                {skip("‹ 5s", "Back 5 seconds", () => back(5), "copy-back-5")}
                 {skip("‹ Word", "Back a word", () => skipBack(words), "copy-back-word")}
               </div>
               <div className="modeswitch" role="group" aria-label="On">
                 {skip("Word ›", "On a word", () => skipOn(words), "copy-on-word")}
-                {skip("5 s ›", "On 5 seconds", () => on(5), "copy-on-5")}
-                {skip("15 s ›", "On 15 seconds", () => on(15), "copy-on-15")}
+                {skip("5s ›", "On 5 seconds", () => on(5), "copy-on-5")}
+                {skip("15s ›", "On 15 seconds", () => on(15), "copy-on-15")}
                 {skip("Line ›", "On a line", () => skipOn(overs), "copy-on-line")}
               </div>
               {input === "slots" && (
@@ -1513,7 +1561,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           <div className="copykeys">
             <p className="legend keys" data-testid="copy-hotkeys">
               On the page: <kbd>Space</kbd> or <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause
-              &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5 s
+              &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5s
               {input === "slots" && (
                 <>
                   {" "}
@@ -1522,7 +1570,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               )}
             </p>
             <p className="legend keys" data-testid="copy-box-keys">
-              In a box: <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> lock the line
+              In a box: <kbd>Enter</kbd> {waits ? "lock the line and go on, or play or pause" : "play or pause"} &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> lock the line
               &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{MOD}</kbd> for the other keys
             </p>
           </div>

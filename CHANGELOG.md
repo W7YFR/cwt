@@ -11,9 +11,12 @@ nothing to the site. The next release carries them.
 
 - **New exchange** on the Copy page generates a QSO to copy: a standard **CQ** QSO, or a **POTA**, **SST**, **MST** or **CWT** run. Opening a recording stays beside it.
 - Settings for a generated QSO: **QSOs in a run**, **A standard QSO is**, **Between lines**, and **Speed**. **Format** sends each station at its own speed, and **Mine** sends every station at the sliders. A change of speed or gap applies to the QSO on the page and keeps your copy.
+- **Wait** in **Between lines** stops a generated QSO after each line. **Enter** in the line's box locks your copy and goes on.
 
 ### Changed
 
+- On every page, the settings sections side by side are one height.
+- On the Copy page, **The recording** sits beside **Audio** in the settings.
 - On the QSO page, **Suggest my reply** and the station in a run word their lines more ways, as operators do.
 
 ### Fixed

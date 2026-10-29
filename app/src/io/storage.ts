@@ -545,9 +545,9 @@ export interface Prefs {
   copyRunQsos?: number;
   /** How much each station says in a generated rag chew. Absent is full. */
   copyChatLength?: "full" | "short" | "pieces";
-  /** The silence between two lines of a generated QSO, in seconds. Absent is
-   *  1. */
-  copyGapSec?: number;
+  /** Between two lines of a generated QSO: a silence of so many seconds, or
+   *  wait, which stops at the end of each line until Enter. Absent is 1. */
+  copyGap?: "1" | "2" | "3" | "5" | "wait";
   /** A generated QSO's stations send at the speeds of its format, or all at
    *  the Copy page's sliders. Absent is the format's. */
   copySpeed?: "format" | "mine";
@@ -746,7 +746,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copyKind: oneOf("cq", "cwt", "sst", "mst", "pota"),
   copyRunQsos: isNum,
   copyChatLength: oneOf("full", "short", "pieces"),
-  copyGapSec: isNum,
+  copyGap: oneOf("1", "2", "3", "5", "wait"),
   copySpeed: oneOf("format", "mine"),
   copyCharWpm: isNum,
   copyFarnsworthWpm: isNum,

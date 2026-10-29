@@ -2859,3 +2859,11 @@ header .modeswitch button { white-space: nowrap; }
 /* Sections stacked in one column of the page's row, as You over After a QSO,
    so a short section does not sit alone beside a tall one. */
 .viewpanel .sectioncol { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+
+/* Sections side by side are one height: each box grows to match the one
+   beside it, so a row of the settings reads as a row. The settings in a box
+   stay at its top. In a column of two sections, the last one grows. */
+.viewpanel.formpanel,
+.viewpanel.formpanel .pagerow { align-items: stretch; }
+.viewpanel.formpanel .panelrow > .panelgroups:last-child { flex: 1 1 auto; }
+.viewpanel.formpanel .sectioncol > .panelrow:last-child { flex: 1 1 auto; }

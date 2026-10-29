@@ -575,7 +575,7 @@ describe("a generated QSO", () => {
   }
 
   it("is generated in the kind chosen, a line per over, the station that calls CQ first", async () => {
-    await makeUp({ copyKind: "sst", copyRunQsos: 1, copyGapSec: 0.5, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await makeUp({ copyKind: "sst", copyRunQsos: 1, copyGap: "1", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
     await playThrough();
     expect(lines().length).toBeGreaterThanOrEqual(5);
     expect(lines()[0]!.dataset.sender).toBe("0");
@@ -616,5 +616,38 @@ describe("a generated QSO", () => {
     await until("the QSO to come back", () => state() === "paused");
     expect(length()).toBe(was);
     expect(boxes()[0]!.value).toBe("CQ MST");
+  });
+});
+
+describe("Wait between lines", () => {
+  /** Mount the page and generate a QSO that stops after each line. */
+  async function locked(): Promise<void> {
+    mount({ copyKind: "cwt", copyRunQsos: 1, copyGap: "wait", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-new-first"));
+    await until("the QSO to be ready", () => state() === "ready");
+  }
+
+  it("stops after a line, and goes on to the next when Enter locks it", async () => {
+    await locked();
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    expect(lines()).toHaveLength(1);
+    await fill(boxes()[0]!, "CQ CWT");
+    await enter(boxes()[0]!);
+    expect(lines()[0]!.querySelector('[data-testid="copy-type"]'), "line 1 locked").toBeNull();
+    await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
+    await wait(200);
+    expect(state(), "it waits").toBe("paused");
+  });
+
+  it("goes on without locking the line on Play", async () => {
+    await locked();
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    await click(button("copy-play"));
+    await until("line 2", () => lines().length === 2);
+    await until("a stop", () => state() === "paused");
+    expect(lines()).toHaveLength(2);
   });
 });
