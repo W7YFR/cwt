@@ -76,6 +76,15 @@ html { scrollbar-gutter: stable both-edges; }
    not, so every element takes it. */
 html { scrollbar-color: color-mix(in srgb, var(--ink-faint) 45%, transparent) transparent; }
 * { scrollbar-width: thin; }
+/* Each box that scrolls up and down keeps room for its bar, so nothing in it
+   moves when the bar comes, and the reading in it keeps clear of the bar. A
+   message set in the middle keeps the same room on both sides, so it stays in
+   the middle. */
+.dialog, .drilllist, .micdebug, .soundpath .prose, .qsohelp .prose, .qsomain, .qsoside, .qsoguide {
+  scrollbar-gutter: stable;
+}
+.zenmessage { scrollbar-gutter: stable both-edges; }
+.soundpath .prose, .qsohelp .prose { padding-right: 12px; }
 
 body {
   margin: 0;
@@ -2374,9 +2383,7 @@ button.cal { font-size: 11px; padding: 3px 8px; }
   line-height: 1.6;
 }
 .qsoside p { color: var(--ink-dim); }
-/* Room between the speeds and the scrollbar. Room for the bar is kept even
-   when there is none, so lines do not shift when it comes. */
-.qsomain, .qsoside, .qsoguide { scrollbar-gutter: stable; }
+/* Room between the speeds and the scrollbar. */
 .qsomain { padding-right: 16px; }
 .qsoside { padding-right: 8px; }
 /* The suggested reply, under the log. */

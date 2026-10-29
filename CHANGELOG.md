@@ -20,7 +20,7 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- Scroll bars are thin on every page.
+- Scroll bars are thin on every page, with room kept beside them so nothing moves when one appears.
 - During a QSO, a line's play button plays it on your turn, and Cmd+Enter (Ctrl+Enter off a Mac) plays the station's last line. The microphone is not copied while it plays.
 - With **Lenient**, the QSO page reads a gap that could be between letters or between words as whichever makes words, as a person copying would.
 - The QSO page fits the window. The log scrolls on its own and keeps its newest line in view, so the heading and controls stay put.
