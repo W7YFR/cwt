@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.18.0 — 2026-10-29
+
 ### Added
 
 - On the QSO page, `CQ POTA`, `CQ SST`, `CQ MST` or `CQ CWT` starts a run: short QSOs in that format, one station after another, until you press Stop. Each station sends at its format's speed, and the page counts the QSOs.
