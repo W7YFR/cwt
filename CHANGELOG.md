@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.19.1 — 2026-10-31
+
 ### Changed
 
 - A POTA station now and then sends BK around an item you ask for again, as in `BK 5NN 5NN BK`.
