@@ -1313,8 +1313,10 @@ export function QsoScreen({
     const added = replayAdded();
     return added ? tape([part], tapeRate(), added) : lineAudio(part, tapeRate());
   };
-  const playClip = (key: string, clip: Clip) => {
-    if (replaying === key) {
+  /** Play `clip`, or stop it if it plays now. With `again`, play it from
+   *  its start even then. */
+  const playClip = (key: string, clip: Clip, again = false) => {
+    if (replaying === key && !again) {
       listen.stop();
       return;
     }
@@ -1343,7 +1345,8 @@ export function QsoScreen({
     while (i >= 0 && lines[i]!.you) i--;
     const part = i >= 0 ? tapeLineOf(i) : null;
     if (!part || cannotPlay() !== null) return;
-    playClip(`line ${i}`, lineHeard(part));
+    // From its start every time, even while it plays.
+    playClip(`line ${i}`, lineHeard(part), true);
   };
   const replayKey = useRef(replayLast);
   replayKey.current = replayLast;

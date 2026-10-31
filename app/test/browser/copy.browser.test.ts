@@ -844,6 +844,25 @@ describe("the keys the pages share", () => {
     expect(box.value, "nothing typed").toBe("");
   });
 
+  it("plays the line again from its start on Option or Alt+R while it plays, and does not stop it", async () => {
+    await open();
+    await playTo(2);
+    const box = lines()[1]!.querySelector<HTMLInputElement>('[data-testid="copy-type"]')!;
+    const before = plays.length;
+    await altR(box);
+    await altR(box);
+    expect(plays.length, "two plays, not a play and a stop").toBe(before + 2);
+    expect(plays[plays.length - 1]).toEqual(plays[plays.length - 2]);
+  });
+
+  it("lights the line it plays again from the start, not the line before", async () => {
+    await open();
+    await playTo(2);
+    await altR(lines()[1]!.querySelector<HTMLInputElement>('[data-testid="copy-type"]')!);
+    expect(lines()[1]!.classList.contains("now"), "line 2 lit").toBe(true);
+    expect(lines()[0]!.classList.contains("now"), "line 1 not lit").toBe(false);
+  });
+
   it("plays the last line heard again on Option or Alt+R, outside a box", async () => {
     await open();
     await playTo(2);

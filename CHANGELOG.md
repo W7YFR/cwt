@@ -19,6 +19,8 @@ nothing to the site. The next release carries them.
 ### Fixed
 
 - In an opened recording with wide spacing, a character at the end of one station's turn, such as `<BT>`, no longer shows at the start of the other station's line.
+- Option+R plays the line again from its start even while it plays, where it used to stop it.
+- A line played again no longer lights the line before it for a moment as it starts.
 - A prosign's slot shows a dot for each of its letters, as you type and once graded, so a first letter typed right no longer shows as wrong. A spelling that keys the same, such as NG for `<KN>`, shows yellow.
 
 ## v1.22.0 — 2026-10-31

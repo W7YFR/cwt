@@ -794,6 +794,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     if (!file) return;
     player.wake();
     mode.current = "part";
+    setPartAt(null);
     setPlaying({ from, to });
     void player.playBuffer(file.audio, Math.max(0, from - PART_PAD_SEC), Math.min(duration, to + PART_PAD_SEC));
   };
@@ -1410,7 +1411,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   /** Option+R or Alt+R: the line plays again. The line of the box you are in,
    *  or else the line playing, or the last one heard. As the QSO page's
-   *  Option+R plays the station's last line. Again while it plays stops it. */
+   *  Option+R plays the station's last line. Again while it plays starts it again. */
   const replayLine = (box: HTMLElement | null) => {
     if (!rec) return;
     const inBox = box?.closest<HTMLElement>("li[data-line]")?.dataset.line;
@@ -1418,12 +1419,20 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     const i = inBox !== undefined ? Number(inBox) : nowLine >= 0 ? nowLine : heardLast;
     const over = rec.overs[i];
     if (!over) return;
-    if (typeof playing === "object" && playing?.from === over.t0) player.stop();
-    else playPart(over.t0, over.t1);
+    // From its start every time, even while it plays.
+    playPart(over.t0, over.t1);
   };
 
-  /** The line playing now: the one the recording is in, or the part. */
-  const nowAt = mode.current === "part" ? partAt : mode.current === "main" ? pos : null;
+  /** The line playing now: the one the recording is in, or the part. A
+   *  part starts a little before itself, and that lead-in is its own, not
+   *  the line before. */
+  const part = typeof playing === "object" ? playing : null;
+  const nowAt =
+    mode.current === "part" && part
+      ? Math.min(Math.max(partAt ?? part.from, part.from), part.to)
+      : mode.current === "main"
+        ? pos
+        : null;
   const nowLine =
     rec && nowAt !== null ? rec.overs.findIndex((o, i) => nowAt >= o.t0 - 0.05 && nowAt < (rec.overs[i + 1]?.t0 ?? Infinity)) : -1;
 
