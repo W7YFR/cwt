@@ -10,6 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - The Copy page shows the speed an opened recording was sent at, measured from the recording, beside its name.
+- **Wait** on the Copy page stops after each line of an opened recording too.
 
 ### Changed
 

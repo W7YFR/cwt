@@ -212,10 +212,15 @@ const GAPS: ReadonlyArray<Option<Gap>> = [
   { value: "2", label: "2s" },
   { value: "3", label: "3s" },
   { value: "5", label: "5s" },
-  { value: "wait", label: "Wait", note: `It stops after each line, and goes on when you press ${MOD}+Enter in its box.` },
+  {
+    value: "wait",
+    label: "Wait",
+    note: `It stops after each line, in a recording too, and goes on when you press ${MOD}+Enter in its box.`,
+  },
 ];
 const GAP_HELP =
   "The silence between one station's line and the next. A change applies to the QSO on the page. " +
+  "An opened recording keeps its own silences, but Wait applies to it too. " +
   `Wait stops after each line until you type what you heard and press ${MOD}+Enter, which locks the line ` +
   "and goes on, as Enter does once every character is copied. Play, or Enter before then, goes on " +
   "without locking it.";
@@ -734,9 +739,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     save(new Blob([`${text.join("\n\n")}\n`], { type: "text/plain" }), `${stem()}.txt`);
   };
 
-  /** Wait between lines: a generated QSO stops after each line you copy,
-   *  until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
-  const waits = gap === "wait" && !!file?.script && linesShow === "copy";
+  /** Wait between lines: the QSO stops after each line you copy, generated
+   *  or opened, until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
+  const waits = gap === "wait" && linesShow === "copy";
 
   /* ---- playing ---------------------------------------------------------- */
 
@@ -751,7 +756,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     // With Wait, it stops at the end of the next line still open. Starting
     // from the stop, that line is behind it, and it goes on to the next.
     const hold = waits && rec ? rec.overs.findIndex((o, i) => o.t1 + HOLD_PAD_SEC > at + 0.01 && !unlocked[i]?.locked) : -1;
-    const to = hold >= 0 && hold < rec!.overs.length - 1 ? Math.min(rec!.overs[hold]!.t1 + HOLD_PAD_SEC, duration) : null;
+    // Not into the next line, which in a recording can start close after.
+    const next = hold >= 0 ? rec!.overs[hold + 1] : undefined;
+    const to = next ? Math.min(rec!.overs[hold]!.t1 + HOLD_PAD_SEC, next.t0 - 0.02, duration) : null;
     holdAt.current = to;
     void player.playBuffer(file.audio, at, to ?? undefined);
     requestAnimationFrame(backToSlot);

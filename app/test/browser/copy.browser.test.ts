@@ -716,6 +716,18 @@ describe("Wait between lines", () => {
     expect(from, "nothing of line 1 again").toBeGreaterThanOrEqual(Math.max(...ends) - 0.001);
   });
 
+  it("stops after each line of an opened recording too, and goes on when Cmd or Ctrl+Enter locks it", async () => {
+    await open({ copyGap: "wait" });
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    expect(lines()).toHaveLength(1);
+    await fill(boxes()[0]!, "CQ");
+    await enter(boxes()[0]!, true);
+    await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
+    await wait(200);
+    expect(state(), "it waits").toBe("paused");
+  });
+
   it("goes on without locking the line on Enter", async () => {
     await locked();
     await click(button("copy-play"));
