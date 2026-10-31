@@ -7,6 +7,12 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.20.2 — 2026-10-31
+
+### Fixed
+
+- A run station that sends `?` now sends its call when you ask for it, as with `UR CALL ?` or `AGN`. A wrong check of its call, such as `AEH?`, also gets its call.
+
 ## v1.20.1 — 2026-10-31
 
 ### Fixed

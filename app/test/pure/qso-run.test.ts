@@ -226,6 +226,13 @@ describe("the station asks again", () => {
     expect(work(called("cwt"), ["K4ABD TOM 1234"]).replies).toEqual(["K4ABC K4ABC"]);
     expect(work(called("cwt"), ["K4?"]).replies).toEqual(["K4ABC K4ABC"]);
     expect(work(called("cwt"), ["K 4 ?"]).replies, "keyed apart").toEqual(["K4ABC K4ABC"]);
+    expect(work(called("cwt"), ["KAB?"]).replies, "part of it wrong").toEqual(["K4ABC K4ABC"]);
+  });
+
+  it("sends its call for AGN or ? after its own AGN?", () => {
+    for (const ask of ["?", "AGN", "UR CALL ?", "CALL?"]) {
+      expect(work(called("pota"), ["K4ABC", ask, ask]).replies).toEqual(["AGN?", "K4ABC", "K4ABC"]);
+    }
   });
 
   it("says yes to its whole call with a ?, keyed apart with Lenient copy", () => {
