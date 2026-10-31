@@ -24,7 +24,7 @@ import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
 import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
-import { speedsOf } from "@/copy/measure";
+import { speedOf, speedsOf } from "@/copy/measure";
 import { textScript } from "@/copy/text";
 import {
   charsOf,
@@ -164,7 +164,8 @@ const SHOW_DOWNLOAD_HELP =
   "in New exchange. With QSB, noise, QRN or QRM on a generated QSO or your own text, Download " +
   "clean saves it without them, and Download as heard with them.";
 
-const SHOW_SPEED_HELP = "Each line of a generated QSO or your own text shows the speed it was sent at.";
+const SHOW_SPEED_HELP =
+  "Each line shows the speed it was sent at. For an opened recording, it is measured from the line.";
 
 const HIDE_CALLS_HELP =
   "Each station shows as Station 1 or Station 2 until you copy its call in one of your " +
@@ -687,6 +688,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const ended = rec !== null && pos >= duration - 0.05;
   /** A recording's speed, each station's, measured from what was read. */
   const measured = useMemo(() => (rec && !file?.script ? speedsOf(rec) : null), [rec, file?.script]);
+  /** Each line of a recording, its speed, measured from it alone. */
+  const measuredLines = useMemo(
+    () => (rec && !file?.script ? rec.overs.map((o) => speedOf([o])) : null),
+    [rec, file?.script],
+  );
   /** The speed the QSO is sent at, as the page shows it: one speed, or the
    *  slowest to the fastest of its stations. A recording's is measured, so
    *  it says about. */
@@ -1362,14 +1368,21 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     );
   };
 
-  /** The speed line `i` of a generated QSO was sent at, as the QSO page
-   *  shows a line's speed. None for a recording. */
+  /** The speed line `i` was sent at, as the QSO page shows a line's speed.
+   *  A recording's is measured from the line. */
   const lineSpeed = (i: number): React.ReactElement | null => {
-    const line = file?.script?.lines[i];
-    if (!showSpeed || !line) return null;
-    const speed = sendingOf(file!.script!).speed ?? file!.script!.stations[line.station]!.speed;
+    if (!showSpeed || !file) return null;
+    const line = file.script?.lines[i];
+    const speed = file.script
+      ? line && (sendingOf(file.script).speed ?? file.script.stations[line.station]!.speed)
+      : measuredLines?.[i];
+    if (!speed) return null;
     return (
-      <span className="lwpm" data-testid="copy-line-wpm">
+      <span
+        className="lwpm"
+        data-testid="copy-line-wpm"
+        title={file.script ? undefined : "Measured from the recording"}
+      >
         {fmtSpeed(speed)}
       </span>
     );

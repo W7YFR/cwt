@@ -1097,6 +1097,23 @@ describe("downloads", () => {
 });
 
 describe("a recording's speed", () => {
+  it("shows each line's speed, measured from it", async () => {
+    await open();
+    await playTo(2);
+    const shown = lines().map((l) => l.querySelector('[data-testid="copy-line-wpm"]')?.textContent ?? "");
+    expect(shown).toHaveLength(2);
+    for (const text of shown) {
+      const wpm = Number(/^(\d+)(\/\d+)? wpm$/.exec(text)?.[1]);
+      expect(Math.abs(wpm - WPM), text).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("shows no line speeds with the setting off", async () => {
+    await open({ copyShowSpeed: false });
+    await playTo(1);
+    expect($('[data-testid="copy-line-wpm"]')).toBeNull();
+  });
+
   it("shows the speed it was sent at, measured, beside its name", async () => {
     await open();
     const shown = $('[data-testid="copy-sent-speed"]')!.textContent!;
