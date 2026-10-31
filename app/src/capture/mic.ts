@@ -14,14 +14,25 @@
 import { describeInputs, micLog } from "@/micdebug";
 import type { AudioClip } from "@/types";
 
+/** A block is keying when its peak is this many times the input's quiet
+ *  floor between marks. */
+const KEY_RATIO = 6;
+
+/** Nor ever under this peak, so a silent line in does not key on a hiss. */
+const KEY_MIN = 0.002;
+
+/** How fast the floor climbs to a louder quiet, a share each block. It falls
+ *  at once. */
+const FLOOR_RISE = 0.002;
+
 /** Source for the worklet, inlined so there is no second file to ship and no
  *  URL to get wrong under a different deploy base.
  *
  *  It forwards frames rather than accumulating them: a worklet that held a
  *  minute of audio would be holding it on the audio thread, where an allocation
  *  at the wrong moment is a dropped buffer and a dropped buffer is a shortened
- *  dit. */
-const WORKLET_SOURCE = `
+ *  dit. Exported for the tests, which run it on a stand-in audio thread. */
+export const WORKLET_SOURCE = `
 class CaptureProcessor extends AudioWorkletProcessor {
   process(inputs) {
     const input = inputs[0];
@@ -43,6 +54,67 @@ class CaptureProcessor extends AudioWorkletProcessor {
   }
 }
 registerProcessor('cw-capture', CaptureProcessor);
+
+/* The band, cut the moment you key: see BandGate in mic.ts. Its input is the
+   microphone; its output is the band, looped, at the level it is given. */
+class BandGateProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.samples = null;
+    this.step = 1;
+    this.pos = 0;
+    this.level = 0;
+    this.gain = 0;
+    this.delay = 0;
+    this.armed = false;
+    this.hang = 0;
+    this.floor = -1;
+    this.port.onmessage = (ev) => {
+      const m = ev.data;
+      if (m.type === 'band') {
+        this.samples = m.samples;
+        this.step = m.samples ? m.rate / sampleRate : 1;
+        this.pos = 0;
+      } else if (m.type === 'level') this.level = m.level;
+      else if (m.type === 'delay') this.delay = m.sec;
+      else if (m.type === 'arm') this.armed = m.armed;
+    };
+  }
+  process(inputs, outputs) {
+    const out = outputs[0] && outputs[0][0];
+    if (!out) return true;
+    const mic = inputs[0] && inputs[0][0];
+    // Keying, from this block alone: its peak well over the quiet floor.
+    let peak = 0;
+    if (mic) for (let i = 0; i < mic.length; i++) { const a = Math.abs(mic[i]); if (a > peak) peak = a; }
+    if (this.floor < 0 || peak < this.floor) this.floor = peak;
+    const keyed = this.armed && peak > Math.max(${KEY_MIN}, this.floor * ${KEY_RATIO});
+    if (keyed) this.hang = this.delay * sampleRate;
+    else this.floor += (peak - this.floor) * ${FLOOR_RISE};
+    const cut = keyed || this.hang > 0;
+    const target = cut ? 0 : this.level;
+    // Down in a millisecond, back in five: quick, as a receiver is, but
+    // without a click.
+    const rate = target < this.gain ? 1 / (0.001 * sampleRate) : 1 / (0.005 * sampleRate);
+    const band = this.samples;
+    const n = band ? band.length : 0;
+    for (let i = 0; i < out.length; i++) {
+      if (this.gain < target) this.gain = Math.min(target, this.gain + rate * Math.max(this.level, 1e-6));
+      else if (this.gain > target) this.gain = Math.max(target, this.gain - rate * Math.max(this.level, 1e-6));
+      if (n === 0 || this.gain === 0) { out[i] = 0; } else {
+        const j = Math.floor(this.pos);
+        const f = this.pos - j;
+        const a = band[j];
+        const b = band[j + 1 < n ? j + 1 : 0];
+        out[i] = (a + (b - a) * f) * this.gain;
+      }
+      if (n > 0) { this.pos += this.step; if (this.pos >= n) this.pos -= n; }
+    }
+    this.hang = Math.max(0, this.hang - out.length);
+    return true;
+  }
+}
+registerProcessor('cw-band-gate', BandGateProcessor);
 `;
 
 export interface InputDevice {
@@ -177,6 +249,27 @@ export interface Recorder {
   restart(): void;
   /** Stop and release without producing a clip. */
   cancel(): Promise<void>;
+  /** The band, played beside the recording. */
+  readonly band?: BandGate;
+}
+
+/** The band played from the recorder's own audio context, as a receiver
+ *  plays it: cut the moment you key, on the audio thread, with nothing in
+ *  between. On the page's thread, the cut came a beat late.
+ *
+ *  It comes back once you have not keyed for the break-in delay, as a
+ *  radio's receiver does. */
+export interface BandGate {
+  /** The band's track, which loops, or null for none. */
+  set(band: { samples: Float32Array; rate: number } | null): void;
+  /** The playback level, as a gain. 0 is silent. */
+  level(gain: number): void;
+  /** The break-in delay, in seconds. 0 is full break-in: the band is heard
+   *  between your marks. */
+  delay(sec: number): void;
+  /** Cut on keying only while armed: while the page listens for you, not
+   *  while a station plays and the microphone may hear it. */
+  arm(armed: boolean): void;
 }
 
 export interface RecordOptions {
@@ -262,6 +355,16 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   mute.gain.value = 0;
   node.connect(mute).connect(ctx.destination);
 
+  const gate = new AudioWorkletNode(ctx, "cw-band-gate", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+  source.connect(gate);
+  gate.connect(ctx.destination);
+  const band: BandGate = {
+    set: (b) => gate.port.postMessage({ type: "band", samples: b?.samples ?? null, rate: b?.rate ?? 0 }),
+    level: (gain) => gate.port.postMessage({ type: "level", level: gain }),
+    delay: (sec) => gate.port.postMessage({ type: "delay", sec }),
+    arm: (armed) => gate.port.postMessage({ type: "arm", armed }),
+  };
+
   let chunks: Float32Array[] = [];
   let total = 0;
   let restarts = 0;
@@ -302,6 +405,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     stopped = true;
     node.port.onmessage = null;
     node.disconnect();
+    gate.disconnect();
     source.disconnect();
     mute.disconnect();
     stream.getTracks().forEach((t) => t.stop());
@@ -343,6 +447,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
       }
       return out;
     },
+    band,
     restarts: () => restarts,
     restart() {
       chunks = [];

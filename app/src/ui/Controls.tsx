@@ -17,6 +17,8 @@ import { IconCog } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
+import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
+import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
 import { loadUser } from "@/io/storage";
 import { BREAK } from "@/morse";
 import {
@@ -36,6 +38,11 @@ import {
   SHOW_RUNS_HELP,
   RUN_SORT_HELP,
   GAIN_HELP,
+  QSB_HELP,
+  NOISE_HELP,
+  QRN_HELP,
+  BREAK_IN_HELP,
+  QRM_HELP,
   PACE_ABSOLUTE_HELP,
   TIMES_FILE_HELP,
   TIMES_HELP,
@@ -1094,6 +1101,148 @@ export function ListeningLevel({
         max={42}
         step={1}
         value={gainDb}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      {about.tip}
+    </div>
+  );
+}
+
+/** QSB: how deep a generated station fades. The Copy page and the QSO page
+ *  both draw this. */
+export function QsbSlider({
+  qsbDb,
+  onChange,
+}: {
+  qsbDb: number;
+  onChange(qsbDb: number): void;
+}): React.ReactElement {
+  const about = useHelp(QSB_HELP);
+  return (
+    <div className="group">
+      <label htmlFor="qsb" title={about.title}>
+        QSB <output id="qsb-out">{qsbDb > 0 ? `${qsbDb} dB` : "Off"}</output>
+      </label>
+      <input
+        type="range"
+        id="qsb"
+        min={0}
+        max={QSB_MAX_DB}
+        step={QSB_STEP_DB}
+        value={qsbDb}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      {about.tip}
+    </div>
+  );
+}
+
+/** How loud the band noise is under a generated station. The Copy page and
+ *  the QSO page both draw this. */
+export function NoiseSlider({
+  noiseDb,
+  onChange,
+}: {
+  noiseDb: number;
+  onChange(noiseDb: number): void;
+}): React.ReactElement {
+  const about = useHelp(NOISE_HELP);
+  return (
+    <div className="group">
+      <label htmlFor="noise" title={about.title}>
+        Noise <output id="noise-out">{noiseOn(noiseDb) ? `${noiseDb} dB` : "Off"}</output>
+      </label>
+      <input
+        type="range"
+        id="noise"
+        min={NOISE_OFF_DB}
+        max={NOISE_MAX_DB}
+        step={NOISE_STEP_DB}
+        value={noiseDb}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      {about.tip}
+    </div>
+  );
+}
+
+/** QRN: static crashes on a generated station. The Copy page and the QSO
+ *  page both draw this. */
+export function QrnSlider({ qrn, onChange }: { qrn: number; onChange(qrn: number): void }): React.ReactElement {
+  const about = useHelp(QRN_HELP);
+  return (
+    <div className="group">
+      <label htmlFor="qrn" title={about.title}>
+        QRN <output id="qrn-out">{QRN_LEVELS[qrn] ?? QRN_LEVELS[0]}</output>
+      </label>
+      <input
+        type="range"
+        id="qrn"
+        min={0}
+        max={QRN_LEVELS.length - 1}
+        step={1}
+        value={qrn}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      {about.tip}
+    </div>
+  );
+}
+
+/** QRM: another station near a generated one. The Copy page and the QSO
+ *  page both draw this. */
+export function QrmSlider({ qrmDb, onChange }: { qrmDb: number; onChange(qrmDb: number): void }): React.ReactElement {
+  const about = useHelp(QRM_HELP);
+  return (
+    <div className="group">
+      <label htmlFor="qrm" title={about.title}>
+        QRM <output id="qrm-out">{qrmOn(qrmDb) ? `${qrmDb} dB` : "Off"}</output>
+      </label>
+      <input
+        type="range"
+        id="qrm"
+        min={QRM_OFF_DB}
+        max={QRM_MAX_DB}
+        step={QRM_STEP_DB}
+        value={qrmDb}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      {about.tip}
+    </div>
+  );
+}
+
+/** The break-in delay a radio starts with, near enough. */
+export const DEFAULT_BREAK_IN_MS = 800;
+
+/** The longest break-in delay, in ms. */
+const BREAK_IN_MAX_MS = 2000;
+
+/** How long the QSO page's band stays cut after your last mark, as a
+ *  radio's break-in delay. */
+export function BreakInSlider({
+  ms,
+  barred,
+  onChange,
+}: {
+  ms: number;
+  barred: string | null;
+  onChange(ms: number): void;
+}): React.ReactElement {
+  const about = useHelp(barredTitle(barred, BREAK_IN_HELP));
+  return (
+    <div className="group" data-disabled={barred !== null}>
+      <label htmlFor="break-in" title={about.title}>
+        Break-in delay <output id="break-in-out">{ms > 0 ? `${ms} ms` : "Full"}</output>
+      </label>
+      <input
+        type="range"
+        id="break-in"
+        min={0}
+        max={BREAK_IN_MAX_MS}
+        step={50}
+        value={ms}
+        disabled={barred !== null}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       {about.tip}

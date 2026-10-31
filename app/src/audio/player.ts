@@ -13,6 +13,7 @@
  */
 
 import type { Timeline } from "@/types";
+import { fadeCurve, type Fade } from "./qsb";
 import { keyingEnvelope, RAMP_SEC, type ScheduleOptions } from "./schedule";
 import { encodeWav } from "./wav";
 
@@ -41,11 +42,40 @@ export interface TargetVoice {
 
 export const DEFAULT_VOICE: TargetVoice = { toneHz: 600, filterQ: 3 };
 
+/** The target as heard over the air: fading, over the band. Each part is
+ *  absent when it is off. */
+export interface TargetAir {
+  fade?: {
+    /** The station's fading. */
+    fade: Fade;
+    /** Where in the fading the target starts, in seconds. */
+    atSec: number;
+  };
+  /** The band with the target alone: absent when it plays on its own. It
+   *  plays from where the page's clock is in it, so each over hears a
+   *  different part. */
+  band?: Band;
+}
+
+/** The band: noise, QRN and QRM, as one track that loops. Played under a
+ *  station's over here; played on its own, by the recorder: see BandGate. */
+export interface Band {
+  samples: Float32Array;
+  rate: number;
+}
+
+/** How often the fade's gain is set, in seconds. */
+const FADE_STEP_SEC = 0.02;
+
+/** How long the noise with a target takes to come up and to die away. */
+const NOISE_RAMP_SEC = 0.15;
+
+
 export interface Player {
   playBuffer(data: ArrayBuffer | AudioBuffer, from?: number, to?: number): Promise<void>;
   playTarget(
     timeline: Timeline,
-    options: ScheduleOptions & { voice?: TargetVoice },
+    options: ScheduleOptions & { voice?: TargetVoice; air?: TargetAir | undefined },
   ): void;
   stop(): void;
   /** Open the audio context now. A page that plays later, with no click
@@ -99,6 +129,8 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
     gate: GainNode;
     level: GainNode;
     filter: BiquadFilterNode | null;
+    fade: GainNode | null;
+    noise: AudioBufferSourceNode | null;
   } | null = null;
 
   /* A recording is decoded before it plays, and a stop can land in between.
@@ -144,6 +176,15 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
       tgtNodes.osc.disconnect();
       tgtNodes.gate.disconnect();
       tgtNodes.filter?.disconnect();
+      tgtNodes.fade?.disconnect();
+      if (tgtNodes.noise) {
+        try {
+          tgtNodes.noise.stop();
+        } catch {
+          /* already stopped */
+        }
+        tgtNodes.noise.disconnect();
+      }
       tgtNodes.level.disconnect();
       tgtNodes = null;
     }
@@ -248,19 +289,49 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
       gate.gain.value = 0;
       level.gain.value = linGain();
 
+      const env = keyingEnvelope(timeline, options);
+      const t0 = c.currentTime + 0.06; // a beat of headroom for scheduling
+
+      // On the air: a gain that fades the keyed tone, and noise beside it. The
+      // noise goes straight to the level, so it plays through the gaps.
+      let fade: GainNode | null = null;
+      let noise: AudioBufferSourceNode | null = null;
+      const air = options.air;
+      if (air?.fade) {
+        const n = Math.max(2, Math.ceil(env.duration / FADE_STEP_SEC) + 1);
+        fade = c.createGain();
+        fade.gain.setValueCurveAtTime(fadeCurve(air.fade.fade, air.fade.atSec, FADE_STEP_SEC, n), t0, (n - 1) * FADE_STEP_SEC);
+      }
+      if (air?.band && air.band.samples.length > 0) {
+        const buf = c.createBuffer(1, air.band.samples.length, air.band.rate);
+        buf.getChannelData(0).set(air.band.samples);
+        // Up and down in a ramp, not cut, at each end of the over.
+        const ramp = c.createGain();
+        const ramped = Math.min(NOISE_RAMP_SEC, env.duration / 2);
+        ramp.gain.setValueAtTime(0, t0);
+        ramp.gain.linearRampToValueAtTime(1, t0 + ramped);
+        ramp.gain.setValueAtTime(1, t0 + env.duration - ramped);
+        ramp.gain.linearRampToValueAtTime(0, t0 + env.duration);
+        noise = c.createBufferSource();
+        noise.buffer = buf;
+        noise.loop = true;
+        noise.connect(ramp).connect(level);
+        noise.start(t0, (performance.now() / 1000) % buf.duration);
+        noise.stop(t0 + env.duration);
+      }
+
       let filter: BiquadFilterNode | null = null;
+      let head: AudioNode = gate;
+      osc.connect(gate);
       if (voice.filterQ > 0) {
         filter = c.createBiquadFilter();
         filter.type = "bandpass";
         filter.frequency.value = voice.toneHz;
         filter.Q.value = voice.filterQ;
-        osc.connect(gate).connect(filter).connect(level).connect(c.destination);
-      } else {
-        osc.connect(gate).connect(level).connect(c.destination);
+        head = head.connect(filter);
       }
-
-      const env = keyingEnvelope(timeline, options);
-      const t0 = c.currentTime + 0.06; // a beat of headroom for scheduling
+      if (fade) head = head.connect(fade);
+      head.connect(level).connect(c.destination);
       for (const [at, value] of env.points) {
         if (value === 0) gate.gain.setValueAtTime(0, t0 + at);
         else gate.gain.linearRampToValueAtTime(value, t0 + at);
@@ -275,7 +346,7 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         if (mode === "tgt") done();
       };
 
-      tgtNodes = { osc, gate, level, filter };
+      tgtNodes = { osc, gate, level, filter, fade, noise };
       clockStart = t0;
       clockOffset = start;
       clockEnd = endT;

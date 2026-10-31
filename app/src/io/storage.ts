@@ -498,6 +498,12 @@ export interface Prefs {
   qsoGradeTyping?: boolean;
   /** A locked copy on the QSO page can be opened again with Edit. */
   qsoAllowEdits?: boolean;
+  /** The band plays all through a QSO, cut only while you key, not only
+   *  under the station's lines. */
+  qsoBandNoise?: boolean;
+  /** The break-in delay on the QSO page, in ms: how long the band stays cut
+   *  after your last mark. 0 is full break-in. */
+  qsoBreakInMs?: number;
   /** When the QSO page's play buttons show. Absent is always. */
   qsoPlayback?: "never" | "always" | "end";
   /** Download shows under a QSO that is over. Absent is on. */
@@ -559,6 +565,17 @@ export interface Prefs {
   /** The Copy page's sliders, for a generated QSO. */
   copyCharWpm?: number;
   copyFarnsworthWpm?: number;
+  /** How deep a generated station fades, in dB, on the Copy and QSO pages.
+   *  Absent or 0: no fading. */
+  qsbDb?: number;
+  /** The band noise under a generated station, in dB under its peak, on the
+   *  Copy and QSO pages. Absent or at `NOISE_OFF_DB`: none. */
+  noiseDb?: number;
+  /** QRN on the Copy and QSO pages: an index into `QRN_LEVELS`. */
+  qrn?: number;
+  /** QRM on the Copy and QSO pages, in dB under the station's peak. Absent
+   *  or at `QRM_OFF_DB`: none. */
+  qrmDb?: number;
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -731,6 +748,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoHints: oneOf("off", "always", "copied"),
   qsoGradeTyping: isBool,
   qsoAllowEdits: isBool,
+  qsoBandNoise: isBool,
+  qsoBreakInMs: isNum,
   qsoPlayback: oneOf("never", "always", "end"),
   qsoShowDownload: isBool,
   qsoSettingsOpen: isBool,
@@ -757,6 +776,10 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copySpeed: oneOf("format", "mine"),
   copyCharWpm: isNum,
   copyFarnsworthWpm: isNum,
+  qsbDb: isNum,
+  noiseDb: isNum,
+  qrn: isNum,
+  qrmDb: isNum,
 };
 
 export function loadPrefs(): Prefs {

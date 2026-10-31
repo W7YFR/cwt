@@ -17,6 +17,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
+import { NOISE_OFF_DB } from "@/audio/qsb";
+import { QRM_OFF_DB } from "@/copy/band";
 import { encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
@@ -66,6 +68,10 @@ import {
   SettingRow,
   SettingsBand,
   SettingsPanel,
+  NoiseSlider,
+  QrmSlider,
+  QrnSlider,
+  QsbSlider,
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
@@ -333,7 +339,11 @@ function useChoice<
     | "copyRunQsos"
     | "copyChatLength"
     | "copyGap"
-    | "copySpeed",
+    | "copySpeed"
+    | "qsbDb"
+    | "noiseDb"
+    | "qrn"
+    | "qrmDb",
 >(
   key: K,
   or: NonNullable<Prefs[K]>,
@@ -390,6 +400,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [gap, setGap] = useChoice("copyGap", "1");
   const gapSec = gap === "wait" ? WAIT_GAP_SEC : Number(gap);
   const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
+  const [qsbDb, setQsbDb] = useChoice("qsbDb", 0);
+  const [noiseDb, setNoiseDb] = useChoice("noiseDb", NOISE_OFF_DB);
+  const [qrn, setQrn] = useChoice("qrn", 0);
+  const [qrmDb, setQrmDb] = useChoice("qrmDb", QRM_OFF_DB);
   const [mine, setMineRaw] = useState<Speed>(() => {
     const p = loadPrefs();
     const or = loadSpeed() ?? { charWpm: 20, farnsworthWpm: 20 };
@@ -405,7 +419,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     if (speedChoice !== "mine") setSpeedChoice("mine");
   };
   /** How a generated QSO is sent, from the settings. */
-  const sending = { gapSec, speed: speedChoice === "mine" ? mine : undefined };
+  const sending = { gapSec, speed: speedChoice === "mine" ? mine : undefined, qsbDb, noiseDb, qrn, qrmDb };
 
   /** The recording: its name, its own bytes to play, and what was read. A
    *  generated QSO has its script too. */
@@ -561,10 +575,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     void keepCopyFile({ name, audio: new Blob([audio]), recording: sent.rec, script });
   };
 
-  /* A generated QSO sent again when its speed or gap changes, with your copy
+  /* A generated QSO sent again when its speed, gap, QSB or band changes, with your copy
      and where you are in it kept. A slider moves in steps, so this waits
      for it to settle. */
-  const sendKey = `${gapSec}|${speedChoice}|${mine.charWpm}|${mine.farnsworthWpm}`;
+  const sendKey = `${gapSec}|${speedChoice}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}`;
   const sentWith = useRef(sendKey);
   useEffect(() => {
     if (!file?.script || sentWith.current === sendKey) return;
@@ -1307,6 +1321,14 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           className="formpanel qsopanel"
           gainDb={gainDb}
           onGainDb={setGainDb}
+          audioExtra={
+            <>
+              <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
+              <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
+              <QrnSlider qrn={qrn} onChange={setQrn} />
+              <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+            </>
+          }
           pageRow={
             <>
               <Section name="copy" title="Your copy">

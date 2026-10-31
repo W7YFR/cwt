@@ -14,6 +14,10 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
+import { fadeOf, NOISE_OFF_DB, seedOf, type Fade } from "@/audio/qsb";
+import type { Band } from "@/audio/player";
+import { bandAudio, bandOn as anyBand, QRM_OFF_DB } from "@/copy/band";
+import { qrmLines } from "@/copy/generate";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import {
   loadPrefs,
@@ -47,6 +51,7 @@ import { targetTiming } from "@/timing/model";
 import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
 import { MOD, modOf } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
+import { NEEDS_BAND, NEEDS_BAND_BETWEEN } from "./copy";
 import { Graded, RightOnly } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
@@ -60,6 +65,12 @@ import {
   Section,
   SettingRow,
   SettingsBand,
+  BreakInSlider,
+  DEFAULT_BREAK_IN_MS,
+  NoiseSlider,
+  QrmSlider,
+  QrnSlider,
+  QsbSlider,
   SettingsPanel,
   SpeedSliders,
 } from "./Controls";
@@ -87,6 +98,23 @@ const TYPING_QUIET_MS = 1200;
 
 /** The tone a station line plays at when the log kept none. */
 const DEFAULT_TONE_HZ = 600;
+
+/** The band noise's pitch when it plays on its own: the middle of the
+ *  stations' tones. */
+const BAND_TONE_HZ = 645;
+
+/** The band's track: this long, then it loops, at this rate. Long enough
+ *  that QRM does not repeat a QSO soon. */
+const BAND_SEC = 120;
+const BAND_RATE = 12000;
+
+/** How loud the station plays, at its peak. */
+const THEIR_PEAK = 0.5;
+
+const BAND_NOISE_HELP =
+  "Noise, QRN and QRM play all through the QSO, as on a radio, not only while the station sends. " +
+  "They cut while you key. Through speakers, the microphone hears them, and can read QRM as your " +
+  "sending; headphones or a line in keep them out.";
 
 /** The rate a tape is made at when it holds none of your recording. */
 const TAPE_RATE = 24000;
@@ -405,7 +433,8 @@ function useOnOff(
     | "qsoShowDownload"
     | "qsoSideGuide"
     | "qsoGradeTyping"
-    | "qsoAllowEdits",
+    | "qsoAllowEdits"
+    | "qsoBandNoise",
   or: boolean,
 ): readonly [boolean, (next: boolean) => void] {
   const [value, setRaw] = useState<boolean>(() => loadPrefs()[key] ?? or);
@@ -650,6 +679,67 @@ export function QsoScreen({
   useEffect(() => player.setGainDb(gainDb), [player, gainDb]);
   useEffect(() => listen.setGainDb(gainDb), [listen, gainDb]);
 
+  /* QSB on the station, and the band noise under it. The same preferences
+     as the Copy page's. */
+  const [qsbDb, setQsbDbRaw] = useState(() => loadPrefs().qsbDb ?? 0);
+  const setQsbDb = (next: number) => {
+    setQsbDbRaw(next);
+    savePrefs({ ...loadPrefs(), qsbDb: next });
+  };
+  /** Each station's fading, by call and depth, so its next over fades on
+   *  from where the last one was. */
+  const fades = useRef(new Map<string, Fade>());
+  const fadeFor = (call: string): Fade => {
+    const key = `${call}|${qsbDb}`;
+    let fade = fades.current.get(key);
+    if (!fade) fades.current.set(key, (fade = fadeOf(qsbDb, seedOf(call))));
+    return fade;
+  };
+  const [noiseDb, setNoiseDbRaw] = useState(() => loadPrefs().noiseDb ?? NOISE_OFF_DB);
+  const setNoiseDb = (next: number) => {
+    setNoiseDbRaw(next);
+    savePrefs({ ...loadPrefs(), noiseDb: next });
+  };
+  const [qrn, setQrnRaw] = useState(() => loadPrefs().qrn ?? 0);
+  const setQrn = (next: number) => {
+    setQrnRaw(next);
+    savePrefs({ ...loadPrefs(), qrn: next });
+  };
+  const [qrmDb, setQrmDbRaw] = useState(() => loadPrefs().qrmDb ?? QRM_OFF_DB);
+  const setQrmDb = (next: number) => {
+    setQrmDbRaw(next);
+    savePrefs({ ...loadPrefs(), qrmDb: next });
+  };
+  const [bandNoise, setBandNoise] = useOnOff("qsoBandNoise", true);
+  const [breakInMs, setBreakInMsRaw] = useState(() => loadPrefs().qsoBreakInMs ?? DEFAULT_BREAK_IN_MS);
+  const setBreakInMs = (next: number) => {
+    setBreakInMsRaw(next);
+    savePrefs({ ...loadPrefs(), qsoBreakInMs: next });
+  };
+  const hasBand = anyBand({ noiseDb, qrn, qrmDb });
+  /** The band as one track, made again when a setting changes. */
+  const band = useMemo<Band | null>(
+    () =>
+      hasBand
+        ? {
+            samples: bandAudio({
+              n: BAND_SEC * BAND_RATE,
+              rate: BAND_RATE,
+              toneHz: BAND_TONE_HZ,
+              peak: THEIR_PEAK,
+              noiseDb,
+              qrn,
+              qrmDb,
+              qsbDb,
+              seed: Math.floor(Math.random() * 2 ** 31),
+              qrmLines,
+            }),
+            rate: BAND_RATE,
+          }
+        : null,
+    [hasBand, noiseDb, qrn, qrmDb, qsbDb],
+  );
+
   /** The next station in a run, about to call. */
   const nextCall = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quiet = useCallback(() => {
@@ -682,6 +772,15 @@ export function QsoScreen({
     maxSeconds: MAX_OVER_SEC,
   });
   const { recorder } = rec;
+
+  /* The band noise on its own, all through a session, when asked for. */
+  /* Played by the recorder, which cuts it the moment you key: see BandGate. */
+  const gate = recorder?.band ?? null;
+  const bandOn = bandNoise && band !== null && gate !== null;
+  useEffect(() => gate?.set(bandOn ? band : null), [gate, bandOn, band]);
+  useEffect(() => gate?.level(Math.pow(10, gainDb / 20)), [gate, gainDb]);
+  useEffect(() => gate?.arm(phase === "listening"), [gate, phase]);
+  useEffect(() => gate?.delay(breakInMs / 1000), [gate, breakInMs]);
 
   // Stopping the session stops the reply too, and ends the QSO. Not on
   // the first render: a QSO a reload brought back stays open to go on with.
@@ -881,9 +980,15 @@ export function QsoScreen({
         }
         setTheirSpeed(at);
         player.playTarget(timeline, {
-          peak: 0.5,
+          peak: THEIR_PEAK,
           padSec: 0.1,
           voice: { toneHz: them.toneHz, filterQ: 3 },
+          air: {
+            // On the page's clock, so the fading runs on between overs.
+            ...(qsbDb > 0 ? { fade: { fade: fadeFor(them.call), atSec: performance.now() / 1000 } } : {}),
+            // With the over, unless the band already plays it.
+            ...(band && !bandOn ? { band } : {}),
+          },
         });
       },
       (lo + Math.random() * (hi - lo)) * 1000,
@@ -917,6 +1022,7 @@ export function QsoScreen({
     phase === "listening" &&
     copy.turn !== answered.current &&
     isSending(copy.text);
+
 
   /* Your next over has begun: the copy of the QSO before is done. */
   useEffect(() => {
@@ -1651,6 +1757,29 @@ export function QsoScreen({
           }}
           gainDb={gainDb}
           onGainDb={setGainDb}
+          audioExtra={
+            <>
+              <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
+              <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
+              <QrnSlider qrn={qrn} onChange={setQrn} />
+              <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+              <BreakInSlider
+                ms={breakInMs}
+                barred={!hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
+                onChange={setBreakInMs}
+              />
+              <SettingRow label="Between its lines">
+                <Check
+                  id="qso-band-noise"
+                  label="Play the band"
+                  help={BAND_NOISE_HELP}
+                  barred={hasBand ? null : NEEDS_BAND}
+                  checked={bandNoise}
+                  onChange={setBandNoise}
+                />
+              </SettingRow>
+            </>
+          }
           /* What is set for this page alone, under the audio and the speed,
              which both pages share. Grouped by what each is about: the
              station, you, and what comes after a QSO. */

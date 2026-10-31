@@ -15,8 +15,8 @@
 
 import { keyingPlan } from "@/audio/synth";
 import { targetTiming } from "@/timing";
-import type { InputDevice, MicAccess, RecordOptions, Recorder } from "@/capture/mic";
-import type { Player, PlayerCallbacks } from "@/audio/player";
+import type { BandGate, InputDevice, MicAccess, RecordOptions, Recorder } from "@/capture/mic";
+import type { Player, PlayerCallbacks, TargetAir } from "@/audio/player";
 import { copyPasses, type CopyAudio, type CopyRead, type CopyStart } from "@/ui/copyPass";
 
 /** The microphone's rate. Low, as the decoder brings any rate down to its
@@ -67,10 +67,26 @@ function sample(t: number): number {
   return down(t) ? AMPLITUDE * Math.sin(2 * Math.PI * TONE_HZ * t) : 0;
 }
 
+/** What the band gate was last told, and what each of the station's lines
+ *  played with, for a test to read. */
+export const heard: {
+  gate: { band: { samples: Float32Array; rate: number } | null; level: number; armed: boolean; delaySec: number };
+  airs: (TargetAir | undefined)[];
+} = { gate: { band: null, level: 0, armed: false, delaySec: 0 }, airs: [] };
+
+/** The band gate, which only remembers. */
+const gate: BandGate = {
+  set: (band) => void (heard.gate.band = band),
+  level: (gain) => void (heard.gate.level = gain),
+  arm: (armed) => void (heard.gate.armed = armed),
+  delay: (sec) => void (heard.gate.delaySec = sec),
+};
+
 /** A recorder on the fake clock. It records only what the test keys: the
  *  station's reply is not heard, as the page drops it anyway. */
 class ClockRecorder implements Recorder {
   readonly rate = RATE;
+  readonly band = gate;
   private began = now();
   private starts = 0;
 
@@ -153,6 +169,7 @@ export function fakePlayer<T extends object>(real: T) {
         },
         playTarget(timeline, options) {
           teardown();
+          heard.airs.push(options.air);
           // Its clock runs over the padding on either side, as the real one.
           const start = now() + options.padSec;
           const end = timeline.duration + options.padSec;
@@ -208,4 +225,6 @@ export class PageWorker {
 export function resetKey(): void {
   marks = [];
   keyedTo = 0;
+  heard.gate = { band: null, level: 0, armed: false, delaySec: 0 };
+  heard.airs = [];
 }
