@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { newQso } from "@/qso/cq";
 import { FORMATS, FORMAT_IDS, type FormatId } from "@/qso/formats";
-import { hint, meOf, type Me, type Voice } from "@/qso/hint";
+import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME, type Me, type Voice } from "@/qso/hint";
 import { isRun, respond, type AnyQso, type RunContext } from "@/qso/run";
 
 const ME: Me = { call: "W7YFR", name: "ROB", qth: "PORTLAND OR", region: "OR", nr: "" };
@@ -137,6 +137,32 @@ describe("every wording of the hints", () => {
         if (format === "mst") expect(got.number).toBe("1");
       }
     }
+  });
+});
+
+describe("the station, until you have copied it", () => {
+  it("is never named by call or name, in any wording", () => {
+    const hidden = { call: THEIR_CALL, name: THEIR_NAME };
+    let named = 0;
+    for (const start of [null, ...FORMAT_IDS]) {
+      for (let seed = 1; seed <= 60; seed++) {
+        const rand = seeded(seed);
+        let qso: AnyQso = newQso(rand);
+        for (let n = 1; n <= 12; n++) {
+          for (let w = 0; w < 8; w++) {
+            const sent = hint(qso, ME, start, seededVoice(seed * 100 + n * 10 + w, w * 3), hidden);
+            const words = sent.split(" ");
+            expect(words, sent).not.toContain(qso.them.call);
+            expect(words, sent).not.toContain(qso.them.name);
+            if (sent.includes(THEIR_NAME)) named++;
+          }
+          const turn = respond(qso, hint(qso, ME, start), { rand, hour: 10, region: ME.region });
+          if (turn.ended) break;
+          qso = turn.qso;
+        }
+      }
+    }
+    expect(named, "wordings with the name").toBeGreaterThan(0);
   });
 });
 

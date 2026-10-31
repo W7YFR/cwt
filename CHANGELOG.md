@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- The suggested reply on the QSO page no longer gives the station's call or name before you copy them. It shows (THEIR CALL) and (THEIR NAME) until then, unless the station's lines show.
+
 ## v1.19.0 — 2026-10-29
 
 ### Added

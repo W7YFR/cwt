@@ -42,4 +42,20 @@ describe("the suggested reply", () => {
     await fill(box, lastSent().toLowerCase());
     expect(hint()).toMatch(/ ROB OR$/);
   });
+
+  it("leaves out the station's call until you have it, unless its lines show", async () => {
+    const callOf = (text: string) => text.split(" ").find((w) => /^[A-Z0-9]?[A-Z]\d[A-Z]+$/.test(w) && w !== "W7YFR")!;
+    await open({ qsoTheirText: "copy", qsoHints: "always", qsoLockCopy: false, user: USER });
+    await send("CQ SST W7YFR");
+    const call = callOf(lastSent());
+    expect(hint(), "not yet copied").not.toContain(call);
+    await fill($$<HTMLInputElement>('[data-testid="qso-type"]')[0]!, call.toLowerCase());
+    expect(hint(), "copied").toContain(call);
+  });
+
+  it("puts in the station's call when its lines show whole", async () => {
+    await open({ qsoTheirText: "before", qsoHints: "always", user: USER });
+    const call = callIn(await send("CQ SST W7YFR"));
+    expect(hint()).toContain(call);
+  });
 });

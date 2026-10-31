@@ -31,7 +31,7 @@ import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
-import { hint, meOf, seededVoice } from "@/qso/hint";
+import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
@@ -265,7 +265,8 @@ const HINTS: ReadonlyArray<Option<Hints>> = [
 const HINTS_HELP =
   "A suggested reply under the log: one way to answer the station, with your details from User. " +
   "Once copied waits until your copy of the station's line is all right. " +
-  "When its lines are not for copying, it shows once the line has played.";
+  "When its lines are not for copying, it shows once the line has played. " +
+  "The station's call and name show as (THEIR CALL) and (THEIR NAME) until you copy them, unless its lines show.";
 
 interface Line {
   readonly who: string;
@@ -1402,6 +1403,14 @@ export function QsoScreen({
         (l.you ? l.text : typedOf(l)).toUpperCase().replace(/\s+/g, "").includes(call),
     );
 
+  /** Whether you have the word `word` in QSO `n`: in one of your overs as
+   *  copied, or in your copy of one of the station's overs. A whole word,
+   *  so ED is not in RED. */
+  const heard = (n: number, word: string): boolean =>
+    lines.some(
+      (l) => l.qso === n && (l.you ? l.text : typedOf(l)).toUpperCase().split(/\s+/).includes(word),
+    );
+
   /** Who sent a line. The station's call shows only once you have it, when
    *  the over shows whole, or when the QSO is over. Until then, Station. */
   const whoOf = (line: Line): string => {
@@ -1515,6 +1524,13 @@ export function QsoScreen({
     const grade = gradeCopy(lastTheirs.text, typedOf(lastTheirs));
     return grade.right === grade.total;
   };
+  /* The station's call and name go in the reply once you have each, or once
+     one of its lines shows its text. Until then, (THEIR CALL), (THEIR NAME). */
+  const theirsShown = lines.some(
+    (l) => l.qso === qsoNo.current && !l.you && ["before", "sent"].includes(theirModeOf(l)),
+  );
+  const callShown = theirsShown || identified(qsoNo.current, them.call);
+  const nameShown = theirsShown || heard(qsoNo.current, them.name);
   const suggestion =
     recorder && phase === "listening" && (hints === "always" || (hints === "copied" && copiedRight()))
       ? hint(
@@ -1522,6 +1538,7 @@ export function QsoScreen({
           meOf(loadUser()),
           guideKind === "cq" ? null : guideKind,
           seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+          { call: callShown ? them.call : THEIR_CALL, name: nameShown ? them.name : THEIR_NAME },
         )
       : null;
 
