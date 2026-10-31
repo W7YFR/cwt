@@ -617,6 +617,20 @@ describe("a generated QSO", () => {
     expect(aired.some((b, i) => b !== clean[i])).toBe(true);
   });
 
+  it("shows the speed it is sent at, and follows the sliders", async () => {
+    await makeUp({ copyKind: "pota", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 30, copyFarnsworthWpm: 30 });
+    const shown = () => $('[data-testid="copy-sent-speed"]')?.textContent;
+    expect(shown()).toBe("30 wpm");
+    await click(button("panel-toggle"));
+    await fill($<HTMLInputElement>("#farns")!, "20");
+    expect(shown()).toBe("30/20 wpm");
+  });
+
+  it("shows the range of its stations' speeds at Format", async () => {
+    await makeUp({ copyKind: "pota", copyRunQsos: 3, copySpeed: "format" });
+    expect($('[data-testid="copy-sent-speed"]')!.textContent).toMatch(/^\d+(–\d+)? wpm$/);
+  });
+
   it("chooses Mine when a slider moves", async () => {
     await makeUp({ copyKind: "pota", copyRunQsos: 1 });
     await click(button("panel-toggle"));
@@ -979,5 +993,83 @@ describe("back to your box", () => {
       document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "c", bubbles: true, cancelable: true }));
     });
     expect(active()).toBe(boxes()[0]);
+  });
+});
+
+describe("downloads", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const SLOW = { copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, copyKind: "sst", copyRunQsos: 1 } as const;
+  const BAND = { noiseDb: -12, qsbDb: 10, qrn: 2, qrmDb: -14 } as const;
+
+  /** Each file the page saves: its name and what is in it. */
+  function saved(): { name: string; blob: Blob }[] {
+    const files: { name: string; blob: Blob }[] = [];
+    const blobs = new Map<string, Blob>();
+    let n = 0;
+    vi.spyOn(URL, "createObjectURL").mockImplementation((b) => {
+      const url = `blob:test/${n++}`;
+      blobs.set(url, b as Blob);
+      return url;
+    });
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      files.push({ name: this.download, blob: blobs.get(this.href)! });
+    });
+    return files;
+  }
+
+  async function generate(prefs: Prefs = {}): Promise<void> {
+    mount({ ...SLOW, ...prefs });
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-new-first"));
+    await until("the QSO to be ready", () => state() === "ready");
+  }
+
+  /** The share of samples near silence in a 16-bit WAV. */
+  async function quiet(blob: Blob): Promise<number> {
+    const pcm = new Int16Array((await blob.arrayBuffer()).slice(44));
+    let n = 0;
+    for (const v of pcm) if (Math.abs(v) < 300) n++;
+    return n / pcm.length;
+  }
+
+  it("saves a generated QSO as audio and as text, with nothing added", async () => {
+    const files = saved();
+    await generate();
+    expect($('[data-testid="copy-download-heard"]'), "nothing added to hear").toBeNull();
+    await click(button("copy-download"));
+    await click(button("copy-download-text"));
+    expect(files.map((f) => f.name)).toEqual([expect.stringMatching(/\.wav$/), expect.stringMatching(/\.txt$/)]);
+    const text = await files[1]!.blob.text();
+    await playTo(1);
+    await click(button("copy-reveal"));
+    expect(text.trim().split("\n\n")).toHaveLength(lines().length);
+  });
+
+  it("saves a QSO with the band clean, and as heard", async () => {
+    const files = saved();
+    await generate(BAND);
+    await click(button("copy-download-clean"));
+    await click(button("copy-download-heard"));
+    const [clean, heard] = files;
+    expect(clean!.name).not.toMatch(/as-heard/);
+    expect(heard!.name).toMatch(/-as-heard\.wav$/);
+    expect(clean!.blob.size, "the same length").toBe(heard!.blob.size);
+    expect(await quiet(clean!.blob)).toBeGreaterThan(2 * (await quiet(heard!.blob)));
+  });
+
+  it("saves a recording as it was opened", async () => {
+    const files = saved();
+    await open();
+    expect($('[data-testid="copy-sent-speed"]'), "no speed known for a recording").toBeNull();
+    expect($('[data-testid="copy-download-clean"]')).toBeNull();
+    await click(button("copy-download"));
+    expect(files[0]!.name).toBe("qso.wav");
+  });
+
+  it("hides the downloads with the setting off", async () => {
+    await generate({ copyShowDownload: false });
+    expect($('[data-testid="copy-downloads"]')).toBeNull();
   });
 });

@@ -42,7 +42,7 @@ import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
-import { lineAudio, tape, trimmed, type Clip, type TapeLine } from "@/qso/tape";
+import { anyAdded, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
 import { charsOf, copyText, overOfText, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
@@ -263,7 +263,13 @@ const PLAYBACK_HELP =
   "Always shows them on every line. During a QSO they play on your turn, before you start " +
   "sending, and the microphone is not copied while they play. At end " +
   "shows them once the QSO is over.";
-const SHOW_DOWNLOAD_HELP = "Under a QSO that is over, Download saves it as a WAV file.";
+const SHOW_DOWNLOAD_HELP =
+  "Under a QSO that is over, Download saves it as a WAV file. With QSB, noise, QRN or QRM on, " +
+  "Download clean saves it without them, and Download as heard with them.";
+
+const DOWNLOAD_HEARD_HELP =
+  "Save the QSO with the QSB, noise, QRN and QRM set now. They are made again, so they are not " +
+  "the same as you heard live.";
 
 const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
   { value: "sent", label: "As sent", note: "Each letter shows as you send it." },
@@ -1280,11 +1286,25 @@ export function QsoScreen({
       text: line.text,
       speed: { charWpm: at.charWpm, farnsworthWpm: at.farnsworthWpm },
       toneHz: line.toneHz ?? DEFAULT_TONE_HZ,
+      call: line.who,
     };
   };
   /** The rate the tape is made at: your recording's, so it is not changed. */
   const tapeRate = () => yourAudio.current.values().next().value?.rate ?? TAPE_RATE;
   /** Play `clip` as `key`, or stop it when it is the one playing. */
+  /** What a replay adds, as the QSO was heard: the station's fading, and
+   *  the band where it is not already looping under the session. Null with
+   *  nothing to add. */
+  const replayAdded = (): Added | null => {
+    if (!anyAdded({ qsbDb, noiseDb, qrn, qrmDb })) return null;
+    const quiet = bandOn ? { noiseDb: NOISE_OFF_DB, qrn: 0, qrmDb: QRM_OFF_DB } : { noiseDb, qrn, qrmDb };
+    return { qsbDb, ...quiet, seed: Math.floor(Math.random() * 2 ** 31), qrmLines };
+  };
+  /** One line to play again, as it was heard. */
+  const lineHeard = (part: TapeLine): Clip => {
+    const added = replayAdded();
+    return added ? tape([part], tapeRate(), added) : lineAudio(part, tapeRate());
+  };
   const playClip = (key: string, clip: Clip) => {
     if (replaying === key) {
       listen.stop();
@@ -1315,7 +1335,7 @@ export function QsoScreen({
     while (i >= 0 && lines[i]!.you) i--;
     const part = i >= 0 ? tapeLineOf(i) : null;
     if (!part || cannotPlay() !== null) return;
-    playClip(`line ${i}`, lineAudio(part, tapeRate()));
+    playClip(`line ${i}`, lineHeard(part));
   };
   const replayKey = useRef(replayLast);
   replayKey.current = replayLast;
@@ -1349,12 +1369,13 @@ export function QsoScreen({
     }
     return parts.length ? parts : null;
   };
-  /** Save QSO `n` as a WAV file named for the station. */
-  const download = (n: number, clip: Clip) => {
+  /** Save QSO `n` as a WAV file named for the station, and as heard when
+   *  `heard`. */
+  const download = (n: number, clip: Clip, heard = false) => {
     const who = lines.find((l) => l.qso === n && !l.you)?.who ?? "qso";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(encodeWav(clip.samples, clip.rate));
-    a.download = `qso-${who.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.wav`;
+    a.download = `qso-${who.toLowerCase()}-${new Date().toISOString().slice(0, 10)}${heard ? "-as-heard" : ""}.wav`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
@@ -1376,7 +1397,7 @@ export function QsoScreen({
         disabled={why !== null}
         aria-label={on ? "Stop" : "Play this line"}
         title={why ?? (on ? "Stop" : "Play this line")}
-        onClick={() => part && playClip(key, lineAudio(part, tapeRate()))}
+        onClick={() => part && playClip(key, lineHeard(part))}
       >
         {on ? <IconStop /> : <IconPlay />}
       </button>
@@ -1443,6 +1464,10 @@ export function QsoScreen({
     // does not move when they do.
     const parts = qsoParts(n);
     const make = () => tape(parts!, tapeRate());
+    /** As heard: the station's fading and the band, made again. */
+    const heard = (): Clip =>
+      tape(parts!, tapeRate(), { qsbDb, noiseDb, qrn, qrmDb, seed: Math.floor(Math.random() * 2 ** 31), qrmLines });
+    const added = anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
     const gone = parts ? null : "This QSO's recording was not kept";
     const why = gone ?? cannotPlay();
     const key = `qso ${n}`;
@@ -1454,7 +1479,7 @@ export function QsoScreen({
             type="button"
             disabled={why !== null}
             title={why ?? undefined}
-            onClick={() => playClip(key, make())}
+            onClick={() => playClip(key, tape(parts!, tapeRate(), replayAdded() ?? undefined))}
           >
             <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
             {on ? "Stop" : "Play QSO"}
@@ -1463,6 +1488,7 @@ export function QsoScreen({
         {showDownload && (
           <button
             type="button"
+            data-testid="qso-download"
             disabled={gone !== null}
             title={gone ?? undefined}
             onClick={() => download(n, make())}
@@ -1470,7 +1496,21 @@ export function QsoScreen({
             <i className="ico">
               <IconDownload />
             </i>
-            Download
+            {added ? "Download clean" : "Download"}
+          </button>
+        )}
+        {showDownload && added && (
+          <button
+            type="button"
+            data-testid="qso-download-heard"
+            disabled={gone !== null}
+            title={gone ?? DOWNLOAD_HEARD_HELP}
+            onClick={() => download(n, heard(), true)}
+          >
+            <i className="ico">
+              <IconDownload />
+            </i>
+            Download as heard
           </button>
         )}
       </li>

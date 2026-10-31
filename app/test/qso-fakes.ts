@@ -67,12 +67,13 @@ function sample(t: number): number {
   return down(t) ? AMPLITUDE * Math.sin(2 * Math.PI * TONE_HZ * t) : 0;
 }
 
-/** What the band gate was last told, and what each of the station's lines
- *  played with, for a test to read. */
+/** What the band gate was last told, what each of the station's lines
+ *  played with, and each replay as a WAV, for a test to read. */
 export const heard: {
   gate: { band: { samples: Float32Array; rate: number } | null; level: number; armed: boolean; delaySec: number };
   airs: (TargetAir | undefined)[];
-} = { gate: { band: null, level: 0, armed: false, delaySec: 0 }, airs: [] };
+  replays: ArrayBuffer[];
+} = { gate: { band: null, level: 0, armed: false, delaySec: 0 }, airs: [], replays: [] };
 
 /** The band gate, which only remembers. */
 const gate: BandGate = {
@@ -160,7 +161,8 @@ export function fakePlayer<T extends object>(real: T) {
       let gainDb = 0;
       return {
         // A line played again: a second on the fake clock, whatever it holds.
-        async playBuffer() {
+        async playBuffer(data) {
+          if (data instanceof ArrayBuffer) heard.replays.push(data);
           teardown();
           const start = now();
           frame = setInterval(() => {
@@ -227,4 +229,5 @@ export function resetKey(): void {
   keyedTo = 0;
   heard.gate = { band: null, level: 0, armed: false, delaySec: 0 };
   heard.airs = [];
+  heard.replays = [];
 }

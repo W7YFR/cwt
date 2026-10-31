@@ -128,3 +128,24 @@ export function bandAudio(o: BandOptions): Float32Array {
   }
   return out;
 }
+
+/** Where the limiter starts to round peaks off. */
+const KNEE = 0.85;
+
+/** `x`, untouched under `KNEE`, and rounded off above it so it never
+ *  reaches full scale. */
+export function limited(x: number): number {
+  const a = Math.abs(x);
+  if (a <= KNEE) return x;
+  return Math.sign(x) * (KNEE + (1 - KNEE) * Math.tanh((a - KNEE) / (1 - KNEE)));
+}
+
+/** `samples` with the band mixed in under them, in place, when it holds
+ *  anything. Room is left for QRM keyed on top of a station, and a crash
+ *  past that is rounded off near full scale, as a receiver's AGC does. */
+export function addBand(samples: Float32Array, o: Omit<BandOptions, "n">): void {
+  if (!bandOn(o)) return;
+  const noise = bandAudio({ ...o, n: samples.length });
+  const room = 1 / (1 + (qrmOn(o.qrmDb) ? Math.pow(10, o.qrmDb / 20) : 0));
+  for (let i = 0; i < samples.length; i++) samples[i] = limited((samples[i]! + noise[i]!) * room);
+}

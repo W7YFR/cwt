@@ -28,7 +28,7 @@ import type { Length } from "@/qso/wording";
 import { targetTiming } from "@/timing";
 import type { Over, Recording } from "./decode";
 import { overOfText } from "./lines";
-import { bandAudio, bandOn, QRM_OFF_DB, qrmOn, type QrmLine } from "./band";
+import { addBand, QRM_OFF_DB, type QrmLine } from "./band";
 
 /** What a generated QSO is: a rag chew from a plain CQ, or a run of a format. */
 export type Kind = GuideId;
@@ -211,24 +211,17 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
   const durationSec = t + LEAD_SEC;
   const samples = new Float32Array(Math.ceil(durationSec * rate));
   for (const s of sounds) samples.set(s.samples.subarray(0, samples.length - s.at), s.at);
-  if (bandOn(band)) {
-    // One band under every station, on the pitch between them.
-    const tones = script.stations.map((s) => s.toneHz);
-    const noise = bandAudio({
-      ...band,
-      n: samples.length,
-      rate,
-      toneHz: (Math.min(...tones) + Math.max(...tones)) / 2,
-      peak: AMPLITUDE,
-      qsbDb,
-      seed: seedOf(script.stations[0]!.call || script.lines[0]!.text),
-      qrmLines,
-    });
-    // Room for QRM keyed on top of a station, and a crash past that rounded
-    // off near full scale, as a receiver's AGC does.
-    const room = 1 / (1 + (qrmOn(band.qrmDb) ? Math.pow(10, band.qrmDb / 20) : 0));
-    for (let i = 0; i < samples.length; i++) samples[i] = limited((samples[i]! + noise[i]!) * room);
-  }
+  // One band under every station, on the pitch between them.
+  const tones = script.stations.map((s) => s.toneHz);
+  addBand(samples, {
+    ...band,
+    rate,
+    toneHz: (Math.min(...tones) + Math.max(...tones)) / 2,
+    peak: AMPLITUDE,
+    qsbDb,
+    seed: seedOf(script.stations[0]!.call || script.lines[0]!.text),
+    qrmLines,
+  });
   return {
     samples,
     rate,
@@ -238,17 +231,6 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
       overs,
     },
   };
-}
-
-/** Where the limiter starts to round peaks off. */
-const KNEE = 0.85;
-
-/** `x`, untouched under `KNEE`, and rounded off above it so it never
- *  reaches full scale. */
-function limited(x: number): number {
-  const a = Math.abs(x);
-  if (a <= KNEE) return x;
-  return Math.sign(x) * (KNEE + (1 - KNEE) * Math.tanh((a - KNEE) / (1 - KNEE)));
 }
 
 /** Another QSO for QRM to send: any kind, its lines in order. */

@@ -5,10 +5,16 @@
  * you keyed and the quiet after taken out. Each line is brought to the same
  * level, and a short pause goes between them.
  *
+ * As heard, the station's lines fade with QSB, and the band (noise, QRN and
+ * QRM) runs under the whole QSO. Made again, so not the same fading and
+ * noise heard live, but the same settings.
+ *
  * Pure. The page plays it and saves it.
  */
 
+import { fadeOf, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
+import { addBand, bandOn, type QrmLine } from "@/copy/band";
 import { targetTiming } from "@/timing";
 import type { Speed } from "./speed";
 
@@ -19,7 +25,7 @@ export interface Clip {
 
 /** One line of the QSO, as the tape needs it. */
 export type TapeLine =
-  | { readonly you: false; readonly text: string; readonly speed: Speed; readonly toneHz: number }
+  | { readonly you: false; readonly text: string; readonly speed: Speed; readonly toneHz: number; readonly call: string }
   | { readonly you: true; readonly clip: Clip };
 
 /** The level every line is brought to. */
@@ -112,17 +118,43 @@ export function lineAudio(line: TapeLine, rate: number): Clip {
   return { samples: leveled(resampled(trimmed(line.clip), rate).samples), rate };
 }
 
-/** The whole QSO, one line after another, at `rate`. */
-export function tape(lines: readonly TapeLine[], rate: number): Clip {
-  const parts = lines.map((l) => lineAudio(l, rate).samples).filter((s) => s.length > 0);
+/** What was added to the station as it was heard: its fading, and the band
+ *  under it. */
+export interface Added {
+  readonly qsbDb: number;
+  readonly noiseDb: number;
+  readonly qrn: number;
+  readonly qrmDb: number;
+  readonly seed: number;
+  readonly qrmLines: (rand: () => number) => readonly QrmLine[];
+}
+
+/** The whole QSO, one line after another, at `rate`. With `added`, as heard. */
+export function tape(lines: readonly TapeLine[], rate: number, added?: Added): Clip {
+  const parts = lines
+    .map((line) => ({ line, samples: lineAudio(line, rate).samples }))
+    .filter((p) => p.samples.length > 0);
   const pause = Math.round(BETWEEN_SEC * rate);
-  const total = parts.reduce((t, p) => t + p.length, 0) + pause * Math.max(0, parts.length - 1);
+  const total = parts.reduce((t, p) => t + p.samples.length, 0) + pause * Math.max(0, parts.length - 1);
   const out = new Float32Array(total);
   let at = 0;
-  parts.forEach((p, i) => {
+  parts.forEach(({ line, samples }, i) => {
     if (i > 0) at += pause;
-    out.set(p, at);
-    at += p.length;
+    if (added && added.qsbDb > 0 && !line.you) {
+      const fade = fadeOf(added.qsbDb, seedOf(line.call));
+      for (let j = 0; j < samples.length; j++) samples[j]! *= fade((at + j) / rate);
+    }
+    out.set(samples, at);
+    at += samples.length;
   });
+  if (added) {
+    const theirs = lines.find((l) => !l.you);
+    addBand(out, { ...added, rate, toneHz: theirs && !theirs.you ? theirs.toneHz : 600, peak: PEAK });
+  }
   return { samples: out, rate };
+}
+
+/** Whether anything is added to a QSO as it is heard. */
+export function anyAdded(a: Pick<Added, "qsbDb" | "noiseDb" | "qrn" | "qrmDb">): boolean {
+  return a.qsbDb > 0 || bandOn(a);
 }
