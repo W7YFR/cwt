@@ -438,7 +438,12 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       // Calls in the over, other than yours.
       const calls = over.words.filter((w) => isCall(w) && w !== qso.you && w !== ear.saved);
       const exact = over.hasExactly(c);
-      // Its call with a ?, or part of it: it sends its call again.
+      // Its whole call with a ?: yes, that is it. Lenient copy hears it
+      // keyed apart too, as K7B YX?.
+      const confirms =
+        over.hasExactly(`${c}?`) || over.words.some((w, i) => w === c && over.words[i + 1] === "?");
+      if (confirms) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
+      // Part of its call with a ?: it sends its call again.
       const checks = over.words.some((w, i) => {
         const bare = w.replace(/\?+$/, "");
         const asked = w.endsWith("?") || over.words[i + 1] === "?";

@@ -227,6 +227,16 @@ describe("the station asks again", () => {
     expect(work(called("cwt"), ["K4?"]).replies).toEqual(["K4ABC K4ABC"]);
   });
 
+  it("says yes to its whole call with a ?, keyed apart with Lenient copy", () => {
+    const LENIENT: RunContext = { ...FIRST, ear: { lenient: true, saved: "" } };
+    expect(work(called("pota"), ["K4ABC?"]).replies).toEqual(["RR"]);
+    expect(work(called("pota"), ["K4ABC ?"]).replies).toEqual(["RR"]);
+    expect(work(called("pota"), ["K4A BC?"], LENIENT).replies).toEqual(["RR"]);
+    expect(work(called("pota"), ["K4A BC?"]).replies, "Strict copy").toEqual(["K4ABC K4ABC"]);
+    // Then your exchange goes on as ever.
+    expect(work(called("pota"), ["K4ABC?", "UR 5NN WA WA BK"]).replies[1]).toBe("BK TU UR 5NN 5NN GA GA BK");
+  });
+
   it("takes your exchange without its call", () => {
     expect(work(called("cwt"), ["TOM 1234"]).replies).toEqual(["TU JIM 2345"]);
   });
