@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- A recording key, such as R or Escape, pressed the moment a recording starts or ends is no longer ignored.
+
 ## v1.20.0 — 2026-10-31
 
 ### Added
