@@ -21,19 +21,21 @@ export interface FileDropOptions {
   onError(message: string): void;
   /** Ignore drops entirely — while one is already being decoded, say. */
   disabled?: boolean;
+  /** Take a text file too, as the Copy page does. */
+  text?: boolean;
 }
 
 /** True while a drag is over the window, for whatever the page wants to show. */
 export function useFileDrop(options: FileDropOptions): boolean {
-  const { onFile, onError, disabled = false } = options;
+  const { onFile, onError, disabled = false, text = false } = options;
   const [over, setOver] = useState(false);
   const depth = useRef(0);
 
   // Read through a ref so the listeners are attached once rather than being
   // torn down and rebuilt every time a caller re-renders — a re-bind in the
   // middle of a drag would lose the depth count and strand the overlay.
-  const latest = useRef({ onFile, onError, disabled });
-  latest.current = { onFile, onError, disabled };
+  const latest = useRef({ onFile, onError, disabled, text });
+  latest.current = { onFile, onError, disabled, text };
 
   const reset = useCallback(() => {
     depth.current = 0;
@@ -73,7 +75,7 @@ export function useFileDrop(options: FileDropOptions): boolean {
       depth.current = 0;
       setOver(false);
       if (latest.current.disabled) return;
-      const file = audioFromDrop(e.dataTransfer);
+      const file = audioFromDrop(e.dataTransfer, latest.current.text);
       if (file) latest.current.onFile(file);
       else latest.current.onError("That drop had no audio file in it — try another one.");
     };

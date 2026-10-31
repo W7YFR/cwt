@@ -1363,6 +1363,34 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 
 /* Right-aligned beside the drill picker's button. */
 .dialog .fieldrow .slotmenu { margin-left: auto; }
+.dialog .fieldrow .caption {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.dialog .fieldrow .hint { font-size: 12px; }
+
+/* New exchange on the Copy page: wider and taller than other dialogs, for
+   a whole QSO and who sends each line. */
+.dialog.copytextdialog { width: min(1000px, 100%); }
+.sheet:has(.copytextdialog) { padding: 24px 16px; }
+
+/* Who sends each line, beside the line. Station 2's lines in another color. */
+.copyturns {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.copyturns li { display: flex; align-items: center; gap: 10px; }
+.copyturns .modeswitch { flex-shrink: 0; }
+.copyturns .modeswitch button { padding: 2px 9px; font-size: 12px; font-family: var(--mono); }
+.copyturns .turntext { font-family: var(--mono); font-size: 13px; }
+.copyturns li[data-station="1"] .turntext { color: var(--rest); }
 
 /* ---- drill picker --------------------------------------------------------- */
 

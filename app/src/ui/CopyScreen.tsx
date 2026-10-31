@@ -1,7 +1,8 @@
 /* The Copy page: play a QSO in CW and copy it.
  *
- * New exchange generates a QSO: two stations, in a kind you choose, sent from
- * text, so the text is the answer key. Or you open a recording, and the
+ * Generate QSO makes a QSO: two stations, in a kind you choose, sent from
+ * text, so the text is the answer key. New exchange gives the page text of
+ * your own to send the same way. Or you open a recording, and the
  * decoder reads it whole before you start, and what it reads is the key. The recording plays, and each over shows as a
  * line as it starts, with a box to copy it in. A line locks when the next
  * line starts, when you copy again, or on Cmd+Enter (Ctrl+Enter off a
@@ -20,9 +21,10 @@ import { createPlayer } from "@/audio/player";
 import { NOISE_OFF_DB } from "@/audio/qsb";
 import { QRM_OFF_DB } from "@/copy/band";
 import { encodeWavBuffer } from "@/audio/wav";
-import { ACCEPTED, loadAudioFile } from "@/capture/file";
+import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
 import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
+import { textScript } from "@/copy/text";
 import {
   charsOf,
   clock,
@@ -49,6 +51,7 @@ import {
   keepCopyFile,
   loadPrefs,
   loadSpeed,
+  loadUser,
   recallCopy,
   recallCopyFile,
   rememberCopy,
@@ -76,11 +79,15 @@ import {
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
 import { IconEdit, IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
+import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
 import { HomeButton } from "./Wordmark";
-import { MOD, modOf } from "./modKey";
+import { ALT, MOD, modOf } from "./modKey";
+
+/** What the page calls text pasted or typed in. */
+const TEXT_TITLE = "Your text";
 
 /** How long after the last line ends its copy locks, when Lock is on. Every
  *  other line locks when the next one starts. */
@@ -150,7 +157,7 @@ const SEEK_SLOT_HELP =
   "While the recording is paused, it moves to the character of the slot you select. Play " +
   "goes on from there.";
 
-const SHOW_SPEED_HELP = "Each line of a generated QSO shows the speed it was sent at.";
+const SHOW_SPEED_HELP = "Each line of a generated QSO or your own text shows the speed it was sent at.";
 
 const HIDE_CALLS_HELP =
   "Each station shows as Station 1 or Station 2 until you copy its call in one of your " +
@@ -174,7 +181,7 @@ const KINDS: ReadonlyArray<Option<Kind>> = [
   { value: "cwt", label: "CWT", note: "A fast CWops run: names and CWops numbers." },
 ];
 const KIND_HELP =
-  "The kind of QSO New exchange generates, as on the QSO page. CQ is a standard QSO between two " +
+  "The kind of QSO Generate QSO makes, as on the QSO page. CQ is a standard QSO between two " +
   "stations. The others are runs: one station calls CQ and works one station after another.";
 
 const RUN_QSOS: ReadonlyArray<Option<string>> = [
@@ -198,12 +205,13 @@ const GAPS: ReadonlyArray<Option<Gap>> = [
   { value: "2", label: "2s" },
   { value: "3", label: "3s" },
   { value: "5", label: "5s" },
-  { value: "wait", label: "Wait", note: "It stops after each line, and goes on when you press Enter in its box." },
+  { value: "wait", label: "Wait", note: `It stops after each line, and goes on when you press ${MOD}+Enter in its box.` },
 ];
 const GAP_HELP =
   "The silence between one station's line and the next. A change applies to the QSO on the page. " +
-  "Wait stops after each line until you type what you heard and press Enter, which locks the line " +
-  "and goes on. Play goes on without locking it.";
+  `Wait stops after each line until you type what you heard and press ${MOD}+Enter, which locks the line ` +
+  "and goes on, as Enter does once every character is copied. Play, or Enter before then, goes on " +
+  "without locking it.";
 
 /** The silence between lines with Wait, for when you play on. */
 const WAIT_GAP_SEC = 1;
@@ -221,8 +229,8 @@ const SPEED_HELP =
   "How fast a generated QSO is sent. Format: each station at its own speed, as on the air: " +
   `POTA ${FORMATS.pota.wpm.join(" to ")}, SST ${FORMATS.sst.wpm.join(" to ")}, ` +
   `MST ${FORMATS.mst.wpm.join(" to ")}, CWT ${FORMATS.cwt.wpm.join(" to ")}, and a standard QSO 15 to 25 wpm. ` +
-  "Mine: every station at the sliders. A change applies to the QSO on the page, and keeps your copy. " +
-  "Moving a slider chooses Mine.";
+  "Mine: every station at the sliders. Your own text is always at the sliders. A change applies to " +
+  "the QSO on the page, and keeps your copy. Moving a slider chooses Mine.";
 
 /** Where the page is, as its heading says in a word. */
 type CopyState = "reading" | "none" | "playing" | "over" | "paused" | "ready";
@@ -420,6 +428,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   };
   /** How a generated QSO is sent, from the settings. */
   const sending = { gapSec, speed: speedChoice === "mine" ? mine : undefined, qsbDb, noiseDb, qrn, qrmDb };
+  /** How `script` is sent. Your own text has no format, so it is always at
+   *  the sliders. */
+  const sendingOf = (script: Script) => (script.kind === "text" ? { ...sending, speed: mine } : sending);
 
   /** The recording: its name, its own bytes to play, and what was read. A
    *  generated QSO has its script too. */
@@ -533,8 +544,51 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     rememberCopy({ ...kept, at: posRef.current });
   }, [kept, playing]);
 
+  /** New exchange, in the dialog: what the box starts with, and what the
+   *  page calls it. Null when the dialog is closed. */
+  const [textDraft, setTextDraft] = useState<{ text: string; title: string; picks: readonly (number | null)[] } | null>(
+    null,
+  );
+  /** New exchange: the text on the page to edit, or the text last given. */
+  const editText = () => {
+    const script = file?.script;
+    if (script?.kind === "text") setTextDraft({ text: script.source ?? "", title: nameOf(script), picks: script.picks ?? [] });
+    else {
+      const p = loadPrefs();
+      setTextDraft({ text: p.copyText ?? "", title: TEXT_TITLE, picks: p.copyPicks ?? [] });
+    }
+  };
+  /** The text in the dialog, sent at the page's speed, in place of what was
+   *  on the page. */
+  const startText = (text: string, title: string, picks: (number | null)[]) => {
+    const script = textScript(text, { title, picks, speed: mine, user: loadUser() });
+    savePrefs({ ...loadPrefs(), copyText: text, copyPicks: picks });
+    if (!script) {
+      onError("That text has nothing in it to send.");
+      return;
+    }
+    setTextDraft(null);
+    player.stop();
+    cancelLastLock();
+    const sent = sendScript(script, sendingOf(script));
+    const audio = encodeWavBuffer(sent.samples, sent.rate);
+    setFile({ name: title, audio, rec: sent.rec, script });
+    setKept(freshKept(keyOf(title, sent.rec, true), sent.rec, inputPref));
+    setSelected(null);
+    setPos(0);
+    void keepCopyFile({ name: title, audio: new Blob([audio]), recording: sent.rec, script });
+  };
+
   const openFile = useCallback(
     async (f: File) => {
+      if (isTextFile(f)) {
+        try {
+          setTextDraft({ text: await f.text(), title: f.name, picks: [] });
+        } catch {
+          onError(`I could not read ${f.name}.`);
+        }
+        return;
+      }
       player.stop();
       cancelLastLock();
       setReading(true);
@@ -559,7 +613,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     },
     [player, onError],
   );
-  /** New exchange: a QSO generated in the kind chosen, in place of what was
+  /** Generate QSO: a QSO generated in the kind chosen, in place of what was
    *  on the page. */
   const makeExchange = () => {
     player.stop();
@@ -585,7 +639,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     const t = setTimeout(() => {
       sentWith.current = sendKey;
       const was = file.rec;
-      const sent = sendScript(file.script!, sending);
+      const sent = sendScript(file.script!, sendingOf(file.script!));
       const audio = encodeWavBuffer(sent.samples, sent.rate);
       player.stop();
       cancelLastLock();
@@ -616,7 +670,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const duration = rec?.durationSec ?? 0;
   const ended = rec !== null && pos >= duration - 0.05;
   /** Wait between lines: a generated QSO stops after each line you copy,
-   *  until you press Enter in its box. */
+   *  until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
   const waits = gap === "wait" && !!file?.script && linesShow === "copy";
 
   /* ---- playing ---------------------------------------------------------- */
@@ -707,6 +761,30 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     const to = skipSpan(spans, posRef.current, -1, lastBack.current);
     seek(to === null ? null : leadIn(spans, to));
     lastBack.current = to;
+  };
+  /** Where the word you are copying starts: the selected slot's word, or
+   *  in a box the word the cursor is in, counted by the words typed before
+   *  it. Null when you are in no line. */
+  const yourWord = (el: EventTarget | null): number | null => {
+    if (input === "slots") return selectedChar()?.word.chars[0]!.t0 ?? null;
+    const i = lineOf(el);
+    const over = i === null ? undefined : rec?.overs[i];
+    if (!over || !(el instanceof HTMLInputElement)) return null;
+    const before = el.value.slice(0, el.selectionStart ?? el.value.length).trimStart();
+    const k = before ? before.split(/\s+/).length - 1 : 0;
+    return over.words[Math.min(k, over.words.length - 1)]?.chars[0]!.t0 ?? null;
+  };
+  /** Play on from the start of the word you are copying, a little before
+   *  it. In no line, from the start of the word playing. */
+  const fromWord = (el: EventTarget | null) => {
+    const at = posRef.current;
+    let start = yourWord(el);
+    if (start === null) {
+      let i = -1;
+      for (let k = 0; k < words.length && words[k]![0] <= at + 0.01; k++) i = k;
+      start = i < 0 ? null : words[i]![0];
+    }
+    play(start === null ? at : leadIn(words, start));
   };
   /** On to the next word or line, a little before it. */
   const skipOn = (spans: readonly [number, number][]) => {
@@ -859,27 +937,50 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   /** Back to the box you were copying in: the line playing now, or the
    *  last open one. In slots, its first empty slot. */
-  const focusBox = () => {
+  const focusBox = (): boolean => {
     const root = log.current;
-    if (!root) return;
+    if (!root) return false;
     const inputs = (li: Element | null) => [...(li?.querySelectorAll<HTMLInputElement>("input") ?? [])];
     const now = inputs(root.querySelector("li.now"));
     const open = now.length ? now : inputs([...root.querySelectorAll("li")].reverse().find((li) => li.querySelector("input")) ?? null);
     const el = open.find((x) => !x.value) ?? open[0];
     el?.focus();
+    return !!el;
   };
 
   /** Back to your slot as the recording plays: the one selected last, or
    *  the box you were copying in. Not when you are in a box already. */
   const backToSlot = () => {
     if (isBox(document.activeElement)) return;
+    wantBox.current = false;
     if (lastSlot.current?.isConnected) lastSlot.current.focus();
-    else focusBox();
+    else if (!focusBox()) wantBox.current = true;
+  };
+  /** Back to your slot once there is one: a play from the start has no line
+   *  to copy in until the first one starts. */
+  const wantBox = useRef(false);
+  useEffect(() => {
+    if (!wantBox.current || isBox(document.activeElement)) return;
+    // Not when you have gone on to something else since, such as a setting.
+    const at = document.activeElement;
+    if (at && at !== document.body && !(at instanceof HTMLButtonElement && at.closest("main.copy"))) {
+      wantBox.current = false;
+      return;
+    }
+    backToSlot();
+  });
+
+  /** After a click on a playback control: back to your slot, so you can
+   *  type on. */
+  const afterControl = (ev: React.MouseEvent) => {
+    const el = (ev.target as HTMLElement).closest("button");
+    if (!el || el.disabled || el.dataset.testid === "copy-line-edit") return;
+    requestAnimationFrame(backToSlot);
   };
 
-  /** The page's keys that move the recording: Space plays and pauses, the
-   *  arrows move by word, with Shift by five seconds, and in slots Down
-   *  plays the selected letter and Up its word. Whether it was one. */
+  /** The page's keys that move the recording: Space plays and pauses, and
+   *  the arrows move by word, with Shift by five seconds. Whether it was
+   *  one. */
   const moveKey = (ev: KeyboardEvent): boolean => {
     if (ev.key === " ") toggle();
     else if (ev.key === "ArrowLeft") {
@@ -888,30 +989,68 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     } else if (ev.key === "ArrowRight") {
       if (ev.shiftKey) on(5);
       else skipOn(words);
-    } else if (ev.key === "ArrowDown" && input === "slots" && selected) playLetter();
-    else if (ev.key === "ArrowUp" && input === "slots" && selected) playWord();
-    else return false;
+    } else return false;
     ev.preventDefault();
     return true;
   };
 
-  /* With Cmd on a Mac or Ctrl elsewhere, the page's keys work in a box, and
-     Enter in a box locks its line. */
+  /** Lock line `i`. Stopped, it plays on: with `always`, from where it
+   *  stopped, and otherwise only where Wait stopped after the line. Never
+   *  from inside the line, which you have copied already. */
+  const lockLine = (i: number, always: boolean) => {
+    const open = !lines[i]?.locked;
+    setLine(i, { locked: true });
+    if (open && (always || waits) && mode.current === null && !ended) {
+      const from = Math.max(posRef.current, rec?.overs[i]?.t1 ?? 0);
+      play(from, lines.map((l, j) => (j === i ? { ...l, locked: true } : l)));
+    }
+  };
+
+  /** Whether your copy of line `i` has every character, typed up to the
+   *  box's last one, or in every slot. Right or not. */
+  const copiedAll = (i: number, el: HTMLInputElement): boolean => {
+    const l = lines[i];
+    const over = rec?.overs[i];
+    if (!l || !over || l.locked) return false;
+    if (input === "slots") return l.slots.every(Boolean);
+    const typed = plain(l.typed).replace(/ /g, "").length;
+    return el.selectionStart === el.value.length && typed >= keyedOf(over).length;
+  };
+
+  /** The line of the box `el` is in, or null. */
+  const lineOf = (el: EventTarget | null): number | null => {
+    const line = isBox(el) ? el.closest<HTMLElement>("li[data-line]")?.dataset.line : undefined;
+    return line === undefined ? null : Number(line);
+  };
+
+  /* Cmd on a Mac or Ctrl elsewhere with Enter, in a box, locks its line.
+     With Wait, stopped after the line, it goes on too. */
   const modKey = (ev: KeyboardEvent): boolean => {
-    if (!modOf(ev)) return false;
-    if (ev.key === ".") {
-      ev.preventDefault();
+    if (!modOf(ev) || ev.key !== "Enter") return false;
+    const i = lineOf(ev.target);
+    if (i === null) return false;
+    ev.preventDefault();
+    lockLine(i, false);
+    return true;
+  };
+
+  /* Playback with Option on a Mac or Alt elsewhere, in a box or out of one:
+     R plays the line again, L the selected slot's letter and W its word,
+     Enter plays on from the start of the word you are copying, and the
+     page's keys work in a box. By the key's place, as Option
+     changes the character a Mac types. */
+  const altKey = (ev: KeyboardEvent): boolean => {
+    if (!ev.altKey || ev.metaKey || ev.ctrlKey) return false;
+    const plain = !ev.shiftKey;
+    if (plain && ev.code === "KeyR") {
       if (!ev.repeat) replayLine(isBox(ev.target) ? ev.target : null);
-      return true;
-    }
-    if (ev.key === "Enter") {
-      const line = isBox(ev.target) ? ev.target.closest<HTMLElement>("li[data-line]")?.dataset.line : undefined;
-      if (line === undefined) return false;
-      ev.preventDefault();
-      setLine(Number(line), { locked: true });
-      return true;
-    }
-    return moveKey(ev);
+    } else if (plain && ev.key === "Enter") fromWord(ev.target);
+    else if (plain && ev.code === "KeyL" && input === "slots" && selected) playLetter();
+    else if (plain && ev.code === "KeyW" && input === "slots" && selected) playWord();
+    else if (plain && ev.code === "Space") toggle();
+    else return moveKey(ev);
+    ev.preventDefault();
+    return true;
   };
 
   /* Outside a box: Space or Enter plays and pauses, Esc pauses, and the
@@ -919,23 +1058,22 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
      and pauses, and Esc leaves it; the rest is typing. */
   const keyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
   keyRef.current = (ev) => {
-    if (!rec) return;
-    if (modKey(ev)) return;
-    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (!rec || textDraft) return;
     const el = ev.target as HTMLElement | null;
+    if (modKey(ev)) return;
+    if (altKey(ev)) {
+      if (!isBox(el)) requestAnimationFrame(backToSlot);
+      return;
+    }
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (isBox(el)) {
       if (ev.key === "Enter") {
         ev.preventDefault();
-        // With Wait, Enter while stopped locks the box's line and goes on.
-        const line = el.closest<HTMLElement>("li[data-line]")?.dataset.line;
-        if (waits && mode.current !== "main" && line !== undefined && !lines[Number(line)]?.locked) {
-          const i = Number(line);
-          const next = lines.map((l, j) => (j === i ? { ...l, locked: true } : l));
-          setLine(i, { locked: true });
-          if (!ended) play(posRef.current, next);
-          return;
-        }
-        toggle();
+        // With every character of the line copied, Enter locks it and goes
+        // on. Otherwise it plays and pauses.
+        const i = lineOf(el);
+        if (i !== null && copiedAll(i, el)) lockLine(i, true);
+        else toggle();
       }
       return;
     }
@@ -947,11 +1085,17 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       }
       return;
     }
+    // A character typed anywhere else goes into your slot.
+    if (ev.key.length === 1 && ev.key !== " " && linesShow === "copy") {
+      backToSlot();
+      return;
+    }
     if (el?.tagName === "BUTTON") return;
     if (ev.key === "Enter") {
       ev.preventDefault();
       toggle();
-    } else moveKey(ev);
+      requestAnimationFrame(backToSlot);
+    } else if (moveKey(ev)) requestAnimationFrame(backToSlot);
   };
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => keyRef.current(ev);
@@ -1083,8 +1227,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           if (el.value) requestAnimationFrame(() => el.setSelectionRange(0, 0));
         }}
         onKeyDown={(ev) => {
-          // With Cmd or Ctrl, a key is the page's.
-          if (ev.metaKey || ev.ctrlKey) return;
+          // With Cmd, Ctrl, Option or Alt, a key is the page's.
+          if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
           if (ev.key === "Escape") {
             ev.preventDefault();
             ev.currentTarget.blur();
@@ -1149,7 +1293,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const lineSpeed = (i: number): React.ReactElement | null => {
     const line = file?.script?.lines[i];
     if (!showSpeed || !line) return null;
-    const speed = sending.speed ?? file!.script!.stations[line.station]!.speed;
+    const speed = sendingOf(file!.script!).speed ?? file!.script!.stations[line.station]!.speed;
     return (
       <span className="lwpm" data-testid="copy-line-wpm">
         {fmtSpeed(speed)}
@@ -1177,9 +1321,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     );
   };
 
-  /** Cmd+. or Ctrl+.: the line plays again. The line of the box you are in,
+  /** Option+R or Alt+R: the line plays again. The line of the box you are in,
    *  or else the line playing, or the last one heard. As the QSO page's
-   *  Cmd+. plays the station's last line. Again while it plays stops it. */
+   *  Option+R plays the station's last line. Again while it plays stops it. */
   const replayLine = (box: HTMLElement | null) => {
     if (!rec) return;
     const inBox = box?.closest<HTMLElement>("li[data-line]")?.dataset.line;
@@ -1207,13 +1351,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     : !rec
       ? recalling
         ? ""
-        : "Generate a QSO to copy, or open a recording of CW."
+        : "Generate a QSO to copy, write your own, or open a recording of CW."
       : playing === "main"
         ? linesShow === "copy"
           ? "Type what you hear in each line."
           : "Listen along."
         : heldLine >= 0
-          ? "Type what you heard, then press Enter to go on."
+          ? `Type what you heard, then press ${MOD}+Enter to lock it and go on.`
           : linesShow === "copy" && perfect
             ? "You copied every line. Copy again starts a fresh attempt."
             : ended
@@ -1284,16 +1428,24 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
           onClick={makeExchange}
         >
+          Generate QSO
+        </button>
+        <button
+          data-testid="copy-text-open"
+          disabled={reading || playing !== null}
+          title="Paste or type an exchange of your own to copy, sent in CW"
+          onClick={editText}
+        >
           New exchange
         </button>
-        {/* Icon only, after New exchange: a recording is the rarer way in,
+        {/* Icon only, after Generate QSO and New exchange: a recording is the rarer way in,
             as on the Send page. */}
         <button
           className="iconbtn copyopen"
           data-testid="copy-open"
           disabled={reading}
-          aria-label="Open a recording"
-          title="Open a recording of CW to copy, or drop one on the page"
+          aria-label="Open a recording or a text file"
+          title="Open a recording of CW or a .txt file to copy, or drop one on the page"
           onClick={pickFile}
         >
           <IconUpload />
@@ -1392,7 +1544,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                   />
                 </div>
               </Section>
-              <Section name="make" title="Generated QSOs">
+              <Section name="make" title="Generated QSOs and your text">
                 <div className="panelgroups">
                   <ChoiceGroup
                     id="copy-kind"
@@ -1523,7 +1675,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
         {rec && (
           <>
-            <div className="qsocontrols">
+            <div className="qsocontrols" onClick={afterControl}>
               <button className="primary copyplay" data-testid="copy-play" onClick={toggle}>
                 <i className="ico">{playing === "main" ? <IconPause /> : <IconPlay />}</i>
                 {playing === "main" ? "Pause" : fresh ? "Start" : "Play"}
@@ -1545,7 +1697,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 {file!.name}
               </span>
             </div>
-            <div className="qsocontrols copyskips">
+            <div className="qsocontrols copyskips" onClick={afterControl}>
               <div className="modeswitch" role="group" aria-label="Back">
                 {skip("‹ Line", "Back a line", () => skipBack(overs), "copy-back-line")}
                 {skip("‹ 15s", "Back 15 seconds", () => back(15), "copy-back-15")}
@@ -1560,8 +1712,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               </div>
               {input === "slots" && (
                 <div className="modeswitch" role="group" aria-label="Play the selected slot">
-                  {slotPlay("Letter", "Play the selected letter", playLetter, "copy-play-letter")}
-                  {slotPlay("Word", "Play the selected word", playWord, "copy-play-word")}
+                  {slotPlay("Letter", `Play the selected letter (${ALT}+L)`, playLetter, "copy-play-letter")}
+                  {slotPlay("Word", `Play the selected word (${ALT}+W)`, playWord, "copy-play-word")}
                 </div>
               )}
             </div>
@@ -1578,12 +1730,16 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               ))}
             </div>
             <button className="primary" data-testid="copy-new-first" onClick={makeExchange}>
-              New exchange
+              Generate QSO
             </button>
             <span className="hint">
               or{" "}
+              <button type="button" className="link" data-testid="copy-text-first" onClick={editText}>
+                write your own
+              </button>
+              ,{" "}
               <button type="button" className="link" data-testid="copy-open-first" onClick={pickFile}>
-                open a recording
+                open a recording or a .txt file
               </button>
               , or drop one on the page
             </span>
@@ -1604,21 +1760,24 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               <li>Click a word in a finished line, or select part of it, to hear it again.</li>
             </ul>
             {settingsOpen ? (
-              <p>Change the speed of a generated QSO and the pause between its lines in the settings panel.</p>
+              <p>
+                Change the speed of a generated QSO or your own text, and the pause between its lines, in the settings
+                panel.
+              </p>
             ) : (
               <p>
                 Open the{" "}
                 <button type="button" className="link" data-testid="copy-guide-settings" onClick={() => setSettingsOpen(true)}>
                   settings
                 </button>{" "}
-                to change the speed of a generated QSO and the pause between its lines.
+                to change the speed of a generated QSO or your own text, and the pause between its lines.
               </p>
             )}
           </div>
         )}
 
         {rec && kept && (
-          <ol className="qsolog copylog" data-testid="copy-log" ref={log} onMouseUp={onLogMouseUp}>
+          <ol className="qsolog copylog" data-testid="copy-log" ref={log} onMouseUp={onLogMouseUp} onClick={afterControl}>
             {shown.map(({ o, i }) => {
               const label = whoOf(o.sender);
               return (
@@ -1656,7 +1815,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           className="visually-hidden"
           tabIndex={-1}
           type="file"
-          accept={ACCEPTED}
+          accept={`${ACCEPTED},.txt,text/plain`}
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) void openFile(f);
@@ -1668,35 +1827,45 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           <div className="copykeys">
             <p className="legend keys" data-testid="copy-hotkeys">
               On the page: <kbd>Space</kbd> or <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause
-              &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>.</kbd> play the line again
+              &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>R</kbd> play the line again &nbsp;·&nbsp; <kbd>{ALT}</kbd>{" "}
+              <kbd>Enter</kbd> play from your word
               &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5s
               {input === "slots" && (
                 <>
                   {" "}
-                  &nbsp;·&nbsp; <kbd>↓</kbd> <kbd>↑</kbd> the selected letter or word
+                  &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
                 </>
               )}
             </p>
-            {/* Only the keys the settings use: none in a box with no boxes,
-                and with Wait, Enter is the lock. */}
+            {/* Only the keys the settings use: none in a box with no boxes. */}
             {linesShow === "copy" && (
               <p className="legend keys" data-testid="copy-box-keys">
-                In a box:{" "}
-                {waits ? (
+                In a box: <kbd>Enter</kbd> play or pause, or lock a line copied in full and go on &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd>{" "}
+                {waits ? "lock the line and go on" : "lock the line"}
+                {input === "slots" && (
                   <>
-                    <kbd>Enter</kbd> lock the line and go on
-                  </>
-                ) : (
-                  <>
-                    <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> lock the line
+                    {" "}
+                    &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
                   </>
                 )}
-                &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{MOD}</kbd> for the other keys
+                &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{ALT}</kbd> for the other keys
               </p>
             )}
           </div>
         )}
       </main>
+      {textDraft && (
+        <CopyText
+          text={textDraft.text}
+          picks={textDraft.picks}
+          onStart={(next) => startText(next.text, textDraft.title, next.picks)}
+          onCancel={() => setTextDraft(null)}
+          onConfigureUser={() => {
+            setTextDraft(null);
+            onConfigure();
+          }}
+        />
+      )}
     </>
   );
 }

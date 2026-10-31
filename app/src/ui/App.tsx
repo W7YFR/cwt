@@ -376,6 +376,7 @@ export function App(): React.ReactElement {
     },
     onError: setError,
     disabled: opening,
+    text: page === "copy" && !configuring && !calibrating,
   });
 
   return (
@@ -389,7 +390,13 @@ export function App(): React.ReactElement {
           role="presentation"
           data-accepts={String(canOpenFile)}
         >
-          <p>{canOpenFile ? "Drop a recording to open it" : OPEN_FILE_CLOSED}</p>
+          <p>
+            {!canOpenFile
+              ? OPEN_FILE_CLOSED
+              : page === "copy" && !configuring && !calibrating
+                ? "Drop a recording or a text file to open it"
+                : "Drop a recording to open it"}
+          </p>
         </div>
       )}
 

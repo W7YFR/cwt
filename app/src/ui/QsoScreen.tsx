@@ -49,7 +49,7 @@ import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
-import { MOD, modOf } from "./modKey";
+import { ALT, altOf } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { NEEDS_BAND, NEEDS_BAND_BETWEEN } from "./copy";
 import { Graded, RightOnly } from "./Graded";
@@ -1306,8 +1306,8 @@ export function QsoScreen({
     const now = qso.current;
     if (isRun(now) && now.stage === "waiting") waitForNext();
   };
-  /** Cmd+. anywhere on the page, or Ctrl+.: the station's last line plays
-   *  again, with the play buttons on every line, as Cmd+. plays the line
+  /** Option+R anywhere on the page, or Alt+R: the station's last line plays
+   *  again, with the play buttons on every line, as Option+R plays the line
    *  again on the Copy page. */
   const replayLast = () => {
     if (playback !== "always") return;
@@ -1321,7 +1321,7 @@ export function QsoScreen({
   replayKey.current = replayLast;
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key !== "." || ev.repeat || !modOf(ev)) return;
+      if (ev.code !== "KeyR" || ev.repeat || !altOf(ev)) return;
       ev.preventDefault();
       ev.stopPropagation();
       replayKey.current();
@@ -2151,7 +2151,7 @@ export function QsoScreen({
                 {playback === "always" && (
                   <>
                     {" "}
-                    &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>.</kbd> play its last line again
+                    &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>R</kbd> play its last line again
                   </>
                 )}
               </p>
