@@ -92,6 +92,21 @@ export function slotRight(char: string, typed: string): boolean {
   return canonicalChar(/^[A-Z]{2,}$/.test(t) ? `<${t}>` : t) === canonicalChar(char);
 }
 
+/** The dot under each letter of a prosign's slot, as typed so far: right,
+ *  wrong, or none for a letter not yet typed. A whole prosign spelled
+ *  another way that keys the same, such as NG for <KN>, is near in each
+ *  letter that differs: it sounds right, but is not the letters sent. */
+export function letterDots(char: string, typed: string): ("cright" | "cnear" | "cwrong" | null)[] {
+  const want = slotText(char);
+  const t = typed.trim().toUpperCase();
+  const keysSame = t.length >= want.length && slotRight(char, t);
+  return [...want].map((l, k) => {
+    if (k >= t.length) return null;
+    if (t[k] === l) return "cright";
+    return keysSame ? "cnear" : "cwrong";
+  });
+}
+
 export interface LineGrade {
   readonly right: number;
   readonly total: number;

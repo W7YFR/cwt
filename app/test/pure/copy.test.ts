@@ -12,6 +12,7 @@ import {
   nextCopy,
   overOfText,
   skipSpan,
+  letterDots,
   slotRight,
   slotsOfTyped,
   type LineCopy,
@@ -140,6 +141,19 @@ describe("your copy", () => {
     const slots = ["C", "Q", "D", "X", "N", "1", "A", "K", "KN"];
     expect(gradeLine(o, { ...emptyCopy(o), slots }, "slots")).toEqual({ right: 8, total: 9 });
     expect(slotRight("<KN>", "kn")).toBe(true);
+  });
+
+  it("marks each letter of a prosign's slot as it is typed", () => {
+    expect(letterDots("<KN>", "k"), "the first letter right").toEqual(["cright", null]);
+    expect(letterDots("<KN>", "x"), "the first letter wrong").toEqual(["cwrong", null]);
+    expect(letterDots("<KN>", "kn")).toEqual(["cright", "cright"]);
+    expect(letterDots("<KN>", "kx")).toEqual(["cright", "cwrong"]);
+    expect(letterDots("<SK>", "ks")).toEqual(["cwrong", "cwrong"]);
+    // A spelling that keys the same sounds right, but is not the letters
+    // sent: near, where it differs.
+    expect(letterDots("<KN>", "ng")).toEqual(["cnear", "cnear"]);
+    expect(letterDots("<UN>", "ig")).toEqual(["cnear", "cnear"]);
+    expect(letterDots("<AR>", "ar")).toEqual(["cright", "cright"]);
   });
 
   it("grades a character the table lacks by its pattern", () => {

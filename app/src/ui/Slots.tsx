@@ -11,7 +11,7 @@
 
 import { useRef } from "react";
 import { patternOf } from "@/morse";
-import { charsOf, slotRight, slotText, type LineCopy } from "@/copy/lines";
+import { charsOf, letterDots, slotRight, slotText, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 
 /** Where a character is in the audio, for a selection or a click to play. */
@@ -145,9 +145,19 @@ export function Slots({
             const autoFocus = first;
             first = false;
             const typed = copy.slots[i] ?? "";
-            const mark = grade && typed ? (slotRight(c.char, typed) ? " cright" : " cwrong") : "";
+            // A prosign's slot has a dot for each of its letters, so a first
+            // letter typed right does not show as wrong.
+            const mark = grade && typed && want === 1 ? (slotRight(c.char, typed) ? " cright" : " cwrong") : "";
+            const dots = grade && typed && want > 1 ? letterDots(c.char, typed) : null;
             return (
               <span key={ci} className={`slotcell${mark}`}>
+                {dots && (
+                  <span className="slotdots" aria-hidden="true" data-testid="copy-slot-dots">
+                    {dots.map((d, k) => (
+                      <i key={k} className={d ?? undefined} />
+                    ))}
+                  </span>
+                )}
                 <input
                   ref={(el) => {
                     refs.current[i] = el;
