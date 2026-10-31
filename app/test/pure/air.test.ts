@@ -35,6 +35,15 @@ const rms = (x: Float32Array) => Math.sqrt(x.reduce((a, v) => a + v * v, 0) / x.
 const peakOf = (x: Float32Array) => x.reduce((a, v) => Math.max(a, Math.abs(v)), 0);
 const db = (gain: number) => Math.pow(10, gain / 20);
 
+/** How many samples differ. A loop, not toEqual: a QSO is a million samples,
+ *  and a deep compare of that many takes seconds on a busy runner. */
+function differ(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length) return Math.max(a.length, b.length);
+  let n = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
+  return n;
+}
+
 describe("QSB", () => {
   it("does nothing at 0 dB", () => {
     const fade = fadeOf(0, 1);
@@ -152,13 +161,13 @@ describe("a generated QSO on the air", () => {
   it("is the clean QSO with everything off", () => {
     const clean = sendScript(script, { gapSec: 1 });
     const off = sendScript(script, { gapSec: 1, qsbDb: 0, noiseDb: NOISE_OFF_DB, qrn: 0, qrmDb: QRM_OFF_DB });
-    expect(off.samples).toEqual(clean.samples);
+    expect(differ(off.samples, clean.samples)).toBe(0);
   });
 
   it("never reaches full scale, and is the same each time", () => {
     const a = sendScript(script, { gapSec: 1, ...everything });
     expect(peakOf(a.samples)).toBeLessThan(1);
-    expect(sendScript(script, { gapSec: 1, ...everything }).samples).toEqual(a.samples);
+    expect(differ(sendScript(script, { gapSec: 1, ...everything }).samples, a.samples)).toBe(0);
   });
 });
 
