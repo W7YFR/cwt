@@ -61,6 +61,21 @@ describe("decodeRecording", () => {
     });
   }
 
+  it("splits two stations at their change of pitch, spaced wide, with no more than a letter gap between", () => {
+    // Wide spacing, as a slow practice tape has: the change of station is
+    // only a letter gap, too short to read as a word gap.
+    const timing = targetTiming(22, 12);
+    const a = synthesize("CQ DE W7YFR K <BT>", timing, { toneHz: 610, rate: RATE, padSec: 0.5, amplitude: 0.5 }).samples;
+    const b = synthesize("W7YFR DE N1AK K", timing, { toneHz: 580, rate: RATE, padSec: 0, amplitude: 0.5 }).samples;
+    const gap = Math.round(timing.charGapSec * RATE);
+    const samples = new Float32Array(a.length - Math.round(0.5 * RATE) + gap + b.length + RATE);
+    samples.set(a.subarray(0, a.length - Math.round(0.5 * RATE)), 0);
+    samples.set(b, a.length - Math.round(0.5 * RATE) + gap);
+    const rec = decodeRecording(samples, RATE)!;
+    expect(rec.overs.map((o) => o.text)).toEqual(["CQ DE W7YFR K <BT>", "W7YFR DE N1AK K"]);
+    expect(rec.overs.map((o) => o.sender)).toEqual([0, 1]);
+  });
+
   it("keeps each character's time, in order", () => {
     const rec = decodeRecording(qso([{ text: "TEST DE W7YFR", toneHz: 600 }]), RATE)!;
     const chars = rec.overs.flatMap((o) => o.words.flatMap((w) => w.chars));

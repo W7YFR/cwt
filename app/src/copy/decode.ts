@@ -297,13 +297,28 @@ export function decodeRecording(samples: Float32Array, rate: number): Recording 
   const order = centers.map((_, g) => g).sort((a, b) => firstAt[a]! - firstAt[b]!);
   const station = group.map((g) => order.indexOf(g));
 
-  // Words: a word gap or a pause, or a change of pass, starts one.
+  /** Whether read `k` is clearly at its own station's pitch, and not the
+   *  station of read `other`: nearer its own by SAME_STATION_HZ or more. */
+  const clear = (k: number, other: number) =>
+    Math.abs(reads[k]!.pitch - centers[group[other]!]!) - Math.abs(reads[k]!.pitch - centers[group[k]!]!) >=
+    SAME_STATION_HZ;
+
+  // Words: a word gap or a pause, or a change of pass, starts one. So does a
+  // change of station, where both characters are clearly at their station's
+  // pitch: a station sent each, so a word cannot hold both. Spaced wide, the
+  // gap between two stations can read as no more than a letter gap.
   const words: { chars: RecChar[]; senders: number[]; pause: boolean }[] = [];
   reads.forEach((read, i) => {
     const prev = reads[i - 1];
     const gap = read.char.leadGap?.kind;
+    const handover = !!prev && station[i] !== station[i - 1] && clear(i, i - 1) && clear(i - 1, i);
     const opens =
-      !prev || prev.pass !== read.pass || gap === "word-gap" || gap === "pause" || read.char.t0 - prev.char.t1 >= LINE_PAUSE_SEC;
+      !prev ||
+      prev.pass !== read.pass ||
+      handover ||
+      gap === "word-gap" ||
+      gap === "pause" ||
+      read.char.t0 - prev.char.t1 >= LINE_PAUSE_SEC;
     if (opens) {
       words.push({
         chars: [],

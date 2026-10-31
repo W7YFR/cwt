@@ -16,6 +16,10 @@ nothing to the site. The next release carries them.
 - **Wait** under **Between lines** on the Copy page is now **Stop after each line**, under **Your copy**. It stops after each line of an opened recording too.
 - On the QSO page, Enter in a copy box pauses or goes on, as it does on the rest of the page. Cmd+Enter (Ctrl+Enter) locks the copy, as Enter does once every character is copied, as on the Copy page.
 
+### Fixed
+
+- In an opened recording with wide spacing, a character at the end of one station's turn, such as `<BT>`, no longer shows at the start of the other station's line.
+
 ## v1.22.0 — 2026-10-31
 
 ### Added
