@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.20.0 — 2026-10-31
+
 ### Added
 
 - **QSB** on the Copy and QSO pages fades each generated station in and out, up to 30 dB.
