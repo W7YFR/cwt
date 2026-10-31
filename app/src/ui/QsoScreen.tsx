@@ -1333,9 +1333,12 @@ export function QsoScreen({
     if (!closed.includes(n)) return null;
     const play = playback !== "never";
     if (!play && !showDownload) return null;
+    // The row shows while your overs come back after a reload, so the log
+    // does not move when they do.
     const parts = qsoParts(n);
-    if (!parts) return null;
-    const make = () => tape(parts, tapeRate());
+    const make = () => tape(parts!, tapeRate());
+    const gone = parts ? null : "This QSO's recording was not kept";
+    const why = gone ?? cannotPlay();
     const key = `qso ${n}`;
     const on = replaying === key;
     return (
@@ -1343,8 +1346,8 @@ export function QsoScreen({
         {play && (
           <button
             type="button"
-            disabled={cannotPlay() !== null}
-            title={cannotPlay() ?? undefined}
+            disabled={why !== null}
+            title={why ?? undefined}
             onClick={() => playClip(key, make())}
           >
             <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
@@ -1352,7 +1355,12 @@ export function QsoScreen({
           </button>
         )}
         {showDownload && (
-          <button type="button" onClick={() => download(n, make())}>
+          <button
+            type="button"
+            disabled={gone !== null}
+            title={gone ?? undefined}
+            onClick={() => download(n, make())}
+          >
             <i className="ico">
               <IconDownload />
             </i>
