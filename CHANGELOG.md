@@ -10,10 +10,10 @@ nothing to the site. The next release carries them.
 ### Added
 
 - The Copy page shows the speed an opened recording was sent at, measured from the recording, beside its name.
-- **Wait** on the Copy page stops after each line of an opened recording too.
 
 ### Changed
 
+- **Wait** under **Between lines** on the Copy page is now **Stop after each line**, under **Your copy**. It stops after each line of an opened recording too.
 - On the QSO page, Enter in a copy box pauses or goes on, as it does on the rest of the page. Cmd+Enter (Ctrl+Enter) locks the copy, as Enter does once every character is copied, as on the Copy page.
 
 ## v1.22.0 — 2026-10-31

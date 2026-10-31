@@ -206,29 +206,27 @@ const QSO_LENGTHS: ReadonlyArray<Option<Length>> = [
 ];
 const QSO_LENGTH_HELP = "How much each station says in a generated standard QSO, as on the QSO page.";
 
-type Gap = "1" | "2" | "3" | "5" | "wait";
+type Gap = "1" | "2" | "3" | "5";
 const GAPS: ReadonlyArray<Option<Gap>> = [
   { value: "1", label: "1s" },
   { value: "2", label: "2s" },
   { value: "3", label: "3s" },
   { value: "5", label: "5s" },
-  {
-    value: "wait",
-    label: "Wait",
-    note: `It stops after each line, in a recording too, and goes on when you press ${MOD}+Enter in its box.`,
-  },
 ];
 const GAP_HELP =
-  "The silence between one station's line and the next. A change applies to the QSO on the page. " +
-  "An opened recording keeps its own silences, but Wait applies to it too. " +
-  `Wait stops after each line until you type what you heard and press ${MOD}+Enter, which locks the line ` +
-  "and goes on, as Enter does once every character is copied. Play, or Enter before then, goes on " +
-  "without locking it.";
+  "The silence between one station's line and the next, in a generated QSO or your own text. " +
+  "A change applies to the QSO on the page. An opened recording keeps its own silences.";
 
-/** The silence between lines with Wait, for when you play on. */
+const WAIT_HELP =
+  "It stops after each line, in a recording too, until you type what you heard and press " +
+  `${MOD}+Enter, which locks the line and goes on, as Enter does once every character is copied. ` +
+  "Play, or Enter before then, goes on without locking it.";
+
+/** The silence between lines with Stop after each line, for when you play
+ *  on. */
 const WAIT_GAP_SEC = 1;
 
-/** With Wait, how far past the end of its line the QSO stops, so the line's
+/** Stopping after each line, how far past the end of its line the QSO stops, so the line's
  *  last character is heard whole. */
 const HOLD_PAD_SEC = 0.2;
 
@@ -337,7 +335,8 @@ type OnOffKey =
   | "copySeekSlot"
   | "copyAllowEdits"
   | "copyShowSpeed"
-  | "copyShowDownload";
+  | "copyShowDownload"
+  | "copyWait";
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean) => void] {
@@ -419,8 +418,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [kind, setKind] = useChoice("copyKind", "cq");
   const [runQsos, setRunQsos] = useChoice("copyRunQsos", 3);
   const [qsoLength, setQsoLength] = useChoice("copyChatLength", "full");
-  const [gap, setGap] = useChoice("copyGap", "1");
-  const gapSec = gap === "wait" ? WAIT_GAP_SEC : Number(gap);
+  const [gapPref, setGap] = useChoice("copyGap", "1");
+  /** Stop after each line: kept on its own now, but once one of the gaps. */
+  const [wait, setWait] = useOnOff("copyWait", gapPref === "wait");
+  const gap: Gap = gapPref === "wait" ? "1" : gapPref;
+  const gapSec = wait ? WAIT_GAP_SEC : Number(gap);
   const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
   const [qsbDb, setQsbDb] = useChoice("qsbDb", 0);
   const [noiseDb, setNoiseDb] = useChoice("noiseDb", NOISE_OFF_DB);
@@ -479,7 +481,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [playing, setPlaying] = useState<"main" | { from: number; to: number } | null>(null);
   const mode = useRef<"main" | "part" | null>(null);
   const [partAt, setPartAt] = useState<number | null>(null);
-  /** With Wait, where the QSO playing now stops: the end of a line not yet
+  /** Stopping after each line, where the QSO playing now stops: the end of a line not yet
    *  locked. Null when it plays to the end. */
   const holdAt = useRef<number | null>(null);
   /** At the end of the recording, run once the page has rendered. */
@@ -741,7 +743,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   /** Wait between lines: the QSO stops after each line you copy, generated
    *  or opened, until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
-  const waits = gap === "wait" && linesShow === "copy";
+  const waits = wait && linesShow === "copy";
 
   /* ---- playing ---------------------------------------------------------- */
 
@@ -753,7 +755,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     mode.current = "main";
     setPlaying("main");
     setPos(at);
-    // With Wait, it stops at the end of the next line still open. Starting
+    // Stopping after each line, it stops at the end of the next line still open. Starting
     // from the stop, that line is behind it, and it goes on to the next.
     const hold = waits && rec ? rec.overs.findIndex((o, i) => o.t1 + HOLD_PAD_SEC > at + 0.01 && !unlocked[i]?.locked) : -1;
     // Not into the next line, which in a recording can start close after.
@@ -1096,7 +1098,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   };
 
   /* Cmd on a Mac or Ctrl elsewhere with Enter, in a box, locks its line.
-     With Wait, stopped after the line, it goes on too. */
+     Stopping after each line, stopped after it, it goes on too. */
   const modKey = (ev: KeyboardEvent): boolean => {
     if (!modOf(ev) || ev.key !== "Enter") return false;
     const i = lineOf(ev.target);
@@ -1412,7 +1414,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const nowLine =
     rec && nowAt !== null ? rec.overs.findIndex((o, i) => nowAt >= o.t0 - 0.05 && nowAt < (rec.overs[i + 1]?.t0 ?? Infinity)) : -1;
 
-  /** With Wait, the line it stopped after, waiting for Enter, or -1. */
+  /** Stopping after each line, the line it stopped after, waiting for Enter, or -1. */
   const heldLine =
     waits && rec && playing === null
       ? rec.overs.findIndex((o, i) => !lines[i]?.locked && pos >= o.t1 - 0.05 && pos <= o.t1 + HOLD_PAD_SEC + 0.1)
@@ -1588,6 +1590,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                       onChange={setSeekSlot}
                     />
                   </SettingRow>
+                  <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
                   <SettingRow label="When the next line starts">
                     <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />
                   </SettingRow>

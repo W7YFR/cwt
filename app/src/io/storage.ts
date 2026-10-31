@@ -560,9 +560,13 @@ export interface Prefs {
    *  Named for the rag chew it was first called, and kept: a saved setting
    *  is read by this name. */
   copyChatLength?: "full" | "short" | "pieces";
-  /** Between two lines of a generated QSO: a silence of so many seconds, or
-   *  wait, which stops at the end of each line until Enter. Absent is 1. */
+  /** Between two lines of a generated QSO: a silence of so many seconds.
+   *  Absent is 1. Wait was one of these once; it is `copyWait` now, and a
+   *  kept wait reads as 1 with `copyWait` on. */
   copyGap?: "1" | "2" | "3" | "5" | "wait";
+  /** The Copy page stops after each line until you lock it. Absent is off,
+   *  or on with a kept `copyGap` of wait. */
+  copyWait?: boolean;
   /** A generated QSO's stations send at the speeds of its format, or all at
    *  the Copy page's sliders. Absent is the format's. */
   copySpeed?: "format" | "mine";
@@ -778,6 +782,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copyAllowEdits: isBool,
   copyShowSpeed: isBool,
   copyShowDownload: isBool,
+  copyWait: isBool,
   copyEarlier: oneOf("all", "last", "none"),
   copyKind: oneOf("cq", "cwt", "sst", "mst", "pota"),
   copyRunQsos: isNum,

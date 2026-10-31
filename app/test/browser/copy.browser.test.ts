@@ -660,7 +660,7 @@ describe("a generated QSO", () => {
 describe("Wait between lines", () => {
   /** Mount the page and generate a QSO that stops after each line. */
   async function locked(prefs: Prefs = {}): Promise<void> {
-    mount({ copyKind: "cwt", copyRunQsos: 1, copyGap: "wait", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, ...prefs });
+    mount({ copyKind: "cwt", copyRunQsos: 1, copyWait: true, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, ...prefs });
     await until("the page to settle", () => state() === "none");
     await click(button("copy-new-first"));
     await until("the QSO to be ready", () => state() === "ready");
@@ -716,8 +716,18 @@ describe("Wait between lines", () => {
     expect(from, "nothing of line 1 again").toBeGreaterThanOrEqual(Math.max(...ends) - 0.001);
   });
 
+  it("takes a Wait kept from before as Stop after each line, with 1s between lines", async () => {
+    mount({ copyGap: "wait" });
+    await until("the page to settle", () => state() === "none");
+    await click(button("panel-toggle"));
+    expect($<HTMLInputElement>("#copy-wait")!.checked).toBe(true);
+    expect($('[data-testid="copy-gap"] [aria-pressed="true"]')!.textContent).toBe("1s");
+    await click($<HTMLInputElement>("#copy-wait"));
+    expect(loadPrefs().copyWait).toBe(false);
+  });
+
   it("stops after each line of an opened recording too, and goes on when Cmd or Ctrl+Enter locks it", async () => {
-    await open({ copyGap: "wait" });
+    await open({ copyWait: true });
     await click(button("copy-play"));
     await until("a stop after line 1", () => state() === "paused");
     expect(lines()).toHaveLength(1);
