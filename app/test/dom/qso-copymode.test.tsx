@@ -67,6 +67,9 @@ describe("copy mode options", () => {
 
   it("pauses on Enter with the line not all copied, and keeps the box open", async () => {
     const box = await copyAnswer({});
+    // One character: the answer can be as short as a call, which "w7yfr de"
+    // would copy in full.
+    await fill(box, lastSent().slice(0, 1).toLowerCase());
     box.focus();
     await press("Enter");
     expect($$('[data-testid="qso-type"]'), "still open").toHaveLength(1);
