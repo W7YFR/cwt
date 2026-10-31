@@ -686,6 +686,21 @@ describe("Wait between lines", () => {
     await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
   });
 
+  it("goes on from the end of the line it locks, not from the slot you were in", async () => {
+    await locked({ copyInput: "slots", copySeekSlot: true });
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    const slots = [...lines()[0]!.querySelectorAll<HTMLInputElement>('[data-testid="copy-slot"]')];
+    for (const slot of slots) await fill(slot, "E");
+    const before = plays.length;
+    await enter(slots.at(-1)!);
+    expect(plays.length).toBe(before + 1);
+    const [from] = plays.at(-1)!;
+    const ends = [...lines()[0]!.querySelectorAll<HTMLElement>("[data-t1]")].map((e) => Number(e.dataset.t1));
+    expect(ends.length, "line 1's characters").toBeGreaterThan(0);
+    expect(from, "nothing of line 1 again").toBeGreaterThanOrEqual(Math.max(...ends) - 0.001);
+  });
+
   it("goes on without locking the line on Enter", async () => {
     await locked();
     await click(button("copy-play"));
@@ -738,6 +753,41 @@ describe("the keys the pages share", () => {
       await wait(100);
     });
     expect(document.activeElement, "the same slot").toBe(slot);
+  });
+
+  /** Option+Enter, or Alt+Enter, on `el`: where it plays from. */
+  async function altEnter(el: HTMLElement): Promise<number> {
+    const before = plays.length;
+    await act(async () => {
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", altKey: true, bubbles: true, cancelable: true }));
+    });
+    expect(plays.length).toBe(before + 1);
+    await click(button("copy-play"));
+    return plays.at(-1)![0];
+  }
+
+  it("plays on from the word of the selected slot on Option or Alt+Enter", async () => {
+    await open({ copyInput: "slots" });
+    await playTo(1);
+    const firstOf = (w: number) => lines()[0]!.querySelectorAll(".slotword")[w]!.querySelector("input")!;
+    await act(async () => firstOf(1).focus());
+    const second = await altEnter(firstOf(1));
+    await act(async () => firstOf(0).focus());
+    const first = await altEnter(firstOf(0));
+    expect(second, "the second word, after the first").toBeGreaterThan(first);
+    expect(first).toBeGreaterThanOrEqual(0);
+  });
+
+  it("plays on from the word at the cursor in a box on Option or Alt+Enter", async () => {
+    await open();
+    await playTo(1);
+    const box = boxes()[0]!;
+    await fill(box, "CQ CQ");
+    const second = await altEnter(box);
+    await fill(box, "");
+    const first = await altEnter(box);
+    expect(second, "the second word, after the first").toBeGreaterThan(first);
+    expect(box.value, "nothing typed").toBe("");
   });
 
   it("plays and pauses on Option or Alt+Space in a box, with nothing typed", async () => {
@@ -798,5 +848,136 @@ describe("Allow edits", () => {
     await open();
     await playTo(2);
     expect($('[data-testid="copy-line-edit"]')).toBeNull();
+  });
+});
+
+describe("New exchange", () => {
+  const SLOW = { copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 } as const;
+  const QSO = "CQ DE W1AW K\n\nW1AW DE K7ABC\n\nNAME BOB K\n\nR R";
+  const textBox = () => $<HTMLTextAreaElement>('[data-testid="copy-text-box"]');
+  /** The station of each row in the dialog. */
+  const rows = () => $$('[data-testid="copy-text-lines"] li');
+
+  async function write(text: string): Promise<void> {
+    const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    await act(async () => {
+      set.call(textBox()!, text);
+      textBox()!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  /** Mount the page and send `text` from New exchange. */
+  async function own(text: string, prefs: Prefs = {}): Promise<void> {
+    mount({ ...SLOW, ...prefs });
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-text-open"));
+    await write(text);
+    await click(button("copy-text-start"));
+    await until("the text to be ready", () => state() === "ready");
+  }
+
+  /** Every line on the page, by its station. */
+  async function senders(): Promise<number[]> {
+    await playTo(1);
+    await click(button("copy-reveal"));
+    return lines().map((l) => Number(l.dataset.sender));
+  }
+
+  it("puts each line on the page, sent by the station the text says", async () => {
+    await own(QSO);
+    expect(textBox(), "the dialog closes").toBeNull();
+    expect(await senders()).toEqual([0, 1, 1, 0]);
+  });
+
+  it("sends a line by the station you set", async () => {
+    mount(SLOW);
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-text-open"));
+    await write(QSO);
+    await click(rows()[3]!.querySelectorAll("button")[1] as HTMLElement);
+    await click(button("copy-text-start"));
+    await until("the text to be ready", () => state() === "ready");
+    expect(await senders()).toEqual([0, 1, 1, 1]);
+  });
+
+  it("opens the text on the page again, to edit", async () => {
+    await own(QSO);
+    await click(button("copy-text-open"));
+    expect(textBox()!.value).toBe(QSO);
+  });
+
+  it("comes back after a reload, with the stations you set", async () => {
+    mount(SLOW);
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-text-open"));
+    await write(QSO);
+    await click(rows()[3]!.querySelectorAll("button")[1] as HTMLElement);
+    await click(button("copy-text-start"));
+    await until("the text to be ready", () => state() === "ready");
+    await wait(300);
+
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount(SLOW);
+    await until("the text to come back", () => state() === "ready");
+    await click(button("copy-text-open"));
+    expect(textBox()!.value).toBe(QSO);
+    expect(rows().map((r) => Number(r.dataset.station))).toEqual([0, 1, 1, 1]);
+  });
+
+  it("opens a .txt file in New exchange, named for the file", async () => {
+    mount(SLOW);
+    await until("the page to settle", () => state() === "none");
+    await act(async () => fileTarget.current!(new File(["CQ DE W1AW K\n\nW1AW DE K7ABC K"], "homework.txt", { type: "text/plain" })));
+    await until("the dialog", () => textBox() !== null);
+    expect(textBox()!.value).toBe("CQ DE W1AW K\n\nW1AW DE K7ABC K");
+    await click(button("copy-text-start"));
+    await until("the text to be ready", () => state() === "ready");
+    expect($(".copyname")!.title).toBe("homework.txt");
+  });
+
+  it("sends your text at the sliders, with Speed at Format too", async () => {
+    await own(QSO, { copySpeed: "format", copyCharWpm: 33, copyFarnsworthWpm: 33 });
+    await playTo(1);
+    expect($('[data-testid="copy-line-wpm"]')!.textContent).toMatch(/\b33\b/);
+  });
+});
+
+describe("back to your box", () => {
+  const active = () => document.activeElement;
+
+  it("goes into the first line's box once it starts, from Start", async () => {
+    await open();
+    await click(button("copy-play"));
+    await until("the first box", () => boxes().length > 0 && active() === boxes()[0]);
+    await click(button("copy-play"));
+  });
+
+  it("goes back to your box after a playback control", async () => {
+    await open();
+    await playTo(1);
+    (active() as HTMLElement | null)?.blur();
+    await click(button("copy-back-5"));
+    await until("the box", () => active() === boxes()[0]);
+  });
+
+  it("goes back to your box after a playback key off the boxes", async () => {
+    await open();
+    await playTo(1);
+    (active() as HTMLElement | null)?.blur();
+    await act(async () => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+    });
+    await until("the box", () => active() === boxes()[0]);
+  });
+
+  it("takes a character typed off the boxes into your box", async () => {
+    await open();
+    await playTo(1);
+    (active() as HTMLElement | null)?.blur();
+    await act(async () => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "c", bubbles: true, cancelable: true }));
+    });
+    expect(active()).toBe(boxes()[0]);
   });
 });
