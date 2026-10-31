@@ -1063,7 +1063,6 @@ describe("downloads", () => {
   it("saves a recording as it was opened", async () => {
     const files = saved();
     await open();
-    expect($('[data-testid="copy-sent-speed"]'), "no speed known for a recording").toBeNull();
     expect($('[data-testid="copy-download-clean"]')).toBeNull();
     await click(button("copy-download"));
     expect(files[0]!.name).toBe("qso.wav");
@@ -1072,6 +1071,15 @@ describe("downloads", () => {
   it("hides the downloads with the setting off", async () => {
     await generate({ copyShowDownload: false });
     expect($('[data-testid="copy-downloads"]')).toBeNull();
+  });
+});
+
+describe("a recording's speed", () => {
+  it("shows the speed it was sent at, measured, beside its name", async () => {
+    await open();
+    const shown = $('[data-testid="copy-sent-speed"]')!.textContent!;
+    const wpm = Number(/^about (\d+) wpm$/.exec(shown)?.[1]);
+    expect(Math.abs(wpm - WPM), shown).toBeLessThanOrEqual(1);
   });
 });
 

@@ -24,6 +24,7 @@ import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
 import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
+import { speedsOf } from "@/copy/measure";
 import { textScript } from "@/copy/text";
 import {
   charsOf,
@@ -677,16 +678,21 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   const duration = rec?.durationSec ?? 0;
   const ended = rec !== null && pos >= duration - 0.05;
+  /** A recording's speed, each station's, measured from what was read. */
+  const measured = useMemo(() => (rec && !file?.script ? speedsOf(rec) : null), [rec, file?.script]);
   /** The speed the QSO is sent at, as the page shows it: one speed, or the
-   *  slowest to the fastest of its stations. None for a recording. */
+   *  slowest to the fastest of its stations. A recording's is measured, so
+   *  it says about. */
   const speedNow = ((): string | null => {
     const script = file?.script;
-    if (!script) return null;
-    const speeds = script.stations.map((st) => sendingOf(script).speed ?? st.speed);
+    const speeds = script
+      ? script.stations.map((st) => sendingOf(script).speed ?? st.speed)
+      : (measured ?? []).filter((sp): sp is Speed => sp !== null);
+    if (speeds.length === 0) return null;
     const shown = [...new Set(speeds.map(fmtSpeed))];
-    if (shown.length === 1) return shown[0]!;
     const wpm = speeds.map((sp) => sp.charWpm);
-    return `${Math.min(...wpm)}–${Math.max(...wpm)} wpm`;
+    const text = shown.length === 1 ? shown[0]! : `${Math.min(...wpm)}–${Math.max(...wpm)} wpm`;
+    return script ? text : `about ${text}`;
   })();
 
   /* ---- downloads -------------------------------------------------------- */
@@ -1760,7 +1766,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 onChange={(e) => seek(Number(e.target.value))}
               />
               {speedNow && (
-                <span className="hint copyspeed" data-testid="copy-sent-speed" title="The speed it is sent at, from the settings">
+                <span
+                  className="hint copyspeed"
+                  data-testid="copy-sent-speed"
+                  title={file?.script ? "The speed it is sent at, from the settings" : "The speed it was sent at, measured from the recording"}
+                >
                   {speedNow}
                 </span>
               )}
