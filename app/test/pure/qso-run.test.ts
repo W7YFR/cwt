@@ -237,6 +237,17 @@ describe("the station asks again", () => {
     expect(work(called("pota"), ["K4ABC?", "UR 5NN WA WA BK"]).replies[1]).toBe("BK TU UR 5NN 5NN GA GA BK");
   });
 
+  it("says yes to items of its exchange sent back right with a ?", () => {
+    const sent = ["K4ABC UR 5NN WA WA BK"];
+    expect(work(called("pota"), [...sent, "5NN ?"]).replies[1]).toBe("RR");
+    expect(work(called("pota"), [...sent, "599?"]).replies[1], "9 for N").toBe("RR");
+    expect(work(called("pota"), [...sent, "R 5NN GA ?"]).replies[1]).toBe("RR");
+    expect(work(called("cwt"), ["K4ABC TOM 1234", "JIM 2345?"]).replies[1]).toBe("RR");
+    // Wrong: it sends the item again.
+    expect(work(called("pota"), [...sent, "RST ?", "589 59N ?"]).replies.slice(1)).toEqual(["BK 5NN 5NN BK", "BK 5NN 5NN BK"]);
+    expect(work(called("pota"), [...sent, "GA KS?"]).replies[1]).not.toBe("RR");
+  });
+
   it("takes your exchange without its call", () => {
     expect(work(called("cwt"), ["TOM 1234"]).replies).toEqual(["TU JIM 2345"]);
   });

@@ -365,12 +365,11 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
   }
 }
 
-/** One item of the station's exchange, twice, for NR? and the like. Null
- *  when its exchange has no such item. A POTA station now and then puts BK
- *  around it. */
-function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
+/** One item of the station's exchange, or null when its exchange has no
+ *  such item. */
+function valueOf(qso: RunQso, item: Item): string | null {
   const { them, format } = qso;
-  const value =
+  return (
     item === "name"
       ? format === "pota"
         ? null
@@ -387,8 +386,17 @@ function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
             : null
           : format === "pota"
             ? cut(them.rst)
-            : null;
+            : null
+  );
+}
+
+/** One item of the station's exchange, twice, for NR? and the like. Null
+ *  when its exchange has no such item. A POTA station now and then puts BK
+ *  around it. */
+function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
+  const value = valueOf(qso, item);
   if (value === null) return null;
+  const { format } = qso;
   return format === "pota" && rand() < 0.25 ? `BK ${value} ${value} BK` : `${value} ${value}`;
 }
 
@@ -409,6 +417,22 @@ function askedItem(over: Over): Item | null {
     if (asked && bare in ASKED) return ASKED[bare]!;
   }
   return null;
+}
+
+/** Words around a check that are not part of it. Not AROUND: 5NN and GA
+ *  are what a check holds. */
+const CHECK_AROUND = new Set([...TURN_WORDS, "R", "RR", "UR", "RST", "QTH", "NR", "NAME", "ST", "IS"]);
+
+/** Whether `over` checks items of the station's exchange with a ?, as
+ *  58N ? or KS?, and has each of them right. A report reads the same with
+ *  9 or N: 589 is 58N. */
+function checksRight(qso: RunQso, over: Over): boolean {
+  if (!over.words.some((w) => w.endsWith("?"))) return false;
+  const values = new Set(
+    (Object.keys(ASK) as Item[]).flatMap((item) => valueOf(qso, item) ?? []).map(cut),
+  );
+  const checked = over.words.map((w) => w.replace(/\?+$/, "")).filter((w) => w && !CHECK_AROUND.has(w));
+  return checked.length > 0 && checked.every((w) => values.has(cut(w)));
 }
 
 /** Whether `over` asks for the last over again: AGN, ?, QRZ? or CALL?. */
@@ -485,6 +509,8 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
     case "exchanged": {
       const item = askedItem(over);
       if (item) return say(qso, itemOf(qso, item, rand) ?? qso.last);
+      // Its items sent back right with a ?: yes, that is it.
+      if (checksRight(qso, over)) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
       if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last);
       const reply = lastWord(qso, rand);
       return { qso: { ...qso, last: reply ?? qso.last }, reply, ended: true };
