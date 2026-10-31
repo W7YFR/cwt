@@ -156,29 +156,29 @@ describe("playing a line again during a session", () => {
   });
 });
 
-describe("playing the last line again with Cmd+.", () => {
-  /** Ctrl+. on `el`: Cmd+. off a Mac, as the tests run. */
-  const ctrlDot = (el: Element) =>
+describe("playing the last line again with Option+R", () => {
+  /** Option+R on `el`, or Alt+R off a Mac. */
+  const altR = (el: Element) =>
     act(async () => {
-      el.dispatchEvent(new KeyboardEvent("keydown", { key: ".", ctrlKey: true, bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: "r", code: "KeyR", altKey: true, bubbles: true }));
     });
 
-  it("plays on Ctrl+. in the box, without locking it", async () => {
+  it("plays on Option+R in the box, without locking it", async () => {
     await open({ qsoTheirText: "copy", qsoPlayback: "always" });
     await send("CQ CWT W7YFR");
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     box.focus();
-    await ctrlDot(box);
+    await altR(box);
     expect(state(), "the microphone is not read while it plays").not.toBe("sending");
     await until("the line to end", () => yourTurn());
     expect($('[data-testid="qso-type"]'), "the box is still open").not.toBeNull();
   });
 
-  it("plays on Ctrl+. anywhere on the page, not just in a box", async () => {
+  it("plays on Option+R anywhere on the page, not just in a box", async () => {
     await open({ qsoTheirText: "before", qsoPlayback: "always" });
     await send("CQ CWT W7YFR");
     (document.activeElement as HTMLElement | null)?.blur();
-    await ctrlDot(document.body);
+    await altR(document.body);
     expect(state(), "the microphone is not read while it plays").not.toBe("sending");
     await until("the line to end", () => yourTurn());
   });
@@ -188,7 +188,7 @@ describe("playing the last line again with Cmd+.", () => {
     await send("CQ CWT W7YFR");
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     box.focus();
-    await ctrlDot(box);
+    await altR(box);
     expect(state()).toBe("sending");
   });
 

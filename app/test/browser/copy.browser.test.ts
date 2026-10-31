@@ -651,17 +651,27 @@ describe("Wait between lines", () => {
     await until("the QSO to be ready", () => state() === "ready");
   }
 
-  it("stops after a line, and goes on to the next when Enter locks it", async () => {
+  it("stops after a line, and goes on to the next when Cmd or Ctrl+Enter locks it", async () => {
     await locked();
     await click(button("copy-play"));
     await until("a stop after line 1", () => state() === "paused");
     expect(lines()).toHaveLength(1);
     await fill(boxes()[0]!, "CQ CWT");
-    await enter(boxes()[0]!);
+    await enter(boxes()[0]!, true);
     expect(lines()[0]!.querySelector('[data-testid="copy-type"]'), "line 1 locked").toBeNull();
     await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
     await wait(200);
     expect(state(), "it waits").toBe("paused");
+  });
+
+  it("goes on without locking the line on Enter", async () => {
+    await locked();
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    await enter(boxes()[0]!);
+    await until("line 2", () => lines().length === 2);
+    await until("a stop", () => state() === "paused");
+    expect(lines()).toHaveLength(2);
   });
 
   it("goes on without locking the line on Play", async () => {
@@ -676,31 +686,47 @@ describe("Wait between lines", () => {
 });
 
 describe("the keys the pages share", () => {
-  /** Cmd+. on a Mac, Ctrl+. elsewhere, on `el`. */
-  async function modDot(el: HTMLElement): Promise<void> {
-    const mac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+  /** Option+R on a Mac, Alt+R elsewhere, on `el`. */
+  async function altR(el: HTMLElement): Promise<void> {
     await act(async () => {
-      el.dispatchEvent(new KeyboardEvent("keydown", { key: ".", metaKey: mac, ctrlKey: !mac, bubbles: true, cancelable: true }));
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: "®", code: "KeyR", altKey: true, bubbles: true, cancelable: true }));
     });
   }
 
-  it("plays the line of the box you are in again on Cmd or Ctrl+.", async () => {
+  it("plays the line of the box you are in again on Option or Alt+R", async () => {
     await open();
     await playTo(1);
     const before = plays.length;
-    await modDot(boxes()[0]!);
+    await altR(boxes()[0]!);
     expect(plays.length).toBe(before + 1);
     const [, to] = plays[plays.length - 1]!;
     expect(to, "one line, not the rest of the recording").toBeDefined();
     expect(boxes()[0]!.value, "nothing typed").toBe("");
   });
 
-  it("plays the last line heard again on Cmd or Ctrl+., outside a box", async () => {
+  it("plays and pauses on Option or Alt+Space in a box, with nothing typed", async () => {
+    await open();
+    await playTo(1);
+    const box = boxes()[0]!;
+    box.focus();
+    const space = () =>
+      act(async () => {
+        box.dispatchEvent(new KeyboardEvent("keydown", { key: "\u00a0", code: "Space", altKey: true, bubbles: true, cancelable: true }));
+      });
+    const was = state();
+    await space();
+    await until("a change", () => state() !== was);
+    await space();
+    await until("back", () => state() !== "playing");
+    expect(box.value, "nothing typed").toBe("");
+  });
+
+  it("plays the last line heard again on Option or Alt+R, outside a box", async () => {
     await open();
     await playTo(2);
     (document.activeElement as HTMLElement | null)?.blur();
     const before = plays.length;
-    await modDot(document.body);
+    await altR(document.body);
     expect(plays.length).toBe(before + 1);
     expect(plays[plays.length - 1]![1]).toBeDefined();
   });

@@ -84,7 +84,7 @@ import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
 import { HomeButton } from "./Wordmark";
-import { MOD, modOf } from "./modKey";
+import { ALT, MOD, modOf } from "./modKey";
 
 /** What the page calls text pasted or typed in. */
 const TEXT_TITLE = "Your text";
@@ -205,12 +205,12 @@ const GAPS: ReadonlyArray<Option<Gap>> = [
   { value: "2", label: "2s" },
   { value: "3", label: "3s" },
   { value: "5", label: "5s" },
-  { value: "wait", label: "Wait", note: "It stops after each line, and goes on when you press Enter in its box." },
+  { value: "wait", label: "Wait", note: `It stops after each line, and goes on when you press ${MOD}+Enter in its box.` },
 ];
 const GAP_HELP =
   "The silence between one station's line and the next. A change applies to the QSO on the page. " +
-  "Wait stops after each line until you type what you heard and press Enter, which locks the line " +
-  "and goes on. Play goes on without locking it.";
+  `Wait stops after each line until you type what you heard and press ${MOD}+Enter, which locks the line ` +
+  "and goes on. Play, or Enter in the box, goes on without locking it.";
 
 /** The silence between lines with Wait, for when you play on. */
 const WAIT_GAP_SEC = 1;
@@ -666,7 +666,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const duration = rec?.durationSec ?? 0;
   const ended = rec !== null && pos >= duration - 0.05;
   /** Wait between lines: a generated QSO stops after each line you copy,
-   *  until you press Enter in its box. */
+   *  until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
   const waits = gap === "wait" && !!file?.script && linesShow === "copy";
 
   /* ---- playing ---------------------------------------------------------- */
@@ -927,9 +927,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     else focusBox();
   };
 
-  /** The page's keys that move the recording: Space plays and pauses, the
-   *  arrows move by word, with Shift by five seconds, and in slots Down
-   *  plays the selected letter and Up its word. Whether it was one. */
+  /** The page's keys that move the recording: Space plays and pauses, and
+   *  the arrows move by word, with Shift by five seconds. Whether it was
+   *  one. */
   const moveKey = (ev: KeyboardEvent): boolean => {
     if (ev.key === " ") toggle();
     else if (ev.key === "ArrowLeft") {
@@ -938,30 +938,45 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     } else if (ev.key === "ArrowRight") {
       if (ev.shiftKey) on(5);
       else skipOn(words);
-    } else if (ev.key === "ArrowDown" && input === "slots" && selected) playLetter();
-    else if (ev.key === "ArrowUp" && input === "slots" && selected) playWord();
-    else return false;
+    } else return false;
     ev.preventDefault();
     return true;
   };
 
-  /* With Cmd on a Mac or Ctrl elsewhere, the page's keys work in a box, and
-     Enter in a box locks its line. */
+  /* Cmd on a Mac or Ctrl elsewhere with Enter, in a box, locks its line.
+     With Wait, stopped after the line, it goes on too. */
   const modKey = (ev: KeyboardEvent): boolean => {
     if (!modOf(ev)) return false;
-    if (ev.key === ".") {
-      ev.preventDefault();
-      if (!ev.repeat) replayLine(isBox(ev.target) ? ev.target : null);
-      return true;
-    }
     if (ev.key === "Enter") {
       const line = isBox(ev.target) ? ev.target.closest<HTMLElement>("li[data-line]")?.dataset.line : undefined;
       if (line === undefined) return false;
       ev.preventDefault();
-      setLine(Number(line), { locked: true });
+      const i = Number(line);
+      const open = !lines[i]?.locked;
+      setLine(i, { locked: true });
+      if (open && waits && mode.current === null && !ended) {
+        play(posRef.current, lines.map((l, j) => (j === i ? { ...l, locked: true } : l)));
+      }
       return true;
     }
-    return moveKey(ev);
+    return false;
+  };
+
+  /* Playback with Option on a Mac or Alt elsewhere, in a box or out of one:
+     R plays the line again, L the selected slot's letter and W its word,
+     and the page's keys work in a box. By the key's place, as Option
+     changes the character a Mac types. */
+  const altKey = (ev: KeyboardEvent): boolean => {
+    if (!ev.altKey || ev.metaKey || ev.ctrlKey) return false;
+    const plain = !ev.shiftKey;
+    if (plain && ev.code === "KeyR") {
+      if (!ev.repeat) replayLine(isBox(ev.target) ? ev.target : null);
+    } else if (plain && ev.code === "KeyL" && input === "slots" && selected) playLetter();
+    else if (plain && ev.code === "KeyW" && input === "slots" && selected) playWord();
+    else if (plain && ev.code === "Space") toggle();
+    else return moveKey(ev);
+    ev.preventDefault();
+    return true;
   };
 
   /* Outside a box: Space or Enter plays and pauses, Esc pauses, and the
@@ -970,21 +985,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const keyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
   keyRef.current = (ev) => {
     if (!rec || textDraft) return;
-    if (modKey(ev)) return;
+    if (modKey(ev) || altKey(ev)) return;
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     const el = ev.target as HTMLElement | null;
     if (isBox(el)) {
       if (ev.key === "Enter") {
         ev.preventDefault();
-        // With Wait, Enter while stopped locks the box's line and goes on.
-        const line = el.closest<HTMLElement>("li[data-line]")?.dataset.line;
-        if (waits && mode.current !== "main" && line !== undefined && !lines[Number(line)]?.locked) {
-          const i = Number(line);
-          const next = lines.map((l, j) => (j === i ? { ...l, locked: true } : l));
-          setLine(i, { locked: true });
-          if (!ended) play(posRef.current, next);
-          return;
-        }
         toggle();
       }
       return;
@@ -1227,9 +1233,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     );
   };
 
-  /** Cmd+. or Ctrl+.: the line plays again. The line of the box you are in,
+  /** Option+R or Alt+R: the line plays again. The line of the box you are in,
    *  or else the line playing, or the last one heard. As the QSO page's
-   *  Cmd+. plays the station's last line. Again while it plays stops it. */
+   *  Option+R plays the station's last line. Again while it plays stops it. */
   const replayLine = (box: HTMLElement | null) => {
     if (!rec) return;
     const inBox = box?.closest<HTMLElement>("li[data-line]")?.dataset.line;
@@ -1263,7 +1269,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           ? "Type what you hear in each line."
           : "Listen along."
         : heldLine >= 0
-          ? "Type what you heard, then press Enter to go on."
+          ? `Type what you heard, then press ${MOD}+Enter to lock it and go on.`
           : linesShow === "copy" && perfect
             ? "You copied every line. Copy again starts a fresh attempt."
             : ended
@@ -1618,8 +1624,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               </div>
               {input === "slots" && (
                 <div className="modeswitch" role="group" aria-label="Play the selected slot">
-                  {slotPlay("Letter", "Play the selected letter", playLetter, "copy-play-letter")}
-                  {slotPlay("Word", "Play the selected word", playWord, "copy-play-word")}
+                  {slotPlay("Letter", `Play the selected letter (${ALT}+L)`, playLetter, "copy-play-letter")}
+                  {slotPlay("Word", `Play the selected word (${ALT}+W)`, playWord, "copy-play-word")}
                 </div>
               )}
             </div>
@@ -1730,30 +1736,27 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           <div className="copykeys">
             <p className="legend keys" data-testid="copy-hotkeys">
               On the page: <kbd>Space</kbd> or <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause
-              &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>.</kbd> play the line again
+              &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>R</kbd> play the line again
               &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5s
               {input === "slots" && (
                 <>
                   {" "}
-                  &nbsp;·&nbsp; <kbd>↓</kbd> <kbd>↑</kbd> the selected letter or word
+                  &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
                 </>
               )}
             </p>
-            {/* Only the keys the settings use: none in a box with no boxes,
-                and with Wait, Enter is the lock. */}
+            {/* Only the keys the settings use: none in a box with no boxes. */}
             {linesShow === "copy" && (
               <p className="legend keys" data-testid="copy-box-keys">
-                In a box:{" "}
-                {waits ? (
+                In a box: <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd>{" "}
+                {waits ? "lock the line and go on" : "lock the line"}
+                {input === "slots" && (
                   <>
-                    <kbd>Enter</kbd> lock the line and go on
-                  </>
-                ) : (
-                  <>
-                    <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd> lock the line
+                    {" "}
+                    &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
                   </>
                 )}
-                &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{MOD}</kbd> for the other keys
+                &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{ALT}</kbd> for the other keys
               </p>
             )}
           </div>
