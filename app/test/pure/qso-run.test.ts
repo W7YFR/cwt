@@ -60,12 +60,12 @@ describe("your CQ picks the format", () => {
     }
   });
 
-  it("keeps a plain CQ a rag chew", () => {
+  it("keeps a plain CQ a standard QSO", () => {
     const turn = respond(newQso(() => 0), "CQ CQ DE KD9XYZ K", FIRST);
     expect(isRun(turn.qso)).toBe(false);
   });
 
-  it("goes back to a rag chew on a plain CQ between QSOs of a run", () => {
+  it("goes back to a standard QSO on a plain CQ between QSOs of a run", () => {
     const turn = respond(newRun("cwt", () => 0), "CQ CQ DE KD9XYZ K", NEW());
     expect(isRun(turn.qso)).toBe(false);
   });

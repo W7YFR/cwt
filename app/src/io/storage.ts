@@ -556,7 +556,9 @@ export interface Prefs {
   copyKind?: "cq" | "cwt" | "sst" | "mst" | "pota";
   /** How many QSOs a generated run has. Absent is 3. */
   copyRunQsos?: number;
-  /** How much each station says in a generated rag chew. Absent is full. */
+  /** How much each station says in a generated standard QSO. Absent is full.
+   *  Named for the rag chew it was first called, and kept: a saved setting
+   *  is read by this name. */
   copyChatLength?: "full" | "short" | "pieces";
   /** Between two lines of a generated QSO: a silence of so many seconds, or
    *  wait, which stops at the end of each line until Enter. Absent is 1. */

@@ -198,12 +198,12 @@ const RUN_QSOS: ReadonlyArray<Option<string>> = [
 ];
 const RUN_QSOS_HELP = "How many stations call in a generated POTA, SST, MST or CWT run.";
 
-const CHAT_LENGTHS: ReadonlyArray<Option<Length>> = [
+const QSO_LENGTHS: ReadonlyArray<Option<Length>> = [
   { value: "full", label: "Full", note: "Each report, name and QTH in one line, sent twice." },
   { value: "short", label: "Short", note: "Each report, name and QTH in one line, sent once." },
   { value: "pieces", label: "Piece by piece", note: "The station that answers sends its report, name and QTH a line each." },
 ];
-const CHAT_LENGTH_HELP = "How much each station says in a generated standard QSO, as on the QSO page.";
+const QSO_LENGTH_HELP = "How much each station says in a generated standard QSO, as on the QSO page.";
 
 type Gap = "1" | "2" | "3" | "5" | "wait";
 const GAPS: ReadonlyArray<Option<Gap>> = [
@@ -412,7 +412,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [earlier, setEarlier] = useChoice("copyEarlier", "last");
   const [kind, setKind] = useChoice("copyKind", "cq");
   const [runQsos, setRunQsos] = useChoice("copyRunQsos", 3);
-  const [chatLength, setChatLength] = useChoice("copyChatLength", "full");
+  const [qsoLength, setQsoLength] = useChoice("copyChatLength", "full");
   const [gap, setGap] = useChoice("copyGap", "1");
   const gapSec = gap === "wait" ? WAIT_GAP_SEC : Number(gap);
   const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
@@ -626,7 +626,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const makeExchange = () => {
     player.stop();
     cancelLastLock();
-    const script = makeScript({ kind, length: chatLength, qsos: runQsos });
+    const script = makeScript({ kind, length: qsoLength, qsos: runQsos });
     const sent = sendScript(script, sending);
     const audio = encodeWavBuffer(sent.samples, sent.rate);
     const name = nameOf(script);
@@ -1622,12 +1622,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     onChange={(v) => setRunQsos(Number(v))}
                   />
                   <ChoiceGroup
-                    id="copy-chat-length"
+                    id="copy-qso-length"
                     label="A standard QSO is"
-                    help={CHAT_LENGTH_HELP}
-                    value={chatLength}
-                    options={CHAT_LENGTHS}
-                    onChange={(v) => setChatLength(v as Length)}
+                    help={QSO_LENGTH_HELP}
+                    value={qsoLength}
+                    options={QSO_LENGTHS}
+                    onChange={(v) => setQsoLength(v as Length)}
                   />
                   <ChoiceGroup
                     id="copy-gap"

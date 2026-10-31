@@ -7,7 +7,7 @@
  * in every format, and the station never has to ask again.
  *
  * A format is a run: the station that called CQ works one caller after
- * another. A plain CQ is a rag chew with one station.
+ * another. A plain CQ is a standard QSO with one station.
  *
  * The text is the answer key. Each line is sent at its station's speed and
  * pitch, so every character's time is known, with no decoder.
@@ -30,7 +30,7 @@ import type { Over, Recording } from "./decode";
 import { overOfText } from "./lines";
 import { addBand, QRM_OFF_DB, type QrmLine } from "./band";
 
-/** What a generated QSO is: a rag chew from a plain CQ, or a run of a format. */
+/** What a generated QSO is: a standard QSO from a plain CQ, or a run of a format. */
 export type Kind = GuideId;
 
 /** One station of a generated QSO. */
@@ -68,15 +68,15 @@ export interface MakeOptions {
   readonly rand?: Rand;
   /** The local hour, 0 to 23, for GM, GA or GE. Absent: at random. */
   readonly hour?: number;
-  /** A rag chew: how much each over says. */
+  /** A standard QSO: how much each over says. */
   readonly length?: Length;
   /** A run: how many QSOs. */
   readonly qsos?: number;
 }
 
-/** The speeds a rag chew is sent at, slowest and fastest. The station that
+/** The speeds a standard QSO is sent at, slowest and fastest. The station that
  *  answers starts at the speed of the CQ, as on the QSO page. */
-export const RAG_CHEW_WPM: readonly [number, number] = [15, 25];
+export const STANDARD_QSO_WPM: readonly [number, number] = [15, 25];
 
 /** The closest two stations' pitches may be, in Hz. */
 export const PITCH_APART_HZ = 40;
@@ -110,7 +110,7 @@ export function makeScript(options: MakeOptions): Script {
   const start = kind === "cq" ? null : kind;
   const caller = randomCaller(rand);
   const me = meOf(caller);
-  const mySpeed = wpmIn(rand, start ? FORMATS[start].wpm : RAG_CHEW_WPM);
+  const mySpeed = wpmIn(rand, start ? FORMATS[start].wpm : STANDARD_QSO_WPM);
   const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand), speed: mySpeed }];
   const lines: ScriptLine[] = [];
   const voice = { rand, hour };

@@ -20,7 +20,7 @@ export interface ExampleLine {
   readonly text: string;
 }
 
-/** What the guide can show: a rag chew from a plain CQ, or a format. */
+/** What the guide can show: a standard QSO from a plain CQ, or a format. */
 export type GuideId = "cq" | FormatId;
 
 /** The order the guide offers them in. */
@@ -74,8 +74,8 @@ export function exampleYou(user: {
 
 const FIXED = { rand: () => 0, hour: 20 } as const;
 
-/** Work your side of a rag chew through the script, and return both sides. */
-function chat(yours: readonly string[]): ExampleLine[] {
+/** Work your side of a standard QSO through the script, and return both sides. */
+function standard(yours: readonly string[]): ExampleLine[] {
   let qso: Qso = { ...newQso(() => 0), them: EXAMPLE_STATION };
   const lines: ExampleLine[] = [];
   for (const text of yours) {
@@ -105,7 +105,7 @@ export function example(id: GuideId, you: ExampleYou = EXAMPLE_YOU): ExampleLine
   const { call, name, qth, region, nr } = you;
   switch (id) {
     case "cq":
-      return chat([`CQ CQ DE ${call} K`, `K4ABC DE ${call} UR 579 NAME ${name} QTH ${qth} K`, "TNX JIM 73 SK"]);
+      return standard([`CQ CQ DE ${call} K`, `K4ABC DE ${call} UR 579 NAME ${name} QTH ${qth} K`, "TNX JIM 73 SK"]);
     case "cwt":
       return run(id, you, [`CQ CWT ${call}`, `K4ABC ${name} ${nr || region}`, `TU ${call}`]);
     case "sst":

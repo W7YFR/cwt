@@ -75,7 +75,7 @@ export function meOf(user: {
   };
 }
 
-/** Each piece of your exchange, as a rag chew sends it. */
+/** Each piece of your exchange, as a standard QSO sends it. */
 function pieceOf(p: Piece, me: Me, v: Voice): string {
   const rst = me.rst ?? "599";
   if (p === "report") {
@@ -107,9 +107,9 @@ function cqFor(format: FormatId, call: string, v: Voice): string {
   return pick(v.rand, [`CQ ${w} ${call}`, `CQ ${w} ${call} ${call}`, `CQ ${w} DE ${call}`, `${w} ${call}`]);
 }
 
-/** Your next over in a rag chew. Before a station answers, the CQ is for
+/** Your next over in a standard QSO. Before a station answers, the CQ is for
  *  `start`: a plain CQ, or a format's. */
-function chat(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them): string {
+function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them): string {
   const { call } = me;
   const them = who.call;
   const end = () => pick(v.rand, ["K", "KN", "BK"]);
@@ -240,5 +240,5 @@ export function hint(
   voice: Voice = PLAIN,
   them: Them = qso.them,
 ): string {
-  return isRun(qso) ? run(qso, me, voice, them) : chat(qso, me, start, voice, them);
+  return isRun(qso) ? run(qso, me, voice, them) : standard(qso, me, start, voice, them);
 }

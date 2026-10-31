@@ -39,7 +39,7 @@ describe("a generated QSO", () => {
     }
   });
 
-  it("is a rag chew of each length", () => {
+  it("is a standard QSO of each length", () => {
     const lines = (length: "full" | "short" | "pieces") =>
       makeScript({ kind: "cq", rand: seeded(3), length }).lines.length;
     expect(lines("pieces")).toBeGreaterThan(lines("full"));
