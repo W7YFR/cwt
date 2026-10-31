@@ -249,6 +249,14 @@ describe("the station asks again", () => {
     expect(work(called("pota"), [...sent, "GA KS?"]).replies[1]).not.toBe("RR");
   });
 
+  it("sends one item asked for with AGN or PSE, or keyed apart", () => {
+    const sent = ["K4ABC UR 5NN WA WA BK"];
+    for (const ask of ["Q T H ?", "QT H?", "<BK> M EEEE Q T H ?", "QTH AGN", "AGN QTH", "QTH AGN?", "PSE QTH", "QTH PSE?", "STATE?"]) {
+      expect(work(called("pota"), [...sent, ask]).replies[1], ask).toBe("BK GA GA BK");
+    }
+    expect(work(called("pota"), [...sent, "QTH GA?"]).replies[1], "a check, not a request").toBe("RR");
+  });
+
   it("takes your exchange without its call", () => {
     expect(work(called("cwt"), ["TOM 1234"]).replies).toEqual(["TU JIM 2345"]);
   });

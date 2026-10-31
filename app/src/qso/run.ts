@@ -313,7 +313,7 @@ const ASK: Readonly<Record<Item, string>> = { name: "NAME?", number: "NR?", regi
 
 /** The words after a ? that ask for one item. */
 const ASKED: Readonly<Record<string, Item>> = {
-  NR: "number", NAME: "name", OP: "name", QTH: "region", ST: "region", SPC: "region", RST: "report", RPT: "report",
+  NR: "number", NAME: "name", OP: "name", QTH: "region", ST: "region", STATE: "region", SPC: "region", RST: "report", RPT: "report",
 };
 
 /** A report as a contest sends it: 599 as 5NN. */
@@ -407,21 +407,24 @@ function lastWord(qso: RunQso, rand: Rand): string | null {
   return null;
 }
 
-/** The item asked for with a ?, as NR? or NR ?, or null. */
+/** The item asked for, or null: with a ?, as NR? or NR ?, or with AGN or
+ *  PSE, as QTH AGN or PSE QTH. Keyed apart, as Q T H ?, up to three words
+ *  read as one. */
 function askedItem(over: Over): Item | null {
   const { words } = over;
+  if (!words.some((w) => w.endsWith("?") || w === "AGN" || w === "PSE")) return null;
   for (let i = 0; i < words.length; i++) {
-    const w = words[i]!;
-    const bare = w.replace(/\?+$/, "");
-    const asked = w.endsWith("?") || words[i + 1] === "?";
-    if (asked && bare in ASKED) return ASKED[bare]!;
+    for (let back = 0; back <= 2 && back <= i; back++) {
+      const part = words.slice(i - back, i + 1).join("").replace(/\?+$/, "");
+      if (part in ASKED) return ASKED[part]!;
+    }
   }
   return null;
 }
 
 /** Words around a check that are not part of it. Not AROUND: 5NN and GA
  *  are what a check holds. */
-const CHECK_AROUND = new Set([...TURN_WORDS, "R", "RR", "UR", "RST", "QTH", "NR", "NAME", "ST", "IS"]);
+const CHECK_AROUND = new Set([...TURN_WORDS, "R", "RR", "UR", "RST", "QTH", "NR", "NAME", "ST", "STATE", "IS"]);
 
 /** Whether `over` checks items of the station's exchange with a ?, as
  *  58N ? or KS?, and has each of them right. A report reads the same with
@@ -513,10 +516,11 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
     }
 
     case "exchanged": {
+      // Its items sent back right with a ?: yes, that is it. First, as QTH
+      // GA? checks its QTH and does not ask for it.
+      if (checksRight(qso, over)) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
       const item = askedItem(over);
       if (item) return say(qso, itemOf(qso, item, rand) ?? qso.last);
-      // Its items sent back right with a ?: yes, that is it.
-      if (checksRight(qso, over)) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
       if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last);
       const reply = lastWord(qso, rand);
       return { qso: { ...qso, last: reply ?? qso.last }, reply, ended: true };
