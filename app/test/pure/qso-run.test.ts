@@ -225,6 +225,36 @@ describe("the station asks again", () => {
     expect(work(called("cwt"), ["AGN"]).replies).toEqual(["K4ABC"]);
     expect(work(called("cwt"), ["K4ABD TOM 1234"]).replies).toEqual(["K4ABC K4ABC"]);
     expect(work(called("cwt"), ["K4?"]).replies).toEqual(["K4ABC K4ABC"]);
+    expect(work(called("cwt"), ["K 4 ?"]).replies, "keyed apart").toEqual(["K4ABC K4ABC"]);
+  });
+
+  it("says yes to its whole call with a ?, keyed apart with Lenient copy", () => {
+    const LENIENT: RunContext = { ...FIRST, ear: { lenient: true, saved: "" } };
+    expect(work(called("pota"), ["K4ABC?"]).replies).toEqual(["RR"]);
+    expect(work(called("pota"), ["K4ABC ?"]).replies).toEqual(["RR"]);
+    expect(work(called("pota"), ["K4A BC?"], LENIENT).replies).toEqual(["RR"]);
+    expect(work(called("pota"), ["K4A BC?"]).replies, "Strict copy").toEqual(["K4ABC K4ABC"]);
+    // Then your exchange goes on as ever.
+    expect(work(called("pota"), ["K4ABC?", "UR 5NN WA WA BK"]).replies[1]).toBe("BK TU UR 5NN 5NN GA GA BK");
+  });
+
+  it("says yes to items of its exchange sent back right with a ?", () => {
+    const sent = ["K4ABC UR 5NN WA WA BK"];
+    expect(work(called("pota"), [...sent, "5NN ?"]).replies[1]).toBe("RR");
+    expect(work(called("pota"), [...sent, "599?"]).replies[1], "9 for N").toBe("RR");
+    expect(work(called("pota"), [...sent, "R 5NN GA ?"]).replies[1]).toBe("RR");
+    expect(work(called("cwt"), ["K4ABC TOM 1234", "JIM 2345?"]).replies[1]).toBe("RR");
+    // Wrong: it sends the item again.
+    expect(work(called("pota"), [...sent, "RST ?", "589 59N ?"]).replies.slice(1)).toEqual(["BK 5NN 5NN BK", "BK 5NN 5NN BK"]);
+    expect(work(called("pota"), [...sent, "GA KS?"]).replies[1]).not.toBe("RR");
+  });
+
+  it("sends one item asked for with AGN or PSE, or keyed apart", () => {
+    const sent = ["K4ABC UR 5NN WA WA BK"];
+    for (const ask of ["Q T H ?", "QT H?", "<BK> M EEEE Q T H ?", "QTH AGN", "AGN QTH", "QTH AGN?", "PSE QTH", "QTH PSE?", "STATE?"]) {
+      expect(work(called("pota"), [...sent, ask]).replies[1], ask).toBe("BK GA GA BK");
+    }
+    expect(work(called("pota"), [...sent, "QTH GA?"]).replies[1], "a check, not a request").toBe("RR");
   });
 
   it("takes your exchange without its call", () => {
@@ -235,6 +265,12 @@ describe("the station asks again", () => {
     const { replies, ended } = work(called("cwt"), ["K4ABC TOM 1234", "NR?", "NAME ?", "TU KD9XYZ"]);
     expect(replies).toEqual(["TU JIM 2345", "2345 2345", "JIM JIM", null]);
     expect(ended).toBe(true);
+  });
+
+  it("puts BK around a POTA item now and then", () => {
+    const ask = (r: number) => work(called("pota"), ["K4ABC UR 5NN WA WA BK", "QTH?"], { ...FIRST, rand: () => r }).replies[1];
+    expect(ask(0)).toBe("BK GA GA BK");
+    expect(ask(0.9)).toBe("GA GA");
   });
 
   it("sends its exchange again for AGN after it", () => {

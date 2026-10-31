@@ -313,7 +313,7 @@ const ASK: Readonly<Record<Item, string>> = { name: "NAME?", number: "NR?", regi
 
 /** The words after a ? that ask for one item. */
 const ASKED: Readonly<Record<string, Item>> = {
-  NR: "number", NAME: "name", OP: "name", QTH: "region", ST: "region", SPC: "region", RST: "report", RPT: "report",
+  NR: "number", NAME: "name", OP: "name", QTH: "region", ST: "region", STATE: "region", SPC: "region", RST: "report", RPT: "report",
 };
 
 /** A report as a contest sends it: 599 as 5NN. */
@@ -365,11 +365,11 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
   }
 }
 
-/** One item of the station's exchange, twice, for NR? and the like. Null
- *  when its exchange has no such item. */
-function itemOf(qso: RunQso, item: Item): string | null {
+/** One item of the station's exchange, or null when its exchange has no
+ *  such item. */
+function valueOf(qso: RunQso, item: Item): string | null {
   const { them, format } = qso;
-  const value =
+  return (
     item === "name"
       ? format === "pota"
         ? null
@@ -386,8 +386,18 @@ function itemOf(qso: RunQso, item: Item): string | null {
             : null
           : format === "pota"
             ? cut(them.rst)
-            : null;
-  return value === null ? null : `${value} ${value}`;
+            : null
+  );
+}
+
+/** One item of the station's exchange, twice, for NR? and the like. Null
+ *  when its exchange has no such item. A POTA station now and then puts BK
+ *  around it. */
+function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
+  const value = valueOf(qso, item);
+  if (value === null) return null;
+  const { format } = qso;
+  return format === "pota" && rand() < 0.25 ? `BK ${value} ${value} BK` : `${value} ${value}`;
 }
 
 /** What the station sends after your TU, or null for nothing. */
@@ -397,16 +407,35 @@ function lastWord(qso: RunQso, rand: Rand): string | null {
   return null;
 }
 
-/** The item asked for with a ?, as NR? or NR ?, or null. */
+/** The item asked for, or null: with a ?, as NR? or NR ?, or with AGN or
+ *  PSE, as QTH AGN or PSE QTH. Keyed apart, as Q T H ?, up to three words
+ *  read as one. */
 function askedItem(over: Over): Item | null {
   const { words } = over;
+  if (!words.some((w) => w.endsWith("?") || w === "AGN" || w === "PSE")) return null;
   for (let i = 0; i < words.length; i++) {
-    const w = words[i]!;
-    const bare = w.replace(/\?+$/, "");
-    const asked = w.endsWith("?") || words[i + 1] === "?";
-    if (asked && bare in ASKED) return ASKED[bare]!;
+    for (let back = 0; back <= 2 && back <= i; back++) {
+      const part = words.slice(i - back, i + 1).join("").replace(/\?+$/, "");
+      if (part in ASKED) return ASKED[part]!;
+    }
   }
   return null;
+}
+
+/** Words around a check that are not part of it. Not AROUND: 5NN and GA
+ *  are what a check holds. */
+const CHECK_AROUND = new Set([...TURN_WORDS, "R", "RR", "UR", "RST", "QTH", "NR", "NAME", "ST", "STATE", "IS"]);
+
+/** Whether `over` checks items of the station's exchange with a ?, as
+ *  58N ? or KS?, and has each of them right. A report reads the same with
+ *  9 or N: 589 is 58N. */
+function checksRight(qso: RunQso, over: Over): boolean {
+  if (!over.words.some((w) => w.endsWith("?"))) return false;
+  const values = new Set(
+    (Object.keys(ASK) as Item[]).flatMap((item) => valueOf(qso, item) ?? []).map(cut),
+  );
+  const checked = over.words.map((w) => w.replace(/\?+$/, "")).filter((w) => w && !CHECK_AROUND.has(w));
+  return checked.length > 0 && checked.every((w) => values.has(cut(w)));
 }
 
 /** Whether `over` asks for the last over again: AGN, ?, QRZ? or CALL?. */
@@ -436,11 +465,22 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       // Calls in the over, other than yours.
       const calls = over.words.filter((w) => isCall(w) && w !== qso.you && w !== ear.saved);
       const exact = over.hasExactly(c);
-      // Its call with a ?, or part of it: it sends its call again.
+      // Its whole call with a ?: yes, that is it. Lenient copy hears it
+      // keyed apart too, as K7B YX?.
+      const confirms =
+        over.hasExactly(`${c}?`) || over.words.some((w, i) => w === c && over.words[i + 1] === "?");
+      if (confirms) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
+      // Part of its call with a ?: it sends its call again. Keyed apart,
+      // as W 4 ?, the words before the ? read as one.
       const checks = over.words.some((w, i) => {
-        const bare = w.replace(/\?+$/, "");
         const asked = w.endsWith("?") || over.words[i + 1] === "?";
-        return asked && bare.length >= 2 && c.includes(bare) && !(bare in ASKED);
+        if (!asked) return false;
+        const bare = w.replace(/\?+$/, "");
+        if (bare in ASKED) return false;
+        return [0, 1, 2, 3].some((back) => {
+          const part = over.words.slice(Math.max(0, i - back), i).join("") + bare;
+          return part.length >= 2 && c.includes(part);
+        });
       });
       if (checks) return say(qso, `${c} ${c}`);
       // After it asked for one item, your over is read as that item.
@@ -476,8 +516,11 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
     }
 
     case "exchanged": {
+      // Its items sent back right with a ?: yes, that is it. First, as QTH
+      // GA? checks its QTH and does not ask for it.
+      if (checksRight(qso, over)) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
       const item = askedItem(over);
-      if (item) return say(qso, itemOf(qso, item) ?? qso.last);
+      if (item) return say(qso, itemOf(qso, item, rand) ?? qso.last);
       if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last);
       const reply = lastWord(qso, rand);
       return { qso: { ...qso, last: reply ?? qso.last }, reply, ended: true };
