@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.21.0 — 2026-10-31
+
 ### Added
 
 - **New exchange** on the Copy page sends your own text in CW to copy, with notes such as (your call) filled in from your details. Each line shows which station sends it, read from DE and K, and you can change it.
@@ -16,8 +18,8 @@ nothing to the site. The next release carries them.
 ### Changed
 
 - The Copy page's button that generates a QSO is now **Generate QSO**.
-- Enter in a box plays or pauses, and with **Wait** no longer locks the line. Cmd+Enter (Ctrl+Enter) locks it and goes on, as Enter does once every character of the line is copied.
-- Playback keys on the Copy and QSO pages use Option (Alt off a Mac): Option+R plays the line again, Option+L the selected letter, Option+W its word, and Option+Enter plays on from the word you are copying. They replace Cmd+., ↓ and ↑, and in a box or slot Option takes the page's other keys.
+- Enter in a box plays or pauses, and with **Wait** no longer locks the line. Cmd+Enter (Ctrl+Enter) locks it, and with **Wait** goes on. Enter on a line with every character copied locks it and goes on.
+- Playback keys use Option (Alt off a Mac), in place of Cmd+., ↓ and ↑: Option+R plays the line again, Option+L the selected letter, Option+W its word, and Option+Enter plays on from your word. In a box, Option takes the page's other keys.
 
 ## v1.20.2 — 2026-10-31
 
