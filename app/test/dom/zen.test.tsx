@@ -202,6 +202,48 @@ describe("the zen sheet", () => {
       return handle;
     }
 
+    /* A key pressed the moment the page changes, before React's effects for
+       that render have run, as a quick hand or a busy machine can. The keys
+       answered from the render before, which still saw no device list or no
+       recorder, and dropped the key: on a loaded CI runner the tests below
+       hung on it now and then. */
+    it("answers R the moment the page shows it is ready, and Escape the moment the take shows", async () => {
+      const handle = {
+        elapsed: () => 0,
+        peek: () => new Float32Array(0),
+        rate: 48000,
+        since: () => new Float32Array(0),
+        restarts: () => 0,
+        stop: vi.fn().mockResolvedValue({ samples: new Float32Array(1), rate: 8000 }),
+        cancel: vi.fn().mockResolvedValue(undefined),
+        restart: vi.fn(),
+      };
+      vi.spyOn(mic, "startRecording").mockResolvedValue(handle);
+      /** Press `key` as soon as `testid` is in the page, from the DOM's own
+       *  notice of the change. */
+      const pressed: string[] = [];
+      const pressOn = (testid: string, key: string) => {
+        const watch = new MutationObserver(() => {
+          if (!document.querySelector(`[data-testid="${testid}"]`)) return;
+          watch.disconnect();
+          // In act, as a key the test presses is, but before the render's
+          // effects: act runs this first and flushes after.
+          act(() => {
+            fireEvent.keyDown(document.body, { key });
+          });
+          pressed.push(key);
+        });
+        watch.observe(document.body, { childList: true, subtree: true });
+      };
+      pressOn("armed", "r");
+      pressOn("zen", "Escape");
+      render(<Harness />);
+      // Waited on as the other tests wait, so the page's own updates in
+      // between are not act's to answer for.
+      await waitFor(() => expect(pressed).toEqual(["r", "Escape"]), { timeout: 1000 });
+      await waitFor(() => expect(handle.cancel).toHaveBeenCalled(), { timeout: 1000 });
+    });
+
     /* The keys are bound on the document so they work with a hand on a paddle.
        Fired at whatever the sheet focused, which is the arrangement that would
        break if this ever grew a handler that stopped them. */

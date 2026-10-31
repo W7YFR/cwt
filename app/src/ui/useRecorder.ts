@@ -369,58 +369,50 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
    * an R into the intended-message box — which is a word away in "CQ DE
    * W7YFR". Modifiers are left alone too, or this would swallow the browser's
    * own reload. */
-  useEffect(() => {
+  /* The handler is this render's, read through a ref by one listener bound
+     for the hook's life. An effect that bound each render's handler afresh
+     ran a beat after the render: a key pressed in that gap reached the
+     handler from before, which still saw no recorder, and was lost. */
+  const onKeyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
+  onKeyRef.current = (ev: KeyboardEvent) => {
+    // With no R key, the keys wait for a recording.
     if (!recorder && !startKey) return;
-    const onKey = (ev: KeyboardEvent) => {
-      // Mid-composition Enter is committing an IME candidate, not a command.
-      if (ev.isComposing) return;
-      if (!recorder) {
-        // Busy is a recording being analyzed — the same state that disables
-        // the button this key stands in for.
-        const enter = enterStarts && ev.key === "Enter";
-        if (!(bareR(ev) || enter) || busy) return;
-        /* And the same three states that button has, for the same reason:
-           the key and the button are two ways in to one thing, and a rule
-           only one of them obeys is not a rule. Blocked, there is nothing
-           for either to do; unasked, both ask rather than recording from a
-           device that has not been chosen yet. */
-        if (blocked || !probed) return;
-        ev.preventDefault();
-        if (needAccess) void grantAccess();
-        else if (onStartKey) onStartKey();
-        else void start();
-        return;
-      }
-      if (ev.key === "Enter") {
-        ev.preventDefault();
-        if (onEnterKey) onEnterKey();
-        else void finish();
-      } else if (ev.key === "Escape") {
-        ev.preventDefault();
-        void discard();
-      } else if (bareR(ev)) {
-        ev.preventDefault();
-        restart();
-      }
-    };
+    // Mid-composition Enter is committing an IME candidate, not a command.
+    if (ev.isComposing) return;
+    if (!recorder) {
+      // Busy is a recording being analyzed — the same state that disables
+      // the button this key stands in for.
+      const enter = enterStarts && ev.key === "Enter";
+      if (!(bareR(ev) || enter) || busy) return;
+      /* And the same three states that button has, for the same reason:
+         the key and the button are two ways in to one thing, and a rule
+         only one of them obeys is not a rule. Blocked, there is nothing
+         for either to do; unasked, both ask rather than recording from a
+         device that has not been chosen yet. */
+      if (blocked || !probed) return;
+      ev.preventDefault();
+      if (needAccess) void grantAccess();
+      else if (onStartKey) onStartKey();
+      else void start();
+      return;
+    }
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      if (onEnterKey) onEnterKey();
+      else void finish();
+    } else if (ev.key === "Escape") {
+      ev.preventDefault();
+      void discard();
+    } else if (bareR(ev)) {
+      ev.preventDefault();
+      restart();
+    }
+  };
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => onKeyRef.current(ev);
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [
-    blocked,
-    probed,
-    busy,
-    discard,
-    finish,
-    grantAccess,
-    onEnterKey,
-    onStartKey,
-    enterStarts,
-    needAccess,
-    recorder,
-    restart,
-    start,
-    startKey,
-  ]);
+  }, []);
 
   return {
     devices,
