@@ -8,7 +8,8 @@
  * The station asks again the way a contest operator would:
  *
  *   - AGN, ? or QRZ? gets its last over again;
- *   - its call sent wrong, or part of it with a ?, gets its call;
+ *   - its call sent wrong, or part of it with a ?, right or not, gets its
+ *     call;
  *   - an exchange with an item missing gets NAME?, NR? or QTH?, and one it
  *     cannot read at all gets AGN?;
  *   - after its exchange, NR?, NAME?, QTH? or RST? gets that item twice;
@@ -503,11 +504,14 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       const before = { ...qso, got };
       if (missing.length > 0) {
         const nothing = !fresh.name && !fresh.number && !fresh.region && !fresh.report;
-        // Nothing new: AGN gets its last over again, and an over it cannot
-        // read gets AGN?, or the item it still lacks.
+        // Nothing new: AGN gets its last over again, a check of its call
+        // sent wrong, as AEH?, gets its call, and an over it cannot read
+        // gets AGN?, or the item it still lacks. Its AGN? is not its last
+        // over: AGN after it gets its call, or the item it asked for.
         if (nothing && asksAgain(over)) return say(before, qso.last);
+        if (nothing && over.words.some((w) => w.endsWith("?"))) return say(before, `${c} ${c}`);
         if (lacking(qso.format, had).length === FORMATS[qso.format].yours.length && nothing) {
-          return say(before, pick(rand, ["AGN?", "?"]));
+          return { qso: before, reply: pick(rand, ["AGN?", "?"]), ended: false };
         }
         return say(before, ASK[missing[0]!]);
       }
