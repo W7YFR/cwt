@@ -13,7 +13,7 @@ import { act, createElement, type MutableRefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { synthesize } from "@/audio/synth";
 import { encodeWavBuffer } from "@/audio/wav";
-import { forgetCopyFile, recallCopy, savePrefs, type Prefs } from "@/io/storage";
+import { forgetCopyFile, loadPrefs, recallCopy, savePrefs, type Prefs } from "@/io/storage";
 import { targetTiming } from "@/timing/model";
 import { CopyScreen } from "@/ui/CopyScreen";
 import "@/ui/base.css";
@@ -44,6 +44,7 @@ vi.mock("@/audio/player", async (real) => {
         async playBuffer(data, from = 0, to) {
           end("stopped");
           (globalThis as { plays?: [number, number | undefined][] }).plays?.push([from, to]);
+          (globalThis as { played?: unknown }).played = data;
           const stop = to ?? lengthOf(data);
           let t = from;
           frame = setInterval(() => {
@@ -592,6 +593,28 @@ describe("a generated QSO", () => {
     await until("the QSO to be sent again", () => length() > before);
     expect(boxes()[0]!.value).toBe("CQ CWT");
     expect(lines()).toHaveLength(1);
+  });
+
+  it("is sent again through QSB and the band, with your copy kept and its timing the same", async () => {
+    await makeUp({ copyKind: "cwt", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CWT");
+    const played = () => new Uint8Array((globalThis as { played?: ArrayBuffer }).played!);
+    const clean = played();
+    const before = length();
+    await click(button("panel-toggle"));
+    for (const [id, value] of [["qsb", "12"], ["noise", "-20"], ["qrn", "2"], ["qrm", "-20"]] as const) {
+      await fill($<HTMLInputElement>(`#${id}`)!, value);
+    }
+    expect(loadPrefs()).toMatchObject({ qsbDb: 12, noiseDb: -20, qrn: 2, qrmDb: -20 });
+    // Sent again once the sliders settle: what plays next is not the clean QSO.
+    await wait(400);
+    expect(boxes()[0]!.value).toBe("CQ CWT");
+    expect(length()).toBe(before);
+    await playTo(2);
+    const aired = played();
+    expect(aired.length).toBe(clean.length);
+    expect(aired.some((b, i) => b !== clean[i])).toBe(true);
   });
 
   it("chooses Mine when a slider moves", async () => {

@@ -15,9 +15,10 @@
  * Pure.
  */
 
+import { fadeOf, NOISE_OFF_DB, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
 import { newQso } from "@/qso/cq";
-import type { GuideId } from "@/qso/examples";
+import { GUIDE_IDS, type GuideId } from "@/qso/examples";
 import { FORMATS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
 import { callIn, following, isRun, respond, type AnyQso, type RunQso } from "@/qso/run";
@@ -27,6 +28,7 @@ import type { Length } from "@/qso/wording";
 import { targetTiming } from "@/timing";
 import type { Over, Recording } from "./decode";
 import { overOfText } from "./lines";
+import { bandAudio, bandOn, QRM_OFF_DB, qrmOn, type QrmLine } from "./band";
 
 /** What a generated QSO is: a rag chew from a plain CQ, or a run of a format. */
 export type Kind = GuideId;
@@ -144,6 +146,14 @@ export interface SendOptions {
   readonly gapSec: number;
   /** One speed for every station, in place of each one's own. */
   readonly speed?: Speed | undefined;
+  /** How deep each station fades, in dB. 0 or absent: no fading. */
+  readonly qsbDb?: number;
+  /** The band noise, in dB under each station's peak. Absent: none. */
+  readonly noiseDb?: number;
+  /** QRN, an index into `QRN_LEVELS`. Absent: none. */
+  readonly qrn?: number;
+  /** QRM, in dB under each station's peak. Absent: none. */
+  readonly qrmDb?: number;
   readonly rate?: number;
 }
 
@@ -156,6 +166,8 @@ const AMPLITUDE = 0.8;
 /** A script, sent: the sound, and the answer key the Copy page reads. */
 export function sendScript(script: Script, options: SendOptions): { samples: Float32Array; rate: number; rec: Recording } {
   const rate = options.rate ?? 8000;
+  const qsbDb = options.qsbDb ?? 0;
+  const band = { noiseDb: options.noiseDb ?? NOISE_OFF_DB, qrn: options.qrn ?? 0, qrmDb: options.qrmDb ?? QRM_OFF_DB };
   const overs: Over[] = [];
   const sounds: { at: number; samples: Float32Array }[] = [];
   let t = LEAD_SEC;
@@ -170,7 +182,10 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
       padSec: 0,
       amplitude: AMPLITUDE,
     });
-    sounds.push({ at: Math.round(t * rate), samples: sound.samples });
+    const at = Math.round(t * rate);
+    const fade = fadeOf(qsbDb, seedOf(station.call));
+    if (qsbDb > 0) for (let j = 0; j < sound.samples.length; j++) sound.samples[j]! *= fade((at + j) / rate);
+    sounds.push({ at, samples: sound.samples });
     overs.push({
       ...over,
       sender: line.station,
@@ -183,6 +198,24 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
   const durationSec = t + LEAD_SEC;
   const samples = new Float32Array(Math.ceil(durationSec * rate));
   for (const s of sounds) samples.set(s.samples.subarray(0, samples.length - s.at), s.at);
+  if (bandOn(band)) {
+    // One band under every station, on the pitch between them.
+    const tones = script.stations.map((s) => s.toneHz);
+    const noise = bandAudio({
+      ...band,
+      n: samples.length,
+      rate,
+      toneHz: (Math.min(...tones) + Math.max(...tones)) / 2,
+      peak: AMPLITUDE,
+      qsbDb,
+      seed: seedOf(script.stations[0]!.call),
+      qrmLines,
+    });
+    // Room for QRM keyed on top of a station, and a crash past that rounded
+    // off near full scale, as a receiver's AGC does.
+    const room = 1 / (1 + (qrmOn(band.qrmDb) ? Math.pow(10, band.qrmDb / 20) : 0));
+    for (let i = 0; i < samples.length; i++) samples[i] = limited((samples[i]! + noise[i]!) * room);
+  }
   return {
     samples,
     rate,
@@ -192,6 +225,26 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
       overs,
     },
   };
+}
+
+/** Where the limiter starts to round peaks off. */
+const KNEE = 0.85;
+
+/** `x`, untouched under `KNEE`, and rounded off above it so it never
+ *  reaches full scale. */
+function limited(x: number): number {
+  const a = Math.abs(x);
+  if (a <= KNEE) return x;
+  return Math.sign(x) * (KNEE + (1 - KNEE) * Math.tanh((a - KNEE) / (1 - KNEE)));
+}
+
+/** Another QSO for QRM to send: any kind, its lines in order. */
+export function qrmLines(rand: () => number): readonly QrmLine[] {
+  const script = makeScript({ kind: GUIDE_IDS[Math.floor(rand() * GUIDE_IDS.length)]!, rand, qsos: 2 });
+  return script.lines.map((l) => {
+    const station = script.stations[l.station]!;
+    return { text: l.text, speed: station.speed, call: station.call, station: l.station };
+  });
 }
 
 /** What a generated QSO is called on the page: A generated POTA run of 3 QSOs. */

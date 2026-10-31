@@ -7,6 +7,17 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.20.0 — 2026-10-31
+
+### Added
+
+- **QSB** on the Copy and QSO pages fades each generated station in and out, up to 30 dB.
+- **Noise** on the Copy and QSO pages plays band noise under each generated station.
+- **QRN** on the Copy and QSO pages adds static crashes, from Light to Severe.
+- **QRM** on the Copy and QSO pages adds another station near the frequency, sending a QSO of its own.
+- **Play the band** on the QSO page plays noise, QRN and QRM all through a QSO, and cuts them the moment you key. Without it, they fade in and out with each of the station's lines.
+- **Break-in delay** on the QSO page sets how long the band stays cut after your last mark, as on a radio. Full is full break-in (QSK).
+
 ## v1.19.2 — 2026-10-31
 
 ### Fixed

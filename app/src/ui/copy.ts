@@ -142,6 +142,24 @@ export const GAIN_HELP =
   "Applied at playback only — the recording and any download stay at the level " +
   "you recorded.";
 
+export const QSB_HELP =
+  "How deep the station's signal fades, as it does over the air. With noise on, a deep fade " +
+  "drops the signal into the noise. Off sends a steady signal.";
+
+export const NOISE_HELP =
+  "How loud the band noise is, under the station's signal. Off sends a clean signal.";
+
+export const BREAK_IN_HELP =
+  "How long the band stays cut after your last mark, as a radio's break-in delay. Full is " +
+  "full break-in (QSK): you hear the band between your marks.";
+
+export const QRN_HELP =
+  "Static crashes, as from lightning far away, on top of the station's signal.";
+
+export const QRM_HELP =
+  "Another station near the frequency, sending a QSO of its own, and how loud it is under " +
+  "the station you copy.";
+
 export const OPEN_FILE_HELP = "Open a recording from disk";
 
 /** Why a file cannot join a session that already has attempts in it. */
@@ -230,6 +248,8 @@ export const ONE_INPUT = "This is the only input the browser offers.";
 export const CAL_FILE = "Not for a recording opened from disk. A file is read exactly as recorded.";
 export const CAL_NONE = "No calibration is saved for this input. Calibrate to make one.";
 export const CAL_REREADING = "Re-reading the session.";
+export const NEEDS_BAND = "Needs Noise, QRN or QRM on.";
+export const NEEDS_BAND_BETWEEN = "Needs Play the band.";
 
 export const LOOP_HELP =
   "Replay what plays, the range or the whole track, each time it reaches " +

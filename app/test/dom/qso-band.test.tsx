@@ -1,0 +1,96 @@
+/* The band on the QSO page: QSB, noise, QRN and QRM, where the station's
+ * lines play it, and the recorder's gate that cuts it as you key. See
+ * qso-rig.tsx for how the page is driven.
+ */
+
+import { describe, expect, it, vi } from "vitest";
+import { NOISE_OFF_DB } from "@/audio/qsb";
+import { QRM_OFF_DB } from "@/copy/band";
+import { loadPrefs } from "@/io/storage";
+import { heard } from "../qso-fakes";
+import { $, click, mount, open, send, slide, until, useQsoRig, yourTurn } from "../qso-rig";
+
+vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
+vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
+
+useQsoRig();
+
+const input = (id: string) => $<HTMLInputElement>(`#${id}`)!;
+
+describe("the band's settings", () => {
+  it("are in the Audio settings, off to start, and kept", async () => {
+    mount({});
+    await click($('[data-testid="panel-toggle"]'));
+    for (const id of ["qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) {
+      expect(input(id).closest('[data-panel="audio"]'), id).not.toBeNull();
+    }
+    expect(input("qsb").value).toBe("0");
+    expect(input("noise").value).toBe(String(NOISE_OFF_DB));
+    expect(input("qrn").value).toBe("0");
+    expect(input("qrm").value).toBe(String(QRM_OFF_DB));
+    expect(input("break-in").value).toBe("800");
+    expect(input("qso-band-noise").checked).toBe(true);
+
+    // With nothing in the band, there is no band to play or to cut.
+    expect(input("qso-band-noise").disabled).toBe(true);
+    expect(input("break-in").disabled).toBe(true);
+
+    await slide("noise", -26);
+    expect(loadPrefs().noiseDb).toBe(-26);
+    expect(input("qso-band-noise").disabled).toBe(false);
+    expect(input("break-in").disabled).toBe(false);
+
+    // The delay is the band's between lines: off with it.
+    await click(input("qso-band-noise"));
+    expect(loadPrefs().qsoBandNoise).toBe(false);
+    expect(input("break-in").disabled).toBe(true);
+    await click(input("qso-band-noise"));
+
+    await slide("break-in", 300);
+    expect(loadPrefs().qsoBreakInMs).toBe(300);
+    await slide("qsb", 12);
+    await slide("qrn", 2);
+    await slide("qrm", -20);
+    expect(loadPrefs()).toMatchObject({ qsbDb: 12, qrn: 2, qrmDb: -20 });
+  });
+});
+
+describe("the band in a QSO", () => {
+  it("is not there with everything off", async () => {
+    await open({});
+    await send("CQ CQ DE W7YFR W7YFR K");
+    expect(heard.gate.band).toBeNull();
+    const air = heard.airs.at(-1);
+    expect(air?.fade).toBeUndefined();
+    expect(air?.band).toBeUndefined();
+  });
+
+  it("plays from the recorder all through, cut as you key for the break-in delay", async () => {
+    await open({ noiseDb: -26, qsoBreakInMs: 300, gainDb: 6 });
+    await until("the band", () => heard.gate.band !== null);
+    expect(heard.gate.band!.samples.some((x) => x !== 0)).toBe(true);
+    expect(heard.gate.delaySec).toBeCloseTo(0.3);
+    expect(heard.gate.level).toBeCloseTo(Math.pow(10, 6 / 20));
+    // Armed while the page listens for you.
+    expect(yourTurn()).toBe(true);
+    expect(heard.gate.armed).toBe(true);
+
+    await send("CQ CQ DE W7YFR W7YFR K");
+    // The station's line does not carry the band: the recorder plays it.
+    expect(heard.airs.at(-1)?.band).toBeUndefined();
+    expect(heard.gate.band).not.toBeNull();
+  });
+
+  it("comes with each of the station's lines, and its fading, when not played between them", async () => {
+    await open({ noiseDb: -26, qsbDb: 12, qsoBandNoise: false });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    expect(heard.gate.band).toBeNull();
+    const air = heard.airs.at(-1)!;
+    expect(air.band?.samples.some((x) => x !== 0)).toBe(true);
+    const fade = air.fade!.fade;
+    for (let t = 0; t < 60; t += 0.5) {
+      expect(fade(t)).toBeLessThanOrEqual(1);
+      expect(fade(t)).toBeGreaterThanOrEqual(Math.pow(10, -12 / 20) - 1e-9);
+    }
+  });
+});
