@@ -93,15 +93,16 @@ export function slotRight(char: string, typed: string): boolean {
 }
 
 /** The dot under each letter of a prosign's slot, as typed so far: right,
- *  wrong, or none for a letter not yet typed. A whole prosign spelled
- *  another way that keys the same, such as NG for <KN>, is near in each
- *  letter that differs: it sounds right, but is not the letters sent. */
-export function letterDots(char: string, typed: string): ("cright" | "cnear" | "cwrong" | null)[] {
+ *  wrong, or none for a letter not yet typed, or wrong once `locked`. A
+ *  whole prosign spelled another way that keys the same, such as NG for
+ *  <KN>, is near in each letter that differs: it sounds right, but is not
+ *  the letters sent. */
+export function letterDots(char: string, typed: string, locked = false): ("cright" | "cnear" | "cwrong" | null)[] {
   const want = slotText(char);
   const t = typed.trim().toUpperCase();
   const keysSame = t.length >= want.length && slotRight(char, t);
   return [...want].map((l, k) => {
-    if (k >= t.length) return null;
+    if (k >= t.length) return locked ? "cwrong" : null;
     if (t[k] === l) return "cright";
     return keysSame ? "cnear" : "cwrong";
   });

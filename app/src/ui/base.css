@@ -2700,7 +2700,7 @@ header .modeswitch button { white-space: nowrap; }
 /* An open slot, in a cell that can carry the dot of its grade. */
 .qsolog .slotcell { display: inline-flex; }
 /* A prosign's slot: a dot under each of its letters, in place of one. */
-.qsolog .slotcell { position: relative; }
+.qsolog .slotcell, .qsolog .cdots { position: relative; }
 .qsolog .slotdots {
   position: absolute;
   left: 50%;

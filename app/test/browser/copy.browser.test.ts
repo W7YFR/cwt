@@ -1096,6 +1096,34 @@ describe("downloads", () => {
   });
 });
 
+describe("a prosign graded", () => {
+  it("shows a dot for each letter once locked, yellow for a spelling that keys the same", async () => {
+    mount({ copyInput: "slots", copyLockedShows: "grade", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-text-open"));
+    const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    const box = $<HTMLTextAreaElement>('[data-testid="copy-text-box"]')!;
+    await act(async () => {
+      set.call(box, "TU <KN> <KN>");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("copy-text-start"));
+    await until("the text to be ready", () => state() === "ready");
+    await playTo(1);
+    const slots = [...lines()[0]!.querySelectorAll<HTMLInputElement>('[data-testid="copy-slot"]')];
+    await fill(slots[2]!, "K");
+    await fill(slots[3]!, "NG");
+    await enter(slots[3]!, true);
+    const dots = [...lines()[0]!.querySelectorAll('[data-testid="copy-slot-dots"]')].map((d) =>
+      [...d.children].map((i) => i.className),
+    );
+    expect(dots).toEqual([
+      ["cright", "cwrong"],
+      ["cnear", "cnear"],
+    ]);
+  });
+});
+
 describe("a recording's speed", () => {
   it("shows each line's speed, measured from it", async () => {
     await open();

@@ -154,6 +154,8 @@ describe("your copy", () => {
     expect(letterDots("<KN>", "ng")).toEqual(["cnear", "cnear"]);
     expect(letterDots("<UN>", "ig")).toEqual(["cnear", "cnear"]);
     expect(letterDots("<AR>", "ar")).toEqual(["cright", "cright"]);
+    // Locked, a letter left out is wrong.
+    expect(letterDots("<KN>", "k", true)).toEqual(["cright", "cwrong"]);
   });
 
   it("grades a character the table lacks by its pattern", () => {

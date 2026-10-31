@@ -151,13 +151,7 @@ export function Slots({
             const dots = grade && typed && want > 1 ? letterDots(c.char, typed) : null;
             return (
               <span key={ci} className={`slotcell${mark}`}>
-                {dots && (
-                  <span className="slotdots" aria-hidden="true" data-testid="copy-slot-dots">
-                    {dots.map((d, k) => (
-                      <i key={k} className={d ?? undefined} />
-                    ))}
-                  </span>
-                )}
+                {dots && <LetterDots dots={dots} />}
                 <input
                   ref={(el) => {
                     refs.current[i] = el;
@@ -194,6 +188,23 @@ export function Slots({
 /** An earlier attempt at the line, in slots the size of the ones you type
  *  in, so each sits over its slot: what you typed, a dot under it, blue if
  *  right and red if not. */
+/** A dot under each letter of a prosign's slot. */
+function LetterDots({ dots }: { dots: readonly (string | null)[] }): React.ReactElement {
+  return (
+    <span className="slotdots" aria-hidden="true" data-testid="copy-slot-dots">
+      {dots.map((d, k) => (
+        <i key={k} className={d ?? undefined} />
+      ))}
+    </span>
+  );
+}
+
+/** A locked prosign's slot, typed in: its dots, a letter each. Null for any
+ *  other slot, which has one dot. */
+function lockedDots(char: string, typed: string): ReturnType<typeof letterDots> | null {
+  return slotText(char).length > 1 && typed.trim() ? letterDots(char, typed, true) : null;
+}
+
 export function SlotsPast({ over, copy }: { over: Over; copy: LineCopy }): React.ReactElement {
   let i = 0;
   return (
@@ -203,13 +214,12 @@ export function SlotsPast({ over, copy }: { over: Over; copy: LineCopy }): React
           {w.chars.map((c, ci) => {
             const typed = copy.slots[i++] ?? "";
             const want = slotText(c.char).length;
+            const dots = lockedDots(c.char, typed);
+            const mark = dots ? "cdots" : slotRight(c.char, typed) ? "cright" : "cwrong";
             return (
-              <span
-                key={ci}
-                className={`slot${want > 1 ? " wide" : ""} ${slotRight(c.char, typed) ? "cright" : "cwrong"}`}
-                {...timeAttrs(c)}
-              >
+              <span key={ci} className={`slot${want > 1 ? " wide" : ""} ${mark}`} {...timeAttrs(c)}>
                 {typed || " "}
+                {dots && <LetterDots dots={dots} />}
               </span>
             );
           })}
@@ -232,9 +242,15 @@ export function SlotsAsText({ over, copy }: { over: Over; copy: LineCopy }): Rea
           {wi > 0 && " "}
           {w.chars.map((c, ci) => {
             const typed = copy.slots[i++]?.trim().toUpperCase() ?? "";
+            const dots = lockedDots(c.char, typed);
             return (
-              <span key={ci} className={slotRight(c.char, typed) ? "cright" : "cwrong"} {...timeAttrs(c)}>
+              <span
+                key={ci}
+                className={dots ? "cdots" : slotRight(c.char, typed) ? "cright" : "cwrong"}
+                {...timeAttrs(c)}
+              >
                 {typed || " ".repeat(slotText(c.char).length)}
+                {dots && <LetterDots dots={dots} />}
               </span>
             );
           })}
@@ -274,11 +290,13 @@ export function SlotsLocked({
             {w.chars.map((c, ci) => {
               const typed = copy.slots[i++] ?? "";
               const ok = slotRight(c.char, typed);
+              const dots = marks ? lockedDots(c.char, typed) : null;
               return (
                 <span key={ci} className="ccol">
                   <span className="yourcopy">
-                    <span className={marks ? (ok ? "cright" : "cwrong") : undefined} {...timeAttrs(c)}>
+                    <span className={!marks ? undefined : dots ? "cdots" : ok ? "cright" : "cwrong"} {...timeAttrs(c)}>
                       {typed || " "}
+                      {dots && <LetterDots dots={dots} />}
                     </span>
                   </span>
                   {sent && (
