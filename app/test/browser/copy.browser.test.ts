@@ -644,8 +644,8 @@ describe("a generated QSO", () => {
 
 describe("Wait between lines", () => {
   /** Mount the page and generate a QSO that stops after each line. */
-  async function locked(): Promise<void> {
-    mount({ copyKind: "cwt", copyRunQsos: 1, copyGap: "wait", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+  async function locked(prefs: Prefs = {}): Promise<void> {
+    mount({ copyKind: "cwt", copyRunQsos: 1, copyGap: "wait", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, ...prefs });
     await until("the page to settle", () => state() === "none");
     await click(button("copy-new-first"));
     await until("the QSO to be ready", () => state() === "ready");
@@ -662,6 +662,28 @@ describe("Wait between lines", () => {
     await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
     await wait(200);
     expect(state(), "it waits").toBe("paused");
+  });
+
+  it("locks the line and goes on, on Enter at the end of a box with every character copied", async () => {
+    await locked();
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    // Right or not: a full line locks.
+    await fill(boxes()[0]!, "E".repeat(80));
+    await enter(boxes()[0]!);
+    expect(lines()[0]!.querySelector('[data-testid="copy-type"]'), "line 1 locked").toBeNull();
+    await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
+  });
+
+  it("locks the line and goes on, on Enter with every slot filled", async () => {
+    await locked({ copyInput: "slots" });
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    const slots = [...lines()[0]!.querySelectorAll<HTMLInputElement>('[data-testid="copy-slot"]')];
+    for (const slot of slots) await fill(slot, "E");
+    await enter(slots.at(-1)!);
+    expect(lines()[0]!.querySelectorAll('[data-testid="copy-slot"]'), "line 1 locked").toHaveLength(0);
+    await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
   });
 
   it("goes on without locking the line on Enter", async () => {
@@ -702,6 +724,20 @@ describe("the keys the pages share", () => {
     const [, to] = plays[plays.length - 1]!;
     expect(to, "one line, not the rest of the recording").toBeDefined();
     expect(boxes()[0]!.value, "nothing typed").toBe("");
+  });
+
+  it("stays in the slot on Option or Alt with an arrow", async () => {
+    await open({ copyInput: "slots" });
+    await playTo(1);
+    const slot = lines()[0]!.querySelectorAll<HTMLInputElement>('[data-testid="copy-slot"]')[2]!;
+    await act(async () => {
+      slot.focus();
+      for (const shiftKey of [false, true]) {
+        slot.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", altKey: true, shiftKey, bubbles: true, cancelable: true }));
+      }
+      await wait(100);
+    });
+    expect(document.activeElement, "the same slot").toBe(slot);
   });
 
   it("plays and pauses on Option or Alt+Space in a box, with nothing typed", async () => {

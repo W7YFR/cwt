@@ -15,8 +15,8 @@ nothing to the site. The next release carries them.
 ### Changed
 
 - The Copy page's button that generates a QSO is now **Generate QSO**.
-- With **Wait**, Enter in a box plays or pauses, and Cmd+Enter (Ctrl+Enter) locks the line and goes on.
-- Playback keys on the Copy and QSO pages use Option (Alt off a Mac): Option+R plays the line again, Option+L the selected letter and Option+W its word. They replace Cmd+., ↓ and ↑, and in a box Option takes the page's other keys.
+- Enter in a box plays or pauses, and with **Wait** no longer locks the line. Cmd+Enter (Ctrl+Enter) locks it and goes on, as Enter does once every character of the line is copied.
+- Playback keys on the Copy and QSO pages use Option (Alt off a Mac): Option+R plays the line again, Option+L the selected letter and Option+W its word. They replace Cmd+., ↓ and ↑, and in a box or slot Option takes the page's other keys.
 
 ## v1.20.2 — 2026-10-31
 

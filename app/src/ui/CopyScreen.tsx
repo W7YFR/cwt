@@ -210,7 +210,8 @@ const GAPS: ReadonlyArray<Option<Gap>> = [
 const GAP_HELP =
   "The silence between one station's line and the next. A change applies to the QSO on the page. " +
   `Wait stops after each line until you type what you heard and press ${MOD}+Enter, which locks the line ` +
-  "and goes on. Play, or Enter in the box, goes on without locking it.";
+  "and goes on, as Enter does once every character is copied. Play, or Enter before then, goes on " +
+  "without locking it.";
 
 /** The silence between lines with Wait, for when you play on. */
 const WAIT_GAP_SEC = 1;
@@ -943,23 +944,42 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     return true;
   };
 
+  /** Lock line `i`. Stopped, it plays on: with `always`, from wherever it
+   *  stopped, and otherwise only where Wait stopped after the line. */
+  const lockLine = (i: number, always: boolean) => {
+    const open = !lines[i]?.locked;
+    setLine(i, { locked: true });
+    if (open && (always || waits) && mode.current === null && !ended) {
+      play(posRef.current, lines.map((l, j) => (j === i ? { ...l, locked: true } : l)));
+    }
+  };
+
+  /** Whether your copy of line `i` has every character, typed up to the
+   *  box's last one, or in every slot. Right or not. */
+  const copiedAll = (i: number, el: HTMLInputElement): boolean => {
+    const l = lines[i];
+    const over = rec?.overs[i];
+    if (!l || !over || l.locked) return false;
+    if (input === "slots") return l.slots.every(Boolean);
+    const typed = plain(l.typed).replace(/ /g, "").length;
+    return el.selectionStart === el.value.length && typed >= keyedOf(over).length;
+  };
+
+  /** The line of the box `el` is in, or null. */
+  const lineOf = (el: EventTarget | null): number | null => {
+    const line = isBox(el) ? el.closest<HTMLElement>("li[data-line]")?.dataset.line : undefined;
+    return line === undefined ? null : Number(line);
+  };
+
   /* Cmd on a Mac or Ctrl elsewhere with Enter, in a box, locks its line.
      With Wait, stopped after the line, it goes on too. */
   const modKey = (ev: KeyboardEvent): boolean => {
-    if (!modOf(ev)) return false;
-    if (ev.key === "Enter") {
-      const line = isBox(ev.target) ? ev.target.closest<HTMLElement>("li[data-line]")?.dataset.line : undefined;
-      if (line === undefined) return false;
-      ev.preventDefault();
-      const i = Number(line);
-      const open = !lines[i]?.locked;
-      setLine(i, { locked: true });
-      if (open && waits && mode.current === null && !ended) {
-        play(posRef.current, lines.map((l, j) => (j === i ? { ...l, locked: true } : l)));
-      }
-      return true;
-    }
-    return false;
+    if (!modOf(ev) || ev.key !== "Enter") return false;
+    const i = lineOf(ev.target);
+    if (i === null) return false;
+    ev.preventDefault();
+    lockLine(i, false);
+    return true;
   };
 
   /* Playback with Option on a Mac or Alt elsewhere, in a box or out of one:
@@ -991,7 +1011,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     if (isBox(el)) {
       if (ev.key === "Enter") {
         ev.preventDefault();
-        toggle();
+        // With every character of the line copied, Enter locks it and goes
+        // on. Otherwise it plays and pauses.
+        const i = lineOf(el);
+        if (i !== null && copiedAll(i, el)) lockLine(i, true);
+        else toggle();
       }
       return;
     }
@@ -1139,8 +1163,8 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           if (el.value) requestAnimationFrame(() => el.setSelectionRange(0, 0));
         }}
         onKeyDown={(ev) => {
-          // With Cmd or Ctrl, a key is the page's.
-          if (ev.metaKey || ev.ctrlKey) return;
+          // With Cmd, Ctrl, Option or Alt, a key is the page's.
+          if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
           if (ev.key === "Escape") {
             ev.preventDefault();
             ev.currentTarget.blur();
@@ -1748,7 +1772,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
             {/* Only the keys the settings use: none in a box with no boxes. */}
             {linesShow === "copy" && (
               <p className="legend keys" data-testid="copy-box-keys">
-                In a box: <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd>{" "}
+                In a box: <kbd>Enter</kbd> play or pause, or lock a line copied in full and go on &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd>{" "}
                 {waits ? "lock the line and go on" : "lock the line"}
                 {input === "slots" && (
                   <>
