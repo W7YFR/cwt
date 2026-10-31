@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- A POTA station now and then sends BK around an item you ask for again, as in `BK 5NN 5NN BK`.
+
 ### Fixed
 
 - The suggested reply on the QSO page no longer gives the station's call or name before you copy them. It shows (THEIR CALL) and (THEIR NAME) until then, unless the station's lines show.

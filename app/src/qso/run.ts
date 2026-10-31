@@ -366,8 +366,9 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
 }
 
 /** One item of the station's exchange, twice, for NR? and the like. Null
- *  when its exchange has no such item. */
-function itemOf(qso: RunQso, item: Item): string | null {
+ *  when its exchange has no such item. A POTA station now and then puts BK
+ *  around it. */
+function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
   const { them, format } = qso;
   const value =
     item === "name"
@@ -387,7 +388,8 @@ function itemOf(qso: RunQso, item: Item): string | null {
           : format === "pota"
             ? cut(them.rst)
             : null;
-  return value === null ? null : `${value} ${value}`;
+  if (value === null) return null;
+  return format === "pota" && rand() < 0.25 ? `BK ${value} ${value} BK` : `${value} ${value}`;
 }
 
 /** What the station sends after your TU, or null for nothing. */
@@ -477,7 +479,7 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
 
     case "exchanged": {
       const item = askedItem(over);
-      if (item) return say(qso, itemOf(qso, item) ?? qso.last);
+      if (item) return say(qso, itemOf(qso, item, rand) ?? qso.last);
       if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last);
       const reply = lastWord(qso, rand);
       return { qso: { ...qso, last: reply ?? qso.last }, reply, ended: true };

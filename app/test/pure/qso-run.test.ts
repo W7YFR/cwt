@@ -237,6 +237,12 @@ describe("the station asks again", () => {
     expect(ended).toBe(true);
   });
 
+  it("puts BK around a POTA item now and then", () => {
+    const ask = (r: number) => work(called("pota"), ["K4ABC UR 5NN WA WA BK", "QTH?"], { ...FIRST, rand: () => r }).replies[1];
+    expect(ask(0)).toBe("BK GA GA BK");
+    expect(ask(0.9)).toBe("GA GA");
+  });
+
   it("sends its exchange again for AGN after it", () => {
     expect(work(called("mst"), ["K4ABC TOM 1", "AGN"]).replies).toEqual(["TU JIM 23", "TU JIM 23"]);
   });
