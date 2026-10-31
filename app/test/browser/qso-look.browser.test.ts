@@ -35,7 +35,8 @@ describe("a copy shown right only", () => {
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     await fill(box, "W7YFR DE");
     box.focus();
-    await press("Enter");
+    // Part of the line: Cmd or Ctrl+Enter locks it, where Enter would pause.
+    await press("Enter", true);
 
     const right = $('[data-testid="qso-right-only"] .cright')!;
     const probe = document.createElement("span");
