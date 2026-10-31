@@ -2,9 +2,9 @@
  * long each word is, so this is the easier way to copy.
  *
  * Typing fills a slot and moves to the next. Space goes to the next word, and
- * Backspace in an empty slot goes back one. Enter locks the line, where
- * the page takes `onLock`, and is the page's key where not. Escape leaves
- * it. On an attempt after the first, the slots you got right can stay
+ * Backspace in an empty slot goes back one. Where the page takes `onLock`,
+ * Cmd+Enter locks the line, and so does Enter once every slot is filled;
+ * any other Enter is the page's key. Escape leaves it. On an attempt after the first, the slots you got right can stay
  * as they were. With `at`, the slot whose character is playing lights up.
  * With `grade`, a dot under each filled slot says if it is right.
  */
@@ -98,6 +98,9 @@ export function Slots({
       ev.stopPropagation();
       ev.currentTarget.blur();
     } else if (ev.key === "Enter" && onLock) {
+      // Cmd+Enter locks, and Enter once every slot is filled. Other Enter is
+      // the page's.
+      if (!(ev.metaKey || ev.ctrlKey || copy.slots.every(Boolean))) return;
       ev.preventDefault();
       ev.stopPropagation();
       onLock?.();

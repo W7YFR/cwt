@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- On the QSO page, Enter in a copy box pauses or goes on, as it does on the rest of the page. Cmd+Enter (Ctrl+Enter) locks the copy, as Enter does once every character is copied, as on the Copy page.
+
 ## v1.22.0 — 2026-10-31
 
 ### Added

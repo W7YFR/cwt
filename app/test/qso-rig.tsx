@@ -93,11 +93,12 @@ export async function fill(el: HTMLInputElement, text: string): Promise<void> {
 }
 
 /** Press a key, as `Enter` or `Escape`, on what has focus. */
-export async function press(key: string): Promise<void> {
+export async function press(key: string, mod = false): Promise<void> {
   const at = document.activeElement ?? document.body;
+  // Ctrl stands in for Cmd too: the pages take either.
   await act(async () => {
-    at.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
-    at.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true, cancelable: true }));
+    at.dispatchEvent(new KeyboardEvent("keydown", { key, ctrlKey: mod, bubbles: true, cancelable: true }));
+    at.dispatchEvent(new KeyboardEvent("keyup", { key, ctrlKey: mod, bubbles: true, cancelable: true }));
   });
 }
 

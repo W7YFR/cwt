@@ -16,6 +16,7 @@ import {
   row,
   send,
   showTheirs,
+  state,
   theirs,
   until,
   useQsoRig,
@@ -64,10 +65,31 @@ describe("copy mode options", () => {
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
   });
 
-  it("locks it on Enter, and grades it at once when asked", async () => {
+  it("pauses on Enter with the line not all copied, and keeps the box open", async () => {
+    const box = await copyAnswer({});
+    box.focus();
+    await press("Enter");
+    expect($$('[data-testid="qso-type"]'), "still open").toHaveLength(1);
+    await until("the pause", () => state() === "paused");
+    // Enter again goes on, as on the page.
+    $<HTMLInputElement>('[data-testid="qso-type"]')!.focus();
+    await press("Enter");
+    await until("going on", () => state() !== "paused");
+  });
+
+  it("locks it on Enter once every character is copied", async () => {
+    const box = await copyAnswer({});
+    await fill(box, lastSent().toLowerCase());
+    box.focus();
+    await press("Enter");
+    expect($$('[data-testid="qso-type"]')).toHaveLength(0);
+    expect(state(), "not paused").not.toBe("paused");
+  });
+
+  it("locks it on Cmd or Ctrl+Enter, and grades it at once when asked", async () => {
     const box = await copyAnswer({ qsoLockedShows: "grade" });
     box.focus();
-      await press("Enter");
+    await press("Enter", true);
     expect($$('[data-testid="qso-type"]')).toHaveLength(0);
     // Spaces aside: lined up with the station's answer, which varies, your
     // copy can take a column's space between its characters.
@@ -86,7 +108,7 @@ describe("copy mode options", () => {
     const box = $<HTMLInputElement>('[data-testid="qso-type"]')!;
     await fill(box, typed.toLowerCase());
     box.focus();
-      await press("Enter");
+    await press("Enter", true);
     const shown = $('[data-testid="qso-right-only"]');
     expect(shown).not.toBeNull();
     // Your copy as typed: each character right. The rest of the station's
