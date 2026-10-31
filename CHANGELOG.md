@@ -15,6 +15,10 @@ nothing to the site. The next release carries them.
 
 - The suggested reply on the QSO page no longer gives the station's call or name before you copy them. It shows (THEIR CALL) and (THEIR NAME) until then, unless the station's lines show.
 
+### Development
+
+- The dev server shows the icon with green lettering, so a dev tab stands apart from the site.
+
 ## v1.19.0 — 2026-10-29
 
 ### Added

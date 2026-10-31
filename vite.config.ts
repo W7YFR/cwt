@@ -71,6 +71,38 @@ function devCsp(): Plugin {
   };
 }
 
+/* A green icon in dev, so a dev tab is not taken for the site.
+ *
+ * The dev server sends favicon.svg with its blue lettering green, the app's
+ * --ok. The page links the SVG only, under a new address, so the browser
+ * neither picks the blue .ico nor shows an icon it has cached. Serve-time
+ * only: the build ships the blue icon as it is. */
+function devIcon(): Plugin {
+  const BLUE = "#6aa9ff";
+  const GREEN = "#3fb950";
+  const file = fileURLToPath(new URL("./app/public/favicon.svg", import.meta.url));
+  return {
+    name: "dev-icon",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.split("?")[0]!.endsWith("/favicon.svg")) return next();
+        const svg = readFileSync(file, "utf8");
+        if (!svg.includes(BLUE)) console.warn("[dev-icon] no blue in favicon.svg — the dev icon is not green");
+        res.setHeader("Content-Type", "image/svg+xml");
+        res.setHeader("Cache-Control", "no-store");
+        res.end(svg.replaceAll(BLUE, GREEN));
+      });
+    },
+    transformIndexHtml(html) {
+      return html
+        .replace(/<link rel="icon" href="favicon\.ico"[^>]*>\n?/, "")
+        .replace(/<link rel="apple-touch-icon"[^>]*>\n?/, "")
+        .replace('href="favicon.svg"', 'href="favicon.svg?dev"');
+    },
+  };
+}
+
 /* https for the dev server, when there is a certificate to do it with.
  *
  * Only a phone needs this. The microphone is offered to secure contexts only,
@@ -98,7 +130,7 @@ export default defineConfig({
   // Relative, so the build works at the domain root or under any subpath —
   // one page, no router, nothing to resolve against wrongly.
   base: "./",
-  plugins: [react(), devCsp()],
+  plugins: [react(), devCsp(), devIcon()],
   server: {
     /* The port is named rather than left to drift, because it is written on
        the certificate's address in the instructions and in the Makefile's
