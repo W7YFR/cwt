@@ -24,6 +24,7 @@ import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
 import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
+import { speedOf, speedsOf } from "@/copy/measure";
 import { textScript } from "@/copy/text";
 import {
   charsOf,
@@ -163,7 +164,8 @@ const SHOW_DOWNLOAD_HELP =
   "in New exchange. With QSB, noise, QRN or QRM on a generated QSO or your own text, Download " +
   "clean saves it without them, and Download as heard with them.";
 
-const SHOW_SPEED_HELP = "Each line of a generated QSO or your own text shows the speed it was sent at.";
+const SHOW_SPEED_HELP =
+  "Each line shows the speed it was sent at. For an opened recording, it is measured from the line.";
 
 const HIDE_CALLS_HELP =
   "Each station shows as Station 1 or Station 2 until you copy its call in one of your " +
@@ -198,31 +200,34 @@ const RUN_QSOS: ReadonlyArray<Option<string>> = [
 ];
 const RUN_QSOS_HELP = "How many stations call in a generated POTA, SST, MST or CWT run.";
 
-const CHAT_LENGTHS: ReadonlyArray<Option<Length>> = [
+const QSO_LENGTHS: ReadonlyArray<Option<Length>> = [
   { value: "full", label: "Full", note: "Each report, name and QTH in one line, sent twice." },
   { value: "short", label: "Short", note: "Each report, name and QTH in one line, sent once." },
   { value: "pieces", label: "Piece by piece", note: "The station that answers sends its report, name and QTH a line each." },
 ];
-const CHAT_LENGTH_HELP = "How much each station says in a generated standard QSO, as on the QSO page.";
+const QSO_LENGTH_HELP = "How much each station says in a generated standard QSO, as on the QSO page.";
 
-type Gap = "1" | "2" | "3" | "5" | "wait";
+type Gap = "1" | "2" | "3" | "5";
 const GAPS: ReadonlyArray<Option<Gap>> = [
   { value: "1", label: "1s" },
   { value: "2", label: "2s" },
   { value: "3", label: "3s" },
   { value: "5", label: "5s" },
-  { value: "wait", label: "Wait", note: `It stops after each line, and goes on when you press ${MOD}+Enter in its box.` },
 ];
 const GAP_HELP =
-  "The silence between one station's line and the next. A change applies to the QSO on the page. " +
-  `Wait stops after each line until you type what you heard and press ${MOD}+Enter, which locks the line ` +
-  "and goes on, as Enter does once every character is copied. Play, or Enter before then, goes on " +
-  "without locking it.";
+  "The silence between one station's line and the next, in a generated QSO or your own text. " +
+  "A change applies to the QSO on the page. An opened recording keeps its own silences.";
 
-/** The silence between lines with Wait, for when you play on. */
+const WAIT_HELP =
+  "It stops after each line, in a recording too, until you type what you heard and press " +
+  `${MOD}+Enter, which locks the line and goes on, as Enter does once every character is copied. ` +
+  "Play, or Enter before then, goes on without locking it.";
+
+/** The silence between lines with Stop after each line, for when you play
+ *  on. */
 const WAIT_GAP_SEC = 1;
 
-/** With Wait, how far past the end of its line the QSO stops, so the line's
+/** Stopping after each line, how far past the end of its line the QSO stops, so the line's
  *  last character is heard whole. */
 const HOLD_PAD_SEC = 0.2;
 
@@ -331,7 +336,8 @@ type OnOffKey =
   | "copySeekSlot"
   | "copyAllowEdits"
   | "copyShowSpeed"
-  | "copyShowDownload";
+  | "copyShowDownload"
+  | "copyWait";
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean) => void] {
@@ -412,9 +418,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [earlier, setEarlier] = useChoice("copyEarlier", "last");
   const [kind, setKind] = useChoice("copyKind", "cq");
   const [runQsos, setRunQsos] = useChoice("copyRunQsos", 3);
-  const [chatLength, setChatLength] = useChoice("copyChatLength", "full");
-  const [gap, setGap] = useChoice("copyGap", "1");
-  const gapSec = gap === "wait" ? WAIT_GAP_SEC : Number(gap);
+  const [qsoLength, setQsoLength] = useChoice("copyChatLength", "full");
+  const [gapPref, setGap] = useChoice("copyGap", "1");
+  /** Stop after each line: kept on its own now, but once one of the gaps. */
+  const [wait, setWait] = useOnOff("copyWait", gapPref === "wait");
+  const gap: Gap = gapPref === "wait" ? "1" : gapPref;
+  const gapSec = wait ? WAIT_GAP_SEC : Number(gap);
   const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
   const [qsbDb, setQsbDb] = useChoice("qsbDb", 0);
   const [noiseDb, setNoiseDb] = useChoice("noiseDb", NOISE_OFF_DB);
@@ -473,7 +482,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [playing, setPlaying] = useState<"main" | { from: number; to: number } | null>(null);
   const mode = useRef<"main" | "part" | null>(null);
   const [partAt, setPartAt] = useState<number | null>(null);
-  /** With Wait, where the QSO playing now stops: the end of a line not yet
+  /** Stopping after each line, where the QSO playing now stops: the end of a line not yet
    *  locked. Null when it plays to the end. */
   const holdAt = useRef<number | null>(null);
   /** At the end of the recording, run once the page has rendered. */
@@ -626,7 +635,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const makeExchange = () => {
     player.stop();
     cancelLastLock();
-    const script = makeScript({ kind, length: chatLength, qsos: runQsos });
+    const script = makeScript({ kind, length: qsoLength, qsos: runQsos });
     const sent = sendScript(script, sending);
     const audio = encodeWavBuffer(sent.samples, sent.rate);
     const name = nameOf(script);
@@ -677,16 +686,26 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   const duration = rec?.durationSec ?? 0;
   const ended = rec !== null && pos >= duration - 0.05;
+  /** A recording's speed, each station's, measured from what was read. */
+  const measured = useMemo(() => (rec && !file?.script ? speedsOf(rec) : null), [rec, file?.script]);
+  /** Each line of a recording, its speed, measured from it alone. */
+  const measuredLines = useMemo(
+    () => (rec && !file?.script ? rec.overs.map((o) => speedOf([o])) : null),
+    [rec, file?.script],
+  );
   /** The speed the QSO is sent at, as the page shows it: one speed, or the
-   *  slowest to the fastest of its stations. None for a recording. */
+   *  slowest to the fastest of its stations. A recording's is measured, so
+   *  it says about. */
   const speedNow = ((): string | null => {
     const script = file?.script;
-    if (!script) return null;
-    const speeds = script.stations.map((st) => sendingOf(script).speed ?? st.speed);
+    const speeds = script
+      ? script.stations.map((st) => sendingOf(script).speed ?? st.speed)
+      : (measured ?? []).filter((sp): sp is Speed => sp !== null);
+    if (speeds.length === 0) return null;
     const shown = [...new Set(speeds.map(fmtSpeed))];
-    if (shown.length === 1) return shown[0]!;
     const wpm = speeds.map((sp) => sp.charWpm);
-    return `${Math.min(...wpm)}–${Math.max(...wpm)} wpm`;
+    const text = shown.length === 1 ? shown[0]! : `${Math.min(...wpm)}–${Math.max(...wpm)} wpm`;
+    return script ? text : `about ${text}`;
   })();
 
   /* ---- downloads -------------------------------------------------------- */
@@ -728,9 +747,9 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     save(new Blob([`${text.join("\n\n")}\n`], { type: "text/plain" }), `${stem()}.txt`);
   };
 
-  /** Wait between lines: a generated QSO stops after each line you copy,
-   *  until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
-  const waits = gap === "wait" && !!file?.script && linesShow === "copy";
+  /** Wait between lines: the QSO stops after each line you copy, generated
+   *  or opened, until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
+  const waits = wait && linesShow === "copy";
 
   /* ---- playing ---------------------------------------------------------- */
 
@@ -742,10 +761,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     mode.current = "main";
     setPlaying("main");
     setPos(at);
-    // With Wait, it stops at the end of the next line still open. Starting
+    // Stopping after each line, it stops at the end of the next line still open. Starting
     // from the stop, that line is behind it, and it goes on to the next.
     const hold = waits && rec ? rec.overs.findIndex((o, i) => o.t1 + HOLD_PAD_SEC > at + 0.01 && !unlocked[i]?.locked) : -1;
-    const to = hold >= 0 && hold < rec!.overs.length - 1 ? Math.min(rec!.overs[hold]!.t1 + HOLD_PAD_SEC, duration) : null;
+    // Not into the next line, which in a recording can start close after.
+    const next = hold >= 0 ? rec!.overs[hold + 1] : undefined;
+    const to = next ? Math.min(rec!.overs[hold]!.t1 + HOLD_PAD_SEC, next.t0 - 0.02, duration) : null;
     holdAt.current = to;
     void player.playBuffer(file.audio, at, to ?? undefined);
     requestAnimationFrame(backToSlot);
@@ -773,6 +794,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     if (!file) return;
     player.wake();
     mode.current = "part";
+    setPartAt(null);
     setPlaying({ from, to });
     void player.playBuffer(file.audio, Math.max(0, from - PART_PAD_SEC), Math.min(duration, to + PART_PAD_SEC));
   };
@@ -1083,7 +1105,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   };
 
   /* Cmd on a Mac or Ctrl elsewhere with Enter, in a box, locks its line.
-     With Wait, stopped after the line, it goes on too. */
+     Stopping after each line, stopped after it, it goes on too. */
   const modKey = (ev: KeyboardEvent): boolean => {
     if (!modOf(ev) || ev.key !== "Enter") return false;
     const i = lineOf(ev.target);
@@ -1347,14 +1369,21 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     );
   };
 
-  /** The speed line `i` of a generated QSO was sent at, as the QSO page
-   *  shows a line's speed. None for a recording. */
+  /** The speed line `i` was sent at, as the QSO page shows a line's speed.
+   *  A recording's is measured from the line. */
   const lineSpeed = (i: number): React.ReactElement | null => {
-    const line = file?.script?.lines[i];
-    if (!showSpeed || !line) return null;
-    const speed = sendingOf(file!.script!).speed ?? file!.script!.stations[line.station]!.speed;
+    if (!showSpeed || !file) return null;
+    const line = file.script?.lines[i];
+    const speed = file.script
+      ? line && (sendingOf(file.script).speed ?? file.script.stations[line.station]!.speed)
+      : measuredLines?.[i];
+    if (!speed) return null;
     return (
-      <span className="lwpm" data-testid="copy-line-wpm">
+      <span
+        className="lwpm"
+        data-testid="copy-line-wpm"
+        title={file.script ? undefined : "Measured from the recording"}
+      >
         {fmtSpeed(speed)}
       </span>
     );
@@ -1382,7 +1411,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   /** Option+R or Alt+R: the line plays again. The line of the box you are in,
    *  or else the line playing, or the last one heard. As the QSO page's
-   *  Option+R plays the station's last line. Again while it plays stops it. */
+   *  Option+R plays the station's last line. Again while it plays starts it again. */
   const replayLine = (box: HTMLElement | null) => {
     if (!rec) return;
     const inBox = box?.closest<HTMLElement>("li[data-line]")?.dataset.line;
@@ -1390,16 +1419,24 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     const i = inBox !== undefined ? Number(inBox) : nowLine >= 0 ? nowLine : heardLast;
     const over = rec.overs[i];
     if (!over) return;
-    if (typeof playing === "object" && playing?.from === over.t0) player.stop();
-    else playPart(over.t0, over.t1);
+    // From its start every time, even while it plays.
+    playPart(over.t0, over.t1);
   };
 
-  /** The line playing now: the one the recording is in, or the part. */
-  const nowAt = mode.current === "part" ? partAt : mode.current === "main" ? pos : null;
+  /** The line playing now: the one the recording is in, or the part. A
+   *  part starts a little before itself, and that lead-in is its own, not
+   *  the line before. */
+  const part = typeof playing === "object" ? playing : null;
+  const nowAt =
+    mode.current === "part" && part
+      ? Math.min(Math.max(partAt ?? part.from, part.from), part.to)
+      : mode.current === "main"
+        ? pos
+        : null;
   const nowLine =
     rec && nowAt !== null ? rec.overs.findIndex((o, i) => nowAt >= o.t0 - 0.05 && nowAt < (rec.overs[i + 1]?.t0 ?? Infinity)) : -1;
 
-  /** With Wait, the line it stopped after, waiting for Enter, or -1. */
+  /** Stopping after each line, the line it stopped after, waiting for Enter, or -1. */
   const heldLine =
     waits && rec && playing === null
       ? rec.overs.findIndex((o, i) => !lines[i]?.locked && pos >= o.t1 - 0.05 && pos <= o.t1 + HOLD_PAD_SEC + 0.1)
@@ -1575,6 +1612,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                       onChange={setSeekSlot}
                     />
                   </SettingRow>
+                  <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
                   <SettingRow label="When the next line starts">
                     <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />
                   </SettingRow>
@@ -1622,12 +1660,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     onChange={(v) => setRunQsos(Number(v))}
                   />
                   <ChoiceGroup
-                    id="copy-chat-length"
+                    id="copy-qso-length"
                     label="A standard QSO is"
-                    help={CHAT_LENGTH_HELP}
-                    value={chatLength}
-                    options={CHAT_LENGTHS}
-                    onChange={(v) => setChatLength(v as Length)}
+                    help={QSO_LENGTH_HELP}
+                    value={qsoLength}
+                    options={QSO_LENGTHS}
+                    onChange={(v) => setQsoLength(v as Length)}
                   />
                   <ChoiceGroup
                     id="copy-gap"
@@ -1760,7 +1798,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 onChange={(e) => seek(Number(e.target.value))}
               />
               {speedNow && (
-                <span className="hint copyspeed" data-testid="copy-sent-speed" title="The speed it is sent at, from the settings">
+                <span
+                  className="hint copyspeed"
+                  data-testid="copy-sent-speed"
+                  title={file?.script ? "The speed it is sent at, from the settings" : "The speed it was sent at, measured from the recording"}
+                >
                   {speedNow}
                 </span>
               )}

@@ -13,6 +13,7 @@ import { act, createElement, type MutableRefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { synthesize } from "@/audio/synth";
 import { encodeWavBuffer } from "@/audio/wav";
+import { RESTART_SEC } from "@/copy/lines";
 import { forgetCopyFile, loadPrefs, recallCopy, savePrefs, type Prefs } from "@/io/storage";
 import { targetTiming } from "@/timing/model";
 import { CopyScreen } from "@/ui/CopyScreen";
@@ -659,7 +660,7 @@ describe("a generated QSO", () => {
 describe("Wait between lines", () => {
   /** Mount the page and generate a QSO that stops after each line. */
   async function locked(prefs: Prefs = {}): Promise<void> {
-    mount({ copyKind: "cwt", copyRunQsos: 1, copyGap: "wait", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, ...prefs });
+    mount({ copyKind: "cwt", copyRunQsos: 1, copyWait: true, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, ...prefs });
     await until("the page to settle", () => state() === "none");
     await click(button("copy-new-first"));
     await until("the QSO to be ready", () => state() === "ready");
@@ -713,6 +714,28 @@ describe("Wait between lines", () => {
     const ends = [...lines()[0]!.querySelectorAll<HTMLElement>("[data-t1]")].map((e) => Number(e.dataset.t1));
     expect(ends.length, "line 1's characters").toBeGreaterThan(0);
     expect(from, "nothing of line 1 again").toBeGreaterThanOrEqual(Math.max(...ends) - 0.001);
+  });
+
+  it("takes a Wait kept from before as Stop after each line, with 1s between lines", async () => {
+    mount({ copyGap: "wait" });
+    await until("the page to settle", () => state() === "none");
+    await click(button("panel-toggle"));
+    expect($<HTMLInputElement>("#copy-wait")!.checked).toBe(true);
+    expect($('[data-testid="copy-gap"] [aria-pressed="true"]')!.textContent).toBe("1s");
+    await click($<HTMLInputElement>("#copy-wait"));
+    expect(loadPrefs().copyWait).toBe(false);
+  });
+
+  it("stops after each line of an opened recording too, and goes on when Cmd or Ctrl+Enter locks it", async () => {
+    await open({ copyWait: true });
+    await click(button("copy-play"));
+    await until("a stop after line 1", () => state() === "paused");
+    expect(lines()).toHaveLength(1);
+    await fill(boxes()[0]!, "CQ");
+    await enter(boxes()[0]!, true);
+    await until("a stop after line 2", () => state() === "paused" && lines().length === 2);
+    await wait(200);
+    expect(state(), "it waits").toBe("paused");
   });
 
   it("goes on without locking the line on Enter", async () => {
@@ -819,6 +842,25 @@ describe("the keys the pages share", () => {
     await space();
     await until("back", () => state() !== "playing");
     expect(box.value, "nothing typed").toBe("");
+  });
+
+  it("plays the line again from its start on Option or Alt+R while it plays, and does not stop it", async () => {
+    await open();
+    await playTo(2);
+    const box = lines()[1]!.querySelector<HTMLInputElement>('[data-testid="copy-type"]')!;
+    const before = plays.length;
+    await altR(box);
+    await altR(box);
+    expect(plays.length, "two plays, not a play and a stop").toBe(before + 2);
+    expect(plays[plays.length - 1]).toEqual(plays[plays.length - 2]);
+  });
+
+  it("lights the line it plays again from the start, not the line before", async () => {
+    await open();
+    await playTo(2);
+    await altR(lines()[1]!.querySelector<HTMLInputElement>('[data-testid="copy-type"]')!);
+    expect(lines()[1]!.classList.contains("now"), "line 2 lit").toBe(true);
+    expect(lines()[0]!.classList.contains("now"), "line 1 not lit").toBe(false);
   });
 
   it("plays the last line heard again on Option or Alt+R, outside a box", async () => {
@@ -1062,7 +1104,6 @@ describe("downloads", () => {
   it("saves a recording as it was opened", async () => {
     const files = saved();
     await open();
-    expect($('[data-testid="copy-sent-speed"]'), "no speed known for a recording").toBeNull();
     expect($('[data-testid="copy-download-clean"]')).toBeNull();
     await click(button("copy-download"));
     expect(files[0]!.name).toBe("qso.wav");
@@ -1071,5 +1112,93 @@ describe("downloads", () => {
   it("hides the downloads with the setting off", async () => {
     await generate({ copyShowDownload: false });
     expect($('[data-testid="copy-downloads"]')).toBeNull();
+  });
+});
+
+describe("a prosign graded", () => {
+  it("shows a dot for each letter once locked, yellow for a spelling that keys the same", async () => {
+    mount({ copyInput: "slots", copyLockedShows: "grade", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await until("the page to settle", () => state() === "none");
+    await click(button("copy-text-open"));
+    const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    const box = $<HTMLTextAreaElement>('[data-testid="copy-text-box"]')!;
+    await act(async () => {
+      set.call(box, "TU <KN> <KN>");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("copy-text-start"));
+    await until("the text to be ready", () => state() === "ready");
+    await playTo(1);
+    const slots = [...lines()[0]!.querySelectorAll<HTMLInputElement>('[data-testid="copy-slot"]')];
+    await fill(slots[2]!, "K");
+    await fill(slots[3]!, "NG");
+    await enter(slots[3]!, true);
+    const dots = [...lines()[0]!.querySelectorAll('[data-testid="copy-slot-dots"]')].map((d) =>
+      [...d.children].map((i) => i.className),
+    );
+    expect(dots).toEqual([
+      ["cright", "cwrong"],
+      ["cnear", "cnear"],
+    ]);
+  });
+});
+
+describe("a recording's speed", () => {
+  it("shows each line's speed, measured from it", async () => {
+    await open();
+    await playTo(2);
+    const shown = lines().map((l) => l.querySelector('[data-testid="copy-line-wpm"]')?.textContent ?? "");
+    expect(shown).toHaveLength(2);
+    for (const text of shown) {
+      const wpm = Number(/^(\d+)(\/\d+)? wpm$/.exec(text)?.[1]);
+      expect(Math.abs(wpm - WPM), text).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("shows no line speeds with the setting off", async () => {
+    await open({ copyShowSpeed: false });
+    await playTo(1);
+    expect($('[data-testid="copy-line-wpm"]')).toBeNull();
+  });
+
+  it("shows the speed it was sent at, measured, beside its name", async () => {
+    await open();
+    const shown = $('[data-testid="copy-sent-speed"]')!.textContent!;
+    const wpm = Number(/^about (\d+) wpm$/.exec(shown)?.[1]);
+    expect(Math.abs(wpm - WPM), shown).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("skipping by line", () => {
+  /** Where the recording is, as the scrubber has it. */
+  const at = () => Number($<HTMLInputElement>(".copyscrub")!.value);
+  /** Where line `i` starts: its first character, once the answers show. */
+  const start = (i: number) => Number(lines()[i]!.querySelector<HTMLElement>("[data-t0]")!.dataset.t0);
+
+  it("goes back to the start of the line, then to the line before, in a recording", async () => {
+    await open();
+    await playTo(1);
+    await click(button("copy-reveal"));
+    // Well into line 2: just after a line starts, back goes to the one before.
+    await fill($<HTMLInputElement>(".copyscrub")!, String(start(1) + 1));
+    expect(at()).toBeGreaterThan(start(1) + RESTART_SEC);
+    await click(button("copy-back-line"));
+    // A little before the line, so its first character is heard whole, and
+    // not back into the line before.
+    expect(at()).toBeLessThanOrEqual(start(1));
+    expect(at()).toBeGreaterThan(start(0));
+    await click(button("copy-back-line"));
+    expect(at()).toBeLessThanOrEqual(start(0));
+  });
+
+  it("goes on to the start of the next line, in a recording", async () => {
+    await open();
+    await playTo(1);
+    await click(button("copy-reveal"));
+    await click(button("copy-back-line"));
+    expect(at()).toBeLessThanOrEqual(start(0));
+    await click(button("copy-on-line"));
+    expect(at()).toBeLessThanOrEqual(start(1));
+    expect(at()).toBeGreaterThan(start(0));
   });
 });

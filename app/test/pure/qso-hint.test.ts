@@ -32,7 +32,7 @@ function workFromHints(first: AnyQso, context: RunContext, me: Me, most = 12): {
 }
 
 describe("a QSO worked from the hints", () => {
-  it("ends, for a rag chew of each length", () => {
+  it("ends, for a standard QSO of each length", () => {
     for (const length of ["full", "short", "pieces"] as const) {
       for (let seed = 1; seed <= 20; seed++) {
         const rand = seeded(seed);
@@ -103,7 +103,7 @@ describe("every wording of the hints", () => {
     { qth: "ATLANTA GA", region: "GA" },
   ];
 
-  it("works a rag chew of each length, and the station copies all of you", () => {
+  it("works a standard QSO of each length, and the station copies all of you", () => {
     for (const length of ["full", "short", "pieces"] as const) {
       for (let seed = 1; seed <= 150; seed++) {
         const rand = seeded(seed);
@@ -126,7 +126,7 @@ describe("every wording of the hints", () => {
         const me: Me = { ...ME, ...places[seed % 2]!, name: names[seed % 3]!, nr: ["", "3001", "291"][seed % 3]! };
         const voice = { rand, hour: seed % 24 };
         const qso = workWorded(newQso(rand), { rand, hour: 10, region: me.region }, me, voice, format);
-        if (!isRun(qso)) throw new Error("a rag chew");
+        if (!isRun(qso)) throw new Error("a standard QSO");
         expect(qso.format).toBe(format);
         const got = qso.got!;
         const yours = FORMATS[format].yours;

@@ -1,6 +1,6 @@
 /* The kinds of QSO your CQ can call for.
  *
- * A plain CQ is a rag chew, run by cq.ts. A CQ with a format's word in it,
+ * A plain CQ is a standard QSO, run by cq.ts. A CQ with a format's word in it,
  * as CQ CWT or CQ POTA, is a run of short QSOs in that format, run by
  * run.ts: each station sends its call, the two of you swap the exchange, you
  * send TU, and the next station calls.

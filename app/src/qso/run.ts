@@ -13,7 +13,7 @@
  *   - an exchange with an item missing gets NAME?, NR? or QTH?, and one it
  *     cannot read at all gets AGN?;
  *   - after its exchange, NR?, NAME?, QTH? or RST? gets that item twice;
- *   - QRS and QRQ work as in a rag chew.
+ *   - QRS and QRQ work as in a standard QSO.
  *
  * Your call is not needed: whoever answers a CQ in a run takes the next over
  * as theirs. Its call with another call sent wrong is not.
@@ -21,7 +21,7 @@
  * Each station sends at a speed of its own in the format's range, not yours.
  *
  * Pure, like cq.ts. `respond` is the page's way in: it picks the run or the
- * rag chew from your CQ.
+ * standard QSO from your CQ.
  */
 
 import { pick, randomCaller, regionOf, type Rand, type Station } from "./station";
@@ -87,7 +87,7 @@ export function isRun(qso: AnyQso): qso is RunQso {
 export interface RunContext extends Context {
   /** Your region from User, which the station takes as a region. */
   readonly region?: string;
-  /** Your speed: a rag chew's station starts at it. */
+  /** Your speed: a standard QSO's station starts at it. */
   readonly speed?: Speed;
 }
 
@@ -118,7 +118,7 @@ export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "
   };
 }
 
-/** The QSO after `qso`: the next station in a run, or a new rag chew. */
+/** The QSO after `qso`: the next station in a run, or a new standard QSO. */
 export function following(qso: AnyQso, rand: Rand, speed: Speed = DEFAULT_SPEED): AnyQso {
   if (isRun(qso)) return newRun(qso.format, rand, qso.made + 1, qso.them.call, qso.you);
   return newQso(rand, qso.you, speed);
@@ -543,11 +543,11 @@ function namedIn(over: Over): FormatId | null {
   return FORMAT_IDS.find((id) => over.joined.includes(`CQ${FORMATS[id].word}`)) ?? null;
 }
 
-/** The station's answer to one over you sent: in a run, or in a rag chew.
+/** The station's answer to one over you sent: in a run, or in a standard QSO.
  *
  * Before a station has called, your CQ picks: one with a format's word
  * starts a run of it, or one of another format a new run. A plain CQ in a
- * run goes back to a rag chew. */
+ * run goes back to a standard QSO. */
 export function respond(qso: AnyQso, heard: string, context: RunContext = {}): RunTurn {
   const { ear = STRICT, rand = Math.random, speed = DEFAULT_SPEED } = context;
   const fresh = isRun(qso) ? qso.stage === "waiting" : qso.stage === "cq";

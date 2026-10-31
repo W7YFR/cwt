@@ -5,6 +5,7 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { $, $$, callIn, click, ended, fill, key, mount, open, press, send, state, theirs, unmount, until, useQsoRig, yourTurn } from "../qso-rig";
+import { heard } from "../qso-fakes";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -172,6 +173,17 @@ describe("playing the last line again with Option+R", () => {
     expect(state(), "the microphone is not read while it plays").not.toBe("sending");
     await until("the line to end", () => yourTurn());
     expect($('[data-testid="qso-type"]'), "the box is still open").not.toBeNull();
+  });
+
+  it("plays again from the start on Option+R while it plays, and does not stop", async () => {
+    await open({ qsoTheirText: "before", qsoPlayback: "always" });
+    await send("CQ CWT W7YFR");
+    const before = heard.replays.length;
+    await altR(document.body);
+    await altR(document.body);
+    expect(heard.replays.length, "two plays, not a play and a stop").toBe(before + 2);
+    expect(state(), "still playing").not.toBe("sending");
+    await until("the line to end", () => yourTurn());
   });
 
   it("plays on Option+R anywhere on the page, not just in a box", async () => {

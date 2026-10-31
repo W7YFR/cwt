@@ -92,6 +92,22 @@ export function slotRight(char: string, typed: string): boolean {
   return canonicalChar(/^[A-Z]{2,}$/.test(t) ? `<${t}>` : t) === canonicalChar(char);
 }
 
+/** The dot under each letter of a prosign's slot, as typed so far: right,
+ *  wrong, or none for a letter not yet typed, or wrong once `locked`. A
+ *  whole prosign spelled another way that keys the same, such as NG for
+ *  <KN>, is near in each letter that differs: it sounds right, but is not
+ *  the letters sent. */
+export function letterDots(char: string, typed: string, locked = false): ("cright" | "cnear" | "cwrong" | null)[] {
+  const want = slotText(char);
+  const t = typed.trim().toUpperCase();
+  const keysSame = t.length >= want.length && slotRight(char, t);
+  return [...want].map((l, k) => {
+    if (k >= t.length) return locked ? "cwrong" : null;
+    if (t[k] === l) return "cright";
+    return keysSame ? "cnear" : "cwrong";
+  });
+}
+
 export interface LineGrade {
   readonly right: number;
   readonly total: number;
@@ -168,7 +184,7 @@ export function heard(call: string, copies: readonly string[]): boolean {
 
 /** A skip back to a word's start goes to the word before when it is already
  *  this close to the start of this one, so a press always moves. */
-const RESTART_SEC = 0.4;
+export const RESTART_SEC = 0.4;
 
 /** A skip to a word or a line lands this long before it, so its first
  *  character is heard whole. */

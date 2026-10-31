@@ -74,7 +74,7 @@ describe("copy in slots", () => {
     expect($(".qsolog li.them .who")!.textContent).toBe(call);
   });
 
-  it("locks on Enter, and grades every slot right", async () => {
+  it("locks on Enter with every slot filled, and grades every slot right", async () => {
     await slotsAnswer({ qsoLockedShows: "grade" });
     await fillRight();
     slots()[0]!.focus();
@@ -87,11 +87,20 @@ describe("copy in slots", () => {
     expect($('[data-testid="qso-stop"]'), "Enter did not stop the session").not.toBeNull();
   });
 
+  it("pauses on Enter with a slot still empty, and keeps the slots open", async () => {
+    await slotsAnswer();
+    await fill(slots()[0]!, wanted()[0]!);
+    slots()[0]!.focus();
+    await press("Enter");
+    expect(slots().length, "still open").toBeGreaterThan(0);
+    await until("the pause", () => state() === "paused");
+  });
+
   it("marks a slot left empty as missed", async () => {
     await slotsAnswer({ qsoLockedShows: "grade" });
     await fill(slots()[0]!, wanted()[0]!);
     slots()[0]!.focus();
-    await press("Enter");
+    await press("Enter", true);
     const locked = $('[data-testid="copy-slots-locked"]')!;
     expect(locked.querySelectorAll(".yourcopy .cright")).toHaveLength(1);
     expect(locked.querySelectorAll(".sentcopy .cwrong")).toHaveLength(wanted().length - 1);
@@ -139,10 +148,10 @@ describe("Clear", () => {
 });
 
 describe("a slot copy put right after it locks", () => {
-  it("opens again with Edit, keeps what you typed, and locks again on Enter", async () => {
+  it("opens again with Edit, keeps what you typed, and locks again on Cmd or Ctrl+Enter, or Enter when full", async () => {
     await slotsAnswer({ qsoAllowEdits: true });
     await fill(slots()[0]!, "x");
-    await press("Enter");
+    await press("Enter", true);
     expect(slots(), "locked").toHaveLength(0);
 
     await click($('[data-testid="qso-line-edit"]'));

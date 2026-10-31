@@ -115,8 +115,8 @@ function yourRow(label: string, meant: string, took: string, check = true): Repo
   return { from: "you", label, sent: meant, copied: took, ok: check && meant ? same(took, meant) : null };
 }
 
-/** The station's items in a rag chew, with the report as it sent it. */
-function chatRows(qso: Qso, lines: readonly TheirLine[], me: Meant): ReportRow[] {
+/** The station's items in a standard QSO, with the report as it sent it. */
+function standardRows(qso: Qso, lines: readonly TheirLine[], me: Meant): ReportRow[] {
   const { them } = qso;
   // 599 goes out as 5NN now and then: whichever its lines hold.
   const rst = lines.some((l) => l.text.split(/\s+/).includes("5NN")) && them.rst === "599" ? "5NN" : them.rst;
@@ -174,7 +174,7 @@ function runRows(qso: RunQso, lines: readonly TheirLine[], me: Meant): ReportRow
  *  station took any of your exchange has nothing of yours to check: you may
  *  not have sent it. */
 export function exchangeReport(qso: AnyQso, lines: readonly TheirLine[], me: Meant): ReportRow[] {
-  const rows = isRun(qso) ? runRows(qso, lines, me) : chatRows(qso, lines, me);
+  const rows = isRun(qso) ? runRows(qso, lines, me) : standardRows(qso, lines, me);
   const early = isRun(qso) ? qso.stage !== "exchanged" : ["cq", "asking", "called"].includes(qso.stage);
   const none = rows.every((r) => r.from !== "you" || r.label === "Call" || !r.copied);
   if (!early || !none) return rows;

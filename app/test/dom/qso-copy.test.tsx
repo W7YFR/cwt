@@ -81,7 +81,7 @@ describe("a copy put right after it locks", () => {
     await open({ qsoTheirText: "copy" });
     await send("CQ CQ DE W7YFR W7YFR K");
     await fill($<HTMLInputElement>('[data-testid="qso-type"]')!, "k9um");
-    await press("Enter");
+    await press("Enter", true);
     expect($('[data-testid="qso-locked"]')).not.toBeNull();
     expect($('[data-testid="qso-line-edit"]')).toBeNull();
   });
@@ -91,13 +91,13 @@ describe("a copy put right after it locks", () => {
     await send("CQ CQ DE W7YFR W7YFR K");
     const box = () => $<HTMLInputElement>('[data-testid="qso-type"]');
     await fill(box()!, "k9um");
-    await press("Enter");
+    await press("Enter", true);
     expect(box(), "locked").toBeNull();
 
     await click($('[data-testid="qso-line-edit"]'));
     expect(box()!.value).toBe("k9um");
     await fill(box()!, "k4um");
-    await press("Enter");
+    await press("Enter", true);
     expect($('[data-testid="qso-locked"]')?.textContent).toBe("K4UM");
   });
 });

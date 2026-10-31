@@ -12,6 +12,7 @@ import {
   nextCopy,
   overOfText,
   skipSpan,
+  letterDots,
   slotRight,
   slotsOfTyped,
   type LineCopy,
@@ -60,6 +61,21 @@ describe("decodeRecording", () => {
       expect(Math.abs(rec.senders[1]!.toneHz - b)).toBeLessThan(3);
     });
   }
+
+  it("splits two stations at their change of pitch, spaced wide, with no more than a letter gap between", () => {
+    // Wide spacing, as a slow practice tape has: the change of station is
+    // only a letter gap, too short to read as a word gap.
+    const timing = targetTiming(22, 12);
+    const a = synthesize("CQ DE W7YFR K <BT>", timing, { toneHz: 610, rate: RATE, padSec: 0.5, amplitude: 0.5 }).samples;
+    const b = synthesize("W7YFR DE N1AK K", timing, { toneHz: 580, rate: RATE, padSec: 0, amplitude: 0.5 }).samples;
+    const gap = Math.round(timing.charGapSec * RATE);
+    const samples = new Float32Array(a.length - Math.round(0.5 * RATE) + gap + b.length + RATE);
+    samples.set(a.subarray(0, a.length - Math.round(0.5 * RATE)), 0);
+    samples.set(b, a.length - Math.round(0.5 * RATE) + gap);
+    const rec = decodeRecording(samples, RATE)!;
+    expect(rec.overs.map((o) => o.text)).toEqual(["CQ DE W7YFR K <BT>", "W7YFR DE N1AK K"]);
+    expect(rec.overs.map((o) => o.sender)).toEqual([0, 1]);
+  });
 
   it("keeps each character's time, in order", () => {
     const rec = decodeRecording(qso([{ text: "TEST DE W7YFR", toneHz: 600 }]), RATE)!;
@@ -125,6 +141,21 @@ describe("your copy", () => {
     const slots = ["C", "Q", "D", "X", "N", "1", "A", "K", "KN"];
     expect(gradeLine(o, { ...emptyCopy(o), slots }, "slots")).toEqual({ right: 8, total: 9 });
     expect(slotRight("<KN>", "kn")).toBe(true);
+  });
+
+  it("marks each letter of a prosign's slot as it is typed", () => {
+    expect(letterDots("<KN>", "k"), "the first letter right").toEqual(["cright", null]);
+    expect(letterDots("<KN>", "x"), "the first letter wrong").toEqual(["cwrong", null]);
+    expect(letterDots("<KN>", "kn")).toEqual(["cright", "cright"]);
+    expect(letterDots("<KN>", "kx")).toEqual(["cright", "cwrong"]);
+    expect(letterDots("<SK>", "ks")).toEqual(["cwrong", "cwrong"]);
+    // A spelling that keys the same sounds right, but is not the letters
+    // sent: near, where it differs.
+    expect(letterDots("<KN>", "ng")).toEqual(["cnear", "cnear"]);
+    expect(letterDots("<UN>", "ig")).toEqual(["cnear", "cnear"]);
+    expect(letterDots("<AR>", "ar")).toEqual(["cright", "cright"]);
+    // Locked, a letter left out is wrong.
+    expect(letterDots("<KN>", "k", true)).toEqual(["cright", "cwrong"]);
   });
 
   it("grades a character the table lacks by its pattern", () => {

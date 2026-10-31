@@ -14,7 +14,7 @@ const FIRST = { rand: () => 0, hour: 20 };
 const shown = (rows: ReturnType<typeof exchangeReport>) =>
   rows.map((r) => `${r.from} ${r.label}: ${r.sent} > ${r.copied ?? "-"}${r.ok === false ? " ✗" : ""}`);
 
-describe("a rag chew's report", () => {
+describe("a standard QSO's report", () => {
   const worked = (): Qso => {
     let q: Qso = { ...newQso(() => 0), them: JIM };
     for (const o of ["CQ CQ DE W7YFR K", "K4ABC DE W7YFR UR 599 NAME BOB QTH PORTLAND OR K"]) {

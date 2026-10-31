@@ -44,12 +44,12 @@ import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { anyAdded, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
-import { charsOf, copyText, overOfText, type CopyInput, type LineCopy } from "@/copy/lines";
+import { charsOf, copyText, overOfText, plain, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
-import { ALT, altOf } from "./modKey";
+import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { NEEDS_BAND, NEEDS_BAND_BETWEEN } from "./copy";
 import { Graded, RightOnly } from "./Graded";
@@ -281,7 +281,7 @@ const YOUR_TEXT_HELP =
 
 const ALLOW_EDITS_HELP =
   "An Edit button beside a locked copy opens it again, so you can fix a mistake. " +
-  "It locks again when you next start sending, or on Enter. Not once the QSO is over.";
+  `It locks again when you next start sending, or on ${MOD}+Enter. Not once the QSO is over.`;
 const GRADE_TYPING_HELP =
   "A dot under each slot you fill says if it is right: blue if right, red if not.";
 
@@ -403,7 +403,7 @@ function wpmOf(s: SentWpm): string {
 
 const LOCK_HELP =
   "Your copy of the station's line can no longer change once you start sending. " +
-  "Enter in the box locks it too.";
+  `${MOD}+Enter in the box locks it too, as does Enter once every character is copied.`;
 const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
   { value: "nothing", label: "My copy", note: "Your copy as you typed it." },
   { value: "right", label: "What I got right", note: "Your copy, each letter marked right or missed." },
@@ -416,15 +416,23 @@ const LOCKED_SHOWS_HELP =
 const SHOW_SPEED_HELP = "Each of your lines shows the speed you sent it at.";
 const SHOW_THEIR_SPEED_HELP = "Each of the station's lines shows the speed it sent it at.";
 
-/** Enter and Escape in a copy box are not the recorder's: it listens on the
- *  document, and these keys would stop the session. Enter locks the copy,
- *  and so does Cmd+Enter, or Ctrl+Enter, as on the Copy page. */
-function keepKeys(ev: React.KeyboardEvent, lock: () => void): void {
-  if (ev.key === "Enter" || ev.key === "Escape") {
+/** Escape in a copy box is not the recorder's: it listens on the document,
+ *  and would stop the session. Cmd+Enter, or Ctrl+Enter, locks the copy, and
+ *  so does Enter once every character is copied, as on the Copy page. Other
+ *  Enter is the page's: it pauses, or goes on when paused. */
+function keepKeys(ev: React.KeyboardEvent, lock: () => void, full: boolean): void {
+  const locks = ev.key === "Enter" && (ev.metaKey || ev.ctrlKey || full);
+  if (ev.key === "Escape" || locks) {
     ev.preventDefault();
     ev.stopPropagation();
   }
-  if (ev.key === "Enter") lock();
+  if (locks) lock();
+}
+
+/** Whether `typed` holds as many characters as `sent`, spaces aside. */
+function copiedAll(typed: string, sent: string): boolean {
+  const count = (t: string) => plain(t).replace(/\s+/g, "").length;
+  return count(typed) >= count(sent);
 }
 
 /** An on or off setting kept as a preference, with its default. */
@@ -1247,7 +1255,7 @@ export function QsoScreen({
   const lock = (at: number) =>
     setLines((l) => l.map((line, i) => (i === at ? { ...line, locked: true } : line)));
   /** Open a locked copy again, to put a mistake right. It locks again when
-   *  you next start sending, or on Enter. */
+   *  you next start sending, or on Cmd+Enter. */
   const unlock = (at: number) =>
     setLines((l) => l.map((line, i) => (i === at ? { ...line, locked: false } : line)));
 
@@ -1305,8 +1313,10 @@ export function QsoScreen({
     const added = replayAdded();
     return added ? tape([part], tapeRate(), added) : lineAudio(part, tapeRate());
   };
-  const playClip = (key: string, clip: Clip) => {
-    if (replaying === key) {
+  /** Play `clip`, or stop it if it plays now. With `again`, play it from
+   *  its start even then. */
+  const playClip = (key: string, clip: Clip, again = false) => {
+    if (replaying === key && !again) {
       listen.stop();
       return;
     }
@@ -1335,7 +1345,8 @@ export function QsoScreen({
     while (i >= 0 && lines[i]!.you) i--;
     const part = i >= 0 ? tapeLineOf(i) : null;
     if (!part || cannotPlay() !== null) return;
-    playClip(`line ${i}`, lineHeard(part));
+    // From its start every time, even while it plays.
+    playClip(`line ${i}`, lineHeard(part), true);
   };
   const replayKey = useRef(replayLast);
   replayKey.current = replayLast;
@@ -1656,7 +1667,9 @@ export function QsoScreen({
           autoComplete="off"
           onKeyDown={(ev) => {
             typed();
-            keepKeys(ev, () => lock(at));
+            const el = ev.currentTarget;
+            const atEnd = el.selectionStart === el.value.length;
+            keepKeys(ev, () => lock(at), atEnd && copiedAll(line.typed, line.text));
           }}
           onChange={(ev) => setTyped(at, ev.target.value)}
         />

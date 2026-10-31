@@ -7,6 +7,24 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.23.0 — 2026-10-31
+
+### Added
+
+- The Copy page shows the speed an opened recording was sent at, measured from the recording, beside its name and on each line.
+
+### Changed
+
+- **Wait** under **Between lines** on the Copy page is now **Stop after each line**, under **Your copy**. It stops after each line of an opened recording too.
+- On the QSO page, Enter in a copy box pauses or goes on, as elsewhere on the page. Cmd+Enter (Ctrl+Enter) locks the copy, and so does Enter once every character is copied.
+
+### Fixed
+
+- In an opened recording with wide spacing, a character at the end of one station's turn, such as `<BT>`, no longer shows at the start of the other station's line.
+- Option+R while a line plays starts it again from the top, instead of stopping it.
+- A line played again no longer lights the line before it for a moment as it starts.
+- A prosign's slot shows a dot for each of its letters, as you type and once graded, so a first letter typed right no longer shows as wrong. A spelling that keys the same, such as NG for `<KN>`, shows yellow.
+
 ## v1.22.0 — 2026-10-31
 
 ### Added

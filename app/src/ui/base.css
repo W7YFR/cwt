@@ -2699,6 +2699,22 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .slot.kept { color: var(--ink-dim); border-bottom-color: transparent; }
 /* An open slot, in a cell that can carry the dot of its grade. */
 .qsolog .slotcell { display: inline-flex; }
+/* A prosign's slot: a dot under each of its letters, in place of one. */
+.qsolog .slotcell, .qsolog .cdots { position: relative; }
+.qsolog .slotdots {
+  position: absolute;
+  left: 50%;
+  bottom: -0.3em;
+  display: flex;
+  gap: 0.3em;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.qsolog .slotdots i { width: 0.3em; height: 0.3em; border-radius: 50%; }
+.qsolog .slotdots .cright { background: var(--you); }
+.qsolog .slotdots .cwrong { background: var(--bad); }
+.qsolog .slotdots .cnear { background: var(--warn); }
+.qsolog .slotdots .cright::after, .qsolog .slotdots .cwrong::after { content: none; }
 /* The slot whose character is playing. */
 .qsolog .slot.playing { border-bottom-color: var(--you); box-shadow: inset 0 -1px 0 var(--you); }
 @media (max-width: 700px) {
