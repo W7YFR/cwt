@@ -1470,21 +1470,28 @@ export function QsoScreen({
     const added = anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
     const gone = parts ? null : "This QSO's recording was not kept";
     const why = gone ?? cannotPlay();
-    const key = `qso ${n}`;
-    const on = replaying === key;
+    /** A play button: clean, or as heard with all that is added. */
+    const playButton = (asHeard: boolean, label: string, testId: string) => {
+      const key = `qso ${n}${asHeard ? " heard" : ""}`;
+      const on = replaying === key;
+      return (
+        <button
+          type="button"
+          data-testid={testId}
+          disabled={why !== null}
+          title={why ?? undefined}
+          onClick={() => playClip(key, asHeard ? tape(parts!, tapeRate(), replayAdded() ?? undefined) : make())}
+        >
+          <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
+          {on ? "Stop" : label}
+        </button>
+      );
+    };
     return (
       <li className="qsotape" data-testid="qso-tape">
-        {play && (
-          <button
-            type="button"
-            disabled={why !== null}
-            title={why ?? undefined}
-            onClick={() => playClip(key, tape(parts!, tapeRate(), replayAdded() ?? undefined))}
-          >
-            <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
-            {on ? "Stop" : "Play QSO"}
-          </button>
-        )}
+        {play && !added && playButton(false, "Play QSO", "qso-play")}
+        {play && added && playButton(false, "Play clean", "qso-play")}
+        {play && added && playButton(true, "Play as heard", "qso-play-heard")}
         {showDownload && (
           <button
             type="button"

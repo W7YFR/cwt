@@ -10,7 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Download** on the Copy page saves the QSO as audio, and **Download text** saves its lines as a text file that **New exchange** opens.
-- With QSB, noise, QRN or QRM on, the Copy and QSO pages offer **Download clean** and **Download as heard**, which saves the QSO with them. On the QSO page, **Play QSO** and each line's play button play it as heard.
+- With QSB, noise, QRN or QRM on, the Copy and QSO pages offer **Download clean** and **Download as heard**, which saves the QSO with them. The QSO page also offers **Play clean** and **Play as heard**, and as heard, the band stops while you send.
 - The Copy page shows the speed a generated QSO or your own text is sent at, beside its name.
 
 ### Fixed

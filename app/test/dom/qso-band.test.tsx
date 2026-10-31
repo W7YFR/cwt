@@ -8,7 +8,7 @@ import { NOISE_OFF_DB } from "@/audio/qsb";
 import { QRM_OFF_DB } from "@/copy/band";
 import { loadPrefs } from "@/io/storage";
 import { heard } from "../qso-fakes";
-import { $, EXCHANGE, click, ended, key, mount, open, send, slide, theirs, unmount, until, useQsoRig, yourTurn } from "../qso-rig";
+import { $, EXCHANGE, click, ended, key, mount, open, send, slide, theirs, until, useQsoRig, yourTurn } from "../qso-rig";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -132,14 +132,21 @@ describe("downloading a QSO", () => {
     return n / pcm.length;
   };
 
-  it("plays the QSO again as heard, and clean with nothing added", async () => {
+  it("plays the QSO with Play QSO alone, clean, with nothing added", async () => {
     await qso({});
-    await click($('[data-testid="qso-tape"] button'));
-    const clean = heard.replays.at(-1)!;
-    unmount();
+    expect($('[data-testid="qso-play-heard"]')).toBeNull();
+    await click($('[data-testid="qso-play"]'));
+    expect(quiet(heard.replays.at(-1)!)).toBeGreaterThan(0.2);
+  });
+
+  it("plays the QSO clean or as heard, with the band on", async () => {
     await qso({ noiseDb: -12 });
-    await click($('[data-testid="qso-tape"] button'));
+    await click($('[data-testid="qso-play"]'));
+    const clean = heard.replays.at(-1)!;
+    await click($('[data-testid="qso-play"]'));
+    await click($('[data-testid="qso-play-heard"]'));
     const noisy = heard.replays.at(-1)!;
+    expect(noisy).not.toBe(clean);
     expect(quiet(clean)).toBeGreaterThan(0.2);
     expect(quiet(noisy), "the band in the gaps").toBeLessThan(quiet(clean) / 2);
   });

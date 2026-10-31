@@ -142,10 +142,13 @@ export function limited(x: number): number {
 
 /** `samples` with the band mixed in under them, in place, when it holds
  *  anything. Room is left for QRM keyed on top of a station, and a crash
- *  past that is rounded off near full scale, as a receiver's AGC does. */
-export function addBand(samples: Float32Array, o: Omit<BandOptions, "n">): void {
+ *  past that is rounded off near full scale, as a receiver's AGC does.
+ *  With `level`, the band at each sample is scaled by it: 0 cuts it. */
+export function addBand(samples: Float32Array, o: Omit<BandOptions, "n">, level?: Float32Array): void {
   if (!bandOn(o)) return;
   const noise = bandAudio({ ...o, n: samples.length });
   const room = 1 / (1 + (qrmOn(o.qrmDb) ? Math.pow(10, o.qrmDb / 20) : 0));
-  for (let i = 0; i < samples.length; i++) samples[i] = limited((samples[i]! + noise[i]!) * room);
+  for (let i = 0; i < samples.length; i++) {
+    samples[i] = limited((samples[i]! + noise[i]! * (level ? level[i]! : 1)) * room);
+  }
 }

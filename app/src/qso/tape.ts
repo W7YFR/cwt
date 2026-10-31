@@ -6,8 +6,11 @@
  * level, and a short pause goes between them.
  *
  * As heard, the station's lines fade with QSB, and the band (noise, QRN and
- * QRM) runs under the whole QSO. Made again, so not the same fading and
- * noise heard live, but the same settings.
+ * QRM) runs under the QSO, but not under your lines: a radio does not
+ * receive while it sends. The tape knows where each of your lines is, so
+ * the band cuts at its first sound and comes back after its last, with a
+ * short ramp each way. Made again, so not the same fading and noise heard
+ * live, but the same settings.
  *
  * Pure. The page plays it and saves it.
  */
@@ -36,6 +39,10 @@ const EDGE_SEC = 0.3;
 
 /** A longer quiet inside your line is cut to this, seconds. */
 const GAP_SEC = 1;
+
+/** How long the band takes to cut and to come back around your line,
+ *  seconds: short, but long enough not to click. */
+const RAMP_SEC = 0.008;
 
 /** The pause between one line and the next, seconds. */
 const BETWEEN_SEC = 0.6;
@@ -137,9 +144,22 @@ export function tape(lines: readonly TapeLine[], rate: number, added?: Added): C
   const pause = Math.round(BETWEEN_SEC * rate);
   const total = parts.reduce((t, p) => t + p.samples.length, 0) + pause * Math.max(0, parts.length - 1);
   const out = new Float32Array(total);
+  /** Where each of your lines is, start and end, in samples. */
+  const yours: [number, number][] = [];
   let at = 0;
   parts.forEach(({ line, samples }, i) => {
     if (i > 0) at += pause;
+    if (line.you) {
+      // From its first sound to its last, not the quiet kept at its ends.
+      let first = -1;
+      let last = -1;
+      for (let j = 0; j < samples.length; j++) {
+        if (Math.abs(samples[j]!) < SOUND_SHARE * PEAK) continue;
+        if (first < 0) first = j;
+        last = j;
+      }
+      if (first >= 0) yours.push([at + first, at + last + 1]);
+    }
     if (added && added.qsbDb > 0 && !line.you) {
       const fade = fadeOf(added.qsbDb, seedOf(line.call));
       for (let j = 0; j < samples.length; j++) samples[j]! *= fade((at + j) / rate);
@@ -149,9 +169,25 @@ export function tape(lines: readonly TapeLine[], rate: number, added?: Added): C
   });
   if (added) {
     const theirs = lines.find((l) => !l.you);
-    addBand(out, { ...added, rate, toneHz: theirs && !theirs.you ? theirs.toneHz : 600, peak: PEAK });
+    addBand(out, { ...added, rate, toneHz: theirs && !theirs.you ? theirs.toneHz : 600, peak: PEAK }, bandLevel(total, yours, rate));
   }
   return { samples: out, rate };
+}
+
+/** The band's level at each of `n` samples: 1, and 0 over each of `spans`,
+ *  ramped down just before it and up just after. */
+export function bandLevel(n: number, spans: readonly [number, number][], rate: number): Float32Array {
+  const level = new Float32Array(n).fill(1);
+  const ramp = Math.max(1, Math.round(RAMP_SEC * rate));
+  for (const [from, to] of spans) {
+    for (let i = Math.max(0, from); i < Math.min(n, to); i++) level[i] = 0;
+    for (let k = 1; k <= ramp; k++) {
+      const g = k / (ramp + 1);
+      if (from - k >= 0) level[from - k] = Math.min(level[from - k]!, g);
+      if (to - 1 + k < n) level[to - 1 + k] = Math.min(level[to - 1 + k]!, g);
+    }
+  }
+  return level;
 }
 
 /** Whether anything is added to a QSO as it is heard. */
