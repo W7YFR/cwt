@@ -2403,6 +2403,9 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsobody { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 .qsobody.side { grid-template-columns: minmax(0, 1fr) minmax(300px, 60ch); gap: 32px; }
 .qsomain { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; }
+/* Room each side for a blurred call or line to fade out, which the scroll
+   would otherwise cut off sharp. The margin keeps the text where it was. */
+.qsomain { padding-inline: 12px; margin-inline: -12px; }
 .qsoside {
   min-height: 0;
   overflow-y: auto;

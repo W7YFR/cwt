@@ -13,6 +13,10 @@ nothing to the site. The next release carries them.
 - With QSB, noise, QRN or QRM on, the Copy and QSO pages offer **Download clean** and **Download as heard**, which saves the QSO with them. On the QSO page, **Play QSO** and each line's play button play it as heard.
 - The Copy page shows the speed a generated QSO or your own text is sent at, beside its name.
 
+### Fixed
+
+- A blurred call or line on the QSO page no longer ends in a sharp edge on the left.
+
 ## v1.21.0 — 2026-10-31
 
 ### Added
