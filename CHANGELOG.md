@@ -7,6 +7,15 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **New exchange** on the Copy page sends your own text in CW to copy, with notes such as (your call) filled in from your details. Each line shows which station sends it, read from DE and K, and you can change it.
+- The Copy page opens a .txt file, picked or dropped, in **New exchange**.
+
+### Changed
+
+- The Copy page's button that generates a QSO is now **Generate QSO**.
+
 ## v1.20.2 — 2026-10-31
 
 ### Fixed

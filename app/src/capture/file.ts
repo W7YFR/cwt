@@ -39,13 +39,20 @@ export async function loadAudioFile(file: File): Promise<LoadedFile> {
   return { clip, name: file.name, data };
 }
 
-/** The first audio file in a drop, or null if the drop had none. */
-export function audioFromDrop(items: DataTransfer | null): File | null {
+/** Whether `file` is plain text, such as a .txt file. */
+export function isTextFile(file: File): boolean {
+  return file.type === "text/plain" || /\.txt$/i.test(file.name);
+}
+
+/** The first audio file in a drop, or null if the drop had none. With
+ *  `text`, a text file too. */
+export function audioFromDrop(items: DataTransfer | null, text = false): File | null {
   if (!items) return null;
   const files = Array.from(items.files);
   return (
     files.find((f) => f.type.startsWith("audio/")) ??
     files.find((f) => /\.(wav|mp3|m4a|aac|flac|ogg|opus|aiff?|)$/i.test(f.name)) ??
+    (text ? files.find(isTextFile) : undefined) ??
     null
   );
 }

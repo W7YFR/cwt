@@ -48,9 +48,17 @@ export interface ScriptLine {
   readonly text: string;
 }
 
-/** A generated QSO as text. The station that called CQ is the first. */
+/** A QSO as text: generated, or given as text. In a generated one, the
+ *  station that called CQ is the first. */
 export interface Script {
-  readonly kind: Kind;
+  readonly kind: Kind | "text";
+  /** Text given: what the page calls it. */
+  readonly title?: string;
+  /** Text given: the text as it was given, to edit again. */
+  readonly source?: string;
+  /** Text given: the station you set for each line, or null where the text
+   *  says. */
+  readonly picks?: readonly (number | null)[];
   readonly stations: readonly ScriptStation[];
   readonly lines: readonly ScriptLine[];
 }
@@ -157,6 +165,10 @@ export interface SendOptions {
   readonly rate?: number;
 }
 
+/** Text given: the pause between two lines from one station, in seconds,
+ *  when the gap between lines is longer. */
+export const SAME_STATION_PAUSE_SEC = 0.5;
+
 /** Silence before the first line and after the last, in seconds. */
 const LEAD_SEC = 0.5;
 
@@ -172,7 +184,8 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
   const sounds: { at: number; samples: Float32Array }[] = [];
   let t = LEAD_SEC;
   script.lines.forEach((line, i) => {
-    if (i > 0) t += options.gapSec;
+    const same = script.kind === "text" && i > 0 && script.lines[i - 1]!.station === line.station;
+    if (i > 0) t += same ? Math.min(options.gapSec, SAME_STATION_PAUSE_SEC) : options.gapSec;
     const station = script.stations[line.station]!;
     const { charWpm, farnsworthWpm } = options.speed ?? station.speed;
     const over = overOfText(line.text, charWpm, farnsworthWpm);
@@ -183,7 +196,7 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
       amplitude: AMPLITUDE,
     });
     const at = Math.round(t * rate);
-    const fade = fadeOf(qsbDb, seedOf(station.call));
+    const fade = fadeOf(qsbDb, seedOf(station.call || String(line.station)));
     if (qsbDb > 0) for (let j = 0; j < sound.samples.length; j++) sound.samples[j]! *= fade((at + j) / rate);
     sounds.push({ at, samples: sound.samples });
     overs.push({
@@ -208,7 +221,7 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
       toneHz: (Math.min(...tones) + Math.max(...tones)) / 2,
       peak: AMPLITUDE,
       qsbDb,
-      seed: seedOf(script.stations[0]!.call),
+      seed: seedOf(script.stations[0]!.call || script.lines[0]!.text),
       qrmLines,
     });
     // Room for QRM keyed on top of a station, and a crash past that rounded
@@ -249,12 +262,13 @@ export function qrmLines(rand: () => number): readonly QrmLine[] {
 
 /** What a generated QSO is called on the page: A generated POTA run of 3 QSOs. */
 export function nameOf(script: Script): string {
+  if (script.kind === "text") return script.title ?? "Your text";
   if (script.kind === "cq") return "A generated standard QSO";
   const qsos = script.stations.length - 1;
   return `A generated ${FORMATS[script.kind].word} run of ${qsos} QSO${qsos === 1 ? "" : "s"}`;
 }
 
-const KINDS: readonly string[] = ["cq", "cwt", "sst", "mst", "pota"];
+const KINDS: readonly string[] = ["cq", "cwt", "sst", "mst", "pota", "text"];
 
 function isSpeed(v: unknown): v is Speed {
   const s = v as Speed | null;
@@ -265,6 +279,9 @@ function isSpeed(v: unknown): v is Speed {
 export function isScript(v: unknown): v is Script {
   const s = v as Script | null;
   if (!s || !KINDS.includes(s.kind) || !Array.isArray(s.stations) || !Array.isArray(s.lines)) return false;
+  if (s.title !== undefined && typeof s.title !== "string") return false;
+  if (s.source !== undefined && typeof s.source !== "string") return false;
+  if (s.picks !== undefined && !(Array.isArray(s.picks) && s.picks.every((p) => p === null || p === 0 || p === 1))) return false;
   const stations = s.stations.every((x) => typeof x?.call === "string" && typeof x.toneHz === "number" && isSpeed(x.speed));
   return (
     stations &&

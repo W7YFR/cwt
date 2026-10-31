@@ -550,7 +550,7 @@ export interface Prefs {
   /** Which earlier attempts show while you try again on the Copy page: all,
    *  the last, or none, to go again clean. Absent is the last. */
   copyEarlier?: "all" | "last" | "none";
-  /** The kind of QSO New exchange generates on the Copy page. Absent is CQ. */
+  /** The kind of QSO Generate QSO makes on the Copy page. Absent is CQ. */
   copyKind?: "cq" | "cwt" | "sst" | "mst" | "pota";
   /** How many QSOs a generated run has. Absent is 3. */
   copyRunQsos?: number;
@@ -562,6 +562,11 @@ export interface Prefs {
   /** A generated QSO's stations send at the speeds of its format, or all at
    *  the Copy page's sliders. Absent is the format's. */
   copySpeed?: "format" | "mine";
+  /** The text last given to the Copy page to copy, as typed. */
+  copyText?: string;
+  /** The station set for each line of that text, or null where the text
+   *  says. */
+  copyPicks?: (number | null)[];
   /** The Copy page's sliders, for a generated QSO. */
   copyCharWpm?: number;
   copyFarnsworthWpm?: number;
@@ -774,6 +779,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copyChatLength: oneOf("full", "short", "pieces"),
   copyGap: oneOf("1", "2", "3", "5", "wait"),
   copySpeed: oneOf("format", "mine"),
+  copyText: isStr,
+  copyPicks: (v) => Array.isArray(v) && v.every((p) => p === null || p === 0 || p === 1),
   copyCharWpm: isNum,
   copyFarnsworthWpm: isNum,
   qsbDb: isNum,

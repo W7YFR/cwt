@@ -567,7 +567,7 @@ describe("a generated QSO", () => {
     return Number(m) * 60 + Number(s);
   };
 
-  /** Mount the page and generate a QSO, as New exchange does. */
+  /** Mount the page and generate a QSO, as Generate QSO does. */
   async function makeUp(prefs: Prefs = {}): Promise<void> {
     mount(prefs);
     await until("the page to settle", () => state() === "none");

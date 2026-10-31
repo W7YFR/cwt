@@ -1,7 +1,8 @@
 /* The Copy page: play a QSO in CW and copy it.
  *
- * New exchange generates a QSO: two stations, in a kind you choose, sent from
- * text, so the text is the answer key. Or you open a recording, and the
+ * Generate QSO makes a QSO: two stations, in a kind you choose, sent from
+ * text, so the text is the answer key. New exchange gives the page text of
+ * your own to send the same way. Or you open a recording, and the
  * decoder reads it whole before you start, and what it reads is the key. The recording plays, and each over shows as a
  * line as it starts, with a box to copy it in. A line locks when the next
  * line starts, when you copy again, or on Cmd+Enter (Ctrl+Enter off a
@@ -20,9 +21,10 @@ import { createPlayer } from "@/audio/player";
 import { NOISE_OFF_DB } from "@/audio/qsb";
 import { QRM_OFF_DB } from "@/copy/band";
 import { encodeWavBuffer } from "@/audio/wav";
-import { ACCEPTED, loadAudioFile } from "@/capture/file";
+import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
 import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
+import { textScript } from "@/copy/text";
 import {
   charsOf,
   clock,
@@ -49,6 +51,7 @@ import {
   keepCopyFile,
   loadPrefs,
   loadSpeed,
+  loadUser,
   recallCopy,
   recallCopyFile,
   rememberCopy,
@@ -76,11 +79,15 @@ import {
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
 import { IconEdit, IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
+import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
 import { HomeButton } from "./Wordmark";
 import { MOD, modOf } from "./modKey";
+
+/** What the page calls text pasted or typed in. */
+const TEXT_TITLE = "Your text";
 
 /** How long after the last line ends its copy locks, when Lock is on. Every
  *  other line locks when the next one starts. */
@@ -174,7 +181,7 @@ const KINDS: ReadonlyArray<Option<Kind>> = [
   { value: "cwt", label: "CWT", note: "A fast CWops run: names and CWops numbers." },
 ];
 const KIND_HELP =
-  "The kind of QSO New exchange generates, as on the QSO page. CQ is a standard QSO between two " +
+  "The kind of QSO Generate QSO makes, as on the QSO page. CQ is a standard QSO between two " +
   "stations. The others are runs: one station calls CQ and works one station after another.";
 
 const RUN_QSOS: ReadonlyArray<Option<string>> = [
@@ -533,8 +540,51 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     rememberCopy({ ...kept, at: posRef.current });
   }, [kept, playing]);
 
+  /** New exchange, in the dialog: what the box starts with, and what the
+   *  page calls it. Null when the dialog is closed. */
+  const [textDraft, setTextDraft] = useState<{ text: string; title: string; picks: readonly (number | null)[] } | null>(
+    null,
+  );
+  /** New exchange: the text on the page to edit, or the text last given. */
+  const editText = () => {
+    const script = file?.script;
+    if (script?.kind === "text") setTextDraft({ text: script.source ?? "", title: nameOf(script), picks: script.picks ?? [] });
+    else {
+      const p = loadPrefs();
+      setTextDraft({ text: p.copyText ?? "", title: TEXT_TITLE, picks: p.copyPicks ?? [] });
+    }
+  };
+  /** The text in the dialog, sent at the page's speed, in place of what was
+   *  on the page. */
+  const startText = (text: string, title: string, picks: (number | null)[]) => {
+    const script = textScript(text, { title, picks, speed: mine, user: loadUser() });
+    savePrefs({ ...loadPrefs(), copyText: text, copyPicks: picks });
+    if (!script) {
+      onError("That text has nothing in it to send.");
+      return;
+    }
+    setTextDraft(null);
+    player.stop();
+    cancelLastLock();
+    const sent = sendScript(script, sending);
+    const audio = encodeWavBuffer(sent.samples, sent.rate);
+    setFile({ name: title, audio, rec: sent.rec, script });
+    setKept(freshKept(keyOf(title, sent.rec, true), sent.rec, inputPref));
+    setSelected(null);
+    setPos(0);
+    void keepCopyFile({ name: title, audio: new Blob([audio]), recording: sent.rec, script });
+  };
+
   const openFile = useCallback(
     async (f: File) => {
+      if (isTextFile(f)) {
+        try {
+          setTextDraft({ text: await f.text(), title: f.name, picks: [] });
+        } catch {
+          onError(`I could not read ${f.name}.`);
+        }
+        return;
+      }
       player.stop();
       cancelLastLock();
       setReading(true);
@@ -559,7 +609,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     },
     [player, onError],
   );
-  /** New exchange: a QSO generated in the kind chosen, in place of what was
+  /** Generate QSO: a QSO generated in the kind chosen, in place of what was
    *  on the page. */
   const makeExchange = () => {
     player.stop();
@@ -919,7 +969,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
      and pauses, and Esc leaves it; the rest is typing. */
   const keyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
   keyRef.current = (ev) => {
-    if (!rec) return;
+    if (!rec || textDraft) return;
     if (modKey(ev)) return;
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     const el = ev.target as HTMLElement | null;
@@ -1207,7 +1257,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     : !rec
       ? recalling
         ? ""
-        : "Generate a QSO to copy, or open a recording of CW."
+        : "Generate a QSO to copy, write your own, or open a recording of CW."
       : playing === "main"
         ? linesShow === "copy"
           ? "Type what you hear in each line."
@@ -1284,16 +1334,24 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
           onClick={makeExchange}
         >
+          Generate QSO
+        </button>
+        <button
+          data-testid="copy-text-open"
+          disabled={reading || playing !== null}
+          title="Paste or type an exchange of your own to copy, sent in CW"
+          onClick={editText}
+        >
           New exchange
         </button>
-        {/* Icon only, after New exchange: a recording is the rarer way in,
+        {/* Icon only, after Generate QSO and New exchange: a recording is the rarer way in,
             as on the Send page. */}
         <button
           className="iconbtn copyopen"
           data-testid="copy-open"
           disabled={reading}
-          aria-label="Open a recording"
-          title="Open a recording of CW to copy, or drop one on the page"
+          aria-label="Open a recording or a text file"
+          title="Open a recording of CW or a .txt file to copy, or drop one on the page"
           onClick={pickFile}
         >
           <IconUpload />
@@ -1578,12 +1636,16 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               ))}
             </div>
             <button className="primary" data-testid="copy-new-first" onClick={makeExchange}>
-              New exchange
+              Generate QSO
             </button>
             <span className="hint">
               or{" "}
+              <button type="button" className="link" data-testid="copy-text-first" onClick={editText}>
+                write your own
+              </button>
+              ,{" "}
               <button type="button" className="link" data-testid="copy-open-first" onClick={pickFile}>
-                open a recording
+                open a recording or a .txt file
               </button>
               , or drop one on the page
             </span>
@@ -1656,7 +1718,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           className="visually-hidden"
           tabIndex={-1}
           type="file"
-          accept={ACCEPTED}
+          accept={`${ACCEPTED},.txt,text/plain`}
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) void openFile(f);
@@ -1697,6 +1759,18 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           </div>
         )}
       </main>
+      {textDraft && (
+        <CopyText
+          text={textDraft.text}
+          picks={textDraft.picks}
+          onStart={(next) => startText(next.text, textDraft.title, next.picks)}
+          onCancel={() => setTextDraft(null)}
+          onConfigureUser={() => {
+            setTextDraft(null);
+            onConfigure();
+          }}
+        />
+      )}
     </>
   );
 }
