@@ -15,6 +15,7 @@ nothing to the site. The next release carries them.
 
 - The suggested reply on the QSO page no longer gives the station's call or name before you copy them. It shows (THEIR CALL) and (THEIR NAME) until then, unless the station's lines show.
 - A station in a run sent its call or an item again when you checked it right with a ?, as `K7BYX?` or `58N ?`. It now confirms it, as `RR`.
+- A station in a run asked for an item when you checked part of its call keyed apart, as `W 4 ?`. It now sends its call again.
 
 ### Development
 

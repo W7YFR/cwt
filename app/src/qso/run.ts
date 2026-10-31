@@ -467,11 +467,17 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       const confirms =
         over.hasExactly(`${c}?`) || over.words.some((w, i) => w === c && over.words[i + 1] === "?");
       if (confirms) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
-      // Part of its call with a ?: it sends its call again.
+      // Part of its call with a ?: it sends its call again. Keyed apart,
+      // as W 4 ?, the words before the ? read as one.
       const checks = over.words.some((w, i) => {
-        const bare = w.replace(/\?+$/, "");
         const asked = w.endsWith("?") || over.words[i + 1] === "?";
-        return asked && bare.length >= 2 && c.includes(bare) && !(bare in ASKED);
+        if (!asked) return false;
+        const bare = w.replace(/\?+$/, "");
+        if (bare in ASKED) return false;
+        return [0, 1, 2, 3].some((back) => {
+          const part = over.words.slice(Math.max(0, i - back), i).join("") + bare;
+          return part.length >= 2 && c.includes(part);
+        });
       });
       if (checks) return say(qso, `${c} ${c}`);
       // After it asked for one item, your over is read as that item.

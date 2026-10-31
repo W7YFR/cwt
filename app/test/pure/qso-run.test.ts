@@ -225,6 +225,7 @@ describe("the station asks again", () => {
     expect(work(called("cwt"), ["AGN"]).replies).toEqual(["K4ABC"]);
     expect(work(called("cwt"), ["K4ABD TOM 1234"]).replies).toEqual(["K4ABC K4ABC"]);
     expect(work(called("cwt"), ["K4?"]).replies).toEqual(["K4ABC K4ABC"]);
+    expect(work(called("cwt"), ["K 4 ?"]).replies, "keyed apart").toEqual(["K4ABC K4ABC"]);
   });
 
   it("says yes to its whole call with a ?, keyed apart with Lenient copy", () => {
