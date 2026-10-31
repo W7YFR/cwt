@@ -7,6 +7,12 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.19.2 — 2026-10-31
+
+### Fixed
+
+- The QSO page log no longer moves down after a reload when **Play QSO** and **Download** show under each QSO. When a QSO's recording was not kept, the buttons stay in place, turned off.
+
 ## v1.19.1 — 2026-10-31
 
 ### Changed

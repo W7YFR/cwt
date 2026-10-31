@@ -83,6 +83,7 @@ describe("a run after a reload", () => {
     unmount();
     mount({ qsoTheirText: "before" });
     expect($('[data-testid="qso-report"]'), "the report of the QSO before").not.toBeNull();
+    expect($('[data-testid="qso-tape"]'), "the QSO's buttons, before your overs come back").not.toBeNull();
     expect(tally()?.dataset.format).toBe("cwt");
     expect(tally()?.dataset.made).toBe("1");
     await until("the Continue button", () => {
