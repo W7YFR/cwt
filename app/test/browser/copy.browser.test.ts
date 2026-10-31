@@ -13,6 +13,7 @@ import { act, createElement, type MutableRefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { synthesize } from "@/audio/synth";
 import { encodeWavBuffer } from "@/audio/wav";
+import { RESTART_SEC } from "@/copy/lines";
 import { forgetCopyFile, loadPrefs, recallCopy, savePrefs, type Prefs } from "@/io/storage";
 import { targetTiming } from "@/timing/model";
 import { CopyScreen } from "@/ui/CopyScreen";
@@ -1071,5 +1072,39 @@ describe("downloads", () => {
   it("hides the downloads with the setting off", async () => {
     await generate({ copyShowDownload: false });
     expect($('[data-testid="copy-downloads"]')).toBeNull();
+  });
+});
+
+describe("skipping by line", () => {
+  /** Where the recording is, as the scrubber has it. */
+  const at = () => Number($<HTMLInputElement>(".copyscrub")!.value);
+  /** Where line `i` starts: its first character, once the answers show. */
+  const start = (i: number) => Number(lines()[i]!.querySelector<HTMLElement>("[data-t0]")!.dataset.t0);
+
+  it("goes back to the start of the line, then to the line before, in a recording", async () => {
+    await open();
+    await playTo(1);
+    await click(button("copy-reveal"));
+    // Well into line 2: just after a line starts, back goes to the one before.
+    await fill($<HTMLInputElement>(".copyscrub")!, String(start(1) + 1));
+    expect(at()).toBeGreaterThan(start(1) + RESTART_SEC);
+    await click(button("copy-back-line"));
+    // A little before the line, so its first character is heard whole, and
+    // not back into the line before.
+    expect(at()).toBeLessThanOrEqual(start(1));
+    expect(at()).toBeGreaterThan(start(0));
+    await click(button("copy-back-line"));
+    expect(at()).toBeLessThanOrEqual(start(0));
+  });
+
+  it("goes on to the start of the next line, in a recording", async () => {
+    await open();
+    await playTo(1);
+    await click(button("copy-reveal"));
+    await click(button("copy-back-line"));
+    expect(at()).toBeLessThanOrEqual(start(0));
+    await click(button("copy-on-line"));
+    expect(at()).toBeLessThanOrEqual(start(1));
+    expect(at()).toBeGreaterThan(start(0));
   });
 });

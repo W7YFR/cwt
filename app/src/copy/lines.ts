@@ -168,7 +168,7 @@ export function heard(call: string, copies: readonly string[]): boolean {
 
 /** A skip back to a word's start goes to the word before when it is already
  *  this close to the start of this one, so a press always moves. */
-const RESTART_SEC = 0.4;
+export const RESTART_SEC = 0.4;
 
 /** A skip to a word or a line lands this long before it, so its first
  *  character is heard whole. */
