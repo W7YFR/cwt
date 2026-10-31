@@ -7,6 +7,19 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.22.0 — 2026-10-31
+
+### Added
+
+- **Download** on the Copy page saves the QSO as audio, and **Download text** saves its lines as a text file that **New exchange** opens.
+- With QSB, noise, QRN or QRM on, the Copy and QSO pages offer **Download clean** and **Download as heard**, which saves the QSO with them.
+- On the QSO page, **Play clean** and **Play as heard** play a QSO again, and each line's play button plays it as heard. As heard, the band stops while you send.
+- The Copy page shows the speed a generated QSO or your own text is sent at, beside its name.
+
+### Fixed
+
+- A blurred call or line on the QSO page no longer ends in a sharp edge on the left.
+
 ## v1.21.0 — 2026-10-31
 
 ### Added

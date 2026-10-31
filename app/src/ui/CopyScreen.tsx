@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlayer } from "@/audio/player";
 import { NOISE_OFF_DB } from "@/audio/qsb";
 import { QRM_OFF_DB } from "@/copy/band";
-import { encodeWavBuffer } from "@/audio/wav";
+import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
 import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
@@ -59,6 +59,7 @@ import {
   type Prefs,
 } from "@/io/storage";
 import { FORMATS } from "@/qso/formats";
+import { anyAdded } from "@/qso/tape";
 import { fmtSpeed } from "./format";
 import type { LockedShows } from "@/qso/show";
 import type { Speed } from "@/qso/speed";
@@ -78,7 +79,7 @@ import {
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
-import { IconEdit, IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
+import { IconDownload, IconEdit, IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
@@ -156,6 +157,11 @@ const GRADE_TYPING_HELP =
 const SEEK_SLOT_HELP =
   "While the recording is paused, it moves to the character of the slot you select. Play " +
   "goes on from there.";
+
+const SHOW_DOWNLOAD_HELP =
+  "Under the QSO, Download saves it as a WAV file, and Download text as a text file you can open " +
+  "in New exchange. With QSB, noise, QRN or QRM on a generated QSO or your own text, Download " +
+  "clean saves it without them, and Download as heard with them.";
 
 const SHOW_SPEED_HELP = "Each line of a generated QSO or your own text shows the speed it was sent at.";
 
@@ -324,7 +330,8 @@ type OnOffKey =
   | "copyGradeTyping"
   | "copySeekSlot"
   | "copyAllowEdits"
-  | "copyShowSpeed";
+  | "copyShowSpeed"
+  | "copyShowDownload";
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean) => void] {
@@ -397,6 +404,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [seekSlot, setSeekSlot] = useOnOff("copySeekSlot", false);
   const [allowEdits, setAllowEdits] = useOnOff("copyAllowEdits", false);
   const [showSpeed, setShowSpeed] = useOnOff("copyShowSpeed", true);
+  const [showDownload, setShowDownload] = useOnOff("copyShowDownload", true);
   /** How the next attempt copies. The attempt under way keeps its own. */
   const [inputPref, setInputPref] = useChoice("copyInput", "text");
   const [linesShow, setLinesShow] = useChoice("copyLines", "copy");
@@ -669,6 +677,57 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   const duration = rec?.durationSec ?? 0;
   const ended = rec !== null && pos >= duration - 0.05;
+  /** The speed the QSO is sent at, as the page shows it: one speed, or the
+   *  slowest to the fastest of its stations. None for a recording. */
+  const speedNow = ((): string | null => {
+    const script = file?.script;
+    if (!script) return null;
+    const speeds = script.stations.map((st) => sendingOf(script).speed ?? st.speed);
+    const shown = [...new Set(speeds.map(fmtSpeed))];
+    if (shown.length === 1) return shown[0]!;
+    const wpm = speeds.map((sp) => sp.charWpm);
+    return `${Math.min(...wpm)}–${Math.max(...wpm)} wpm`;
+  })();
+
+  /* ---- downloads -------------------------------------------------------- */
+
+  /** Save `blob` as `name`. */
+  const save = (blob: Blob, name: string) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  /** The file name the downloads take, with no extension. */
+  const stem = () =>
+    (file?.name ?? "copy")
+      .replace(/\.[a-z0-9]+$/i, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "copy";
+  /** Whether a QSO sent from text has anything added as it is heard. */
+  const added = !!file?.script && anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
+  /** The QSO as it plays, with all that is added. A recording, as opened. */
+  const downloadHeard = () => {
+    if (!file) return;
+    if (!file.script) save(new Blob([file.audio]), file.name);
+    else save(new Blob([file.audio], { type: "audio/wav" }), `${stem()}${added ? "-as-heard" : ""}.wav`);
+  };
+  /** A QSO sent from text, with nothing added. */
+  const downloadClean = () => {
+    if (!file?.script) return;
+    const quiet = { qsbDb: 0, noiseDb: NOISE_OFF_DB, qrn: 0, qrmDb: QRM_OFF_DB };
+    const sent = sendScript(file.script, { ...sendingOf(file.script), ...quiet });
+    save(encodeWav(sent.samples, sent.rate), `${stem()}.wav`);
+  };
+  /** Its lines as text, a blank line between them, as New exchange reads. */
+  const downloadText = () => {
+    if (!file) return;
+    const text = file.script ? file.script.lines.map((l) => l.text) : file.rec.overs.map((o) => o.text);
+    save(new Blob([`${text.join("\n\n")}\n`], { type: "text/plain" }), `${stem()}.txt`);
+  };
+
   /** Wait between lines: a generated QSO stops after each line you copy,
    *  until you press Cmd+Enter (Ctrl+Enter off a Mac) in its box. */
   const waits = gap === "wait" && !!file?.script && linesShow === "copy";
@@ -1617,6 +1676,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 checked={showSpeed}
                 onChange={setShowSpeed}
               />
+              <Check
+                id="copy-show-download"
+                label="Show Download, to save it as audio or text"
+                help={SHOW_DOWNLOAD_HELP}
+                checked={showDownload}
+                onChange={setShowDownload}
+              />
             </div>
           </Section>
         </SettingsPanel>
@@ -1693,6 +1759,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 value={Math.min(pos, duration)}
                 onChange={(e) => seek(Number(e.target.value))}
               />
+              {speedNow && (
+                <span className="hint copyspeed" data-testid="copy-sent-speed" title="The speed it is sent at, from the settings">
+                  {speedNow}
+                </span>
+              )}
               <span className="hint copyname" title={file!.name}>
                 {file!.name}
               </span>
@@ -1807,6 +1878,45 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
               <p className="hint qsonote" data-testid="copy-score">
                 {current.right} of {current.total} copied in the lines locked so far.
               </p>
+            )}
+            {showDownload && (
+              <div className="copydownloads" data-testid="copy-downloads">
+                <button
+                  type="button"
+                  data-testid={added ? "copy-download-clean" : "copy-download"}
+                  title={added ? "Save the QSO as a WAV file, with nothing added" : "Save the QSO as audio"}
+                  onClick={added ? downloadClean : downloadHeard}
+                >
+                  <i className="ico">
+                    <IconDownload />
+                  </i>
+                  {added ? "Download clean" : "Download"}
+                </button>
+                {added && (
+                  <button
+                    type="button"
+                    data-testid="copy-download-heard"
+                    title="Save the QSO as a WAV file, with the QSB, noise, QRN and QRM you hear"
+                    onClick={downloadHeard}
+                  >
+                    <i className="ico">
+                      <IconDownload />
+                    </i>
+                    Download as heard
+                  </button>
+                )}
+                <button
+                  type="button"
+                  data-testid="copy-download-text"
+                  title="Save the QSO's lines as a text file, which New exchange can open"
+                  onClick={downloadText}
+                >
+                  <i className="ico">
+                    <IconDownload />
+                  </i>
+                  Download text
+                </button>
+              </div>
             )}
           </div>
         )}

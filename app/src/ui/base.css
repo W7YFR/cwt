@@ -2403,6 +2403,9 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsobody { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 .qsobody.side { grid-template-columns: minmax(0, 1fr) minmax(300px, 60ch); gap: 32px; }
 .qsomain { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; }
+/* Room each side for a blurred call or line to fade out, which the scroll
+   would otherwise cut off sharp. The margin keeps the text where it was. */
+.qsomain { padding-inline: 12px; margin-inline: -12px; }
 .qsoside {
   min-height: 0;
   overflow-y: auto;
@@ -2591,6 +2594,10 @@ header .modeswitch button { white-space: nowrap; }
 .qsoreport tr.bad td:last-child { color: var(--bad); }
 .qsolog .qsotape button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
 .qsolog .qsotape .ico { margin-right: 6px; font-style: normal; }
+/* The Copy page's downloads, under the QSO, as the QSO page's are. */
+.copydownloads { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.copydownloads button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
+.copydownloads .ico { margin-right: 6px; font-style: normal; }
 /* The Copy page: the QSO page's panel and log, with a transport over the
    log. */
 .copy button .ico, .copyopen .ico { margin-right: 6px; font-style: normal; }
@@ -2665,6 +2672,7 @@ header .modeswitch button { white-space: nowrap; }
 .copyhead .qsotally { margin-left: auto; font-size: 12px; }
 .copyafter { display: flex; flex-direction: column; gap: 12px; }
 .copy .copyname { margin-left: 4px; }
+.copy .copyspeed { font-family: var(--mono); white-space: nowrap; }
 /* The page's keys, then a box's, a line each. */
 .copykeys { display: flex; flex-direction: column; gap: 4px; }
 .copykeys .legend { margin: 0; }
