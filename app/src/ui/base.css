@@ -949,6 +949,10 @@ canvas.resizing { cursor: ew-resize; }
    is read once and the key is read every time. */
 .legend.howto { color: var(--ink-faint); }
 .legend.keys { color: var(--ink-faint); gap: 4px; }
+/* Keystrokes, on a screen that has none, as in the header. */
+@media (max-width: 700px) {
+  .legend.keys { display: none; }
+}
 /* A key, drawn as one. The mono face and the border are what separate "press
    R" from the letter R in a sentence, which matters most for the single
    letter — "R record" in running text reads as a typo. */

@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- On a phone, the pages no longer list their keyboard keys.
+
 ### Fixed
 
 - On a phone, the header of each page no longer scatters its buttons over several lines. The name and the corner buttons share the first line, the page switch has the next, and the page's buttons the line under it.
