@@ -15,6 +15,10 @@ nothing to the site. The next release carries them.
 
 - **New exchange** on the Copy page is now **Script**, as on the QSO page.
 
+### Fixed
+
+- On the QSO page, a blurred line at the top or bottom of the log fades out instead of ending sharp.
+
 ## v1.24.2 — 2026-11-01
 
 ### Fixed

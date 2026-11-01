@@ -79,12 +79,13 @@ export function newScript(
     return call.includes("(") ? "" : call;
   };
   const other = options.you === 0 ? 1 : 0;
+  const lines = raw.map((l, i) => ({ you: stations[i] === options.you, text: fillText(l, options.user) }));
   return {
     script: true,
     stage: "script",
-    lines: raw.map((l, i) => ({ you: stations[i] === options.you, text: fillText(l, options.user) })),
+    lines,
     at: 0,
-    them: { call: callOf(other), name: "", qth: "", rst: "599", toneHz: TONE_HZ },
+    them: { call: callOf(other), name: nameIn(lines.filter((l) => !l.you)), qth: "", rst: "599", toneHz: TONE_HZ },
     you: callOf(options.you),
     last: "",
     asked: "",
@@ -92,6 +93,16 @@ export function newScript(
     speed: options.speed,
     search: NO_SEARCH,
   };
+}
+
+/** The station's name, as its lines send it: NAME IS JERRY, OP JERRY. Empty
+ *  when they send none. */
+function nameIn(lines: readonly ScriptLine[]): string {
+  for (const { text } of lines) {
+    const m = /(?:^|\s)(?:NAME|OP|NM)(?: IS| HR)*(?: IS)? ([A-Z]{2,})(?=\s|$)/.exec(text);
+    if (m && m[1] !== "IS" && m[1] !== "HR") return m[1]!;
+  }
+  return "";
 }
 
 /** Which station is you, as the text says: the one whose call is `call` or

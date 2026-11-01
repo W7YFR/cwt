@@ -241,7 +241,12 @@ export function hint(
   voice: Voice = PLAIN,
   them: Them = qso.them,
 ): string {
-  // A script: your next line, as it has it.
-  if (isScript(qso)) return yourLine(qso) ?? "";
+  // A script: your next line, with the station's call and name as you have
+  // them, as in every hint.
+  if (isScript(qso)) {
+    const swap = (line: string, word: string, to: string) =>
+      word ? line.replace(new RegExp(`(?<=^|\\s)${word.replace(/[/.]/g, "\\$&")}(?=\\s|$)`, "g"), to) : line;
+    return swap(swap(yourLine(qso) ?? "", qso.them.call, them.call), qso.them.name, them.name);
+  }
   return isRun(qso) ? run(qso, me, voice, them) : standard(qso, me, start, voice, them);
 }
