@@ -35,7 +35,7 @@ import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
-import { fromTop, isScript, newScript, openScript, stationFirst } from "@/qso/script";
+import { fromTop, isScript, newScript, openScript, stationFirst, type ScriptQso } from "@/qso/script";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
@@ -1215,6 +1215,9 @@ export function QsoScreen({
   const [starting, setStarting] = useState(false);
   /** A script to work as the next session's QSO, set by Script. */
   const scriptNext = useRef<AnyQso | null>(null);
+  /** The script last saved: Restart, and Start after it ends, work it again
+   *  from the top. Clear forgets it. */
+  const scriptLast = useRef<ScriptQso | null>(null);
   const fresh = useRef<() => void>(() => {});
   fresh.current = () => {
     setStopped(false);
@@ -1239,6 +1242,9 @@ export function QsoScreen({
     fresh.current();
   }, [recorder]);
   const start = () => {
+    // A script, under way or the last saved, goes again from the top.
+    const now = qso.current;
+    if (!scriptNext.current) scriptNext.current = isScript(now) ? fromTop(now) : scriptLast.current;
     listen.stop();
     player.wake();
     replayOnStart.current = false;
@@ -1265,12 +1271,14 @@ export function QsoScreen({
     setScriptDraft(null);
     if (!script) return;
     scriptNext.current = script;
+    scriptLast.current = script;
     start();
   };
 
   /** Clear the log while no session runs: the page goes back to the guide. */
   const clear = () => {
     listen.stop();
+    scriptLast.current = null;
     pending.current = null;
     fresh.current();
     setStopped(true);
@@ -1787,7 +1795,10 @@ export function QsoScreen({
   const callShown = theirsShown || identified(qsoNo.current, them.call);
   const nameShown = theirsShown || heard(qsoNo.current, them.name);
   const suggestion =
-    recorder && phase === "listening" && (hints === "always" || (hints === "copied" && copiedRight()))
+    // A script always shows what is to be sent next: that is the exercise.
+    recorder &&
+    phase === "listening" &&
+    (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
       ? hint(
           qso.current,
           meOf(loadUser()),
