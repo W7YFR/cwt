@@ -14,7 +14,7 @@
  */
 
 import type { Timing } from "@/types";
-import { CHAR_TO_MORSE, keyableSymbols } from "@/morse";
+import { keyableSymbols, patternOf } from "@/morse";
 
 export interface SynthOptions {
   readonly toneHz?: number;
@@ -44,7 +44,7 @@ export function keyingPlan(
     if (wi > 0) plan.push([false, wordGap]);
     keyableSymbols(word).forEach((ch, li) => {
       if (li > 0) plan.push([false, charGap]);
-      const pattern = CHAR_TO_MORSE[ch]!;
+      const pattern = patternOf(ch)!;
       for (let ei = 0; ei < pattern.length; ei++) {
         if (ei > 0) plan.push([false, unit]);
         plan.push([true, pattern[ei] === "." ? unit : 3 * unit]);

@@ -176,9 +176,10 @@ export function tokenize(text: string): string[] {
  *
  * Anything with no Morse pattern is dropped rather than keyed as "?" — the
  * intended message is what a sender would have sent, and they cannot send a
- * character that has no code. */
+ * character that has no code. A prosign the table does not hold keys as its
+ * letters run together, as `patternOf` says. */
 export function keyableSymbols(word: string): string[] {
   return (String(word ?? "").toUpperCase().match(SYMBOL_RE) ?? []).filter(
-    (t) => t in CHAR_TO_MORSE,
+    (t) => patternOf(t) !== undefined,
   );
 }

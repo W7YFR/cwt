@@ -23,7 +23,7 @@ import { QRM_OFF_DB } from "@/copy/band";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
-import { isScript, makeScript, nameOf, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
+import { isScript, makeScript, nameOf, recordingScript, sendScript, timeIn, type Kind, type Script } from "@/copy/generate";
 import { speedOf, speedsOf } from "@/copy/measure";
 import { textScript } from "@/copy/text";
 import {
@@ -216,7 +216,8 @@ const GAPS: ReadonlyArray<Option<Gap>> = [
 ];
 const GAP_HELP =
   "The silence between one station's line and the next, in a generated QSO or your own text. " +
-  "A change applies to the QSO on the page. An opened recording keeps its own silences.";
+  "A change applies to the QSO on the page. An opened recording keeps its own silences, " +
+  "unless it plays at your speeds.";
 
 const WAIT_HELP =
   "It stops after each line, in a recording too, until you type what you heard and press " +
@@ -242,6 +243,11 @@ const SPEED_HELP =
   `MST ${FORMATS.mst.wpm.join(" to ")}, CWT ${FORMATS.cwt.wpm.join(" to ")}, and a standard QSO 15 to 25 wpm. ` +
   "Mine: every station at the sliders. Your own text is always at the sliders. A change applies to " +
   "the QSO on the page, and keeps your copy. Moving a slider chooses Mine.";
+
+const AT_MINE_HELP =
+  "An opened recording plays its lines sent again at the speed sliders, each station at its own pitch, " +
+  "with Between lines and the band settings as for a generated QSO. It sends what was read, so a " +
+  "letter read wrong is sent wrong. Off: the recording as opened. A change keeps your copy.";
 
 /** Where the page is, as its heading says in a word. */
 type CopyState = "reading" | "none" | "playing" | "over" | "paused" | "ready";
@@ -337,6 +343,7 @@ type OnOffKey =
   | "copyAllowEdits"
   | "copyShowSpeed"
   | "copyShowDownload"
+  | "copyRecordingAtMine"
   | "copyWait";
 
 /** An on or off setting kept as a preference, with its default. */
@@ -411,6 +418,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [allowEdits, setAllowEdits] = useOnOff("copyAllowEdits", false);
   const [showSpeed, setShowSpeed] = useOnOff("copyShowSpeed", true);
   const [showDownload, setShowDownload] = useOnOff("copyShowDownload", true);
+  const [atMine, setAtMine] = useOnOff("copyRecordingAtMine", false);
   /** How the next attempt copies. The attempt under way keeps its own. */
   const [inputPref, setInputPref] = useChoice("copyInput", "text");
   const [linesShow, setLinesShow] = useChoice("copyLines", "copy");
@@ -448,12 +456,29 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   /** How `script` is sent. Your own text has no format, so it is always at
    *  the sliders. */
   const sendingOf = (script: Script) => (script.kind === "text" ? { ...sending, speed: mine } : sending);
+  /** How a generated QSO is sent, as a key: it is sent again when this changes. */
+  const sendKey = `${gapSec}|${speedChoice}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}`;
+  /** How an opened recording plays, as a key: as opened (null), or sent
+   *  again at your speeds, as it is now. */
+  const playKey = atMine ? `${gapSec}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}` : null;
+  /** An opened recording's lines, sent again at your speeds. */
+  const sendRecording = (name: string, read: Recording): { audio: ArrayBuffer; rec: Recording } => {
+    const script = recordingScript(name, read, mine);
+    const sent = sendScript(script, sendingOf(script));
+    return { audio: encodeWavBuffer(sent.samples, sent.rate), rec: sent.rec };
+  };
 
   /** The recording: its name, its own bytes to play, and what was read. A
-   *  generated QSO has its script too. */
-  const [file, setFile] = useState<{ name: string; audio: ArrayBuffer; rec: Recording; script?: Script | undefined } | null>(
-    null,
-  );
+   *  generated QSO has its script too. An opened recording at your speeds
+   *  has what it was as opened in `read`, and the bytes and lines it plays
+   *  as sent again. */
+  const [file, setFile] = useState<{
+    name: string;
+    audio: ArrayBuffer;
+    rec: Recording;
+    script?: Script | undefined;
+    read?: { audio: ArrayBuffer; rec: Recording; with: string } | undefined;
+  } | null>(null);
   /** The recording kept from before is coming back. */
   const [recalling, setRecalling] = useState(true);
   const [reading, setReading] = useState(false);
@@ -542,7 +567,11 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         const script = isScript(stored.script) ? stored.script : undefined;
         const key = keyOf(stored.name, r, !!script);
         const back = recallKept(key, r, inputPref) ?? freshKept(key, r, inputPref);
-        setFile({ name: stored.name, audio, rec: r, script });
+        // At your speeds, your copy kept where it was in the recording sent again.
+        if (!script && playKey !== null) {
+          const sent = sendRecording(stored.name, r);
+          setFile({ name: stored.name, ...sent, read: { audio, rec: r, with: playKey } });
+        } else setFile({ name: stored.name, audio, rec: r, script });
         setKept(back);
         setPos(back.at);
       })
@@ -649,7 +678,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   /* A generated QSO sent again when its speed, gap, QSB or band changes, with your copy
      and where you are in it kept. A slider moves in steps, so this waits
      for it to settle. */
-  const sendKey = `${gapSec}|${speedChoice}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}`;
   const sentWith = useRef(sendKey);
   useEffect(() => {
     if (!file?.script || sentWith.current === sendKey) return;
@@ -675,6 +703,33 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file?.script]);
 
+  /* An opened recording, as opened or sent again at your speeds, as the
+     setting says, with your copy and where you are in it kept. A new
+     recording changes at once; a slider waits to settle. */
+  useEffect(() => {
+    if (!file || file.script || (file.read?.with ?? null) === playKey) return;
+    const t = setTimeout(
+      () => {
+        const read = file.read ?? { audio: file.audio, rec: file.rec };
+        const next = playKey === null ? read : sendRecording(file.name, read.rec);
+        const was = file.rec;
+        player.stop();
+        cancelLastLock();
+        setFile({
+          name: file.name,
+          audio: next.audio,
+          rec: next.rec,
+          read: playKey === null ? undefined : { audio: read.audio, rec: read.rec, with: playKey },
+        });
+        setPos((p) => timeIn(was, next.rec, p));
+        setKept((k) => (k ? { ...k, reached: timeIn(was, next.rec, k.reached), at: timeIn(was, next.rec, k.at) } : k));
+      },
+      file.read && playKey !== null ? 250 : 0,
+    );
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playKey, file]);
+
   useEffect(() => {
     fileTarget.current = (f) => void openFile(f);
     return () => {
@@ -686,18 +741,21 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   const duration = rec?.durationSec ?? 0;
   const ended = rec !== null && pos >= duration - 0.05;
-  /** A recording's speed, each station's, measured from what was read. */
-  const measured = useMemo(() => (rec && !file?.script ? speedsOf(rec) : null), [rec, file?.script]);
-  /** Each line of a recording, its speed, measured from it alone. */
-  const measuredLines = useMemo(
-    () => (rec && !file?.script ? rec.overs.map((o) => speedOf([o])) : null),
-    [rec, file?.script],
+  /** What the page sends: a generated QSO, your text, or an opened
+   *  recording's lines at your speeds. Undefined for a recording as opened. */
+  const sent = useMemo(
+    () => file?.script ?? (file?.read ? recordingScript(file.name, file.read.rec, mine) : undefined),
+    [file, mine],
   );
+  /** A recording's speed, each station's, measured from what was read. */
+  const measured = useMemo(() => (rec && !sent ? speedsOf(rec) : null), [rec, sent]);
+  /** Each line of a recording, its speed, measured from it alone. */
+  const measuredLines = useMemo(() => (rec && !sent ? rec.overs.map((o) => speedOf([o])) : null), [rec, sent]);
   /** The speed the QSO is sent at, as the page shows it: one speed, or the
    *  slowest to the fastest of its stations. A recording's is measured, so
    *  it says about. */
   const speedNow = ((): string | null => {
-    const script = file?.script;
+    const script = sent;
     const speeds = script
       ? script.stations.map((st) => sendingOf(script).speed ?? st.speed)
       : (measured ?? []).filter((sp): sp is Speed => sp !== null);
@@ -726,19 +784,19 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "copy";
   /** Whether a QSO sent from text has anything added as it is heard. */
-  const added = !!file?.script && anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
+  const added = !!sent && anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
   /** The QSO as it plays, with all that is added. A recording, as opened. */
   const downloadHeard = () => {
     if (!file) return;
-    if (!file.script) save(new Blob([file.audio]), file.name);
+    if (!sent) save(new Blob([file.audio]), file.name);
     else save(new Blob([file.audio], { type: "audio/wav" }), `${stem()}${added ? "-as-heard" : ""}.wav`);
   };
   /** A QSO sent from text, with nothing added. */
   const downloadClean = () => {
-    if (!file?.script) return;
+    if (!sent) return;
     const quiet = { qsbDb: 0, noiseDb: NOISE_OFF_DB, qrn: 0, qrmDb: QRM_OFF_DB };
-    const sent = sendScript(file.script, { ...sendingOf(file.script), ...quiet });
-    save(encodeWav(sent.samples, sent.rate), `${stem()}.wav`);
+    const clean = sendScript(sent, { ...sendingOf(sent), ...quiet });
+    save(encodeWav(clean.samples, clean.rate), `${stem()}.wav`);
   };
   /** Its lines as text, a blank line between them, as New exchange reads. */
   const downloadText = () => {
@@ -1373,16 +1431,16 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
    *  A recording's is measured from the line. */
   const lineSpeed = (i: number): React.ReactElement | null => {
     if (!showSpeed || !file) return null;
-    const line = file.script?.lines[i];
-    const speed = file.script
-      ? line && (sendingOf(file.script).speed ?? file.script.stations[line.station]!.speed)
+    const line = sent?.lines[i];
+    const speed = sent
+      ? line && (sendingOf(sent).speed ?? sent.stations[line.station]!.speed)
       : measuredLines?.[i];
     if (!speed) return null;
     return (
       <span
         className="lwpm"
         data-testid="copy-line-wpm"
-        title={file.script ? undefined : "Measured from the recording"}
+        title={sent ? undefined : "Measured from the recording"}
       >
         {fmtSpeed(speed)}
       </span>
@@ -1684,6 +1742,13 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     onChange={(v) => setSpeedChoice(v as SpeedChoice)}
                   />
                   <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
+                  <Check
+                    id="copy-recording-at-mine"
+                    label="Play an opened recording at my speeds"
+                    help={AT_MINE_HELP}
+                    checked={atMine}
+                    onChange={setAtMine}
+                  />
                 </div>
               </Section>
             </>
@@ -1801,7 +1866,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 <span
                   className="hint copyspeed"
                   data-testid="copy-sent-speed"
-                  title={file?.script ? "The speed it is sent at, from the settings" : "The speed it was sent at, measured from the recording"}
+                  title={sent ? "The speed it is sent at, from the settings" : "The speed it was sent at, measured from the recording"}
                 >
                   {speedNow}
                 </span>

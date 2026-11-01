@@ -113,6 +113,7 @@ describe("filling in your details", () => {
   it("names each symbol with no Morse once", () => {
     expect(unkeyable("CQ # DE {W1AW} #")).toEqual(["#", "{", "}"]);
     expect(unkeyable("CQ DE W1AW <SK> 5NN?")).toEqual([]);
+    expect(unkeyable("CQ <UN> <E>")).toEqual(["<E>"]);
   });
 });
 

@@ -7,7 +7,7 @@
  * the user's details. */
 
 import { loadCustomDrills, loadUser, type CustomDrill, type UserInfo } from "@/io/storage";
-import { BREAK, CHAR_TO_MORSE, normalizeMessage, tokenize } from "@/morse";
+import { BREAK, normalizeMessage, patternOf, tokenize } from "@/morse";
 
 export interface Drill {
   /** Stable across releases: keys and test ids are built from it. */
@@ -244,7 +244,7 @@ export function normalizeDrill(text: string): string {
 export function drillProblems(text: string): string[] {
   const unknown = slotsOf(text).filter((s) => !isSlot(s));
   const unkeyable = new Set(
-    tokenize(text.replace(SLOT_RE, " ")).filter((t) => t !== " " && !(t in CHAR_TO_MORSE)),
+    tokenize(text.replace(SLOT_RE, " ")).filter((t) => t !== " " && patternOf(t) === undefined),
   );
   return [
     ...unknown.map((s) => `{${s}} is not a slot.`),
