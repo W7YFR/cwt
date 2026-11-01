@@ -1396,7 +1396,8 @@ const showDownloads = () => tickSetting("show-downloads");
 
     // The header's own row, where the controls are smaller but the rule is the
     // same one. Per wrapped line, as above: the bar wraps on a narrow window.
-    const bar = [...container.querySelectorAll<HTMLElement>(".recordbar > *")];
+    // Not the visually hidden status text: it has no line to sit on.
+    const bar = [...container.querySelectorAll<HTMLElement>(".recordbar > :not(.visually-hidden)")];
     expect(bar.length).toBeGreaterThan(1);
     const barLines = new Map<number, number[]>();
     for (const el of bar) {

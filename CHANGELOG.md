@@ -7,6 +7,19 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.24.1 — 2026-11-01
+
+### Changed
+
+- On a phone, the pages no longer list their keyboard keys.
+- When a QSO ends, the Copy and QSO pages say Done.
+
+### Fixed
+
+- On a phone, each page's header no longer scatters its buttons. The name and the corner buttons share the first line, and the page switch and the page's buttons follow.
+- On the QSO page, **Clear** no longer hangs below the header on a narrow screen.
+- On a phone, a line's copy on the Copy page has the full width under the station, and no longer breaks one letter to a line. The slider has a line of its own.
+
 ## v1.24.0 — 2026-11-01
 
 ### Added

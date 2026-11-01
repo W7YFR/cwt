@@ -255,7 +255,7 @@ const STATE_WORDS: Record<CopyState, string> = {
   reading: "Reading",
   none: "Nothing to copy",
   playing: "Playing",
-  over: "Over",
+  over: "Done",
   paused: "Paused",
   ready: "Ready",
 };
@@ -1575,45 +1575,49 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
       <header>
         <HomeButton onHome={onHome} />
         <PageSwitch page="copy" onPage={onPage} />
-        <button
-          className={rec ? undefined : "primary"}
-          data-testid="copy-new"
-          disabled={reading || playing !== null}
-          title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
-          onClick={makeExchange}
-        >
-          Generate QSO
-        </button>
-        <button
-          data-testid="copy-text-open"
-          disabled={reading || playing !== null}
-          title="Paste or type an exchange of your own to copy, sent in CW"
-          onClick={editText}
-        >
-          New exchange
-        </button>
-        {/* Icon only, after Generate QSO and New exchange: a recording is the rarer way in,
-            as on the Send page. */}
-        <button
-          className="iconbtn copyopen"
-          data-testid="copy-open"
-          disabled={reading}
-          aria-label="Open a recording or a text file"
-          title="Open a recording of CW or a .txt file to copy, or drop one on the page"
-          onClick={pickFile}
-        >
-          <IconUpload />
-        </button>
-        {/* Always here, as on the other pages. Off while the recording plays
-            or before there is one. */}
-        <button
-          data-testid="copy-clear"
-          disabled={!rec || reading || playing !== null}
-          title="Close this QSO and clear every attempt"
-          onClick={clear}
-        >
-          Clear
-        </button>
+        {/* One row, as on the Send page: on a narrow screen it takes its own
+            line under the brand. */}
+        <div className="recordbar">
+          <button
+            className={rec ? undefined : "primary"}
+            data-testid="copy-new"
+            disabled={reading || playing !== null}
+            title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
+            onClick={makeExchange}
+          >
+            Generate QSO
+          </button>
+          <button
+            data-testid="copy-text-open"
+            disabled={reading || playing !== null}
+            title="Paste or type an exchange of your own to copy, sent in CW"
+            onClick={editText}
+          >
+            New exchange
+          </button>
+          {/* Icon only, after Generate QSO and New exchange: a recording is the rarer way in,
+              as on the Send page. */}
+          <button
+            className="iconbtn copyopen"
+            data-testid="copy-open"
+            disabled={reading}
+            aria-label="Open a recording or a text file"
+            title="Open a recording of CW or a .txt file to copy, or drop one on the page"
+            onClick={pickFile}
+          >
+            <IconUpload />
+          </button>
+          {/* Always here, as on the other pages. Off while the recording plays
+              or before there is one. */}
+          <button
+            data-testid="copy-clear"
+            disabled={!rec || reading || playing !== null}
+            title="Close this QSO and clear every attempt"
+            onClick={clear}
+          >
+            Clear
+          </button>
+        </div>
         <div className="cornergroup">
           <button className="iconbtn cornerbtn" aria-label="Configuration" title="Configuration" onClick={onConfigure}>
             <IconUser />
