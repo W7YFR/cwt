@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAR_TO_MORSE, MORSE_TO_CHAR, UNKNOWN, canonicalChar, decodePattern, patternOf, spelled } from "@/morse";
+import { CHAR_TO_MORSE, MORSE_TO_CHAR, UNKNOWN, canonicalChar, decodePattern, keyableSymbols, patternOf, spelled } from "@/morse";
 import { compareText, idealTimeline, pair, targetTiming } from "@/timing";
 import type { Timeline } from "@/types";
 
@@ -41,6 +41,11 @@ describe("a pattern with no character, spelled", () => {
     expect(patternOf("<KN>")).toBe(CHAR_TO_MORSE["<KN>"]);
     expect(patternOf("<E>")).toBeUndefined();
     expect(patternOf(UNKNOWN)).toBeUndefined();
+  });
+
+  it("keys a spelling the table does not hold, and drops what has no Morse", () => {
+    expect(keyableSymbols("A<UN>B")).toEqual(["A", "<UN>", "B"]);
+    expect(keyableSymbols("A#<E>B")).toEqual(["A", "B"]);
   });
 
   it("matches every spelling of one pattern", () => {

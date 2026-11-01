@@ -19,7 +19,7 @@
 
 import { slotsForNote, SLOTS, type Slot } from "@/drills";
 import type { UserInfo } from "@/io/storage";
-import { CHAR_TO_MORSE, tokenize } from "@/morse";
+import { patternOf, tokenize } from "@/morse";
 import type { Speed } from "@/qso/speed";
 import type { Script } from "./generate";
 
@@ -33,7 +33,7 @@ export function linesOf(text: string): string[] {
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((l) => l.toUpperCase().trim().split(/\s+/).join(" "))
-    .filter((l) => tokenize(l).some((t) => t in CHAR_TO_MORSE));
+    .filter((l) => tokenize(l).some((t) => patternOf(t) !== undefined));
 }
 
 /** The station a line names after DE: a call, or a note such as
@@ -96,7 +96,7 @@ export function fillText(text: string, user: UserInfo): string {
 /** The symbols in `text` with no Morse, each once. They are left out when
  *  it is sent. */
 export function unkeyable(text: string): string[] {
-  return [...new Set(tokenize(text).filter((t) => t !== " " && !(t in CHAR_TO_MORSE)))];
+  return [...new Set(tokenize(text).filter((t) => t !== " " && patternOf(t) === undefined))];
 }
 
 export interface TextOptions {

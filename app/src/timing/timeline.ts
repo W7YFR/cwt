@@ -9,7 +9,7 @@
 
 import type { Block, BlockKind, Char, Segment, Timeline, Timing } from "@/types";
 import { median } from "@/dsp/segments";
-import { BREAK, CHAR_TO_MORSE, decodePattern, keyableSymbols } from "@/morse";
+import { BREAK, decodePattern, keyableSymbols, patternOf } from "@/morse";
 
 /** Does this character open a word?
  *
@@ -240,7 +240,7 @@ export function idealTimeline(
         blocks.push(lead);
         t += charGap;
       }
-      const pattern = CHAR_TO_MORSE[ch]!;
+      const pattern = patternOf(ch)!;
       const pending: Block[] = [];
       const c0 = t;
       for (let ei = 0; ei < pattern.length; ei++) {

@@ -7,6 +7,16 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.24.0 — 2026-11-01
+
+### Added
+
+- **Play an opened recording at my speeds** on the Copy page sends a recording's lines again at the speed sliders, each station at its own pitch, with **Between lines** and the band settings. Your copy stays.
+
+### Changed
+
+- A prosign the app has no name for, such as `<UN>`, keys as its letters run together, in your own text and in drills.
+
 ## v1.23.0 — 2026-10-31
 
 ### Added

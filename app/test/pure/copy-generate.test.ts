@@ -2,7 +2,9 @@
  * sent from it. */
 
 import { describe, expect, it } from "vitest";
-import { PITCH_APART_HZ, makeScript, sendScript, type Kind } from "@/copy/generate";
+import { decodeRecording, type Recording } from "@/copy/decode";
+import { PITCH_APART_HZ, makeScript, recordingScript, sendScript, type Kind } from "@/copy/generate";
+import { charsOf } from "@/copy/lines";
 import { GUIDE_IDS } from "@/qso/examples";
 
 /** A fixed sequence, so each QSO is the same every run. */
@@ -91,5 +93,30 @@ describe("a generated QSO, sent", () => {
     expect(slow.rec.durationSec).toBeGreaterThan(sent.rec.durationSec);
     const longer = sendScript(script, { gapSec: 2 });
     expect(longer.rec.durationSec - sent.rec.durationSec).toBeCloseTo(script.lines.length - 1, 6);
+  });
+});
+
+describe("an opened recording, sent again at your speeds", () => {
+  const speed = { charWpm: 25, farnsworthWpm: 10 };
+  const chars = (rec: Recording) => rec.overs.map((o) => charsOf(o).map((c) => c.char));
+
+  it("sends each line as read, from its station, at its pitch, a character for each one read", () => {
+    const first = sendScript(makeScript({ kind: "cq", rand: seeded(5), length: "short" }), { gapSec: 1 });
+    const read = decodeRecording(first.samples, first.rate)!;
+    const again = sendScript(recordingScript("qso.wav", read, speed), { gapSec: 2, speed });
+    expect(again.rec.overs.map((o) => o.sender)).toEqual(read.overs.map((o) => o.sender));
+    expect(chars(again.rec)).toEqual(chars(read));
+    expect(again.rec.senders.map((s) => s.toneHz)).toEqual(read.senders.map((s) => s.toneHz));
+    expect(again.rec.durationSec).toBeGreaterThan(read.durationSec);
+  }, 30_000);
+
+  it("keys a pattern read with no name", () => {
+    const read: Recording = {
+      durationSec: 1,
+      senders: [{ toneHz: 600, call: null }],
+      overs: [{ sender: 0, text: "AB <UN> C", words: [], t0: 0, t1: 1 }],
+    };
+    const again = sendScript(recordingScript("qso.wav", read, speed), { gapSec: 1, speed });
+    expect(chars(again.rec)).toEqual([["A", "B", "<UN>", "C"]]);
   });
 });

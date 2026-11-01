@@ -657,6 +657,64 @@ describe("a generated QSO", () => {
   });
 });
 
+describe("an opened recording at my speeds", () => {
+  /** The length shown in the clock, in seconds. */
+  const length = () => {
+    const [m, s] = $('[data-testid="copy-clock"]')!.textContent!.split("/")[1]!.trim().split(":");
+    return Number(m) * 60 + Number(s);
+  };
+  const slow = { copyCharWpm: 10, copyFarnsworthWpm: 10 };
+  const atMine = () => $<HTMLInputElement>("#copy-recording-at-mine")!;
+
+  it("is sent again when the box is checked, with your copy kept, and as opened when it is cleared", async () => {
+    await open(slow);
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    const opened = length();
+    await click(button("panel-toggle"));
+    await click(atMine());
+    expect(loadPrefs().copyRecordingAtMine).toBe(true);
+    await until("the recording to be sent again", () => length() > opened);
+    expect(boxes()[0]!.value).toBe("CQ CQ");
+    expect(lines()).toHaveLength(1);
+    await click(atMine());
+    await until("the recording as opened", () => length() === opened);
+    expect(boxes()[0]!.value).toBe("CQ CQ");
+  });
+
+  it("sends each line from its own station, at the sliders", async () => {
+    await open({ ...slow, copyRecordingAtMine: true });
+    await playThrough();
+    expect(lines().map((l) => l.dataset.sender)).toEqual(["0", "1", "0"]);
+    const shown = lines().map((l) => l.querySelector('[data-testid="copy-line-wpm"]')?.textContent ?? "");
+    for (const text of shown) expect(Number(/^(\d+) wpm$/.exec(text)?.[1]), text).toBe(10);
+  });
+
+  it("follows the sliders", async () => {
+    await open({ ...slow, copyRecordingAtMine: true });
+    await wait(100);
+    const before = length();
+    await click(button("panel-toggle"));
+    await fill($<HTMLInputElement>("#wpm")!, "30");
+    await until("the recording to be sent again", () => length() < before);
+  });
+
+  it("comes back after a reload, sent again, with your copy", async () => {
+    await open({ ...slow, copyRecordingAtMine: true });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CQ");
+    const was = length();
+    await wait(300);
+
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount({ ...slow, copyRecordingAtMine: true });
+    await until("the recording to come back", () => state() === "paused");
+    expect(length()).toBe(was);
+    expect(boxes()[0]!.value).toBe("CQ CQ");
+  });
+});
+
 describe("Wait between lines", () => {
   /** Mount the page and generate a QSO that stops after each line. */
   async function locked(prefs: Prefs = {}): Promise<void> {

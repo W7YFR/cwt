@@ -549,6 +549,9 @@ export interface Prefs {
   copyShowSpeed?: boolean;
   /** Download shows under the QSO on the Copy page. Absent is on. */
   copyShowDownload?: boolean;
+  /** An opened recording on the Copy page plays its lines sent again at
+   *  your speeds. Absent is off. */
+  copyRecordingAtMine?: boolean;
   /** Which earlier attempts show while you try again on the Copy page: all,
    *  the last, or none, to go again clean. Absent is the last. */
   copyEarlier?: "all" | "last" | "none";
@@ -782,6 +785,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copyAllowEdits: isBool,
   copyShowSpeed: isBool,
   copyShowDownload: isBool,
+  copyRecordingAtMine: isBool,
   copyWait: isBool,
   copyEarlier: oneOf("all", "last", "none"),
   copyKind: oneOf("cq", "cwt", "sst", "mst", "pota"),

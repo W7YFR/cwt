@@ -233,6 +233,17 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
   };
 }
 
+/** An opened recording as a script: each line as read, from the station
+ *  that sent it, at that station's pitch, every station at `speed`. */
+export function recordingScript(name: string, rec: Recording, speed: Speed): Script {
+  return {
+    kind: "text",
+    title: name,
+    stations: rec.senders.map((s) => ({ call: s.call ?? "", toneHz: s.toneHz, speed })),
+    lines: rec.overs.map((o) => ({ station: o.sender, text: o.text })),
+  };
+}
+
 /** Another QSO for QRM to send: any kind, its lines in order. */
 export function qrmLines(rand: () => number): readonly QrmLine[] {
   const script = makeScript({ kind: GUIDE_IDS[Math.floor(rand() * GUIDE_IDS.length)]!, rand, qsos: 2 });
