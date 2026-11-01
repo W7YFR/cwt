@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.24.2 — 2026-11-01
+
 ### Fixed
 
 - In a run, CALL? or UR CALL? gets the station's call. The station no longer answers it with RST? or another of its own questions.
