@@ -2564,6 +2564,9 @@ header .modeswitch button { white-space: nowrap; }
   padding-left: 12px;
 }
 .qsolog .lend .lwpm { margin-left: 0; padding-left: 0; }
+/* The end of the line you are sending: there, so the text wraps short of it,
+   and not seen. */
+.qsolog .lend.reserve { visibility: hidden; }
 .qsolog .qsoplay { width: 24px; height: 24px; font-size: 11px; }
 /* The place of a button a line does not have, so the rest line up. */
 .qsolog .lspace { flex: 0 0 24px; width: 24px; height: 24px; }

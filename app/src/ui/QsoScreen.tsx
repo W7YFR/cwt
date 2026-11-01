@@ -2274,6 +2274,14 @@ export function QsoScreen({
                     {copy.text}
                     {copy.keying && <span className="keying"> {copy.keying}</span>}
                   </span>
+                  {/* The room the line's end takes once it is sent, kept
+                      empty while you send, so the text wraps where it will
+                      stay: the speed at your set speed until it is read. */}
+                  <span className="lend reserve" aria-hidden="true">
+                    {showSpeed && <span className="lwpm">{wpmOf(copy.sentWpm ?? speed)}</span>}
+                    {allowEdits && <span className="lspace" />}
+                    {playback === "always" && <span className="lspace" />}
+                  </span>
                 </li>
               )}
             </ol>

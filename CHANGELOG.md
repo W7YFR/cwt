@@ -20,6 +20,7 @@ nothing to the site. The next release carries them.
 ### Fixed
 
 - On the QSO page, a blurred line at the top or bottom of the log fades out instead of ending sharp.
+- On the QSO page, a long line you are sending wraps short of its speed, where it stays once sent.
 - On the QSO page, a question with its ? keyed apart, such as NAME ?, gets its answer, even with a character beside it that could not be read.
 
 ## v1.24.2 — 2026-11-01
