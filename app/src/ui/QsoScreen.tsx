@@ -35,6 +35,7 @@ import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
+import { isScript, newScript, openScript, stationFirst } from "@/qso/script";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
@@ -51,6 +52,7 @@ import { targetTiming } from "@/timing/model";
 import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
+import { CopyText } from "./CopyText";
 import { NEEDS_BAND, NEEDS_BAND_BETWEEN } from "./copy";
 import { Graded, RightOnly } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
@@ -380,7 +382,7 @@ function recallKept(): Kept | null {
   return {
     ...(k as Kept),
     // A QSO kept before `told` was added.
-    qso: isRun(k.qso as AnyQso)
+    qso: isRun(k.qso as AnyQso) || isScript(k.qso as AnyQso)
       ? (k.qso as AnyQso)
       : { ...(k.qso as Qso), told: Array.isArray((k.qso as Qso).told) ? (k.qso as Qso).told : [] },
     finished,
@@ -900,20 +902,26 @@ export function QsoScreen({
       if (closing.current !== null) {
         const n = closing.current;
         closing.current = null;
-        if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
-          setFinished(n);
-          setNote("Finish your copy.");
-        } else {
-          close(n);
-          setNote("");
-        }
-        ending.current = true;
-        void rec.discard();
+        endQso(n);
         return;
       }
       recorder?.restart();
       setPhase("listening");
     }, AFTER_REPLY_MS);
+  };
+
+  /** QSO `n` is over, and the session stops, so it can be played back.
+   *  With copy to grade, it waits for you to finish typing. */
+  const endQso = (n: number) => {
+    if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
+      setFinished(n);
+      setNote("Finish your copy.");
+    } else {
+      close(n);
+      setNote("");
+    }
+    ending.current = true;
+    void rec.discard();
   };
 
   /** QSO `n` of a run is over. Its copy is graded now, or when you start
@@ -955,6 +963,17 @@ export function QsoScreen({
     setNote("");
     sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
   };
+
+  /* A script that opens with the station's line: it sends as the session
+     starts, as the next station in a run calls. */
+  useEffect(() => {
+    const now = qso.current;
+    if (!recorder || phase !== "listening" || !isScript(now) || !stationFirst(now) || now.at !== 0) return;
+    const turn = openScript(now);
+    qso.current = turn.qso;
+    if (turn.ended) closing.current = qsoNo.current;
+    sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
+  }, [recorder, phase]);
 
   /** The station's over: after a short wait, it goes in the log and plays.
    *  `again` is a line already in the log to play once more, rather than a
@@ -1129,8 +1148,10 @@ export function QsoScreen({
 
     if (turn.reply === null) {
       // Your TU ended a QSO in a run, and the station sends nothing back.
+      // Your line ended a script.
       if (turn.ended) {
-        endInRun(n);
+        if (isRun(turn.qso)) endInRun(n);
+        else endQso(n);
         return;
       }
       setNote("No answer. Call CQ again.");
@@ -1158,6 +1179,8 @@ export function QsoScreen({
   /** The microphone is opening: the button says so at once, so the click
    *  is seen to land while the page waits to swap. */
   const [starting, setStarting] = useState(false);
+  /** A script to work as the next session's QSO, set by Script. */
+  const scriptNext = useRef<AnyQso | null>(null);
   const fresh = useRef<() => void>(() => {});
   fresh.current = () => {
     setStopped(false);
@@ -1171,7 +1194,8 @@ export function QsoScreen({
     qsoNo.current = 0;
     closing.current = null;
     setFinished(null);
-    qso.current = newQso(Math.random, "", speed);
+    qso.current = scriptNext.current ?? newQso(Math.random, "", speed);
+    scriptNext.current = null;
     setTheirSpeed(speed);
     answered.current = -1;
   };
@@ -1187,6 +1211,27 @@ export function QsoScreen({
     freshOnStart.current = true;
     setStarting(true);
     void rec.start().finally(() => setStarting(false));
+  };
+
+  /** Script: the text in the dialog, or null while it is closed. */
+  const [scriptDraft, setScriptDraft] = useState<{
+    text: string;
+    picks: readonly (number | null)[];
+    you: 0 | 1 | null;
+  } | null>(null);
+  const editScript = () => {
+    const p = loadPrefs();
+    setScriptDraft({ text: p.qsoScript ?? "", picks: p.qsoScriptPicks ?? [], you: p.qsoScriptYou ?? null });
+  };
+  /** The script in the dialog starts a new session, as Start does. */
+  const startScript = (next: { text: string; picks: (number | null)[]; you?: 0 | 1 }) => {
+    const you = next.you ?? 1;
+    savePrefs({ ...loadPrefs(), qsoScript: next.text, qsoScriptPicks: next.picks, qsoScriptYou: you });
+    const script = newScript(next.text, { picks: next.picks, you, user: loadUser(), speed });
+    setScriptDraft(null);
+    if (!script) return;
+    scriptNext.current = script;
+    start();
   };
 
   /** Clear the log while no session runs: the page goes back to the guide. */
@@ -1775,6 +1820,16 @@ export function QsoScreen({
         {/* One row, as on the Send page: on a narrow screen it takes its own
             line under the brand. */}
         <div className="recordbar">
+          {/* A QSO of your own, as on the Copy page. Off while a
+              session runs. */}
+          <button
+            data-testid="qso-script"
+            disabled={recorder !== null || starting}
+            title="Paste or type a whole QSO, both sides, and work it line by line"
+            onClick={editScript}
+          >
+            Script
+          </button>
           {/* Always here, as on the other pages. Off while a session runs or
               with nothing in the log. */}
           <button
@@ -2229,6 +2284,19 @@ export function QsoScreen({
           )}
         </div>
       </main>
+      {scriptDraft && (
+        <CopyText
+          text={scriptDraft.text}
+          picks={scriptDraft.picks}
+          you={scriptDraft.you}
+          onStart={startScript}
+          onCancel={() => setScriptDraft(null)}
+          onConfigureUser={() => {
+            setScriptDraft(null);
+            onConfigure();
+          }}
+        />
+      )}
     </>
   );
 }

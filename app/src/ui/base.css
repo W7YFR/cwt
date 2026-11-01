@@ -1389,7 +1389,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 }
 .dialog .fieldrow .hint { font-size: 12px; }
 
-/* New exchange on the Copy page: wider and taller than other dialogs, for
+/* Script, on the Copy and QSO pages: wider and taller than other dialogs, for
    a whole QSO and who sends each line. */
 .dialog.copytextdialog { width: min(1000px, 100%); }
 .sheet:has(.copytextdialog) { padding: 24px 16px; }

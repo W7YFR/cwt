@@ -1,7 +1,7 @@
 /* The Copy page: play a QSO in CW and copy it.
  *
  * Generate QSO makes a QSO: two stations, in a kind you choose, sent from
- * text, so the text is the answer key. New exchange gives the page text of
+ * text, so the text is the answer key. Script gives the page text of
  * your own to send the same way. Or you open a recording, and the
  * decoder reads it whole before you start, and what it reads is the key. The recording plays, and each over shows as a
  * line as it starts, with a box to copy it in. A line locks when the next
@@ -161,7 +161,7 @@ const SEEK_SLOT_HELP =
 
 const SHOW_DOWNLOAD_HELP =
   "Under the QSO, Download saves it as a WAV file, and Download text as a text file you can open " +
-  "in New exchange. With QSB, noise, QRN or QRM on a generated QSO or your own text, Download " +
+  "in Script. With QSB, noise, QRN or QRM on a generated QSO or your own text, Download " +
   "clean saves it without them, and Download as heard with them.";
 
 const SHOW_SPEED_HELP =
@@ -590,12 +590,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     rememberCopy({ ...kept, at: posRef.current });
   }, [kept, playing]);
 
-  /** New exchange, in the dialog: what the box starts with, and what the
+  /** Script, in the dialog: what the box starts with, and what the
    *  page calls it. Null when the dialog is closed. */
   const [textDraft, setTextDraft] = useState<{ text: string; title: string; picks: readonly (number | null)[] } | null>(
     null,
   );
-  /** New exchange: the text on the page to edit, or the text last given. */
+  /** Script: the text on the page to edit, or the text last given. */
   const editText = () => {
     const script = file?.script;
     if (script?.kind === "text") setTextDraft({ text: script.source ?? "", title: nameOf(script), picks: script.picks ?? [] });
@@ -798,7 +798,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
     const clean = sendScript(sent, { ...sendingOf(sent), ...quiet });
     save(encodeWav(clean.samples, clean.rate), `${stem()}.wav`);
   };
-  /** Its lines as text, a blank line between them, as New exchange reads. */
+  /** Its lines as text, a blank line between them, as Script reads. */
   const downloadText = () => {
     if (!file) return;
     const text = file.script ? file.script.lines.map((l) => l.text) : file.rec.overs.map((o) => o.text);
@@ -1590,12 +1590,12 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           <button
             data-testid="copy-text-open"
             disabled={reading || playing !== null}
-            title="Paste or type an exchange of your own to copy, sent in CW"
+            title="Paste or type a QSO of your own to copy, sent in CW"
             onClick={editText}
           >
-            New exchange
+            Script
           </button>
-          {/* Icon only, after Generate QSO and New exchange: a recording is the rarer way in,
+          {/* Icon only, after Generate QSO and Script: a recording is the rarer way in,
               as on the Send page. */}
           <button
             className="iconbtn copyopen"
@@ -2019,7 +2019,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 <button
                   type="button"
                   data-testid="copy-download-text"
-                  title="Save the QSO's lines as a text file, which New exchange can open"
+                  title="Save the QSO's lines as a text file, which Script can open"
                   onClick={downloadText}
                 >
                   <i className="ico">

@@ -1,4 +1,4 @@
-/* New exchange on the Copy page: text of your own to copy, and who sends each
+/* Script on the Copy page: text of your own to copy, and who sends each
  * line of it. The dialog hands over the text as typed and the stations set by
  * hand; the page makes the script. */
 
@@ -30,7 +30,7 @@ beforeEach(() => {
   saveUser({ ...EMPTY_USER, callsign: "W7YFR", name: "Rob" });
 });
 
-describe("New exchange", () => {
+describe("Script", () => {
   it("opens on the text, in upper case", () => {
     open({ text: "cq de w1aw" });
     expect(document.activeElement).toBe(box());

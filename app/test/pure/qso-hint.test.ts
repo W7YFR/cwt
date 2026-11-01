@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { newQso } from "@/qso/cq";
 import { FORMATS, FORMAT_IDS, type FormatId } from "@/qso/formats";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME, type Me, type Voice } from "@/qso/hint";
+import { isScript } from "@/qso/script";
 import { isRun, respond, type AnyQso, type RunContext } from "@/qso/run";
 
 const ME: Me = { call: "W7YFR", name: "ROB", qth: "PORTLAND OR", region: "OR", nr: "" };
@@ -110,7 +111,7 @@ describe("every wording of the hints", () => {
         const me: Me = { ...ME, ...places[seed % 2]!, name: names[seed % 3]!, rst: ["599", "579", "559"][seed % 3]! };
         const voice = { rand, hour: seed % 24 };
         const qso = workWorded(newQso(rand), { rand, hour: 10, length, region: me.region }, me, voice, null);
-        if (isRun(qso)) throw new Error("a run");
+        if (isRun(qso) || isScript(qso)) throw new Error("not a standard QSO");
         expect(qso.you).toBe(me.call);
         expect(qso.yourName).toBe(me.name);
         expect(qso.yourReport).toMatch(me.rst === "599" ? /^(599|5NN)$/ : new RegExp(`^${me.rst}$`));

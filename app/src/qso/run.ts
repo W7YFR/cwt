@@ -43,6 +43,7 @@ import {
   type Context,
   type Qso,
 } from "./cq";
+import { answerScript, isScript, type ScriptQso } from "./script";
 
 /** Your exchange, item by item: what the station has copied of it. */
 export interface Heard {
@@ -79,7 +80,7 @@ export interface RunQso {
   readonly askedAgn?: boolean;
 }
 
-export type AnyQso = Qso | RunQso;
+export type AnyQso = Qso | RunQso | ScriptQso;
 
 export function isRun(qso: AnyQso): qso is RunQso {
   return "format" in qso;
@@ -120,7 +121,8 @@ export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "
   };
 }
 
-/** The QSO after `qso`: the next station in a run, or a new standard QSO. */
+/** The QSO after `qso`: the next station in a run, or a new standard QSO.
+ *  After a script, a standard QSO too: a script plays once. */
 export function following(qso: AnyQso, rand: Rand, speed: Speed = DEFAULT_SPEED): AnyQso {
   if (isRun(qso)) return newRun(qso.format, rand, qso.made + 1, qso.them.call, qso.you);
   return newQso(rand, qso.you, speed);
@@ -582,6 +584,7 @@ function namedIn(over: Over): FormatId | null {
  * starts a run of it, or one of another format a new run. A plain CQ in a
  * run goes back to a standard QSO. */
 export function respond(qso: AnyQso, heard: string, context: RunContext = {}): RunTurn {
+  if (isScript(qso)) return answerScript(qso, heard, context);
   const { ear = STRICT, rand = Math.random, speed = DEFAULT_SPEED } = context;
   const fresh = isRun(qso) ? qso.stage === "waiting" : qso.stage === "cq";
   if (fresh) {

@@ -17,6 +17,7 @@
 import type { Qso } from "./cq";
 import { FORMATS } from "./formats";
 import { isRun, type AnyQso, type RunQso } from "./run";
+import { isScript } from "./script";
 import { gradeCopy } from "./show";
 import { regionOf } from "./station";
 
@@ -174,6 +175,8 @@ function runRows(qso: RunQso, lines: readonly TheirLine[], me: Meant): ReportRow
  *  station took any of your exchange has nothing of yours to check: you may
  *  not have sent it. */
 export function exchangeReport(qso: AnyQso, lines: readonly TheirLine[], me: Meant): ReportRow[] {
+  // A script has no exchange items to check, only its lines.
+  if (isScript(qso)) return [];
   const rows = isRun(qso) ? runRows(qso, lines, me) : standardRows(qso, lines, me);
   const early = isRun(qso) ? qso.stage !== "exchanged" : ["cq", "asking", "called"].includes(qso.stage);
   const none = rows.every((r) => r.from !== "you" || r.label === "Call" || !r.copied);

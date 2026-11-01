@@ -16,6 +16,7 @@
 import { sentPieces, type Qso } from "./cq";
 import { FORMATS, type FormatId } from "./formats";
 import { isRun, type AnyQso, type RunQso } from "./run";
+import { isScript, yourLine } from "./script";
 import { REGIONS } from "./formats";
 import { pick, type Rand } from "./station";
 import { greeting, type Piece } from "./wording";
@@ -240,5 +241,7 @@ export function hint(
   voice: Voice = PLAIN,
   them: Them = qso.them,
 ): string {
+  // A script: your next line, as it has it.
+  if (isScript(qso)) return yourLine(qso) ?? "";
   return isRun(qso) ? run(qso, me, voice, them) : standard(qso, me, start, voice, them);
 }

@@ -7,6 +7,14 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Script** on the QSO page works a QSO you paste or type, both sides, line by line. The station sends its lines and waits for each of yours: word for word with **Strict**, close enough with **Lenient**.
+
+### Changed
+
+- **New exchange** on the Copy page is now **Script**, as on the QSO page.
+
 ## v1.24.2 — 2026-11-01
 
 ### Fixed

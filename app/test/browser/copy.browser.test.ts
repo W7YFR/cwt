@@ -965,7 +965,7 @@ describe("Allow edits", () => {
   });
 });
 
-describe("New exchange", () => {
+describe("Script", () => {
   const SLOW = { copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 } as const;
   const QSO = "CQ DE W1AW K\n\nW1AW DE K7ABC\n\nNAME BOB K\n\nR R";
   const textBox = () => $<HTMLTextAreaElement>('[data-testid="copy-text-box"]');
@@ -980,7 +980,7 @@ describe("New exchange", () => {
     });
   }
 
-  /** Mount the page and send `text` from New exchange. */
+  /** Mount the page and send `text` from Script. */
   async function own(text: string, prefs: Prefs = {}): Promise<void> {
     mount({ ...SLOW, ...prefs });
     await until("the page to settle", () => state() === "none");
@@ -1039,7 +1039,7 @@ describe("New exchange", () => {
     expect(rows().map((r) => Number(r.dataset.station))).toEqual([0, 1, 1, 1]);
   });
 
-  it("opens a .txt file in New exchange, named for the file", async () => {
+  it("opens a .txt file in Script, named for the file", async () => {
     mount(SLOW);
     await until("the page to settle", () => state() === "none");
     await act(async () => fileTarget.current!(new File(["CQ DE W1AW K\n\nW1AW DE K7ABC K"], "homework.txt", { type: "text/plain" })));
