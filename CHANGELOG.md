@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- On a phone, the header of each page no longer scatters its buttons over several lines. The name and the corner buttons share the first line, the page switch has the next, and the page's buttons the line under it.
+- On the QSO page, **Clear** no longer hangs below the header on a narrow screen.
+
 ## v1.24.0 — 2026-11-01
 
 ### Added

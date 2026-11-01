@@ -1772,16 +1772,20 @@ export function QsoScreen({
       <header>
         <HomeButton onHome={onHome} disabled={recorder !== null} />
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
-        {/* Always here, as on the other pages. Off while a session runs or
-            with nothing in the log. */}
-        <button
-          data-testid="qso-clear"
-          disabled={recorder !== null || starting || lines.length === 0}
-          title="Clear the log of every QSO"
-          onClick={clear}
-        >
-          Clear
-        </button>
+        {/* One row, as on the Send page: on a narrow screen it takes its own
+            line under the brand. */}
+        <div className="recordbar">
+          {/* Always here, as on the other pages. Off while a session runs or
+              with nothing in the log. */}
+          <button
+            data-testid="qso-clear"
+            disabled={recorder !== null || starting || lines.length === 0}
+            title="Clear the log of every QSO"
+            onClick={clear}
+          >
+            Clear
+          </button>
+        </div>
         <div className="cornergroup">
           <button
             className="iconbtn cornerbtn"
