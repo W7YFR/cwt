@@ -148,6 +148,11 @@ function sendTheirs(qso: ScriptQso): ScriptTurn {
   };
 }
 
+/** The script from its first line again, at the speed it is at. */
+export function fromTop(qso: ScriptQso): ScriptQso {
+  return { ...qso, stage: "script", at: 0, last: "", asked: "", heard: {} };
+}
+
 /** The station opens the QSO, when the script starts with its line. */
 export function openScript(qso: ScriptQso): ScriptTurn {
   return sendTheirs(qso);

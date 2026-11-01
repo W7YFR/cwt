@@ -35,7 +35,7 @@ import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
-import { isScript, newScript, openScript, stationFirst } from "@/qso/script";
+import { fromTop, isScript, newScript, openScript, stationFirst } from "@/qso/script";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
@@ -774,6 +774,10 @@ export function QsoScreen({
    *  Continue. */
   const goRef = useRef<() => void>(() => {});
   const goKey = useCallback(() => goRef.current(), []);
+  /** R in a session: your turn again, or a script from the top. Bound
+   *  below, once the recorder is. */
+  const restartRef = useRef<() => void>(() => {});
+  const restartKey = useCallback(() => restartRef.current(), []);
 
   const rec = useRecorder({
     deviceId,
@@ -782,6 +786,7 @@ export function QsoScreen({
     onStart: quiet,
     onEnterKey: pauseKey,
     onStartKey: goKey,
+    onRestartKey: restartKey,
     // Only read with nothing recording, so this is paused.
     enterStarts: !stopped && lines.length > 0,
     startKey: true,
@@ -964,16 +969,45 @@ export function QsoScreen({
     sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
   };
 
-  /* A script that opens with the station's line: it sends as the session
-     starts, as the next station in a run calls. */
-  useEffect(() => {
+  /** A script that opens with the station's line: it sends now. */
+  const openScriptNow = () => {
     const now = qso.current;
-    if (!recorder || phase !== "listening" || !isScript(now) || !stationFirst(now) || now.at !== 0) return;
+    if (!isScript(now) || !stationFirst(now) || now.at !== 0) return;
     const turn = openScript(now);
     qso.current = turn.qso;
     if (turn.ended) closing.current = qsoNo.current;
     sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
+  };
+  /* It sends as the session starts, as the next station in a run calls. */
+  useEffect(() => {
+    if (recorder && phase === "listening") openScriptNow();
   }, [recorder, phase]);
+
+  /* R in a session restarts your turn. In a script, before you key, it
+     starts the script over: the station stops, the attempt stays in the log
+     as a QSO of its own, and the script goes again from its first line. */
+  restartRef.current = () => {
+    const now = qso.current;
+    if (!recorder) return;
+    if (!isScript(now) || (phase === "listening" && isSending(copy.text))) {
+      rec.restart();
+      return;
+    }
+    quiet();
+    pending.current = null;
+    closing.current = null;
+    setPlaying(null);
+    const n = qsoNo.current;
+    if (lines.some((l) => l.qso === n)) {
+      setEnds((e) => ({ ...e, [n]: now }));
+      close(n);
+      qsoNo.current++;
+    }
+    qso.current = fromTop(now);
+    setNote("");
+    rec.restart();
+    openScriptNow();
+  };
 
   /** The station's over: after a short wait, it goes in the log and plays.
    *  `again` is a line already in the log to play once more, rather than a
@@ -1482,6 +1516,8 @@ export function QsoScreen({
         nr: user.cwopsNumber.trim(),
       },
     );
+    // A script has no exchange items to check.
+    if (rows.length === 0) return null;
     const call = done.them.call;
     const group = (from: "them" | "you", sent: string, copied: string) => (
       <>
@@ -2265,7 +2301,8 @@ export function QsoScreen({
             )}
             {recorder && (
               <p className="legend keys" data-testid="qso-hotkeys">
-                <kbd>R</kbd> restart your turn &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
+                <kbd>R</kbd> {isScript(qso.current) ? "restart your turn, or the script before you key" : "restart your turn"}{" "}
+                &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
                 <kbd>Esc</kbd> stop
                 {playback === "always" && (
                   <>
