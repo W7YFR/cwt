@@ -230,8 +230,15 @@ describe("the station asks again", () => {
   });
 
   it("sends its call for AGN or ? after its own AGN?", () => {
-    for (const ask of ["?", "AGN", "UR CALL ?", "CALL?"]) {
+    for (const ask of ["?", "AGN"]) {
       expect(work(called("pota"), ["K4ABC", ask, ask]).replies).toEqual(["AGN?", "K4ABC", "K4ABC"]);
+    }
+  });
+
+  it("sends its call twice for CALL?, whatever it asked before", () => {
+    for (const ask of ["CALL?", "UR CALL ?", "UR CALL?", "PSE CALL?", "CALL ?"]) {
+      expect(work(called("pota"), ["K4ABC", ask]).replies[1]).toBe("K4ABC K4ABC");
+      expect(work(called("pota"), ["K4ABC WA", ask, ask]).replies, "after RST?").toEqual(["RST?", "K4ABC K4ABC", "K4ABC K4ABC"]);
     }
   });
 

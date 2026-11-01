@@ -502,9 +502,15 @@ export class Over {
       if (w === "?") {
         const prev = i > 0 ? words[i - 1]! : "";
         const item = theirs(prev);
+        // Part of its call keyed apart, as N 8 V ?: up to four words before
+        // the ? read as one.
+        const apart = [2, 3, 4].find((n) => n <= kept.length && partOfCall(kept.slice(-n).join("")));
         if (item) check(item);
         else if (partOfCall(prev)) add(asked, "call");
-        else kept.push(w);
+        else if (apart) {
+          kept.splice(-apart);
+          add(asked, "call");
+        } else kept.push(w);
         continue;
       }
       const bare = w.replace(/\?+$/, "");
@@ -791,6 +797,12 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
   const paced = pace(qso, over, (slower) => wording.cannotChange(voice(qso), slower));
   if (paced?.reply) return { qso: paced.qso, reply: paced.reply, ended: false };
   if (paced) qso = paced.qso;
+
+  // Its whole call with a ?, once past the call: yes, that is it. Not kept
+  // as the last over, so AGN after it still means the part it is on.
+  if (qso.stage !== "cq" && qso.stage !== "asking" && qso.stage !== "called" && over.asksAbout(them.call)) {
+    return { qso, reply: wording.confirmCall(voice(qso)), ended: false };
+  }
 
   if (qso.stage !== "cq" && qso.stage !== "asking") {
     // Your name, and each piece of your exchange, whenever you send them.

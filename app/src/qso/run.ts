@@ -75,6 +75,8 @@ export interface RunQso {
   /** What it has of your exchange so far, from every over. Absent in a QSO
    *  kept before there was one. */
   readonly got?: Heard;
+  /** Its last over was AGN?, which is not kept as `last`. */
+  readonly askedAgn?: boolean;
 }
 
 export type AnyQso = Qso | RunQso;
@@ -131,7 +133,7 @@ export function callIn(qso: RunQso, rand: Rand = Math.random): RunTurn {
 }
 
 function say(qso: RunQso, reply: string, stage: RunStage = qso.stage): RunTurn {
-  return { qso: { ...qso, stage, last: reply }, reply, ended: false };
+  return { qso: { ...qso, stage, last: reply, askedAgn: false }, reply, ended: false };
 }
 
 /** Words around an exchange that are not part of it. */
@@ -168,7 +170,12 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   const report = reportIn(words);
   const named = FORMATS[format].yours.includes("name");
   const isName = (w: string | undefined) => w !== undefined && /^[A-Z]{2,}$/.test(w);
-  let at = named ? rest.findIndex((w) => isName(w)) : -1;
+  // A region alone, as WA, is a region, not a name: a name that is also a
+  // region, as AL, needs a number or a region after it.
+  const nameAt = (i: number) =>
+    isName(rest[i]) &&
+    (!isRegion(rest[i]!) || words.slice(words.indexOf(rest[i]!) + 1).some((w) => numberOf(w) !== null || isRegion(w)));
+  let at = named ? rest.findIndex((_, i) => nameAt(i)) : -1;
   if (at >= 0 && rest[at] === theirs && isName(rest[at + 1]) && !isRegion(rest[at + 1]!)) at++;
   const name = at >= 0 ? rest[at]! : "";
   const after = rest.slice(at + 1);
@@ -439,9 +446,23 @@ function checksRight(qso: RunQso, over: Over): boolean {
   return checked.length > 0 && checked.every((w) => values.has(cut(w)));
 }
 
-/** Whether `over` asks for the last over again: AGN, ?, QRZ? or CALL?. */
+/** Whether `over` asks for the last over again: AGN, ? or QRZ?. */
 function asksAgain(over: Over): boolean {
-  return over.has("AGN") || over.words.some((w) => ["?", "AGN?", "QRZ?", "CALL?"].includes(w));
+  return over.has("AGN") || over.words.some((w) => ["?", "AGN?", "QRZ?"].includes(w));
+}
+
+/** Whether `over` asks for the station's call: CALL?, UR CALL? or PSE CALL,
+ *  with the ? on the word or after it. */
+function asksCall(over: Over): boolean {
+  const { words } = over;
+  return words.some((w, i) => w === "CALL?" || (w === "CALL" && (words[i + 1] === "?" || words.includes("PSE"))));
+}
+
+/** Whether `heard` holds an item of `format`'s exchange. CWT takes a region
+ *  in place of a number. */
+function holdsItem(format: FormatId, heard: Heard): boolean {
+  const items: Item[] = format === "cwt" ? [...FORMATS[format].yours, "region"] : [...FORMATS[format].yours];
+  return items.some((item) => heard[item] !== "");
 }
 
 /** The station's answer to one over you sent, in a run. */
@@ -483,16 +504,20 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
           return part.length >= 2 && c.includes(part);
         });
       });
-      if (checks) return say(qso, `${c} ${c}`);
+      if (checks || asksCall(over)) return say(qso, `${c} ${c}`);
       // After it asked for one item, your over is read as that item.
       // Lenient copy reads words run together apart. Its call, and yours,
       // are not part of the exchange, keyed apart or a character off.
       const mine = [c, qso.you, ear.saved].filter(Boolean);
       const words = withoutCalls(ear.lenient ? unglued(over.words) : over.words, mine, c);
       const asked = (Object.keys(ASK) as Item[]).find((item) => ASK[item] === qso.last);
-      const fresh = asked
-        ? answerFor(asked, words, region, ear.lenient)
-        : heardIn(qso.format, words, region, them.name, ear.lenient);
+      // CWT takes a region in place of a number, so NR? is answered by one.
+      const answered = asked ? answerFor(asked, words, region, ear.lenient) : null;
+      const fresh = !answered
+        ? heardIn(qso.format, words, region, them.name, ear.lenient)
+        : asked === "number" && qso.format === "cwt" && !answered.number
+          ? { ...answered, region: answerFor("region", words, region, ear.lenient).region }
+          : answered;
       const had = qso.got ?? NOTHING;
       const got = merged(had, fresh);
       // Its call sent wrong: another call, or its own a character off, as
@@ -503,15 +528,22 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       const missing = lacking(qso.format, got);
       const before = { ...qso, got };
       if (missing.length > 0) {
-        const nothing = !fresh.name && !fresh.number && !fresh.region && !fresh.report;
+        const nothing = !holdsItem(qso.format, fresh);
         // Nothing new: AGN gets its last over again, a check of its call
         // sent wrong, as AEH?, gets its call, and an over it cannot read
         // gets AGN?, or the item it still lacks. Its AGN? is not its last
         // over: AGN after it gets its call, or the item it asked for.
         if (nothing && asksAgain(over)) return say(before, qso.last);
+        // An item of its own exchange asked for before it has sent it, as
+        // RST?: that item.
+        const item = nothing ? askedItem(over) : null;
+        const value = item ? itemOf(qso, item, rand) : null;
+        if (value) return say(before, value);
         if (nothing && over.words.some((w) => w.endsWith("?"))) return say(before, `${c} ${c}`);
-        if (lacking(qso.format, had).length === FORMATS[qso.format].yours.length && nothing) {
-          return { qso: before, reply: pick(rand, ["AGN?", "?"]), ended: false };
+        // AGN? once. After it, the item it still lacks, so it never asks
+        // AGN? over and over.
+        if (lacking(qso.format, had).length === FORMATS[qso.format].yours.length && nothing && !qso.askedAgn) {
+          return { qso: { ...before, askedAgn: true }, reply: pick(rand, ["AGN?", "?"]), ended: false };
         }
         return say(before, ASK[missing[0]!]);
       }
@@ -523,6 +555,7 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       // Its items sent back right with a ?: yes, that is it. First, as QTH
       // GA? checks its QTH and does not ask for it.
       if (checksRight(qso, over)) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
+      if (asksCall(over)) return say(qso, `${c} ${c}`);
       const item = askedItem(over);
       if (item) return say(qso, itemOf(qso, item, rand) ?? qso.last);
       if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last);
