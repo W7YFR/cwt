@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.24.1 — 2026-11-01
+
 ### Changed
 
 - On a phone, the pages no longer list their keyboard keys.
