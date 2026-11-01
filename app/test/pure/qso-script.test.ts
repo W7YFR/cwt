@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { EMPTY_USER, type UserInfo } from "@/io/storage";
 import { hint, type Me, type Them } from "@/qso/hint";
 import { respond, type AnyQso, type RunContext } from "@/qso/run";
-import { fromTop, isScript, newScript, openScript, stationFirst, youIn, yourLine, type ScriptQso } from "@/qso/script";
+import { fromTop, isScript, newScript, openScript, scriptReport, stationFirst, youIn, yourLine, type ScriptQso } from "@/qso/script";
 
 const SPEED = { charWpm: 20, farnsworthWpm: 20 };
 
@@ -272,6 +272,45 @@ describe("notes not filled in from User", () => {
   it("are left out of the station's line when you never sent them", () => {
     const qso = script("CQ DE K6RB K\n\nK6RB DE (your call) K\n\nTU (your name) 73", UNSET);
     expect(work(openScript(qso).qso, ["K6RB DE K7ABC K"]).replies[0]).toBe("TU 73");
+  });
+});
+
+describe("the report at the end", () => {
+  it("tells how each line of yours went: tries, asks each way, and how much came through", () => {
+    const yours = [
+      "AC4BT DE W7YFR W7YFR",
+      "AC4BT DE W7YFR W7YFR K",
+      "UR NAME ?",
+      "QTH ?",
+      "AGN",
+      "QRS",
+      "E T",
+      "AC4BT DE W7YFR R GUD CPY JERRY ES TU FER RPT FM VA UR RST IS 569 IN SEATTLE EEEEEEEE NAME IS ROB HW? AC4BT DE W7YFR K",
+    ];
+    const { qso } = work(openScript(script(AC4BT, SET)).qso, yours);
+    const rows = scriptReport(qso);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ tries: 2, again: 1, asked: [], right: 1, errorSigns: 0 });
+    expect(rows[1]).toMatchObject({ tries: 6, again: 1, asked: ["NAME", "QTH", "AGN", "QRS"], right: 1, errorSigns: 1 });
+    expect(rows[1]!.line).toMatch(/^AC4BT DE W7YFR R GUD CPY/);
+  });
+
+  it("counts what did not come through of the line it took", () => {
+    const lenient = work(openScript(script(AC4BT, SET)).qso, ["AC4BT DE W7YFR W7YF K"], LENIENT_EAR).qso;
+    const [row] = scriptReport(lenient);
+    expect(row!.tries).toBe(1);
+    expect(row!.right).toBeGreaterThan(0.9);
+    expect(row!.right).toBeLessThan(1);
+  });
+
+  it("has a line it never took, with no part right", () => {
+    const { qso } = work(openScript(script(AC4BT, SET)).qso, ["E", "T"]);
+    expect(scriptReport(qso)).toEqual([expect.objectContaining({ tries: 2, again: 2, right: null })]);
+  });
+
+  it("starts afresh from the top", () => {
+    const { qso } = work(openScript(script(AC4BT, SET)).qso, ["E", "AC4BT DE W7YFR W7YFR K"]);
+    expect(scriptReport(fromTop(qso))).toEqual([]);
   });
 });
 

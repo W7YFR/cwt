@@ -35,7 +35,7 @@ import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
-import { fromTop, isScript, newScript, openScript, stationFirst, type ScriptQso } from "@/qso/script";
+import { fromTop, isScript, newScript, openScript, scriptReport, stationFirst, type ScriptQso } from "@/qso/script";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
@@ -269,6 +269,10 @@ const SHOW_DOWNLOAD_HELP =
   "Under a QSO that is over, Download saves it as a WAV file. With QSB, noise, QRN or QRM on, " +
   "Download clean saves it without them, and Download as heard with them.";
 
+const SCRIPT_REPORT_HELP =
+  "Beside a script QSO that is over: how often the station asked you to repeat, how many of your " +
+  "lines it took with nothing wrong in them, your error signs, and what you asked the station for.";
+
 const DOWNLOAD_HEARD_HELP =
   "Save the QSO with the QSB, noise, QRN and QRM set now. They are made again, so they are not " +
   "the same as you heard live.";
@@ -447,6 +451,7 @@ function useOnOff(
     | "qsoBlurCall"
     | "qsoReplay"
     | "qsoShowDownload"
+    | "qsoScriptReport"
     | "qsoSideGuide"
     | "qsoGradeTyping"
     | "qsoAllowEdits"
@@ -558,6 +563,7 @@ export function QsoScreen({
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
   const [replayOnContinue, setReplayOnContinue] = useOnOff("qsoReplay", true);
   const [showDownload, setShowDownload] = useOnOff("qsoShowDownload", true);
+  const [scriptReportOn, setScriptReportOn] = useOnOff("qsoScriptReport", false);
   const [playback, setPlaybackRaw] = useState<Playback>(() => loadPrefs().qsoPlayback ?? "always");
   const setPlayback = (next: Playback) => {
     setPlaybackRaw(next);
@@ -1505,9 +1511,54 @@ export function QsoScreen({
   /** Play QSO and Download, under the last line of QSO `n` once it is over. */
   /** Under a QSO that is over: each item of the exchange as one side sent
    *  it and the other copied it, with what went wrong marked. */
+  /** A script's report, read at a glance: how often the station asked you
+   *  to repeat, how many of your lines got through clean, your error signs,
+   *  and what you asked for. None for a QSO kept before the station kept
+   *  count. */
+  const scriptReportOf = (done: ScriptQso): React.ReactElement | null => {
+    if (!scriptReportOn) return null;
+    const rows = scriptReport(done);
+    if (rows.length === 0 || !done.tally) return null;
+    const repeats = rows.reduce((sum, r) => sum + r.again, 0);
+    const errorSigns = rows.reduce((sum, r) => sum + r.errorSigns, 0);
+    // Clean: every character of the line, and nothing else in the over.
+    const clean = rows.filter((r) => {
+      if (!r.accepted) return false;
+      const grade = gradeCopy(r.line, r.accepted);
+      return grade.right === grade.total && grade.yours.every((m) => m.ok !== false);
+    }).length;
+    const asked = rows.flatMap((r) => r.asked);
+    const counts = [...new Set(asked)]
+      .map((w) => ({ w, k: asked.filter((x) => x === w).length }))
+      .sort((a, b) => b.k - a.k);
+    const row = (label: string, value: string, testId: string) => (
+      <tr>
+        <th scope="row">{label}</th>
+        <td data-testid={testId}>{value}</td>
+      </tr>
+    );
+    return (
+      <div className="qsoreport" data-testid="qso-report">
+        <table>
+          <tbody>
+            {row("Repeats", String(repeats), "qso-script-repeats")}
+            {row("Clean lines", `${clean} of ${rows.length}`, "qso-script-clean")}
+            {row("Error signs", String(errorSigns), "qso-script-errors")}
+            {row(
+              "You asked",
+              counts.length === 0 ? "—" : counts.map(({ w, k }) => (k > 1 ? `${w} ×${k}` : w)).join(" · "),
+              "qso-script-asked",
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   const qsoReport = (n: number): React.ReactElement | null => {
     const done = ends[n];
     if (!closed.includes(n) || !done) return null;
+    if (isScript(done)) return scriptReportOf(done);
     const theirLines = lines.filter((l) => l.qso === n && !l.you);
     if (theirLines.length === 0) return null;
     const user = loadUser();
@@ -2078,6 +2129,13 @@ export function QsoScreen({
                       help={SHOW_DOWNLOAD_HELP}
                       checked={showDownload}
                       onChange={setShowDownload}
+                    />
+                    <Check
+                      id="qso-script-report"
+                      label="Show a report after a script"
+                      help={SCRIPT_REPORT_HELP}
+                      checked={scriptReportOn}
+                      onChange={setScriptReportOn}
                     />
                     <SettingRow label="After a pause">
                       <Check

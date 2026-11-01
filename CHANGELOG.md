@@ -12,6 +12,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Script** on the QSO page works a QSO you paste or type, both sides, line by line. The station sends its lines and waits for each of yours: word for word with **Strict**, close enough with **Lenient**.
+- **Show a report after a script** puts a summary beside a finished **Script** QSO: repeats, clean lines, error signs, and what you asked the station for. It is off by default.
 
 ### Changed
 

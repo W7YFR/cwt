@@ -18,7 +18,8 @@
 
 import { fillText, guessStations, linesOf, stationsOf } from "@/copy/text";
 import type { UserInfo } from "@/io/storage";
-import { Over, STRICT, isCall, pace, wordsOf, type Context } from "./cq";
+import { UNKNOWN } from "@/morse";
+import { Over, STRICT, isCall, isErrorSign, pace, wordsOf, type Context } from "./cq";
 import { REGIONS } from "./formats";
 import * as wording from "./wording";
 import { NO_SEARCH, type Search, type Speed } from "./speed";
@@ -51,7 +52,34 @@ export interface ScriptQso {
   /** What you sent in place of each note not filled in, as (YOUR NAME): the
    *  station uses it in its own lines, and your later lines need it. */
   readonly heard: Readonly<Record<string, string>>;
+  /** How each line of yours went, by the place it starts at. Absent in a QSO
+   *  kept before there was one. */
+  readonly tally?: Readonly<Record<number, LineTally>>;
 }
+
+/** Every over you sent while the script waited on one line of yours. */
+export interface LineTally {
+  /** Your overs, the one it took among them. */
+  readonly tries: number;
+  /** The times it could not take your over and asked again. */
+  readonly again: number;
+  /** What you asked it, in order: NAME, QTH, RST, CALL, AGN, QRS or QRQ. */
+  readonly asked: readonly string[];
+  /** The over it took, or empty while it waits. */
+  readonly accepted: string;
+}
+
+const NO_TALLY: LineTally = { tries: 0, again: 0, asked: [], accepted: "" };
+
+/** `qso` with one more over on the tally of the line it waits on. */
+function tallied(qso: ScriptQso, change: (t: LineTally) => Partial<LineTally>): ScriptQso {
+  const was = qso.tally?.[qso.at] ?? NO_TALLY;
+  const now = { ...was, tries: was.tries + 1, ...change(was) };
+  return { ...qso, tally: { ...qso.tally, [qso.at]: now } };
+}
+
+/** The word for each question in a tally. */
+const ASKED_WORD: Readonly<Record<wording.Question, string>> = { call: "CALL", name: "NAME", qth: "QTH", report: "RST" };
 
 export function isScript(qso: object): qso is ScriptQso {
   return "script" in qso;
@@ -211,9 +239,10 @@ function sendTheirs(qso: ScriptQso): ScriptTurn {
   };
 }
 
-/** The script from its first line again, at the speed it is at. */
+/** The script from its first line again, at the speed it is at, with
+ *  nothing yet on the tally. */
 export function fromTop(qso: ScriptQso): ScriptQso {
-  return { ...qso, stage: "script", at: 0, last: "", asked: "", heard: {} };
+  return { ...qso, stage: "script", at: 0, last: "", asked: "", heard: {}, tally: {} };
 }
 
 /** The station opens the QSO, when the script starts with its line. */
@@ -339,9 +368,14 @@ function knows(them: Station, q: wording.Question): boolean {
   return (q === "report" ? them.rst : q === "name" ? them.name : them.qth) !== "";
 }
 
-/** The answer to the questions in `over` that the station can tell, or null
- *  when it asks none of them. */
-function answerFor(qso: ScriptQso, over: Over, rand: () => number, hour: number): string | null {
+/** The answer to the questions in `over` that the station can tell, and
+ *  what they asked, or null when it asks none of them. */
+function answerFor(
+  qso: ScriptQso,
+  over: Over,
+  rand: () => number,
+  hour: number,
+): { reply: string; asked: string[] } | null {
   const them = itemsOf(qso);
   const { asked, checked } = over.asks(them);
   const can = asked.filter((q) => knows(them, q));
@@ -356,7 +390,7 @@ function answerFor(qso: ScriptQso, over: Over, rand: () => number, hour: number)
     length: "full",
     mirror: false,
   };
-  return wording.answers(say, can, sure);
+  return { reply: wording.answers(say, can, sure), asked: [...can, ...sure].map((q) => ASKED_WORD[q]) };
 }
 
 /** The station's answer to one over you sent. */
@@ -365,8 +399,13 @@ export function answerScript(qso: ScriptQso, heard: string, context: Context = {
   const over = new Over(heard, ear);
   if (qso.stage === "done") return { qso, reply: null, ended: true };
 
+  const waiting = yourLine(qso) !== null;
   const paced = pace(qso, over, (slower) => `SRI NO ${slower ? "QRS" : "QRQ"}`);
-  if (paced?.reply) return { qso: paced.qso, reply: paced.reply, ended: false };
+  if (paced?.reply) {
+    const asked = over.speedAsk()?.slower ? "QRS" : "QRQ";
+    const next = waiting ? tallied(paced.qso, (t) => ({ asked: [...t.asked, asked] })) : paced.qso;
+    return { qso: next, reply: paced.reply, ended: false };
+  }
   if (paced) qso = paced.qso;
 
   const mine = yourLine(qso);
@@ -382,15 +421,65 @@ export function answerScript(qso: ScriptQso, heard: string, context: Context = {
     // thing alone, and an item of its own sent back with a ? gets it
     // confirmed. Then it waits for your line, where it was.
     const answer = answerFor(qso, over, rand, context.hour ?? new Date().getHours());
-    if (answer) return { qso: { ...qso, last: answer, asked: "" }, reply: answer, ended: false };
-    if (asksAgain(over) && qso.last) return { qso: { ...qso, asked: "" }, reply: qso.last, ended: false };
+    if (answer) {
+      const next = tallied(qso, (t) => ({ asked: [...t.asked, ...answer.asked] }));
+      return { qso: { ...next, last: answer.reply, asked: "" }, reply: answer.reply, ended: false };
+    }
+    if (asksAgain(over) && qso.last) {
+      const next = tallied(qso, (t) => ({ asked: [...t.asked, "AGN"] }));
+      return { qso: { ...next, asked: "" }, reply: qso.last, ended: false };
+    }
     const ask = pick(rand, ASK_AGAIN.filter((a) => a !== qso.asked));
-    return { qso: { ...qso, asked: ask }, reply: ask, ended: false };
+    return { qso: { ...tallied(qso, (t) => ({ again: t.again + 1 })), asked: ask }, reply: ask, ended: false };
   }
 
   const { next } = overAt(qso, qso.at);
   const notes = { ...qso.heard, ...notesIn(want, sent) };
-  const moved = { ...qso, at: next, asked: "", heard: notes, you: qso.you || (notes["(YOUR CALL)"] ?? "") };
+  const counted = tallied(qso, () => ({ accepted: heard }));
+  const moved = { ...counted, at: next, asked: "", heard: notes, you: qso.you || (notes["(YOUR CALL)"] ?? "") };
   if (next >= qso.lines.length) return { qso: { ...moved, stage: "done" }, reply: null, ended: true };
   return sendTheirs(moved);
+}
+
+/** How one line of yours went, for the report at the end. */
+export interface ScriptRow {
+  /** The line, as the script has it with what you sent for its notes. */
+  readonly line: string;
+  readonly tries: number;
+  readonly again: number;
+  readonly asked: readonly string[];
+  /** How much of the line the over it took has, 0 to 1, or null when it
+   *  never took one. Error signs and characters it could not read are not
+   *  counted against you, nor are words you added. */
+  readonly right: number | null;
+  /** Error signs in the over it took. */
+  readonly errorSigns: number;
+  /** The over it took, as you sent it, or empty when it took none. */
+  readonly accepted: string;
+}
+
+/** Each line of yours the script reached, in order, as it went. */
+export function scriptReport(qso: ScriptQso): ScriptRow[] {
+  const rows: ScriptRow[] = [];
+  for (let at = 0; at < qso.lines.length; ) {
+    const { text, next } = overAt(qso, at);
+    if (qso.lines[at]!.you && (at < qso.at || qso.tally?.[at])) {
+      const t = qso.tally?.[at] ?? NO_TALLY;
+      const line = withHeard(text, qso.heard);
+      const words = compared(t.accepted);
+      const want = wordsIn(expected(line)).join("");
+      const sent = words.filter((w) => !isErrorSign(w)).join("").replaceAll(UNKNOWN, "");
+      rows.push({
+        line,
+        tries: t.tries,
+        again: t.again,
+        asked: t.asked,
+        right: t.accepted && want ? Math.min(1, common(want, sent) / want.length) : null,
+        errorSigns: words.filter(isErrorSign).length,
+        accepted: t.accepted,
+      });
+    }
+    at = next;
+  }
+  return rows;
 }

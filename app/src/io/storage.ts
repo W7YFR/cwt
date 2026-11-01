@@ -508,6 +508,8 @@ export interface Prefs {
   qsoPlayback?: "never" | "always" | "end";
   /** Download shows under a QSO that is over. Absent is on. */
   qsoShowDownload?: boolean;
+  /** A report shows beside a script QSO that is over. Absent is off. */
+  qsoScriptReport?: boolean;
   /** The QSO page's settings band was open. */
   qsoSettingsOpen?: boolean;
   /** Copy mode: your copy locks when you start sending. Absent is on. */
@@ -775,6 +777,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoBreakInMs: isNum,
   qsoPlayback: oneOf("never", "always", "end"),
   qsoShowDownload: isBool,
+  qsoScriptReport: isBool,
   qsoSettingsOpen: isBool,
   qsoLockCopy: isBool,
   qsoLockedShows: oneOf("nothing", "grade", "right"),
