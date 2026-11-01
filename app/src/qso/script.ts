@@ -75,11 +75,12 @@ export function newScript(
   const stations = stationsOf(raw, options.picks);
   const { calls } = guessStations(raw);
   const callOf = (s: number) => {
-    const call = fillText(calls[s] ?? "", options.user);
+    const call = fillText(calls[s] ?? "", options.user).toUpperCase();
     return call.includes("(") ? "" : call;
   };
   const other = options.you === 0 ? 1 : 0;
-  const lines = raw.map((l, i) => ({ you: stations[i] === options.you, text: fillText(l, options.user) }));
+  // Upper case, as every line is: details from User are as typed.
+  const lines = raw.map((l, i) => ({ you: stations[i] === options.you, text: fillText(l, options.user).toUpperCase() }));
   return {
     script: true,
     stage: "script",
