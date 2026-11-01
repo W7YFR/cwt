@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.25.0 — 2026-11-01
+
 ### Added
 
 - **Script** on the QSO page works a QSO you paste or type, both sides, line by line. The station sends its lines and waits for each of yours: word for word with **Strict**, close enough with **Lenient**.
