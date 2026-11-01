@@ -2622,6 +2622,12 @@ header .modeswitch button { white-space: nowrap; }
 .copyskips .modeswitch button { white-space: nowrap; font-size: 13px; }
 /* Room for Station 1 and Station 2, which a call is shorter than. */
 .copylog .who { flex-basis: 10ch; }
+/* On a phone the slider has a line of its own, with the speed and the name
+   under it. */
+@media (max-width: 560px) {
+  .copy .copyscrub { order: 1; flex-basis: 100%; }
+  .copy .copyspeed, .copy .copyname { order: 2; }
+}
 .copy .copyname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 40ch; }
 /* The line playing now: a bar in the margin, the color of the play button
    behind it. */
@@ -2641,6 +2647,13 @@ header .modeswitch button { white-space: nowrap; }
 .copylog .sent [data-t0]:hover, .copylog .sentcopy [data-t0]:hover { color: var(--you); }
 /* A line's cell: earlier attempts over this one's copy. */
 .copylog .copycell { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* On a phone, too narrow for the station, the copy and the line's end side
+   by side: the station and the end share the first line, and the copy has
+   the width of the line under them. */
+@media (max-width: 560px) {
+  .copylog li { flex-wrap: wrap; row-gap: 6px; }
+  .copylog .copycell { order: 1; flex-basis: 100%; }
+}
 /* The box, with its text a set distance in, so an earlier copy over it can
    start at the same place, character over character. */
 .copylog .qsotype {

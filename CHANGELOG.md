@@ -11,6 +11,9 @@ nothing to the site. The next release carries them.
 
 - On a phone, the header of each page no longer scatters its buttons over several lines. The name and the corner buttons share the first line, the page switch has the next, and the page's buttons the line under it.
 - On the QSO page, **Clear** no longer hangs below the header on a narrow screen.
+- On a phone, a line's copy on the Copy page has the full width under the station. It no longer breaks one letter to a line.
+- On a phone, the Copy page's slider has a line of its own, with the speed and the name under it.
+- When a QSO ends, the Copy and QSO pages say Done.
 
 ## v1.24.0 — 2026-11-01
 

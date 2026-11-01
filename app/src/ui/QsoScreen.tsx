@@ -185,7 +185,7 @@ const STATE_WORDS: Record<QsoState, string> = {
   waiting: "Waiting",
   receiving: "Receiving",
   paused: "Paused",
-  over: "Over",
+  over: "Done",
 };
 
 type CopyMode = "strict" | "lenient";

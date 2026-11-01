@@ -255,7 +255,7 @@ const STATE_WORDS: Record<CopyState, string> = {
   reading: "Reading",
   none: "Nothing to copy",
   playing: "Playing",
-  over: "Over",
+  over: "Done",
   paused: "Paused",
   ready: "Ready",
 };
