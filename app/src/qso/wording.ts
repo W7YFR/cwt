@@ -136,6 +136,8 @@ function nameOf(s: Say): string {
 function qthOf(s: Say): string {
   const q = s.them.qth;
   const at = q.lastIndexOf(" ");
+  // A QTH of one word, as VA, has no city to send apart.
+  if (at < 0) return short(s) ? `QTH ${q}` : pick(s.rand, [`QTH ${q} ${q}`, `QTH HR ${q} ${q}`, `QTH IS ${q} ${q}`]);
   const city = q.slice(0, at);
   const state = q.slice(at + 1);
   if (short(s)) return pick(s.rand, [`QTH ${q}`, `QTH ${city}`, `QTH HR ${q}`]);

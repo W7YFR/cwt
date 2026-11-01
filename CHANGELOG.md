@@ -7,6 +7,23 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.25.0 — 2026-11-01
+
+### Added
+
+- **Script** on the QSO page works a QSO you paste or type, both sides, line by line. The station sends its lines, answers a question such as QTH?, and waits for each of yours: word for word with **Strict**, close enough with **Lenient**.
+- **Show a report after a script** puts a summary beside a finished **Script** QSO: repeats, clean lines, error signs, and what you asked the station for. It is off by default.
+
+### Changed
+
+- **New exchange** on the Copy page is now **Script**, as on the QSO page.
+
+### Fixed
+
+- On the QSO page, a blurred line at the top or bottom of the log fades out instead of ending sharp.
+- On the QSO page, a long line you are sending wraps short of its speed, where it stays once sent.
+- On the QSO page, a question with its ? keyed apart, such as NAME ?, gets its answer, even with a character beside it that could not be read.
+
 ## v1.24.2 — 2026-11-01
 
 ### Fixed

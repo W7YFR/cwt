@@ -508,6 +508,8 @@ export interface Prefs {
   qsoPlayback?: "never" | "always" | "end";
   /** Download shows under a QSO that is over. Absent is on. */
   qsoShowDownload?: boolean;
+  /** A report shows beside a script QSO that is over. Absent is off. */
+  qsoScriptReport?: boolean;
   /** The QSO page's settings band was open. */
   qsoSettingsOpen?: boolean;
   /** Copy mode: your copy locks when you start sending. Absent is on. */
@@ -578,6 +580,13 @@ export interface Prefs {
   /** The station set for each line of that text, or null where the text
    *  says. */
   copyPicks?: (number | null)[];
+  /** The QSO page's script: a QSO to work line by line, as typed. */
+  qsoScript?: string;
+  /** The station set by hand for each line of `qsoScript`, or null where the
+   *  text says. */
+  qsoScriptPicks?: (number | null)[];
+  /** Which station of `qsoScript` you are. */
+  qsoScriptYou?: 0 | 1;
   /** The Copy page's sliders, for a generated QSO. */
   copyCharWpm?: number;
   copyFarnsworthWpm?: number;
@@ -768,6 +777,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoBreakInMs: isNum,
   qsoPlayback: oneOf("never", "always", "end"),
   qsoShowDownload: isBool,
+  qsoScriptReport: isBool,
   qsoSettingsOpen: isBool,
   qsoLockCopy: isBool,
   qsoLockedShows: oneOf("nothing", "grade", "right"),
@@ -795,6 +805,9 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   copySpeed: oneOf("format", "mine"),
   copyText: isStr,
   copyPicks: (v) => Array.isArray(v) && v.every((p) => p === null || p === 0 || p === 1),
+  qsoScript: isStr,
+  qsoScriptPicks: (v) => Array.isArray(v) && v.every((p) => p === null || p === 0 || p === 1),
+  qsoScriptYou: (v) => v === 0 || v === 1,
   copyCharWpm: isNum,
   copyFarnsworthWpm: isNum,
   qsbDb: isNum,

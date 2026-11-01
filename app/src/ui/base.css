@@ -1389,7 +1389,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
 }
 .dialog .fieldrow .hint { font-size: 12px; }
 
-/* New exchange on the Copy page: wider and taller than other dialogs, for
+/* Script, on the Copy and QSO pages: wider and taller than other dialogs, for
    a whole QSO and who sends each line. */
 .dialog.copytextdialog { width: min(1000px, 100%); }
 .sheet:has(.copytextdialog) { padding: 24px 16px; }
@@ -2421,9 +2421,10 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsobody { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 .qsobody.side { grid-template-columns: minmax(0, 1fr) minmax(300px, 60ch); gap: 32px; }
 .qsomain { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; }
-/* Room each side for a blurred call or line to fade out, which the scroll
-   would otherwise cut off sharp. The margin keeps the text where it was. */
-.qsomain { padding-inline: 12px; margin-inline: -12px; }
+/* Room on every side for a blurred call or line to fade out, which the
+   scroll would otherwise cut off sharp. The margin keeps the text where it
+   was. */
+.qsomain { padding: 12px; margin: -12px; }
 .qsoside {
   min-height: 0;
   overflow-y: auto;
@@ -2563,6 +2564,9 @@ header .modeswitch button { white-space: nowrap; }
   padding-left: 12px;
 }
 .qsolog .lend .lwpm { margin-left: 0; padding-left: 0; }
+/* The end of the line you are sending: there, so the text wraps short of it,
+   and not seen. */
+.qsolog .lend.reserve { visibility: hidden; }
 .qsolog .qsoplay { width: 24px; height: 24px; font-size: 11px; }
 /* The place of a button a line does not have, so the rest line up. */
 .qsolog .lspace { flex: 0 0 24px; width: 24px; height: 24px; }

@@ -52,6 +52,9 @@ export interface UseRecorderOptions {
    *  the page's own start, which the QSO page needs to begin or go on with
    *  a session. */
   onStartKey?: (() => void) | undefined;
+  /** What R does while recording, in place of restarting the take. The QSO
+   *  page starts a script over with it. */
+  onRestartKey?: (() => void) | undefined;
   /** Enter starts too, as R does, with nothing recording. The QSO page
    *  turns it on while paused, so Enter goes on as it paused. */
   enterStarts?: boolean | undefined;
@@ -147,6 +150,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     onStart,
     onEnterKey,
     onStartKey,
+    onRestartKey,
     enterStarts = false,
     startKey = false,
   } = options;
@@ -405,7 +409,8 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       void discard();
     } else if (bareR(ev)) {
       ev.preventDefault();
-      restart();
+      if (onRestartKey) onRestartKey();
+      else restart();
     }
   };
   useEffect(() => {

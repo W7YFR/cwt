@@ -35,6 +35,7 @@ import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
+import { fromTop, isScript, newScript, openScript, scriptReport, stationFirst, type ScriptQso } from "@/qso/script";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
 import { exchangeReport } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
@@ -51,6 +52,7 @@ import { targetTiming } from "@/timing/model";
 import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
+import { CopyText } from "./CopyText";
 import { NEEDS_BAND, NEEDS_BAND_BETWEEN } from "./copy";
 import { Graded, RightOnly } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
@@ -267,6 +269,10 @@ const SHOW_DOWNLOAD_HELP =
   "Under a QSO that is over, Download saves it as a WAV file. With QSB, noise, QRN or QRM on, " +
   "Download clean saves it without them, and Download as heard with them.";
 
+const SCRIPT_REPORT_HELP =
+  "Beside a script QSO that is over: how often the station asked you to repeat, how many of your " +
+  "lines it took with nothing wrong in them, your error signs, and what you asked the station for.";
+
 const DOWNLOAD_HEARD_HELP =
   "Save the QSO with the QSB, noise, QRN and QRM set now. They are made again, so they are not " +
   "the same as you heard live.";
@@ -380,7 +386,7 @@ function recallKept(): Kept | null {
   return {
     ...(k as Kept),
     // A QSO kept before `told` was added.
-    qso: isRun(k.qso as AnyQso)
+    qso: isRun(k.qso as AnyQso) || isScript(k.qso as AnyQso)
       ? (k.qso as AnyQso)
       : { ...(k.qso as Qso), told: Array.isArray((k.qso as Qso).told) ? (k.qso as Qso).told : [] },
     finished,
@@ -445,6 +451,7 @@ function useOnOff(
     | "qsoBlurCall"
     | "qsoReplay"
     | "qsoShowDownload"
+    | "qsoScriptReport"
     | "qsoSideGuide"
     | "qsoGradeTyping"
     | "qsoAllowEdits"
@@ -556,6 +563,7 @@ export function QsoScreen({
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
   const [replayOnContinue, setReplayOnContinue] = useOnOff("qsoReplay", true);
   const [showDownload, setShowDownload] = useOnOff("qsoShowDownload", true);
+  const [scriptReportOn, setScriptReportOn] = useOnOff("qsoScriptReport", false);
   const [playback, setPlaybackRaw] = useState<Playback>(() => loadPrefs().qsoPlayback ?? "always");
   const setPlayback = (next: Playback) => {
     setPlaybackRaw(next);
@@ -772,6 +780,10 @@ export function QsoScreen({
    *  Continue. */
   const goRef = useRef<() => void>(() => {});
   const goKey = useCallback(() => goRef.current(), []);
+  /** R in a session: your turn again, or a script from the top. Bound
+   *  below, once the recorder is. */
+  const restartRef = useRef<() => void>(() => {});
+  const restartKey = useCallback(() => restartRef.current(), []);
 
   const rec = useRecorder({
     deviceId,
@@ -780,6 +792,7 @@ export function QsoScreen({
     onStart: quiet,
     onEnterKey: pauseKey,
     onStartKey: goKey,
+    onRestartKey: restartKey,
     // Only read with nothing recording, so this is paused.
     enterStarts: !stopped && lines.length > 0,
     startKey: true,
@@ -900,20 +913,26 @@ export function QsoScreen({
       if (closing.current !== null) {
         const n = closing.current;
         closing.current = null;
-        if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
-          setFinished(n);
-          setNote("Finish your copy.");
-        } else {
-          close(n);
-          setNote("");
-        }
-        ending.current = true;
-        void rec.discard();
+        endQso(n);
         return;
       }
       recorder?.restart();
       setPhase("listening");
     }, AFTER_REPLY_MS);
+  };
+
+  /** QSO `n` is over, and the session stops, so it can be played back.
+   *  With copy to grade, it waits for you to finish typing. */
+  const endQso = (n: number) => {
+    if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
+      setFinished(n);
+      setNote("Finish your copy.");
+    } else {
+      close(n);
+      setNote("");
+    }
+    ending.current = true;
+    void rec.discard();
   };
 
   /** QSO `n` of a run is over. Its copy is graded now, or when you start
@@ -954,6 +973,46 @@ export function QsoScreen({
     if (finishedRef.current !== null) close(finishedRef.current);
     setNote("");
     sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
+  };
+
+  /** A script that opens with the station's line: it sends now. */
+  const openScriptNow = () => {
+    const now = qso.current;
+    if (!isScript(now) || !stationFirst(now) || now.at !== 0) return;
+    const turn = openScript(now);
+    qso.current = turn.qso;
+    if (turn.ended) closing.current = qsoNo.current;
+    sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
+  };
+  /* It sends as the session starts, as the next station in a run calls. */
+  useEffect(() => {
+    if (recorder && phase === "listening") openScriptNow();
+  }, [recorder, phase]);
+
+  /* R in a session restarts your turn. In a script, before you key, it
+     starts the script over: the station stops, the attempt stays in the log
+     as a QSO of its own, and the script goes again from its first line. */
+  restartRef.current = () => {
+    const now = qso.current;
+    if (!recorder) return;
+    if (!isScript(now) || (phase === "listening" && isSending(copy.text))) {
+      rec.restart();
+      return;
+    }
+    quiet();
+    pending.current = null;
+    closing.current = null;
+    setPlaying(null);
+    const n = qsoNo.current;
+    if (lines.some((l) => l.qso === n)) {
+      setEnds((e) => ({ ...e, [n]: now }));
+      close(n);
+      qsoNo.current++;
+    }
+    qso.current = fromTop(now);
+    setNote("");
+    rec.restart();
+    openScriptNow();
   };
 
   /** The station's over: after a short wait, it goes in the log and plays.
@@ -1129,8 +1188,10 @@ export function QsoScreen({
 
     if (turn.reply === null) {
       // Your TU ended a QSO in a run, and the station sends nothing back.
+      // Your line ended a script.
       if (turn.ended) {
-        endInRun(n);
+        if (isRun(turn.qso)) endInRun(n);
+        else endQso(n);
         return;
       }
       setNote("No answer. Call CQ again.");
@@ -1158,6 +1219,11 @@ export function QsoScreen({
   /** The microphone is opening: the button says so at once, so the click
    *  is seen to land while the page waits to swap. */
   const [starting, setStarting] = useState(false);
+  /** A script to work as the next session's QSO, set by Script. */
+  const scriptNext = useRef<AnyQso | null>(null);
+  /** The script last saved: Restart, and Start after it ends, work it again
+   *  from the top. Clear forgets it. */
+  const scriptLast = useRef<ScriptQso | null>(null);
   const fresh = useRef<() => void>(() => {});
   fresh.current = () => {
     setStopped(false);
@@ -1171,7 +1237,8 @@ export function QsoScreen({
     qsoNo.current = 0;
     closing.current = null;
     setFinished(null);
-    qso.current = newQso(Math.random, "", speed);
+    qso.current = scriptNext.current ?? newQso(Math.random, "", speed);
+    scriptNext.current = null;
     setTheirSpeed(speed);
     answered.current = -1;
   };
@@ -1181,6 +1248,9 @@ export function QsoScreen({
     fresh.current();
   }, [recorder]);
   const start = () => {
+    // A script, under way or the last saved, goes again from the top.
+    const now = qso.current;
+    if (!scriptNext.current) scriptNext.current = isScript(now) ? fromTop(now) : scriptLast.current;
     listen.stop();
     player.wake();
     replayOnStart.current = false;
@@ -1189,9 +1259,32 @@ export function QsoScreen({
     void rec.start().finally(() => setStarting(false));
   };
 
+  /** Script: the text in the dialog, or null while it is closed. */
+  const [scriptDraft, setScriptDraft] = useState<{
+    text: string;
+    picks: readonly (number | null)[];
+    you: 0 | 1 | null;
+  } | null>(null);
+  const editScript = () => {
+    const p = loadPrefs();
+    setScriptDraft({ text: p.qsoScript ?? "", picks: p.qsoScriptPicks ?? [], you: p.qsoScriptYou ?? null });
+  };
+  /** The script in the dialog starts a new session, as Start does. */
+  const startScript = (next: { text: string; picks: (number | null)[]; you?: 0 | 1 }) => {
+    const you = next.you ?? 1;
+    savePrefs({ ...loadPrefs(), qsoScript: next.text, qsoScriptPicks: next.picks, qsoScriptYou: you });
+    const script = newScript(next.text, { picks: next.picks, you, user: loadUser(), speed });
+    setScriptDraft(null);
+    if (!script) return;
+    scriptNext.current = script;
+    scriptLast.current = script;
+    start();
+  };
+
   /** Clear the log while no session runs: the page goes back to the guide. */
   const clear = () => {
     listen.stop();
+    scriptLast.current = null;
     pending.current = null;
     fresh.current();
     setStopped(true);
@@ -1418,9 +1511,54 @@ export function QsoScreen({
   /** Play QSO and Download, under the last line of QSO `n` once it is over. */
   /** Under a QSO that is over: each item of the exchange as one side sent
    *  it and the other copied it, with what went wrong marked. */
+  /** A script's report, read at a glance: how often the station asked you
+   *  to repeat, how many of your lines got through clean, your error signs,
+   *  and what you asked for. None for a QSO kept before the station kept
+   *  count. */
+  const scriptReportOf = (done: ScriptQso): React.ReactElement | null => {
+    if (!scriptReportOn) return null;
+    const rows = scriptReport(done);
+    if (rows.length === 0 || !done.tally) return null;
+    const repeats = rows.reduce((sum, r) => sum + r.again, 0);
+    const errorSigns = rows.reduce((sum, r) => sum + r.errorSigns, 0);
+    // Clean: every character of the line, and nothing else in the over.
+    const clean = rows.filter((r) => {
+      if (!r.accepted) return false;
+      const grade = gradeCopy(r.line, r.accepted);
+      return grade.right === grade.total && grade.yours.every((m) => m.ok !== false);
+    }).length;
+    const asked = rows.flatMap((r) => r.asked);
+    const counts = [...new Set(asked)]
+      .map((w) => ({ w, k: asked.filter((x) => x === w).length }))
+      .sort((a, b) => b.k - a.k);
+    const row = (label: string, value: string, testId: string) => (
+      <tr>
+        <th scope="row">{label}</th>
+        <td data-testid={testId}>{value}</td>
+      </tr>
+    );
+    return (
+      <div className="qsoreport" data-testid="qso-report">
+        <table>
+          <tbody>
+            {row("Repeats", String(repeats), "qso-script-repeats")}
+            {row("Clean lines", `${clean} of ${rows.length}`, "qso-script-clean")}
+            {row("Error signs", String(errorSigns), "qso-script-errors")}
+            {row(
+              "You asked",
+              counts.length === 0 ? "—" : counts.map(({ w, k }) => (k > 1 ? `${w} ×${k}` : w)).join(" · "),
+              "qso-script-asked",
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   const qsoReport = (n: number): React.ReactElement | null => {
     const done = ends[n];
     if (!closed.includes(n) || !done) return null;
+    if (isScript(done)) return scriptReportOf(done);
     const theirLines = lines.filter((l) => l.qso === n && !l.you);
     if (theirLines.length === 0) return null;
     const user = loadUser();
@@ -1437,6 +1575,8 @@ export function QsoScreen({
         nr: user.cwopsNumber.trim(),
       },
     );
+    // A script has no exchange items to check.
+    if (rows.length === 0) return null;
     const call = done.them.call;
     const group = (from: "them" | "you", sent: string, copied: string) => (
       <>
@@ -1706,7 +1846,10 @@ export function QsoScreen({
   const callShown = theirsShown || identified(qsoNo.current, them.call);
   const nameShown = theirsShown || heard(qsoNo.current, them.name);
   const suggestion =
-    recorder && phase === "listening" && (hints === "always" || (hints === "copied" && copiedRight()))
+    // A script always shows what is to be sent next: that is the exercise.
+    recorder &&
+    phase === "listening" &&
+    (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
       ? hint(
           qso.current,
           meOf(loadUser()),
@@ -1775,6 +1918,16 @@ export function QsoScreen({
         {/* One row, as on the Send page: on a narrow screen it takes its own
             line under the brand. */}
         <div className="recordbar">
+          {/* A QSO of your own, as on the Copy page. Off while a
+              session runs. */}
+          <button
+            data-testid="qso-script"
+            disabled={recorder !== null || starting}
+            title="Paste or type a whole QSO, both sides, and work it line by line"
+            onClick={editScript}
+          >
+            Script
+          </button>
           {/* Always here, as on the other pages. Off while a session runs or
               with nothing in the log. */}
           <button
@@ -1977,6 +2130,13 @@ export function QsoScreen({
                       checked={showDownload}
                       onChange={setShowDownload}
                     />
+                    <Check
+                      id="qso-script-report"
+                      label="Show a report after a script"
+                      help={SCRIPT_REPORT_HELP}
+                      checked={scriptReportOn}
+                      onChange={setScriptReportOn}
+                    />
                     <SettingRow label="After a pause">
                       <Check
                         id="qso-replay"
@@ -2172,6 +2332,14 @@ export function QsoScreen({
                     {copy.text}
                     {copy.keying && <span className="keying"> {copy.keying}</span>}
                   </span>
+                  {/* The room the line's end takes once it is sent, kept
+                      empty while you send, so the text wraps where it will
+                      stay: the speed at your set speed until it is read. */}
+                  <span className="lend reserve" aria-hidden="true">
+                    {showSpeed && <span className="lwpm">{wpmOf(copy.sentWpm ?? speed)}</span>}
+                    {allowEdits && <span className="lspace" />}
+                    {playback === "always" && <span className="lspace" />}
+                  </span>
                 </li>
               )}
             </ol>
@@ -2210,7 +2378,8 @@ export function QsoScreen({
             )}
             {recorder && (
               <p className="legend keys" data-testid="qso-hotkeys">
-                <kbd>R</kbd> restart your turn &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
+                <kbd>R</kbd> {isScript(qso.current) ? "restart your turn, or the script before you key" : "restart your turn"}{" "}
+                &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
                 <kbd>Esc</kbd> stop
                 {playback === "always" && (
                   <>
@@ -2229,6 +2398,19 @@ export function QsoScreen({
           )}
         </div>
       </main>
+      {scriptDraft && (
+        <CopyText
+          text={scriptDraft.text}
+          picks={scriptDraft.picks}
+          you={scriptDraft.you}
+          onStart={startScript}
+          onCancel={() => setScriptDraft(null)}
+          onConfigureUser={() => {
+            setScriptDraft(null);
+            onConfigure();
+          }}
+        />
+      )}
     </>
   );
 }

@@ -245,7 +245,7 @@ describe("no loops, over many QSOs", () => {
           }
           const steps: Step[] = [];
           for (let n = 0; n < 24; n++) {
-            const over = isRun(qso) ? runOver(qso, last, lenient, r) : cqOver(qso, last, lenient, r);
+            const over = isRun(qso) ? runOver(qso, last, lenient, r) : cqOver(qso as Qso, last, lenient, r);
             const turn = respond(qso, over.text, context);
             steps.push({ over, reply: turn.reply ?? "" });
             const loop = loopIn(qso.them.call, steps);

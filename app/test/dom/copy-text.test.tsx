@@ -1,4 +1,4 @@
-/* New exchange on the Copy page: text of your own to copy, and who sends each
+/* Script on the Copy page: text of your own to copy, and who sends each
  * line of it. The dialog hands over the text as typed and the stations set by
  * hand; the page makes the script. */
 
@@ -30,7 +30,7 @@ beforeEach(() => {
   saveUser({ ...EMPTY_USER, callsign: "W7YFR", name: "Rob" });
 });
 
-describe("New exchange", () => {
+describe("Script", () => {
   it("opens on the text, in upper case", () => {
     open({ text: "cq de w1aw" });
     expect(document.activeElement).toBe(box());
@@ -189,5 +189,40 @@ describe("your details in the text", () => {
     open();
     fireEvent.change(box(), { target: { value: "cq de w1aw" } });
     expect(box().value).toBe("CQ DE W1AW");
+  });
+});
+
+describe("Script on the QSO page", () => {
+  const you = () => screen.queryByTestId("copy-text-you");
+  /** Which station You are has pressed. */
+  const pressed = () => [...you()!.querySelectorAll("button")].findIndex((b) => b.getAttribute("aria-pressed") === "true");
+
+  it("has no You are on the Copy page", () => {
+    open({ text: QSO });
+    expect(you()).toBeNull();
+  });
+
+  it("makes you the station with your call, and hands it over", async () => {
+    const user = userEvent.setup();
+    const { onStart } = open({ text: QSO, you: null });
+    expect(pressed()).toBe(1);
+    await user.click(save());
+    expect(onStart).toHaveBeenCalledWith({ text: QSO, picks: [null, null, null, null, null], you: 1 });
+  });
+
+  it("makes you the station of (your call) when User has no call", () => {
+    saveUser({ ...EMPTY_USER });
+    open({ text: "CQ DE K6RB K\n\nK6RB DE (your call) K", you: null });
+    expect(pressed()).toBe(1);
+  });
+
+  it("hands over the station you pick, and starts on the one kept", async () => {
+    const user = userEvent.setup();
+    const { onStart } = open({ text: QSO, you: 0 });
+    expect(pressed()).toBe(0);
+    await user.click(you()!.querySelectorAll("button")[1]!);
+    expect(pressed()).toBe(1);
+    await user.click(save());
+    expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ you: 1 }));
   });
 });
