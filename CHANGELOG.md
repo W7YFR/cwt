@@ -7,6 +7,13 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- In a run, CALL? or UR CALL? gets the station's call. The station no longer answers it with RST? or another of its own questions.
+- In a run, the station asks AGN? once, then asks for what it still needs. Before its exchange, RST?, NAME?, QTH? or NR? gets that item.
+- In a CWT run, a state sent in place of a number counts, also after NR?.
+- In a standard QSO, the station's call with a ? gets it confirmed at any point in the QSO, and part of its call keyed apart, such as N 8 V ?, gets its call.
+
 ## v1.24.1 — 2026-11-01
 
 ### Changed
