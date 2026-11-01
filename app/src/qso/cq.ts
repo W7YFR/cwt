@@ -315,15 +315,28 @@ export function nearly(a: string, b: string): boolean {
   return a.length === b.length ? rest(a, b) : a.length < b.length ? short(a, b) : short(b, a);
 }
 
-/** HW ? and CPY ?, the ? keyed apart, put back together. A lone ? after
- *  them is part of the question, not AGN. */
+/** A word that asks with a ?: HW, CPY, or one of the questions it answers. */
+const isAsking = (w: string) => w === "HW" || w === "CPY" || w in ASKS_FOR;
+
+/** HW ?, CPY ? and the questions it answers, as NAME ?, the ? keyed apart,
+ *  put back together. A lone ? after them is part of the question, not
+ *  AGN. A character the decoder could not read, stuck to the word, is let
+ *  go, on either side or alone between: QTH▯ ?, QTH ▯? and QTH ▯ ? are all
+ *  QTH?. */
 function joinQuestions(words: readonly string[]): string[] {
   const out: string[] = [];
-  for (const w of words) {
+  const bare = (w: string) => w.replaceAll(UNKNOWN, "");
+  words.forEach((w, i) => {
     const prev = out[out.length - 1];
-    if (w === "?" && (prev === "HW" || prev === "CPY")) out[out.length - 1] = `${prev}?`;
+    const asking = prev !== undefined && isAsking(bare(prev));
+    const b = bare(w);
+    // A mark alone between the question word and its ?. Not one with no ?
+    // after it: NAME ▯▯ is a name that did not come through.
+    if (b === "" && asking && bare(words[i + 1] ?? "").startsWith("?")) return;
+    if (b === "?" && asking) out[out.length - 1] = `${bare(prev!)}?`;
+    else if (w.includes(UNKNOWN) && b.endsWith("?") && isAsking(b.slice(0, -1))) out.push(b);
     else out.push(w);
-  }
+  });
   return out;
 }
 

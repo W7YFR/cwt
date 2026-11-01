@@ -19,6 +19,8 @@
 import { fillText, guessStations, linesOf, stationsOf } from "@/copy/text";
 import type { UserInfo } from "@/io/storage";
 import { Over, STRICT, isCall, pace, wordsOf, type Context } from "./cq";
+import { REGIONS } from "./formats";
+import * as wording from "./wording";
 import { NO_SEARCH, type Search, type Speed } from "./speed";
 import { pick, type Station } from "./station";
 
@@ -86,7 +88,13 @@ export function newScript(
     stage: "script",
     lines,
     at: 0,
-    them: { call: callOf(other), name: nameIn(lines.filter((l) => !l.you)), qth: "", rst: "599", toneHz: TONE_HZ },
+    them: {
+      call: callOf(other),
+      name: nameIn(lines.filter((l) => !l.you)),
+      qth: qthIn(lines.filter((l) => !l.you)),
+      rst: reportIn(lines.filter((l) => !l.you)),
+      toneHz: TONE_HZ,
+    },
     you: callOf(options.you),
     last: "",
     asked: "",
@@ -102,6 +110,49 @@ function nameIn(lines: readonly ScriptLine[]): string {
   for (const { text } of lines) {
     const m = /(?:^|\s)(?:NAME|OP|NM)(?: IS| HR)*(?: IS)? ([A-Z]{2,})(?=\s|$)/.exec(text);
     if (m && m[1] !== "IS" && m[1] !== "HR") return m[1]!;
+  }
+  return "";
+}
+
+/** The report the station gives you, as its lines send it: UR RST IS 559,
+ *  or UR 589.
+ *  Empty when they send none. */
+function reportIn(lines: readonly ScriptLine[]): string {
+  for (const { text } of lines) {
+    const m = /(?:^|\s)(?:UR|RST|RPT)(?: RST| RPT)?(?: IS)? ([1-5][0-9N][0-9N])(?=\s|$)/.exec(text);
+    if (m) return m[1]!;
+  }
+  return "";
+}
+
+/** Words that end a QTH: what comes after it in a line. */
+const QTH_STOP = new Set(["NAME", "OP", "NM", "ES", "UR", "RST", "RPT", "HW", "HW?", "K", "KN", "BK", "DE", "SK", "AR", "TU", "=", "<BT>", "AND"]);
+
+/** The station's QTH, as its lines send it: QTH IS SANTA CRUZ, or IN VA, up
+ *  to three words, sent twice taken once. Empty when they send none. */
+function qthIn(lines: readonly ScriptLine[]): string {
+  const read = (words: readonly string[], from: number) => {
+    const out: string[] = [];
+    for (let j = from; j < words.length && out.length < 4; j++) {
+      const w = words[j]!;
+      if ((w === "IS" || w === "HR") && out.length === 0) continue;
+      if (QTH_STOP.has(w) || isCall(w)) break;
+      out.push(w);
+    }
+    const half = out.length / 2;
+    return Number.isInteger(half) && half >= 1 && out.slice(0, half).join(" ") === out.slice(half).join(" ")
+      ? out.slice(0, half)
+      : out.slice(0, 3);
+  };
+  for (const label of ["QTH", "IN", "FM"]) {
+    for (const { text } of lines) {
+      const words = wordsOf(text);
+      const at = words.indexOf(label);
+      if (at < 0) continue;
+      const qth = read(words, at + 1);
+      // IN and FM name a place only when a region ends it: IN VA, FM SALEM OR.
+      if (qth.length && (label === "QTH" || REGIONS.has(qth.at(-1)!))) return qth.join(" ");
+    }
   }
   return "";
 }
@@ -274,6 +325,40 @@ function asksAgain(over: Over): boolean {
  *  twice running. */
 const ASK_AGAIN = ["AGN?", "PSE AGN", "?", "AGN AGN?"];
 
+/** The station with its name, QTH and your report as its lines send them.
+ *  Read each time, so a QSO kept before it read them knows them too. */
+function itemsOf(qso: ScriptQso): Station {
+  const theirs = qso.lines.filter((l) => !l.you);
+  return { ...qso.them, name: nameIn(theirs), qth: qthIn(theirs), rst: reportIn(theirs) };
+}
+
+/** Whether `them` can tell `q`: its call always, its name, QTH and your
+ *  report only when its lines send them. */
+function knows(them: Station, q: wording.Question): boolean {
+  if (q === "call") return them.call !== "";
+  return (q === "report" ? them.rst : q === "name" ? them.name : them.qth) !== "";
+}
+
+/** The answer to the questions in `over` that the station can tell, or null
+ *  when it asks none of them. */
+function answerFor(qso: ScriptQso, over: Over, rand: () => number, hour: number): string | null {
+  const them = itemsOf(qso);
+  const { asked, checked } = over.asks(them);
+  const can = asked.filter((q) => knows(them, q));
+  const sure = checked.filter((p) => knows(them, p));
+  if (can.length === 0 && sure.length === 0) return null;
+  const say: wording.Say = {
+    them,
+    you: qso.you,
+    name: qso.heard["(YOUR NAME)"] ?? "",
+    rand,
+    hour,
+    length: "full",
+    mirror: false,
+  };
+  return wording.answers(say, can, sure);
+}
+
 /** The station's answer to one over you sent. */
 export function answerScript(qso: ScriptQso, heard: string, context: Context = {}): ScriptTurn {
   const { ear = STRICT, rand = Math.random } = context;
@@ -293,6 +378,11 @@ export function answerScript(qso: ScriptQso, heard: string, context: Context = {
   const sent = compared(heard);
   const right = ear.lenient ? lenientMatch(want, sent) : strictMatch(want, sent);
   if (!right) {
+    // A question about one thing it can tell, as NAME? or UR RST?, gets that
+    // thing alone, and an item of its own sent back with a ? gets it
+    // confirmed. Then it waits for your line, where it was.
+    const answer = answerFor(qso, over, rand, context.hour ?? new Date().getHours());
+    if (answer) return { qso: { ...qso, last: answer, asked: "" }, reply: answer, ended: false };
     if (asksAgain(over) && qso.last) return { qso: { ...qso, asked: "" }, reply: qso.last, ended: false };
     const ask = pick(rand, ASK_AGAIN.filter((a) => a !== qso.asked));
     return { qso: { ...qso, asked: ask }, reply: ask, ended: false };

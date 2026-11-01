@@ -189,6 +189,64 @@ describe("your line", () => {
   });
 });
 
+describe("a question while it waits for your line", () => {
+  /** After the station's exchange, waiting for yours. */
+  const waiting = () => work(openScript(script(AC4BT, SET)).qso, ["AC4BT DE W7YFR W7YFR K"]).qso;
+
+  it("reads its name, QTH and your report from its own lines", () => {
+    expect(script(AC4BT, SET).them).toMatchObject({ call: "AC4BT", name: "JERRY", qth: "VA", rst: "559" });
+    const santa = script("CQ DE K6RB K\n\nK6RB DE W7YFR K\n\nW7YFR DE K6RB UR 589 QTH IS SANTA CRUZ SANTA CRUZ ES NAME ROB K", SET);
+    expect(santa.them).toMatchObject({ qth: "SANTA CRUZ", rst: "589", name: "ROB" });
+  });
+
+  it("gets that one thing, not its whole over again", () => {
+    for (const [ask, want] of [
+      ["UR NAME ?", /^(NAME|OP)( HR| IS)? JERRY JERRY (K|KN)$/],
+      ["NAME?", /JERRY JERRY/],
+      ["UR RST?", /^(UR|RST|UR RST)( IS)? 559 559 (K|KN)$/],
+      ["QTH?", /^QTH( HR| IS)? VA VA (K|KN)$/],
+      ["UR QTH ?", /VA VA/],
+      ["AC4?", /AC4BT AC4BT/],
+      ["CALL?", /AC4BT AC4BT/],
+    ] as const) {
+      const reply = work(waiting(), [ask], { ...STRICT_EAR, rand: Math.random }).replies[0]!;
+      expect(reply, ask).toMatch(want);
+      expect(reply, ask).not.toMatch(/TU FER CALL/);
+    }
+  });
+
+  it("confirms an item of its own sent back with a ?", () => {
+    expect(work(waiting(), ["JERRY ?"]).replies[0]).toMatch(/^(R R|YES|RR) JERRY (K|KN)$/);
+  });
+
+  it("then goes on with the script once you send your line", () => {
+    const yours = yourLine(waiting())!;
+    const { replies } = work(waiting(), ["UR NAME ?", "AGN", yours]);
+    expect(replies[1]).toBe(replies[0]);
+    expect(replies[2]).toMatch(/^W7YFR DE AC4BT GUD CPY ROB MNI TKS/);
+  });
+
+  it("answers in a QSO kept before it read its items", () => {
+    const kept = { ...waiting(), them: { call: "AC4BT", name: "", qth: "", rst: "599", toneHz: 600 } };
+    expect(work(kept, ["QTH ?"]).replies[0]).toMatch(/VA VA/);
+    expect(work(kept, ["RST ?"]).replies[0]).toMatch(/559 559/);
+    expect(work(kept, ["KN RR HNN 5NN <BT> G EEE QTH ?"]).replies[0]).toMatch(/VA VA/);
+  });
+
+  it("lets go of a character it could not read, stuck to the question", () => {
+    expect(work(waiting(), ["QTH\u25AF ?"]).replies[0]).toMatch(/VA VA/);
+    expect(work(waiting(), ["QTH\u25AF?"]).replies[0]).toMatch(/VA VA/);
+    expect(work(waiting(), ["UR NAME\u25AF ?"]).replies[0]).toMatch(/JERRY JERRY/);
+    for (const over of ["QTH \u25AF?", "QTH \u25AF ?", "\u25AFQTH ?", "QTH \u25AF\u25AF ?", "UR QTH\u25AF \u25AF?"]) {
+      expect(work(waiting(), [over]).replies[0], over).toMatch(/VA VA/);
+    }
+  });
+
+  it("asks again for a thing its lines never send", () => {
+    expect(["AGN?", "PSE AGN", "?", "AGN AGN?"]).toContain(work(waiting(), ["NR?"]).replies[0]);
+  });
+});
+
 describe("notes not filled in from User", () => {
   /** You key K7ABC, BOISE ID and AL for your call, QTH and name. */
   const keyed = (line: string) =>
