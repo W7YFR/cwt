@@ -54,7 +54,7 @@ beforeEach(() => localStorage.clear());
 describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
   it("applies one to the recording already on screen", async () => {
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
 
     const before = result.current.loaded!.take;
     expect(before.profile ?? null).toBeNull();
@@ -75,7 +75,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
        an entry every time somebody tries a different profile, and the history
        stops being a history of sessions. */
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
     const before = result.current.loaded!.take;
 
     await act(async () => {
@@ -94,7 +94,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
        them here would punish exactly the comparison this exists for: you
        change the profile to see what moved, not to lose your place. */
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
     act(() => result.current.setSettings({ tolerance: 0.12, ppu: 40, charWpm: 18 }));
     const kept = result.current.settings;
 
@@ -107,7 +107,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
 
   it("goes back to reading it raw", async () => {
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
     const raw = result.current.loaded!.take.measured.charWpm;
 
     await act(async () => {
@@ -125,7 +125,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
     /* The loop: set it up, send it, look at it, wipe it, send it again. What
        is wiped is the recording; what survives is what you are practicing. */
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
     act(() => result.current.setSettings({ charWpm: 18, tolerance: 0.1 }));
 
     act(() => result.current.reset());
@@ -148,7 +148,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
        recording an empty grade comes out "100% consistent", which is the most
        convincing kind of wrong. */
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
     act(() => result.current.reset());
 
     const r = result.current.review!;
@@ -164,9 +164,9 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
        together — and the runs not being looked at are exactly the ones nobody
        would think to check. */
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t2" }));
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t3" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t2" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t3" }));
     // Looking at the middle one, so neither the first nor the last is the
     // selected run that would be re-read on its own.
     act(() => result.current.selectRun(1));
@@ -193,8 +193,8 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
        about which one is on screen. Applied per run, so a session with both in
        it comes out with each read the way its own source allows. */
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: "someone-else.wav", id: "f1" }));
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t2" }));
+    await act(() => result.current.load(clip(), { source: "someone-else.wav", id: "f1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, id: "t2" }));
     const before = result.current.runs.map((r) => r.take.measured.charWpm);
 
     await act(async () => {
@@ -210,7 +210,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
 
   it("leaves a session with nothing recorded in it alone", async () => {
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
+    await act(() => result.current.load(clip(), { source: MIC_SOURCE, expected: SENT, id: "t1" }));
     act(() => result.current.reset());
 
     await act(async () => {
@@ -229,7 +229,7 @@ describe.skipIf(!HAVE)("re-reading a take under a calibration", () => {
        enforced here as well as at record time, because this is a second door
        into the same decision. */
     const { result } = renderHook(() => useTake());
-    act(() => result.current.load(clip(), { source: "someone-else.wav", id: "t1" }));
+    await act(() => result.current.load(clip(), { source: "someone-else.wav", id: "t1" }));
     const before = result.current.loaded!.take.measured.charWpm;
 
     await act(async () => {

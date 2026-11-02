@@ -26,8 +26,9 @@ import { noteMicOpened, noteMicRefused, useMicAccess } from "./useMicAccess";
 
 export interface UseRecorderOptions {
   deviceId: string | undefined;
-  /** A finished recording, at the level it was captured. */
-  onClip(clip: AudioClip): void;
+  /** A finished recording, at the level it was captured. `busy` holds until
+   *  a returned promise settles. */
+  onClip(clip: AudioClip): void | Promise<void>;
   onError(message: string): void;
   /** Called just before the device is opened.
    *
@@ -341,7 +342,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
         onError("That recording came back empty — check the input device and try again.");
         return;
       }
-      onClip(clip);
+      await onClip(clip);
     } finally {
       setBusy(false);
     }

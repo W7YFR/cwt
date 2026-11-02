@@ -37,6 +37,7 @@ import {
 import { defaultSettings, reviewTake } from "@/timing";
 import { BREAK_DEFAULT_SEC } from "@/timing/timeline";
 import type { AudioClip, Review, ReviewSettings, Take } from "@/types";
+import { readTake } from "./readTake";
 
 export interface LoadedTake {
   take: Take;
@@ -81,7 +82,9 @@ export interface TakeState {
   settings: ReviewSettings;
   review: Review | null;
   setSettings(patch: Partial<ReviewSettings>): void;
-  load(clip: AudioClip, options: AnalyzeOptions, data?: ArrayBuffer | null): void;
+  /** Read a recording and add it to the session. Resolves once it is on
+   *  screen. The clip's samples are not usable after. */
+  load(clip: AudioClip, options: AnalyzeOptions, data?: ArrayBuffer | null): Promise<void>;
   /** Adopt a Take somebody else already analyzed — see io/bundle.ts, and the
    *  restore path in ui/App.tsx. */
   adopt(take: Take, audio: ArrayBuffer, options?: AdoptOptions): void;
@@ -365,8 +368,12 @@ export function useTake(): TakeState {
     [persist],
   );
 
+  /* Moved on by everything that replaces the session. A take still being read
+     when that happens belongs to a session that is gone, and is dropped. */
+  const generation = useRef(0);
+
   const load = useCallback(
-    (clip: AudioClip, options: AnalyzeOptions, data: ArrayBuffer | null = null) => {
+    async (clip: AudioClip, options: AnalyzeOptions, data: ArrayBuffer | null = null) => {
       /* What this attempt was aimed at.
        *
        * A session declares its speeds — in the New session dialog, or on the
@@ -389,7 +396,9 @@ export function useTake(): TakeState {
               targetFarnsworth: settingsRef.current.farnsworthWpm,
             }
           : options;
-      const { take, clip: analyzed } = analyzeClip(clip, aimed);
+      const started = generation.current;
+      const { take, clip: analyzed } = await readTake(clip, aimed);
+      if (generation.current !== started) return;
       const entry: LoadedTake = { take, clip: analyzed, data };
       /* The first attempt establishes what the session is about; later ones
          join it. So only the first sets the speed and the intended message —
@@ -422,6 +431,7 @@ export function useTake(): TakeState {
 
   const adopt = useCallback(
     (take: Take, audio: ArrayBuffer, options: AdoptOptions = {}) => {
+      generation.current++;
       // No DSP here: the segments arrived already measured. Everything from the
       // grading onward is the same code path a browser recording takes, which is
       // the point of shipping the take raw rather than pre-graded.
@@ -517,6 +527,7 @@ export function useTake(): TakeState {
   const adoptSession = useCallback(
     (entries: readonly StoredRun[], at: number) => {
       if (entries.length === 0) return;
+      generation.current++;
       const lanes: LoadedTake[] = entries.map((e) => ({
         take: e.take,
         clip: { samples: new Float32Array(0), rate: e.take.rate, peak: e.take.peak },
@@ -558,6 +569,7 @@ export function useTake(): TakeState {
        things. From the review it keeps the session exactly as it is; from the
        landing screen there is no session yet and the message being practiced
        lives up in the app, not in settings that have never been used. */
+    generation.current++;
     const s = { ...settingsRef.current, ...overrides };
     if (s.farnsworthWpm > s.charWpm) s.farnsworthWpm = s.charWpm;
     const take = blankTake({
@@ -585,6 +597,7 @@ export function useTake(): TakeState {
   }, []);
 
   const clear = useCallback(() => {
+    generation.current++;
     setRuns([]);
     setSelected(0);
     runsRef.current = [];

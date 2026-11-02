@@ -148,9 +148,13 @@ function newId(): string {
 export function analyzeClip(input: AudioClip, options: AnalyzeOptions): AnalyzeResult {
   let clip = input;
   let leadSec = 0;
+  let toneHz = options.toneHz;
 
   if (options.trim) {
     const trimmed = trimSilence(clip.samples, clip.rate, TRIM_PAD, options.toneHz);
+    // Found once, here. Detecting it again on the trimmed clip doubles the
+    // slowest step of a long take.
+    toneHz ??= trimmed.toneHz;
     if (trimmed.leadSec > 0 || trimmed.samples.length !== clip.samples.length) {
       let peak = 0;
       for (let i = 0; i < trimmed.samples.length; i++) {
@@ -166,14 +170,15 @@ export function analyzeClip(input: AudioClip, options: AnalyzeOptions): AnalyzeR
   // copy — and only the DSP. `clip` stays at the recorded level.
   const forAnalysis = normalized(clip);
   const profile = options.profile ?? null;
-  const { toneHz, segments, presence } = segmentsFrom(
+  const found = segmentsFrom(
     forAnalysis.samples,
     forAnalysis.rate,
     {
-      ...(options.toneHz !== undefined ? { toneHz: options.toneHz } : {}),
+      ...(toneHz !== undefined ? { toneHz } : {}),
       ...(profile ? { calibration: calibrationOf(profile) } : {}),
     },
   );
+  const { segments, presence } = found;
   if (!presence.keyed) throw new NoKeyingError();
 
   const expected = (options.expected ?? "").trim() || null;
@@ -192,7 +197,7 @@ export function analyzeClip(input: AudioClip, options: AnalyzeOptions): AnalyzeR
     id: options.id ?? newId(),
     recordedAt: options.now ?? isoNow(),
     source: options.source,
-    toneHz: Math.round(toneHz * 10) / 10,
+    toneHz: Math.round(found.toneHz * 10) / 10,
     rate: clip.rate,
     durationSec: Math.round((clip.samples.length / clip.rate) * 1000) / 1000,
     peak: Math.round(clip.peak * 1e5) / 1e5,

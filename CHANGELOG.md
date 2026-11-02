@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- On the Send page, the page no longer freezes after you stop a long take. It shows *measuring your sending…* until the review is ready.
+
 ## v1.25.0 — 2026-11-01
 
 ### Added
