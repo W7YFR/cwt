@@ -207,6 +207,9 @@ export const CAPTION_ALL_HELP =
   "being read. The band is reserved either way, so nothing moves — what you " +
   "get is every decode at once.";
 
+export const LETTER_SIZE_HELP =
+  "How large the letters over and under the marks are. The rows make room for them.";
+
 export const IGNORE_CONSTRUCTION_HELP =
   "Grade only the spacing between characters and between words. An " +
   "automatic keyer forms each character, so its dits, dahs and inner gaps " +

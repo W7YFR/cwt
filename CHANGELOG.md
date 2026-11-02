@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Letter size** in the chart settings on the Send page makes the chart's letters Small, Medium or Large. Medium is the size they were.
+
 ## v1.25.1 — 2026-11-02
 
 ### Fixed

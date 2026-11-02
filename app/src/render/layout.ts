@@ -14,7 +14,7 @@
 
 import type { Block, Char, Review, Slot, ViewMode } from "@/types";
 import { subLabel } from "@/timing";
-import { CAPTION_GLYPH_W, MARKER_W, PAD_X, REST_W } from "./geometry";
+import { CAPTION_PX, captionBand, MARKER_W, PAD_X, REST_W } from "./geometry";
 import { planColumns, type ColumnPlan } from "./columns";
 
 /** Breakpoints of a piecewise time->x map, as [seconds, contentX] pairs. */
@@ -65,6 +65,8 @@ export interface Layout {
    * here — the time axis, the hit test, the focus highlight — has to agree
    * with that or it is answering about a picture nobody is looking at. */
   charMarkers?: boolean;
+  /** Font size of the captions, which can reach past the last mark. */
+  captionPx?: number;
 }
 
 /** Is this gap the sender resting rather than spacing?
@@ -119,8 +121,8 @@ export function sentCaption(slot: Slot, blank: boolean): { text: string; bad: bo
 /** Right edge of a caption that starts at `from`. A caption starts where its
  *  character does and can run past it, a prosign most of all, so the last
  *  caption can reach further than the last mark. */
-function captionEnd(text: string, from: number): number {
-  return from + text.length * CAPTION_GLYPH_W;
+function captionEnd(text: string, from: number, px = CAPTION_PX): number {
+  return from + text.length * captionBand(px).glyphW;
 }
 
 /** The per-character column axis, measured at one zoom.
@@ -177,6 +179,7 @@ export function measureColumns(
   runs: readonly (readonly Slot[])[],
   ppu: number,
   markers = false,
+  captionPx = CAPTION_PX,
 ): ColumnMetrics {
   const plan = planColumns(runs);
   const n = plan.columns.length;
@@ -232,8 +235,8 @@ export function measureColumns(
       const bx = x[c]! + gapW[c]!;
       reach = Math.max(
         reach,
-        captionEnd(sentCaption(slot, false).text, bx),
-        captionEnd(slot.ideal?.char ?? "", bx),
+        captionEnd(sentCaption(slot, false).text, bx, captionPx),
+        captionEnd(slot.ideal?.char ?? "", bx, captionPx),
       );
     });
   });
@@ -257,6 +260,9 @@ export interface LayoutOptions {
    *  only needs room for the tick. Only consulted when this run measures its
    *  own axis — a shared one was measured with the same answer. */
   readonly charMarkers?: boolean;
+  /** Font size of the captions. Only consulted when this run measures its
+   *  own axis, as with `charMarkers`. */
+  readonly captionPx?: number;
   /** The column axis to lay this run out against, and which run it is.
    *
    * Omitted for a lone run, which measures its own — the result is the same
@@ -325,7 +331,8 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
        out identical to the way this was built when a chart could only ever
        hold one. */
     const cols =
-      options.columns ?? measureColumns([slots], ppu, options.charMarkers === true);
+      options.columns ??
+      measureColumns([slots], ppu, options.charMarkers === true, options.captionPx);
     // The axis answers this, not the caller: a layout read one way and drawn
     // the other is the bug this exists to make unreachable.
     const markers = cols.markers;
@@ -390,6 +397,7 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
       unitSec,
       leadPx: 0,
       charMarkers: markers,
+      ...(options.captionPx !== undefined ? { captionPx: options.captionPx } : {}),
     }, options.leadSec ?? 0, options.tailSec ?? 0);
   }
 
@@ -434,11 +442,11 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
     const ix = slot.ideal ? toX(slot.ideal.t0, 0) - offTgt : null;
     if (x !== null) {
       endYou = x + charWidth(slot.actual, ppu);
-      reach = Math.max(reach, captionEnd(sentCaption(slot, false).text, x));
+      reach = Math.max(reach, captionEnd(sentCaption(slot, false).text, x, options.captionPx));
     }
     if (ix !== null && slot.ideal) {
       endTgt = ix + charWidth(slot.ideal, ppu);
-      reach = Math.max(reach, captionEnd(slot.ideal.char, ix));
+      reach = Math.max(reach, captionEnd(slot.ideal.char, ix, options.captionPx));
     }
 
     items.push({ slot, x, ix, gapW: 0, youGapW: 0, tgtGapW: 0, bodyW: 0, w: 0 });
@@ -471,7 +479,18 @@ export function buildLayout(review: Review, options: LayoutOptions): Layout {
     ) + PAD_X;
 
   return withRunway(
-    { view, items, width, maps, origin, breaks, ppu, unitSec, leadPx: 0 },
+    {
+      view,
+      items,
+      width,
+      maps,
+      origin,
+      breaks,
+      ppu,
+      unitSec,
+      leadPx: 0,
+      ...(options.captionPx !== undefined ? { captionPx: options.captionPx } : {}),
+    },
     options.leadSec ?? 0,
     options.tailSec ?? 0,
   );
@@ -615,7 +634,7 @@ export function rangeEdges(
     const intended = slot.ideal?.char ?? "";
     const text = sent.length > intended.length ? sent : intended;
     x0 = Math.min(x0, span[0]);
-    x1 = Math.max(x1, span[1], captionEnd(text, span[0]));
+    x1 = Math.max(x1, span[1], captionEnd(text, span[0], layout.captionPx));
   });
   return [x0 - RANGE_PAD, x1 + RANGE_PAD];
 }

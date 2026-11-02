@@ -8,6 +8,8 @@
  * number, not two.
  */
 
+import type { LetterSize } from "@/types";
+
 /** Left band for track labels. Content never enters it — it is clipped out,
  *  so scrolled blocks pass behind the labels instead of over them. */
 export const GUTTER = 44;
@@ -23,12 +25,20 @@ export const PAD_X = 8;
  * was written across the character it was about. */
 export const LABEL_H = 30;
 
-/** Font size of a character's caption, in every view. */
+/** Font size of a character's caption, in every view, at the default
+ *  letter size. */
 export const CAPTION_PX = 16;
 
 /** Advance of one character-caption glyph: the 0.6em monospace faces use,
  *  rounded up. The layout has no canvas to measure text with. */
 export const CAPTION_GLYPH_W = CAPTION_PX * 0.625;
+
+/** Font size of a character's caption at each letter size. */
+export const LETTER_PX: Readonly<Record<LetterSize, number>> = {
+  small: 12,
+  medium: CAPTION_PX,
+  large: 22,
+};
 
 /** Where the text sits inside a caption band, from the edge nearest the row it
  *  belongs to. The target's band is above its row and yours is below, so both
@@ -37,6 +47,29 @@ export const CAPTION_GLYPH_W = CAPTION_PX * 0.625;
 export const CAP_CHAR = 10;
 /** And the note under it, from the same edge. */
 export const CAP_NOTE = 23;
+
+/** A caption band sized for one font size. */
+export interface CaptionBand {
+  /** Font size of the character. */
+  readonly px: number;
+  /** Advance of one glyph. */
+  readonly glyphW: number;
+  /** Height of the band. */
+  readonly labelH: number;
+  /** Where the character sits, from the edge nearest its row. */
+  readonly char: number;
+  /** Where the note under it sits, from the same edge. */
+  readonly note: number;
+}
+
+/** The caption band for a font size. It grows with the letters, so a larger
+ *  letter never reaches into the marks or the note. At CAPTION_PX it is
+ *  LABEL_H, CAP_CHAR and CAP_NOTE exactly. */
+export function captionBand(px = CAPTION_PX): CaptionBand {
+  const char = Math.round(px * 0.625);
+  const note = char + Math.round(px / 2) + 5;
+  return { px, glyphW: px * 0.625, labelH: note + 7, char, note };
+}
 
 /** Air above a row's grade strip, separating it from whatever is above.
  *
@@ -140,6 +173,8 @@ export interface Rows {
   scroll: number;
   height: number;
   plotBottom: number;
+  /** The caption bands the rows were laid out for. */
+  caption: CaptionBand;
 }
 
 /** Lay the rows out for a given number of attempts.
@@ -166,9 +201,15 @@ export interface Rows {
  * With one captioned run this reproduces the constants above exactly, which is
  * asserted rather than hoped for: the fixed layout was correct, and stacking
  * must not quietly move a chart that has nothing stacked on it. */
-export function rowsFor(runs: number, captioned: number, all = false): Rows {
+export function rowsFor(
+  runs: number,
+  captioned: number,
+  all = false,
+  captionPx = CAPTION_PX,
+): Rows {
+  const caption = captionBand(captionPx);
   const tgtLabel = RULER_H;
-  const tgt = tgtLabel + LABEL_H;
+  const tgt = tgtLabel + caption.labelH;
   let y = tgt + ROW_H;
 
   const lanes: RunRow[] = [];
@@ -176,7 +217,7 @@ export function rowsFor(runs: number, captioned: number, all = false): Rows {
     const grade = y + LANE_GAP;
     const row = grade + GRADE_H;
     const label = all || r === captioned ? row + ROW_H : null;
-    const bottom = row + ROW_H + LABEL_H;
+    const bottom = row + ROW_H + caption.labelH;
     lanes.push({ grade, row, label, bottom });
     y = bottom;
   }
@@ -191,6 +232,7 @@ export function rowsFor(runs: number, captioned: number, all = false): Rows {
     scroll,
     height: scroll + SCROLL_H,
     plotBottom: drift + DRIFT_H,
+    caption,
   };
 }
 

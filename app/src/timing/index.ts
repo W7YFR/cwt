@@ -173,6 +173,7 @@ export function defaultSettings(take: Take): ReviewSettings {
     charMarkers: false,
     runScores: true,
     captionAll: false,
+    letterSize: "medium",
     advancedGrading: true,
     ignoreConstruction: true,
     showDownloads: false,
