@@ -375,6 +375,8 @@ export interface ReviewSettings {
    * what it costs is a page of text where you may only have wanted one row
    * of it. */
   captionAll: boolean;
+  /** How large the chart's letters are. The caption bands grow with them. */
+  letterSize: LetterSize;
   /** Put the message on screen by itself while you record, and nothing else.
    *
    * The opposite of the paced aids rather than another one of them: no beat to
@@ -414,6 +416,9 @@ export interface ReviewSettings {
 export type RunSort = "oldest" | "newest" | "best" | "worst";
 
 export type ViewMode = "per-char" | "absolute" | "overlay";
+
+/** The size of the letters on the Send chart. */
+export type LetterSize = "small" | "medium" | "large";
 
 /** Everything the review derives from a `Take` plus its settings. Recomputed
  *  whenever either changes; cheap enough to do synchronously. */

@@ -153,6 +153,7 @@ function restorePrefs(base: ReviewSettings): ReviewSettings {
     showChartControls: p.showChartControls ?? base.showChartControls,
     showRuns: p.showRuns ?? base.showRuns,
     captionAll: p.captionAll ?? base.captionAll,
+    letterSize: p.letterSize ?? base.letterSize,
     zenMode: p.zenMode ?? base.zenMode,
     plainFollow: p.plainFollow ?? base.plainFollow,
     plainGrading: p.plainGrading ?? base.plainGrading,
@@ -185,6 +186,7 @@ function personal(prev: ReviewSettings) {
     showChartControls: prev.showChartControls,
     showRuns: prev.showRuns,
     captionAll: prev.captionAll,
+    letterSize: prev.letterSize,
     zenMode: prev.zenMode,
     plainFollow: prev.plainFollow,
     plainGrading: prev.plainGrading,
@@ -255,6 +257,7 @@ export function useTake(): TakeState {
       /* Off. One row of text is a caption; six is a wall, and the rows under
          it are the thing being compared. */
       captionAll: false,
+      letterSize: "medium",
       zenMode: false,
       plainFollow: true,
       plainGrading: true,
@@ -338,6 +341,7 @@ export function useTake(): TakeState {
         showChartControls: next.showChartControls,
         showRuns: next.showRuns,
         captionAll: next.captionAll,
+        letterSize: next.letterSize,
         zenMode: next.zenMode,
         plainFollow: next.plainFollow,
         plainGrading: next.plainGrading,

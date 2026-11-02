@@ -15,7 +15,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffe
 import { createPortal } from "react-dom";
 import { IconCog } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
-import type { ReviewSettings, Timing, ViewMode } from "@/types";
+import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
@@ -29,6 +29,7 @@ import {
   ADVANCED_GRADING_HELP,
   IGNORE_CONSTRUCTION_HELP,
   CAPTION_ALL_HELP,
+  LETTER_SIZE_HELP,
   CHAR_MARKERS_HELP,
   COLLAPSE_RESTS_HELP,
   RUN_SCORES_HELP,
@@ -574,6 +575,12 @@ export function ChoiceGroup({
   );
 }
 
+const LETTER_SIZES = [
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+];
+
 const VIEWS = [
   { value: "per-char", label: "Per character" },
   { value: "absolute", label: "Absolute time" },
@@ -996,6 +1003,14 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
             help={CAPTION_ALL_HELP}
             checked={s.captionAll}
             onChange={(v) => onChange({ captionAll: v })}
+          />
+          <ChoiceGroup
+            id="letter-size"
+            label="Letter size"
+            help={LETTER_SIZE_HELP}
+            value={s.letterSize}
+            options={LETTER_SIZES}
+            onChange={(v) => onChange({ letterSize: v as LetterSize })}
           />
         </div>
       </Section>

@@ -14,7 +14,7 @@ import type { Block, Char, Review, ReviewSettings } from "@/types";
 import {
   DRAG_SLOP,
   GUTTER,
-  HEIGHT,
+  LETTER_PX,
   PAD_R,
   RANGE_GRAB,
   RULER_H,
@@ -368,6 +368,7 @@ export function createChart(
             stack.reviews.map((r) => r.slots),
             input.settings.ppu,
             input.settings.charMarkers,
+            LETTER_PX[input.settings.letterSize],
           )
         : undefined;
 
@@ -384,6 +385,7 @@ export function createChart(
          across a width that is no longer there, and the playhead sweeps a
          character's phantom width and then snaps back to the next column. */
       charMarkers: input.settings.charMarkers,
+      captionPx: LETTER_PX[input.settings.letterSize],
     };
 
     lanes = stack.order.map((at) => {
@@ -412,8 +414,13 @@ export function createChart(
        and there is no row for a caption to belong to. */
     rows =
       input.settings.view === "overlay"
-        ? rowsFor(1, -1)
-        : rowsFor(lanes.length, selected, input.settings.captionAll);
+        ? rowsFor(1, -1, false, LETTER_PX[input.settings.letterSize])
+        : rowsFor(
+            lanes.length,
+            selected,
+            input.settings.captionAll,
+            LETTER_PX[input.settings.letterSize],
+          );
   }
 
   /** How wide the chart would be at this zoom — the whole of it.
@@ -432,6 +439,7 @@ export function createChart(
             stack.reviews.map((r) => r.slots),
             ppu,
             input.settings.charMarkers,
+            LETTER_PX[input.settings.letterSize],
           )
         : undefined;
     let width = 0;
@@ -443,6 +451,7 @@ export function createChart(
         leadSec,
         tailSec: leadSec,
         charMarkers: input.settings.charMarkers,
+        captionPx: LETTER_PX[input.settings.letterSize],
         durationSec: review.take.durationSec,
         ...(cols ? { columns: cols, run: at } : {}),
       });
@@ -1109,6 +1118,7 @@ export function createChart(
         ppu,
         durationSec: input.review.take.durationSec,
         charMarkers: input.settings.charMarkers,
+        captionPx: LETTER_PX[input.settings.letterSize],
       });
       let note = "";
       if (GUTTER + exportLayout.width + PAD_R > budget) {
@@ -1119,6 +1129,7 @@ export function createChart(
           ppu,
           durationSec: input.review.take.durationSec,
           charMarkers: input.settings.charMarkers,
+          captionPx: LETTER_PX[input.settings.letterSize],
         });
         note = `zoomed to ${ppu.toFixed(1)} px/unit so the whole session fits`;
       }
@@ -1128,19 +1139,25 @@ export function createChart(
          against and would be missing from the picture entirely. */
       const exportColumns =
         input.settings.view === "per-char"
-          ? measureColumns([input.review.slots], ppu, input.settings.charMarkers)
+          ? measureColumns(
+              [input.review.slots],
+              ppu,
+              input.settings.charMarkers,
+              LETTER_PX[input.settings.letterSize],
+            )
           : undefined;
 
+      const exportRows = rowsFor(1, 0, false, LETTER_PX[input.settings.letterSize]);
       const w = Math.ceil(GUTTER + exportLayout.width + PAD_R);
       const off = document.createElement("canvas");
       off.width = Math.round(w * dpr);
-      off.height = Math.round(HEIGHT * dpr);
+      off.height = Math.round(exportRows.height * dpr);
       const offCtx = off.getContext("2d");
       if (!offCtx) throw new Error("could not make an offscreen canvas");
       offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Opaque ground: a PNG has no page behind it to supply the background.
       offCtx.fillStyle = palette.panel;
-      offCtx.fillRect(0, 0, w, HEIGHT);
+      offCtx.fillRect(0, 0, w, exportRows.height);
 
       draw(offCtx as unknown as Parameters<typeof draw>[0], {
         runs: [
@@ -1157,7 +1174,7 @@ export function createChart(
         layout: exportLayout,
         slots: input.review.slots,
         analysis: input.review.analysis,
-        rows: rowsFor(1, 0),
+        rows: exportRows,
         palette,
         view: input.settings.view,
         tolerance: input.settings.tolerance,

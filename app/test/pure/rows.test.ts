@@ -8,6 +8,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  CAP_CHAR,
+  CAP_NOTE,
+  CAPTION_PX,
   GRADE_H,
   HEIGHT,
   LABEL_H,
@@ -21,6 +24,8 @@ import {
   Y_TGT_LABEL,
   Y_YOU,
   Y_YOU_LABEL,
+  LETTER_PX,
+  captionBand,
   rowsFor,
 } from "@/render/geometry";
 
@@ -99,5 +104,31 @@ describe("the row geometry", () => {
        runs and one run are the same picture. */
     expect(rowsFor(0, 0).runs).toHaveLength(1);
     expect(rowsFor(0, -1).height).toBe(rowsFor(1, -1).height);
+  });
+});
+
+describe("the letter size", () => {
+  it("is the fixed caption band at the default size", () => {
+    expect(LETTER_PX.medium).toBe(CAPTION_PX);
+    expect(captionBand(CAPTION_PX)).toMatchObject({ labelH: LABEL_H, char: CAP_CHAR, note: CAP_NOTE });
+    expect(rowsFor(1, 0, false, LETTER_PX.medium).height).toBe(HEIGHT);
+  });
+
+  it("grows the caption bands with the letters, and nothing else", () => {
+    const small = rowsFor(2, 0, false, LETTER_PX.small);
+    const large = rowsFor(2, 0, false, LETTER_PX.large);
+    const grew = large.caption.labelH - small.caption.labelH;
+    expect(grew).toBeGreaterThan(0);
+    // One band over the target and one under each of the two runs.
+    expect(large.height - small.height).toBe(3 * grew);
+    expect(large.runs[1]!.row - large.runs[0]!.row).toBe(small.runs[1]!.row - small.runs[0]!.row + grew);
+  });
+
+  it("keeps the note under the letter and inside the band", () => {
+    for (const px of Object.values(LETTER_PX)) {
+      const band = captionBand(px);
+      expect(band.char + px / 2).toBeLessThan(band.note);
+      expect(band.note).toBeLessThan(band.labelH);
+    }
   });
 });

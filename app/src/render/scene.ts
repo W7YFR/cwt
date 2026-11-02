@@ -12,15 +12,11 @@
 
 import type { Analysis, Block, Char, Slot, ViewMode } from "@/types";
 import {
-  CAP_CHAR,
-  CAP_NOTE,
-  CAPTION_PX,
   CLOCK_MARKER_MIN_W,
   DRIFT_H,
   GRADE_H,
   GUTTER,
   HEIGHT,
-  LABEL_H,
   MARK_H,
   MARKER_W,
   PLAYHEAD_W,
@@ -425,10 +421,10 @@ function drawFocus(ctx: Ctx2D, scene: Scene): void {
     top = lit.row - 2;
     // A row without a caption band of its own is lit to its own bottom edge
     // rather than into the row below it.
-    h = ROW_H + (lit.label === null ? 2 : LABEL_H + 2);
+    h = ROW_H + (lit.label === null ? 2 : scene.rows.caption.labelH + 2);
   } else {
     top = scene.rows.tgtLabel;
-    h = LABEL_H + ROW_H + 2;
+    h = scene.rows.caption.labelH + ROW_H + 2;
   }
 
   const color = scene.focus.side === "you" ? scene.palette.you : scene.palette.tgt;
@@ -489,7 +485,7 @@ function caption(ctx: Ctx2D, text: string, start: number, y: number): void {
 /** The target's caption line. Its band is above its row, so the text is
  *  measured up from the marks rather than down onto them. */
 function tgtCapY(scene: Scene): number {
-  return scene.rows.tgtLabel + LABEL_H - CAP_CHAR;
+  return scene.rows.tgtLabel + scene.rows.caption.labelH - scene.rows.caption.char;
 }
 
 /** The per-character view: the target once, then every attempt at it.
@@ -526,7 +522,7 @@ function drawTargetRow(ctx: Ctx2D, scene: Scene): void {
        because any glyph there reads as a character. */
     if (ideal) {
       ctx.fillStyle = C.ink;
-      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
+      ctx.font = `600 ${scene.rows.caption.px}px ${C.mono}`;
       caption(ctx, ideal.char, bx, tgtCapY(scene));
       drawLiveMark(ctx, scene, ideal, bx);
     }
@@ -570,8 +566,8 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
     if (row.label !== null) {
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C.ink;
-      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
-      caption(ctx, cap.text, bx, row.label + CAP_CHAR);
+      ctx.font = `600 ${scene.rows.caption.px}px ${C.mono}`;
+      caption(ctx, cap.text, bx, row.label + scene.rows.caption.char);
 
       // A word-boundary error is a fault in what was sent, so it is called out
       // beside that row's caption, over the gap that caused it.
@@ -584,7 +580,7 @@ function drawRunRow(ctx: Ctx2D, scene: Scene, r: number): void {
         ctx.fillText(
           slot.spaceOp === "del" ? "no space" : "extra space",
           it.x + it.gapW / 2,
-          row.label + CAP_NOTE,
+          row.label + scene.rows.caption.note,
         );
       }
     }
@@ -629,7 +625,7 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
          but on a wall clock the two rows' characters sit at different x, and
          that offset IS the drift. Naming both is what makes it readable. */
       ctx.fillStyle = C.ink;
-      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
+      ctx.font = `600 ${scene.rows.caption.px}px ${C.mono}`;
       caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       drawLiveMark(ctx, scene, slot.ideal, it.ix);
     }
@@ -669,8 +665,8 @@ function drawAbsolute(ctx: Ctx2D, scene: Scene): void {
       if (row.label === null) continue;
       const cap = sentCaption(slot, blank);
       ctx.fillStyle = cap.bad ? C.bad : C.ink;
-      ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
-      caption(ctx, cap.text, it.x, row.label + CAP_CHAR);
+      ctx.font = `600 ${scene.rows.caption.px}px ${C.mono}`;
+      caption(ctx, cap.text, it.x, row.label + scene.rows.caption.char);
     }
   });
 }
@@ -716,7 +712,7 @@ function drawOverlay(ctx: Ctx2D, scene: Scene): void {
       if (visible(it.ix, iw, scene)) {
         band(slot.ideal, it.ix, C.tgt, 0.55);
         ctx.fillStyle = C.ink;
-        ctx.font = `600 ${CAPTION_PX}px ${C.mono}`;
+        ctx.font = `600 ${scene.rows.caption.px}px ${C.mono}`;
         caption(ctx, slot.ideal.char, it.ix, tgtCapY(scene));
       }
     }
