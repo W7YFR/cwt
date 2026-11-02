@@ -70,7 +70,7 @@ export interface ReviewScreenProps {
     source: string,
     fromMic: boolean,
     data: ArrayBuffer | null,
-  ): void;
+  ): void | Promise<void>;
   onError(message: string): void;
   deviceId: string | undefined;
   /** Saved calibrations, which one is in use, and how to change it.

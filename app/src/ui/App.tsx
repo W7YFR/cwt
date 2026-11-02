@@ -297,10 +297,10 @@ export function App(): React.ReactElement {
   }, []);
 
   const onAudio = useCallback(
-    (clip: AudioClip, source: string, fromMic: boolean, data: ArrayBuffer | null) => {
+    async (clip: AudioClip, source: string, fromMic: boolean, data: ArrayBuffer | null) => {
       setError(null);
       try {
-        take.load(
+        await take.load(
           clip,
           {
             source,
@@ -349,7 +349,7 @@ export function App(): React.ReactElement {
       setError(null);
       try {
         const loaded = await loadAudioFile(file);
-        onAudio(loaded.clip, loaded.name, false, loaded.data);
+        await onAudio(loaded.clip, loaded.name, false, loaded.data);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {

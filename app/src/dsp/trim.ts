@@ -19,6 +19,9 @@ export interface TrimResult {
   /** How much was cut from the front — the offset between the original
    *  recording's clock and the trimmed one. */
   leadSec: number;
+  /** The tone the trim keyed off, when it got far enough to find one. The
+   *  analysis after it reuses this rather than detecting it again. */
+  toneHz?: number;
 }
 
 /** Trim dead air from both ends, keeping `pad` seconds of it.
@@ -41,15 +44,17 @@ export function trimSilence(
   if (samples.length === 0 || pad < 0) return none;
   if (samples.length <= Math.floor(2 * pad * rate)) return none;
 
+  let tone: number;
   let env: Float32Array;
   let thr: number;
   try {
-    const tone = toneHz ?? detectTone(samples, rate);
+    tone = toneHz ?? detectTone(samples, rate);
     env = envelope(samples, rate, tone, bandwidth);
     thr = keyingThreshold(env);
   } catch {
     return none;
   }
+  const kept: TrimResult = { samples, leadSec: 0, toneHz: tone };
 
   let first = -1;
   let last = -1;
@@ -59,15 +64,15 @@ export function trimSilence(
       last = i;
     }
   }
-  if (first < 0) return none;
+  if (first < 0) return kept;
 
   const p = Math.floor(pad * rate);
   const start = Math.max(first - p, 0);
   const end = Math.min(last + 1 + p, samples.length);
-  if (end - start < Math.floor(0.1 * rate)) return none;
-  if (start === 0 && end === samples.length) return none;
+  if (end - start < Math.floor(0.1 * rate)) return kept;
+  if (start === 0 && end === samples.length) return kept;
 
-  return { samples: samples.subarray(start, end), leadSec: start / rate };
+  return { samples: samples.subarray(start, end), leadSec: start / rate, toneHz: tone };
 }
 
 /** Times (seconds) where the waveform appears to have been cut.

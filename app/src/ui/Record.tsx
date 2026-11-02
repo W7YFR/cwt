@@ -351,6 +351,11 @@ export function RecordBar({
         >
           Clear
         </button>
+        {/* A long take reads for a second or more after Stop. Not hidden
+            while empty, so it is announced when filled. */}
+        <span className="hint" aria-live="polite" data-testid="reading-take">
+          {rec.busy ? "measuring your sending…" : ""}
+        </span>
       </div>
 
       {/* Nothing at all without `?micdebug` in the URL. */}

@@ -41,31 +41,31 @@ const record = (result: { current: ReturnType<typeof useTake> }, name: string, i
 beforeEach(() => localStorage.clear());
 
 describe("a practice session", () => {
-  it("stacks a second recording rather than replacing the first", () => {
+  it("stacks a second recording rather than replacing the first", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     expect(result.current.runs).toHaveLength(1);
 
-    record(result, CLEAN, "r2");
+    await record(result, CLEAN, "r2");
     expect(result.current.runs).toHaveLength(2);
     // And lands on the one just recorded, which is the one you want to see.
     expect(result.current.selected).toBe(1);
   });
 
-  it("keeps the target fixed once the session has one", () => {
+  it("keeps the target fixed once the session has one", async () => {
     /* The failure this prevents: run 2 arriving with its own idea of what was
        being sent, replacing the target halfway through and re-grading
        everything already on screen against it. */
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     act(() => result.current.setSettings({ expected: "CQ DE W7YFR" }));
     const target = result.current.settings.expected;
 
-    record(result, CLEAN, "r2");
+    await record(result, CLEAN, "r2");
     expect(result.current.settings.expected).toBe(target);
   });
 
-  it("keeps it across a clear, which is what makes the loop a loop", () => {
+  it("keeps it across a clear, which is what makes the loop a loop", async () => {
     /* Clear throws the recordings away and keeps the message — that is the
        whole of what it is for. The first recording after it is the first
        recording of a session again, and it used to establish the target the
@@ -76,45 +76,45 @@ describe("a practice session", () => {
        Only ever filled in, never replaced: whatever put it there is what the
        session is about until somebody says otherwise. */
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     act(() => result.current.setSettings({ expected: "CQ DE W7YFR" }));
     const target = result.current.settings.expected;
 
     act(() => result.current.reset());
     expect(result.current.settings.expected).toBe(target);
 
-    record(result, CLEAN, "r2");
+    await record(result, CLEAN, "r2");
     expect(result.current.settings.expected).toBe(target);
   });
 
-  it("still takes the decode when there is nothing to keep", () => {
+  it("still takes the decode when there is nothing to keep", async () => {
     /* The other half of the rule, and the reason the box is not simply left
        alone: opening a recording with nothing declared has only one honest
        answer for what it was aimed at, and it is what came out. */
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     expect(result.current.settings.expected).toBe(result.current.loaded!.take.decoded);
     expect(result.current.settings.expected).not.toBe("");
   });
 
-  it("grades every attempt against that one target", () => {
+  it("grades every attempt against that one target", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     act(() => result.current.setSettings({ expected: "CQ DE W7YFR" }));
-    record(result, CLEAN, "r2");
+    await record(result, CLEAN, "r2");
 
     expect(result.current.reviews).toHaveLength(2);
     const targets = result.current.reviews.map((r) => r.ideal.chars.map((c) => c.char).join(""));
     expect(targets[0]).toBe(targets[1]);
   });
 
-  it("re-grades every attempt when the speed or the tolerance changes", () => {
+  it("re-grades every attempt when the speed or the tolerance changes", async () => {
     /* A setting is about the session, not about the row you happen to be
        reading. Applied to one run and not the rest, the rows stop being
        comparable — which is the only reason to stack them. */
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
-    record(result, CLEAN, "r2");
+    await record(result, SLOPPY, "r1");
+    await record(result, CLEAN, "r2");
     // The first run, so the second is one nobody is looking at.
     act(() => result.current.selectRun(0));
 
@@ -145,10 +145,10 @@ describe("a practice session", () => {
     );
   });
 
-  it("reads whichever attempt is picked", () => {
+  it("reads whichever attempt is picked", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
-    record(result, CLEAN, "r2");
+    await record(result, SLOPPY, "r1");
+    await record(result, CLEAN, "r2");
 
     act(() => result.current.selectRun(0));
     expect(result.current.selected).toBe(0);
@@ -156,10 +156,10 @@ describe("a practice session", () => {
     expect(result.current.review).toBe(result.current.reviews[0]);
   });
 
-  it("drops one attempt and keeps the rest", () => {
+  it("drops one attempt and keeps the rest", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
-    record(result, CLEAN, "r2");
+    await record(result, SLOPPY, "r1");
+    await record(result, CLEAN, "r2");
     const keeping = result.current.runs[0]!.take.id;
 
     act(() => result.current.dropRun(1));
@@ -171,10 +171,10 @@ describe("a practice session", () => {
     expect(result.current.review).not.toBeNull();
   });
 
-  it("keeps reading something when the attempt dropped was an earlier one", () => {
+  it("keeps reading something when the attempt dropped was an earlier one", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
-    record(result, CLEAN, "r2");
+    await record(result, SLOPPY, "r1");
+    await record(result, CLEAN, "r2");
     const last = result.current.runs[1]!.take.id;
 
     act(() => result.current.dropRun(0));
@@ -182,9 +182,9 @@ describe("a practice session", () => {
     expect(result.current.loaded!.take.id).toBe(last);
   });
 
-  it("leaves an empty session at the same settings when the only attempt is dropped", () => {
+  it("leaves an empty session at the same settings when the only attempt is dropped", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     act(() => result.current.setSettings({ expected: "PARIS" }));
 
     act(() => result.current.dropRun(0));
@@ -193,10 +193,10 @@ describe("a practice session", () => {
     expect(result.current.settings.expected).toBe("PARIS");
   });
 
-  it("starts over when the whole session is cleared", () => {
+  it("starts over when the whole session is cleared", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
-    record(result, CLEAN, "r2");
+    await record(result, SLOPPY, "r1");
+    await record(result, CLEAN, "r2");
 
     act(() => result.current.reset());
     expect(result.current.runs).toHaveLength(1);
@@ -204,22 +204,32 @@ describe("a practice session", () => {
     expect(result.current.runs[0]!.take.segments).toHaveLength(0);
   });
 
-  it("does not count the empty attempt as a run to stack onto", () => {
+  it("drops a take still being read when the session is cleared", async () => {
+    const { result } = renderHook(() => useTake());
+    await act(async () => {
+      const reading = result.current.load(clipOf(SLOPPY), { source: MIC_SOURCE, id: "r1" });
+      result.current.clear();
+      await reading;
+    });
+    expect(result.current.runs).toHaveLength(0);
+  });
+
+  it("does not count the empty attempt as a run to stack onto", async () => {
     /* A cleared session holds one blank take so the chart has a row to draw.
        The next recording has to take its place rather than pile on top of it. */
     const { result } = renderHook(() => useTake());
     act(() => result.current.reset());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     expect(result.current.runs).toHaveLength(1);
     expect(result.current.runs[0]!.take.segments.length).toBeGreaterThan(0);
   });
 });
 
 describe("coming back to a session", () => {
-  it("writes down the order and which attempt was being read", () => {
+  it("writes down the order and which attempt was being read", async () => {
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
-    record(result, CLEAN, "r2");
+    await record(result, SLOPPY, "r1");
+    await record(result, CLEAN, "r2");
     act(() => result.current.selectRun(0));
 
     const saved = loadPrefs().session!;
@@ -227,15 +237,15 @@ describe("coming back to a session", () => {
     expect(saved.selected).toBe(0);
   });
 
-  it("does not wipe it on the way up", () => {
+  it("does not wipe it on the way up", async () => {
     /* The bug this exists for: the effect that records the session also ran on
        the very first render, with nothing loaded — and it runs before the one
        that restores. Clearing on an empty list wiped the thing about to be
        restored, so every reload lost the stack and looked like the recording
        had failed rather than the bookkeeping. */
     const first = renderHook(() => useTake());
-    record(first.result, SLOPPY, "r1");
-    record(first.result, CLEAN, "r2");
+    await record(first.result, SLOPPY, "r1");
+    await record(first.result, CLEAN, "r2");
     const wanted = loadPrefs().session!;
     first.unmount();
 
@@ -244,10 +254,10 @@ describe("coming back to a session", () => {
     expect(loadPrefs().session).toEqual(wanted);
   });
 
-  it("opens every attempt again, reading the one that was being read", () => {
+  it("opens every attempt again, reading the one that was being read", async () => {
     const first = renderHook(() => useTake());
-    record(first.result, SLOPPY, "r1");
-    record(first.result, CLEAN, "r2");
+    await record(first.result, SLOPPY, "r1");
+    await record(first.result, CLEAN, "r2");
     act(() => first.result.current.setSettings({ expected: "CQ DE W7YFR" }));
     const ids = first.result.current.runs.map((r) => r.take.id);
     const takes = first.result.current.runs.map((r) => r.take);
@@ -265,12 +275,12 @@ describe("coming back to a session", () => {
     expect(back.result.current.reviews).toHaveLength(2);
   });
 
-  it("carries the session's settings back rather than rebuilding them", () => {
+  it("carries the session's settings back rather than rebuilding them", async () => {
     /* The intended message is the one thing every attempt shares, and it lives
        in the settings rather than on any one take. Rebuilding from a take
        would drop it and re-grade the session against its own decode. */
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     const take = result.current.runs[0]!.take;
     const settings = { ...result.current.settings, expected: "PARIS PARIS" };
 
@@ -278,12 +288,12 @@ describe("coming back to a session", () => {
     expect(result.current.settings.expected).toBe("PARIS PARIS");
   });
 
-  it("keeps the person's settings over the snapshot saved with a take", () => {
+  it("keeps the person's settings over the snapshot saved with a take", async () => {
     /* The snapshot is as old as the last change made with that take open,
        and a reload restores it. Preferences set since then must stand. */
     savePrefs({ ...loadPrefs(), tolerance: 0.45, view: "absolute", showHints: false });
     const { result } = renderHook(() => useTake());
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     const take = result.current.runs[0]!.take;
     const settings = {
       ...result.current.settings,
@@ -302,7 +312,7 @@ describe("coming back to a session", () => {
 });
 
 describe("the speed a session declares", () => {
-  it("survives the first recording", () => {
+  it("survives the first recording", async () => {
     /* A session is several attempts at one message at ONE speed — that is what
        makes its rows comparable. Declaring 25/12 and then having the first
        recording replace the overall speed with whatever it measured means the
@@ -312,15 +322,15 @@ describe("the speed a session declares", () => {
     act(() => result.current.reset({ charWpm: 25, farnsworthWpm: 12 }));
     expect(result.current.settings.farnsworthWpm).toBe(12);
 
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
     expect(result.current.settings.charWpm).toBe(25);
     expect(result.current.settings.farnsworthWpm).toBe(12);
   });
 
-  it("grades that recording against the speed declared, not its own", () => {
+  it("grades that recording against the speed declared, not its own", async () => {
     const { result } = renderHook(() => useTake());
     act(() => result.current.reset({ charWpm: 25, farnsworthWpm: 12 }));
-    record(result, SLOPPY, "r1");
+    await record(result, SLOPPY, "r1");
 
     const take = result.current.runs[0]!.take;
     expect(take.target).toMatchObject({ charWpm: 25, farnsworthWpm: 12 });
@@ -328,19 +338,19 @@ describe("the speed a session declares", () => {
     expect(take.target.explicit).toBe(true);
   });
 
-  it("still reads an opened file at its own speed", () => {
+  it("still reads an opened file at its own speed", async () => {
     /* A file was made somewhere else, possibly by somebody else, and nobody
        declared anything about it. Inferring its speed is the only thing that
        can be done, and it is what has always happened. */
     const { result } = renderHook(() => useTake());
     act(() => result.current.reset({ charWpm: 25, farnsworthWpm: 12 }));
-    act(() => result.current.load(clipOf(SLOPPY), { source: "a-file.wav", id: "f1" }));
+    await act(() => result.current.load(clipOf(SLOPPY), { source: "a-file.wav", id: "f1" }));
     expect(result.current.runs[0]!.take.target.explicit).toBe(false);
   });
 });
 
 describe("ignoring character construction", () => {
-  it("survives a reload", () => {
+  it("survives a reload", async () => {
     vi.useFakeTimers();
     try {
       const first = renderHook(() => useTake());
