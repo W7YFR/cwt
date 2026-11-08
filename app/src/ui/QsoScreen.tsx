@@ -49,9 +49,9 @@ import { charsOf, copyText, overOfText, plain, type CopyInput, type LineCopy } f
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconDownload, IconEdit, IconPlay, IconStop } from "./Icons";
+import { IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
-import { QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
@@ -243,16 +243,13 @@ type Playback = "never" | "always" | "end";
 const PLAYBACKS: ReadonlyArray<Option<Playback>> = [
   { value: "never", label: "Never", note: "No buttons to play lines again." },
   { value: "always", label: "Always", note: "On every line. During a QSO, they play on your turn." },
-  { value: "end", label: "At end", note: "On every line once the QSO is over, with Play QSO." },
+  { value: "end", label: "At end", note: "On every line, and under the QSO, once the QSO is over." },
 ];
 const PLAYBACK_HELP =
-  "When the play buttons show: on each line and as Play QSO under a QSO that is over. " +
+  "When the play buttons show: on each line, and under a QSO that is over. " +
   "Always shows them on every line. During a QSO they play on your turn, before you start " +
   "sending, and the microphone is not copied while they play. At end " +
   "shows them once the QSO is over.";
-const SHOW_DOWNLOAD_HELP =
-  "Under a QSO that is over, Download saves it as a WAV file. With QSB, noise, QRN or QRM on, " +
-  "Download clean saves it without them, and Download as heard with them.";
 
 const SCRIPT_REPORT_HELP =
   "Beside a script QSO that is over: how often the station asked you to repeat, how many of your " +
@@ -581,7 +578,6 @@ export function QsoScreen({
   const showSettings = () => settings.show("page");
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
   const [replayOnContinue, setReplayOnContinue] = useOnOff("qsoReplay", true);
-  const [showDownload, setShowDownload] = useOnOff("qsoShowDownload", true);
   const [scriptReportOn, setScriptReportOn] = useOnOff("qsoScriptReport", false);
   const [playback, setPlaybackRaw] = useState<Playback>(() => loadPrefs().qsoPlayback ?? "always");
   const setPlayback = (next: Playback) => {
@@ -1621,10 +1617,12 @@ export function QsoScreen({
       </div>
     );
   };
-  const qsoTapeRow = (n: number): React.ReactElement | null => {
+  /** Under a QSO that is over: ▶, which plays it as heard, and ⋯, with the
+   *  clean and the heard versions to play or save, then its name. First on
+   *  the row, under the start of its lines, where they are seen. */
+  const qsoTapeRow = (n: number, at: number): React.ReactElement | null => {
     if (!closed.includes(n)) return null;
     const play = playback !== "never";
-    if (!play && !showDownload) return null;
     // The row shows while your overs come back after a reload, so the log
     // does not move when they do.
     const parts = qsoParts(n);
@@ -1635,56 +1633,58 @@ export function QsoScreen({
     const added = anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
     const gone = parts ? null : "This QSO's recording was not kept";
     const why = gone ?? cannotPlay();
-    /** A play button: clean, or as heard with all that is added. */
-    const playButton = (asHeard: boolean, label: string, testId: string) => {
-      const key = `qso ${n}${asHeard ? " heard" : ""}`;
-      const on = replaying === key;
-      return (
-        <button
-          type="button"
-          data-testid={testId}
-          disabled={why !== null}
-          title={why ?? undefined}
-          onClick={() => playClip(key, asHeard ? tape(parts!, tapeRate(), replayAdded() ?? undefined) : make())}
-        >
-          <i className="ico">{on ? <IconStop /> : <IconPlay />}</i>
-          {on ? "Stop" : label}
-        </button>
-      );
-    };
+    const playKey = (asHeard: boolean) => `qso ${n}${asHeard ? " heard" : ""}`;
+    const playIt = (asHeard: boolean) =>
+      playClip(playKey(asHeard), asHeard ? tape(parts!, tapeRate(), replayAdded() ?? undefined) : make());
+    const playing = replaying === playKey(added) || replaying === playKey(false);
+    const name = `QSO ${at + 1}${ends[n] ? ` · ${ends[n]!.them.call}` : ""}`;
     return (
       <li className="qsotape" data-testid="qso-tape">
-        {play && !added && playButton(false, "Play QSO", "qso-play")}
-        {play && added && playButton(false, "Play clean", "qso-play")}
-        {play && added && playButton(true, "Play as heard", "qso-play-heard")}
-        {showDownload && (
-          <button
-            type="button"
-            data-testid="qso-download"
-            disabled={gone !== null}
-            title={gone ?? undefined}
-            onClick={() => download(n, make())}
-          >
-            <i className="ico">
-              <IconDownload />
-            </i>
-            {added ? "Download clean" : "Download"}
-          </button>
-        )}
-        {showDownload && added && (
-          <button
-            type="button"
-            data-testid="qso-download-heard"
-            disabled={gone !== null}
-            title={gone ?? DOWNLOAD_HEARD_HELP}
-            onClick={() => download(n, heard(), true)}
-          >
-            <i className="ico">
-              <IconDownload />
-            </i>
-            Download as heard
-          </button>
-        )}
+        <span className="tapeend">
+          {play && (
+            <button
+              type="button"
+              className="iconbtn qsoplay"
+              data-testid="qso-play"
+              disabled={why !== null}
+              aria-label={playing ? "Stop" : `Play ${name}`}
+              title={why ?? (playing ? "Stop" : added ? "Play this QSO as you heard it" : "Play this QSO")}
+              /* Stop is for whichever version is playing, clean from ⋯
+                 included; only when nothing is does it play as heard. */
+              onClick={() => (playing ? listen.stop() : playIt(added))}
+            >
+              {playing ? <IconStop /> : <IconPlay />}
+            </button>
+          )}
+          {/* Up: the row is at the foot of a QSO, often low on the page. */}
+          <MoreMenu label={`More for ${name}`} testId="qso-more" up>
+            {play && added && (
+              <>
+                <MenuHeading>Play</MenuHeading>
+                <PlayItem label="Clean" testId="qso-play-clean" disabled={why !== null} title={why ?? undefined} onClick={() => playIt(false)} />
+                <PlayItem label="As heard" testId="qso-play-heard" disabled={why !== null} title={why ?? undefined} onClick={() => playIt(true)} />
+              </>
+            )}
+            <MenuHeading>Download</MenuHeading>
+            <DownloadItem
+              label={added ? "Audio, clean" : "Audio"}
+              testId="qso-download"
+              disabled={gone !== null}
+              title={gone ?? undefined}
+              onClick={() => download(n, make())}
+            />
+            {added && (
+              <DownloadItem
+                label="Audio, as heard"
+                testId="qso-download-heard"
+                disabled={gone !== null}
+                title={gone ?? DOWNLOAD_HEARD_HELP}
+                onClick={() => download(n, heard(), true)}
+              />
+            )}
+          </MoreMenu>
+        </span>
+        <span className="tapename">{name}</span>
       </li>
     );
   };
@@ -2176,13 +2176,6 @@ export function QsoScreen({
                       onChange={(v) => setPlayback(v as Playback)}
                     />
                     <Check
-                      id="qso-show-download"
-                      label="Show Download, to save it as audio"
-                      help={SHOW_DOWNLOAD_HELP}
-                      checked={showDownload}
-                      onChange={setShowDownload}
-                    />
-                    <Check
                       id="qso-script-report"
                       label="Show a report after a script"
                       help={SCRIPT_REPORT_HELP}
@@ -2361,7 +2354,7 @@ export function QsoScreen({
                           </li>
                         );
                       })}
-                      {qsoTapeRow(group.qso)}
+                      {qsoTapeRow(group.qso, g)}
                     </ol>
                     {qsoReport(group.qso)}
                   </li>

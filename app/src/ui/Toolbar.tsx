@@ -8,7 +8,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SettingsForm } from "./Controls";
-import { IconDownload, IconUpload } from "./Icons";
+import { IconDownload, IconPlay, IconUpload } from "./Icons";
 import { useSettings, type SettingsTab } from "./SettingsDrawer";
 
 /** The least room kept between a popover and the window's edge. */
@@ -102,6 +102,17 @@ export function longest(values: readonly string[]): string {
 /** The widest a speed reads, as 45/45 wpm. */
 export const WIDEST_SPEED = "45/45 wpm";
 
+/** The box `position: fixed` measures from, in window coordinates: the
+ *  page keeps scrollbar gutters that a fixed box is placed inside. */
+function fixedFrame(): { left: number; right: number; top: number } {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:0;right:0;top:0;height:0;visibility:hidden;pointer-events:none";
+  document.body.appendChild(probe);
+  const f = probe.getBoundingClientRect();
+  probe.remove();
+  return { left: f.left, right: f.right, top: f.top };
+}
+
 /** One quick setting: its name and value, and the setting itself a click
  *  away. The popover links to the setting's tab in Settings. */
 export function QuickChip({
@@ -187,22 +198,54 @@ export function QuickChip({
   );
 }
 
-/** ⋯: what is done rarely. Its items are buttons; a click on one closes it. */
-function MoreMenu({ children }: { children: React.ReactNode }): React.ReactElement {
+/** ⋯: what is done rarely. Its items are buttons; a click on one closes it.
+ *  The toolbar has one, and so does each finished QSO on the QSO page. */
+export function MoreMenu({
+  label = "More",
+  testId = "more",
+  up = false,
+  children,
+}: {
+  label?: string;
+  testId?: string;
+  /** Open above the button, for one that sits low on the page. */
+  up?: boolean;
+  children: React.ReactNode;
+}): React.ReactElement {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   const close = useRef(() => setOpen(false)).current;
   usePopover(open, close, root);
-  useInView(open, pop);
+  useInView(open && !up, pop);
+  /* Above the button, placed against the window: a menu inside a scrolling
+     log would be cut off by it. Clear of the window's edges, and below the
+     button after all when there is no room above. */
+  useLayoutEffect(() => {
+    const el = pop.current;
+    const btn = root.current;
+    if (!open || !up || !el || !btn) return;
+    const b = btn.getBoundingClientRect();
+    const frame = fixedFrame();
+    const h = el.offsetHeight;
+    const w = el.offsetWidth;
+    const above = b.top - 6 - h;
+    const top = above >= EDGE_PX ? above : b.bottom + 6;
+    const left = Math.min(b.left, frame.right - EDGE_PX - w);
+    el.style.top = `${top - frame.top}px`;
+    el.style.left = `${Math.max(frame.left + EDGE_PX, left) - frame.left}px`;
+    /* Placed once, so a scroll would leave it behind: it closes instead. */
+    window.addEventListener("scroll", close, true);
+    return () => window.removeEventListener("scroll", close, true);
+  }, [open, up, close]);
   return (
     <div className="quick more" ref={root}>
       <button
         type="button"
         className="iconbtn"
-        data-testid="more"
-        aria-label="More"
-        title="More"
+        data-testid={testId}
+        aria-label={label}
+        title={label}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
@@ -211,7 +254,7 @@ function MoreMenu({ children }: { children: React.ReactNode }): React.ReactEleme
       </button>
       {open && (
         <div
-          className="quickpop menu"
+          className={up ? "quickpop menu up" : "quickpop menu"}
           ref={pop}
           role="menu"
           onClick={(e) => {
@@ -277,20 +320,28 @@ export function OpenFileItem({
 }
 
 /** An item in ⋯ that saves a file. */
-export function DownloadItem({
-  label,
-  disabled = false,
-  title,
-  onClick,
-}: {
+export function DownloadItem(props: Omit<MenuItemProps, "icon">): React.ReactElement {
+  return <MenuItem {...props} icon={<IconDownload />} />;
+}
+
+/** An item in ⋯ that plays something. */
+export function PlayItem(props: Omit<MenuItemProps, "icon">): React.ReactElement {
+  return <MenuItem {...props} icon={<IconPlay />} />;
+}
+
+interface MenuItemProps {
   label: string;
+  icon: React.ReactNode;
   disabled?: boolean;
-  title?: string;
+  title?: string | undefined;
+  testId?: string;
   onClick(): void;
-}): React.ReactElement {
+}
+
+function MenuItem({ label, icon, disabled = false, title, testId, onClick }: MenuItemProps): React.ReactElement {
   return (
-    <button type="button" role="menuitem" disabled={disabled} title={title} onClick={onClick}>
-      <IconDownload /> {label}
+    <button type="button" role="menuitem" data-testid={testId} disabled={disabled} title={title} onClick={onClick}>
+      {icon} {label}
     </button>
   );
 }

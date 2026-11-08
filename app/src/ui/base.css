@@ -2560,8 +2560,6 @@ header .modeswitch button { white-space: nowrap; }
 .qsoreport tbody th[scope="row"] { color: var(--ink-dim); }
 .qsoreport td { font-family: var(--mono); color: var(--ink); }
 .qsoreport tr.bad td:last-child { color: var(--bad); }
-.qsolog .qsotape button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
-.qsolog .qsotape .ico { margin-right: 6px; font-style: normal; }
 /* The Copy page's downloads, under the QSO, as the QSO page's are. */
 .copydownloads { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .copydownloads button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -3070,6 +3068,7 @@ header .modeswitch button { white-space: nowrap; }
 .quick .chip[aria-expanded="true"] { border-color: var(--you); }
 /* The setting itself, under its chip: the same form as in Settings. */
 .quickpop {
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -3107,6 +3106,8 @@ header .modeswitch button { white-space: nowrap; }
 .quickpop .quickmore { display: block; margin: 8px 2px 0 auto; font-size: 12.5px; }
 /* ⋯: a short list of buttons. */
 .quick.more { margin-left: auto; }
+.qsolog .qsotape .quick.more { margin-left: 0; }
+.quickpop.menu.up { position: fixed; top: 0; left: 0; }
 .quickpop.menu { width: max-content; min-width: 220px; padding: 6px; display: flex; flex-direction: column; gap: 2px; left: auto; }
 .quickpop.menu > button {
   justify-content: flex-start;
@@ -3188,3 +3189,9 @@ header .modeswitch button { white-space: nowrap; }
 @media (max-width: 560px) {
   .keylist .keyrow { grid-template-columns: 120px minmax(0, 1fr); }
 }
+
+/* Under a QSO that is over: ▶ and ⋯ first, then its name. */
+.qsolog .qsotape { align-items: center; justify-content: flex-start; }
+.qsolog .qsotape .tapename { font: 12.5px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); }
+.qsolog .qsotape .tapeend { display: flex; align-items: center; gap: 6px; }
+.qsolog .qsotape .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
