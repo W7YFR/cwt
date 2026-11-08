@@ -2799,28 +2799,19 @@ header .modeswitch button { white-space: nowrap; }
 .viewpanel.formpanel .subgroup > .group { padding: 5px 0; }
 /* A line between groups of settings that belong together, and none between
    the settings inside one. */
-.viewpanel.formpanel .subgroup { position: relative; padding: 4px 0; }
-.viewpanel.formpanel .panelrow > .panelgroups > .subgroup + *,
-.viewpanel.formpanel .panelrow > .panelgroups > * + .subgroup { border-top: 1px solid var(--line); }
-/* The group's name, in the name column beside its first setting. */
-/* A guide line down the name column, under the group's name, as far as its
-   last setting; the names of its settings are indented from it. */
-.viewpanel.formpanel .subgroup::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: 38px;
-  bottom: 12px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--line);
+/* A group of settings that belong together, on a faintly shaded block
+   across the row: where it starts and ends is the block's edge. */
+.viewpanel.formpanel .subgroup {
+  position: relative;
+  padding: 4px 8px;
+  margin: 4px -8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
-.viewpanel.formpanel .subgroup .group > label:not(.check):not(.field),
-.viewpanel.formpanel .subgroup .group > .caption,
-.viewpanel.formpanel .subgroup .group > label.field .fieldname { padding-left: 14px; }
+/* The group's name, in the name column beside its first setting. */
 .viewpanel.formpanel .subgroup > .subhead {
   position: absolute;
-  left: 0;
+  left: 8px;
   top: 13px;
   width: var(--namecol);
   line-height: 22px;
@@ -3021,22 +3012,7 @@ header .modeswitch button { white-space: nowrap; }
 .drawer .viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 100%; }
 @media (max-width: 560px) {
   /* No name column on a phone: a group's name heads its settings. */
-  /* A guide line down the name column, under the group's name, as far as its
-   last setting; the names of its settings are indented from it. */
-.viewpanel.formpanel .subgroup::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: 38px;
-  bottom: 12px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--line);
-}
-.viewpanel.formpanel .subgroup .group > label:not(.check):not(.field),
-.viewpanel.formpanel .subgroup .group > .caption,
-.viewpanel.formpanel .subgroup .group > label.field .fieldname { padding-left: 14px; }
-.viewpanel.formpanel .subgroup > .subhead { position: static; display: block; padding-top: 4px; }
+  .viewpanel.formpanel .subgroup > .subhead { position: static; display: block; padding-top: 4px; }
   .drawer { width: 100%; border-left: 0; }
   .drawerbody { padding: 14px 16px 24px; }
   .drawer .viewpanel.formpanel .group { grid-template-columns: minmax(0, 1fr) auto; }
@@ -3162,18 +3138,20 @@ header .modeswitch button { white-space: nowrap; }
     left: calc(50% - 50vw);
     width: 100vw;
     z-index: 20;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
     background: var(--panel);
     border-top: 1px solid var(--line);
     box-shadow: 0 -6px 18px rgba(0, 0, 0, .18);
   }
   .toolactions > .recordbar { flex-wrap: nowrap; }
+  .toolactions button { white-space: nowrap; }
   .toolactions .srcrow { display: none; }
   /* From the foot of the screen, the drill list opens upward. */
   .toolactions .drillpicker.floating .drilllist { top: auto; bottom: calc(100% + 6px); }
-  /* Room under the page for the bar. */
-  .app { padding-bottom: 72px; }
+  /* Room under the page for the bar, two lines of it where a page has that
+     many actions. */
+  .app { padding-bottom: 120px; }
 }
 .qsocontrols:empty { display: none; }
 /* The level meter beside Pause and Stop, as wide as the one beside Stop and review. */
@@ -3188,3 +3166,9 @@ header .modeswitch button { white-space: nowrap; }
 .note.notes { display: grid; }
 .note.notes > span { grid-area: 1 / 1; }
 .note.notes > span[data-on="false"] { visibility: hidden; }
+/* Between a page's own actions and the ones on what it holds, as Copy's
+   attempts. */
+.toolsep { width: 1px; height: 22px; background: var(--line); }
+@media (max-width: 560px) { .toolsep { display: none; } }
+/* A group whose every setting does nothing now dims its name too. */
+.viewpanel.formpanel .subgroup:not(:has(input:not(:disabled), button:not(:disabled):not(.helpdot))) > .subhead { opacity: .45; }

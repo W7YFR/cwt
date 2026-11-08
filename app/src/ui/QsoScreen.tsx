@@ -55,7 +55,7 @@ import { QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
-import { NEEDS_BAND, NEEDS_BAND_BETWEEN } from "./copy";
+import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY } from "./copy";
 import { Graded, RightOnly } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
@@ -1867,7 +1867,7 @@ export function QsoScreen({
 
   const status = !recorder
     ? open
-      ? "Press Continue to go on, or Restart for a new QSO."
+      ? "Press Continue to go on, or New QSO to start again."
       : lines.length > 0
         ? "Press Start for a new QSO."
         : "Press Start, then call CQ."
@@ -1908,6 +1908,11 @@ export function QsoScreen({
       : phase === "waiting"
         ? "waiting"
         : "receiving";
+
+  /* Why a setting of your copy does nothing now: no copy to type, or no
+     slots to type it in. */
+  const copyBar = theirText === "copy" ? null : NEEDS_THEIR_LINES_COPY;
+  const slotsBar = copyBar ?? (copyInput === "slots" ? null : NEEDS_SLOTS);
 
   /* What the chips and Settings share: one copy of each, drawn wherever it
      is open. */
@@ -2002,7 +2007,7 @@ export function QsoScreen({
                   >
                     <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
                   </button>
-                  {/* Restart clears the log and starts a new QSO with a new
+                  {/* New QSO clears the log and starts a new QSO with a new
                       station, as Start does when there is nothing to go on with. */}
                   {open && !starting && (
                     <button
@@ -2179,7 +2184,7 @@ export function QsoScreen({
               <Section name="copy" title="Typing">
                 <div className="panelgroups">
                   <ChoiceGroup
-                    id="qso-copy-input"
+                    id="qso-copy-input" barred={copyBar}
                     label="Copy in"
                     help={COPY_INPUT_HELP}
                     value={copyInput}
@@ -2187,21 +2192,21 @@ export function QsoScreen({
                     onChange={(v) => setCopyInput(v as CopyInput)}
                   />
                   <Check
-                    id="qso-grade-typing"
+                    id="qso-grade-typing" barred={slotsBar}
                     label="Grade slots as I type"
                     help={GRADE_TYPING_HELP}
                     checked={gradeTyping}
                     onChange={setGradeTyping}
                   />
                   <Check
-                    id="qso-lock-copy"
+                    id="qso-lock-copy" barred={copyBar}
                     label="Lock my copy when I start sending"
                     help={LOCK_HELP}
                     checked={lockCopy}
                     onChange={setLockCopy}
                   />
                   <ChoiceGroup
-                    id="qso-locked-shows"
+                    id="qso-locked-shows" barred={copyBar}
                     label="My locked copy shows"
                     help={LOCKED_SHOWS_HELP}
                     value={lockedShows}
@@ -2209,7 +2214,7 @@ export function QsoScreen({
                     onChange={(v) => setLockedShows(v as LockedShows)}
                   />
                   <Check
-                    id="qso-allow-edits"
+                    id="qso-allow-edits" barred={copyBar}
                     label="Allow edits"
                     help={ALLOW_EDITS_HELP}
                     checked={allowEdits}

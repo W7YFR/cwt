@@ -85,7 +85,7 @@ export function Report({
               </>
             ) : (
               <>
-                Say what you are going to send in <b>Intended message</b> above
+                Say what you are going to send in <b>Message</b> above
                 and the target appears, to hear and to key against. You can
                 record without one — the timing still gets graded, against your
                 own sending rather than against anything you meant.

@@ -164,6 +164,9 @@ export function ReviewScreen({
      while the dialog is up: a key that starts a recording behind an open
      dialog answers a question nobody asked. */
   const [starting, setStarting] = useState(false);
+  /* A drill picked while the session has runs in it: the New session dialog
+     opens with its text, so the runs are not cleared without asking. */
+  const [startWith, setStartWith] = useState<string | null>(null);
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [status, setStatus] = useState("");
   // The playhead moves every frame. Routing it through state would re-render
@@ -779,14 +782,19 @@ export function ReviewScreen({
                 leadLeft={leadLeft}
                 onClear={blank ? undefined : onClear}
                 onNewSession={() => setStarting(true)}
-                onDrill={(d) =>
+                onDrill={(d) => {
+                  if (!blank) {
+                    setStartWith(d.text);
+                    setStarting(true);
+                    return;
+                  }
                   onNewSession({
                     expected: d.text,
                     charWpm: settings.charWpm,
                     farnsworthWpm: Math.min(settings.farnsworthWpm, settings.charWpm),
                     times: settings.times,
-                  })
-                }
+                  });
+                }}
                 /* Drawn by the bar, on the row it shares with the note about
                    how the file is being read. */
                 source={loaded.take.source}
@@ -843,7 +851,7 @@ export function ReviewScreen({
               <DownloadItem label="Your audio" disabled={blank} title="The recording, as made" onClick={() => void downloadYou()} />
               <DownloadItem
                 label="Target audio"
-                title="Perfect keying of the intended message, rendered at the current speed"
+                title="Perfect keying of the message, rendered at the current speed"
                 onClick={() => void downloadTarget()}
               />
               <DownloadItem label="Chart PNG" title="The whole analysis, not just the visible part" onClick={downloadPng} />
@@ -945,19 +953,24 @@ export function ReviewScreen({
 
       {starting && (
         <NewSession
-          expected={settings.expected}
+          expected={startWith ?? settings.expected}
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
-          onCancel={() => setStarting(false)}
+          onCancel={() => {
+            setStarting(false);
+            setStartWith(null);
+          }}
           onConfigureUser={
             onConfigureUser &&
             (() => {
               setStarting(false);
+              setStartWith(null);
               onConfigureUser();
             })
           }
           onStart={(next, record) => {
             setStarting(false);
+            setStartWith(null);
             onNewSession(next);
             /* The session is declared and the microphone opens on the same
                click. Safe in this order because the state change above lands

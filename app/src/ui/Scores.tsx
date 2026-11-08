@@ -64,7 +64,7 @@ export function Scores({
       data-testid="fit-wpm"
       title="Set the target speeds to the ones this run was sent at"
     >
-      Fit WPM
+      Use these speeds
     </button>
   );
 

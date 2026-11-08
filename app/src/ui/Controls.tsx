@@ -223,7 +223,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
           does not. */}
       <div className="msgrow">
         <div className="group grow">
-          <label htmlFor="expected">Intended message</label>
+          <label htmlFor="expected">Message</label>
           {/* Says what the box is FOR, which is the thing worth knowing when it
               is empty: with nothing here there is no source of truth, so the
               grade falls back to the decoder's own reading of you and the
@@ -249,7 +249,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
                 type="button"
                 className="clearbtn"
                 data-testid="clear-expected"
-                aria-label="Clear intended message"
+                aria-label="Clear the message"
                 title="Clear"
                 onClick={() => {
                   onChange({ expected: "" });
@@ -560,21 +560,24 @@ export function ChoiceGroup({
   help,
   value,
   options,
+  barred = null,
   onChange,
 }: {
   id: string;
   label: string;
   help?: string;
   value: string;
+  /** Why it does nothing now, when another setting rules it out. */
+  barred?: string | null;
   /** Each choice, with a sentence on what it does. The chosen one's shows
    *  under the buttons. */
   options: ReadonlyArray<{ value: string; label: string; note?: string }>;
   onChange(value: string): void;
 }): React.ReactElement {
   const note = options.find((o) => o.value === value)?.note;
-  const about = useHelp(help);
+  const about = useHelp(help === undefined && !barred ? undefined : barredTitle(barred, help ?? ""));
   return (
-    <div className="group choicegroup" title={about.title}>
+    <div className="group choicegroup" title={about.title} data-disabled={barred !== null}>
       <span className="caption" id={`${id}-label`}>
         {label}
       </span>
@@ -590,6 +593,7 @@ export function ChoiceGroup({
             key={o.value}
             type="button"
             aria-pressed={value === o.value}
+            disabled={barred !== null}
             onClick={() => onChange(o.value)}
           >
             {o.label}
@@ -975,14 +979,14 @@ export function SendSettings({
           />
           <Check
             id="run-scores"
-            label="Show each attempt's scores"
+            label="Show each run's scores"
             help={RUN_SCORES_HELP}
             checked={s.runScores}
             onChange={(v) => onChange({ runScores: v })}
           />
           <Check
             id="caption-all"
-            label="Caption every attempt"
+            label="Caption every run"
             help={CAPTION_ALL_HELP}
             checked={s.captionAll}
             onChange={(v) => onChange({ captionAll: v })}

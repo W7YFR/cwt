@@ -198,12 +198,12 @@ export const CAL_CORRECTION_HELP =
   "length never changes. Measured by holding a paddle at a speed you state.";
 
 export const RUN_SCORES_HELP =
-  "Each attempt\u2019s two scores in the gutter beside its name: how much " +
+  "Each run\u2019s two scores in the gutter beside its name: how much " +
   "landed inside the tolerance, and how much decoded to the target. Which " +
-  "attempt went better, without clicking through them one at a time.";
+  "run went better, without clicking through them one at a time.";
 
 export const CAPTION_ALL_HELP =
-  "Caption every attempt with what it came out as, rather than only the one " +
+  "Caption every run with what it came out as, rather than only the one " +
   "being read. The band is reserved either way, so nothing moves — what you " +
   "get is every decode at once.";
 
@@ -252,6 +252,9 @@ export const CAL_FILE = "Not for a recording opened from disk. A file is read ex
 export const CAL_NONE = "No calibration is saved for this input. Calibrate to make one.";
 export const CAL_REREADING = "Re-reading the session.";
 export const NEEDS_BAND = "Needs Noise, QRN or QRM on.";
+export const NEEDS_LINES_COPY = "Needs Each line shows = Copy.";
+export const NEEDS_THEIR_LINES_COPY = "Needs The station's lines show = Copy.";
+export const NEEDS_SLOTS = "Needs Copy in = Slots.";
 export const NEEDS_BAND_BETWEEN = "Needs Play the band.";
 
 export const LOOP_HELP =

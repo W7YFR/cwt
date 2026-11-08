@@ -80,6 +80,7 @@ import {
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
 import { IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
 import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
+import { NEEDS_LINES_COPY, NEEDS_SLOTS } from "./copy";
 import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
@@ -1563,6 +1564,11 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
 
   const current = kept ? scoreOf(kept.attempts[attempt]!) : { right: 0, total: 0 };
 
+  /* Why a setting of your copy does nothing now: no copy to type, or no
+     slots to type it in. */
+  const copyBar = linesShow === "copy" ? null : NEEDS_LINES_COPY;
+  const slotsBar = copyBar ?? (inputPref === "slots" ? null : NEEDS_SLOTS);
+
   /* What the chips and Settings share: one copy of each, drawn wherever it
      is open. */
   const makeSection = (
@@ -1676,6 +1682,41 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               >
                 Clear
               </button>
+              {/* What acts on your attempts. Always here, so nothing moves;
+                  off until there is a copy to check. */}
+              <span className="toolsep" aria-hidden="true" />
+              <button
+                data-testid="copy-restart"
+                disabled={!rec || !started}
+                title="Clear every attempt and go back to the start"
+                onClick={restart}
+              >
+                Start over
+              </button>
+              <div className="modeswitch" role="group" aria-label="Show answers">
+                <button
+                  aria-pressed={!!kept?.revealed}
+                  data-testid="copy-reveal"
+                  disabled={!rec || !started || !kept}
+                  title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
+                  onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
+                >
+                  Show answers
+                </button>
+              </div>
+              <button
+                className={rec && ((ended && locked) || perfect) ? "primary" : undefined}
+                data-testid="copy-again"
+                disabled={!rec || linesShow !== "copy" || (!locked && !ended)}
+                title={
+                  linesShow === "copy"
+                    ? "Play the whole recording again and copy it once more"
+                    : "Needs Each line shows = Copy"
+                }
+                onClick={again}
+              >
+                Copy again
+              </button>
             </>
           }
           chips={
@@ -1697,7 +1738,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
                       options={LINES_SHOW}
                       onChange={(v) => setLinesShow(v as LinesShow)}
                     />
-                    <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
+                    <Check id="copy-wait" barred={copyBar} label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
                   </div>
                 </Section>
               </QuickChip>
@@ -1755,7 +1796,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
                 options={LINES_SHOW}
                 onChange={(v) => setLinesShow(v as LinesShow)}
               />
-              <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
+              <Check id="copy-wait" barred={copyBar} label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
               <Check
                 id="copy-hide-calls"
                 label="Hide the station's call until I copy it"
@@ -1780,7 +1821,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               <Section name="copy" title="Typing">
                 <div className="panelgroups">
                   <ChoiceGroup
-                    id="copy-input"
+                    id="copy-input" barred={copyBar}
                     label="Copy in"
                     help={INPUT_HELP}
                     value={inputPref}
@@ -1789,30 +1830,30 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
                   />
                   <Subgroup label="Slots">
                     <Check
-                      id="copy-follow"
+                      id="copy-follow" barred={slotsBar}
                       label="Highlight the active slot"
                       help={FOLLOW_HELP}
                       checked={follow}
                       onChange={setFollow}
                     />
                     <Check
-                      id="copy-grade-typing"
+                      id="copy-grade-typing" barred={slotsBar}
                       label="Grade slots as I type"
                       help={GRADE_TYPING_HELP}
                       checked={gradeTyping}
                       onChange={setGradeTyping}
                     />
                     <Check
-                      id="copy-seek-slot"
+                      id="copy-seek-slot" barred={slotsBar}
                       label="When paused, move to the slot I select"
                       help={SEEK_SLOT_HELP}
                       checked={seekSlot}
                       onChange={setSeekSlot}
                     />
                   </Subgroup>
-                  <Check id="copy-lock" label="Lock my copy when the next line starts" help={LOCK_HELP} checked={lock} onChange={setLock} />
+                  <Check id="copy-lock" barred={copyBar} label="Lock my copy when the next line starts" help={LOCK_HELP} checked={lock} onChange={setLock} />
                   <ChoiceGroup
-                    id="copy-locked-shows"
+                    id="copy-locked-shows" barred={copyBar}
                     label="My locked copy shows"
                     help={LOCKED_SHOWS_HELP}
                     value={lockedShows}
@@ -1820,14 +1861,14 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
                     onChange={(v) => setLockedShows(v as LockedShows)}
                   />
                   <Check
-                    id="copy-allow-edits"
+                    id="copy-allow-edits" barred={copyBar}
                     label="Allow edits"
                     help={ALLOW_EDITS_HELP}
                     checked={allowEdits}
                     onChange={setAllowEdits}
                   />
                   <ChoiceGroup
-                    id="copy-earlier"
+                    id="copy-earlier" barred={copyBar}
                     label="When I copy again, show"
                     help={EARLIER_HELP}
                     value={earlier}
@@ -1863,44 +1904,6 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
             )}
             <span className="copysay">{status}</span>
           </div>
-          {/* What acts on your attempts, by the line that names the attempt:
-              Start over, Show answers, then Copy again, the next step.
-              Always here once there is a recording, so nothing moves. Off
-              until there is a copy to check. */}
-          {rec && (
-            <div className="copyattempt">
-              <button
-                data-testid="copy-restart"
-                disabled={!started}
-                title="Clear every attempt and go back to the start"
-                onClick={restart}
-              >
-                Start over
-              </button>
-              <div className="modeswitch" role="group" aria-label="Show answers">
-                <button
-                  aria-pressed={!!kept?.revealed}
-                  data-testid="copy-reveal"
-                  disabled={!started || !kept}
-                  title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
-                  onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
-                >
-                  Show answers
-                </button>
-              </div>
-              {linesShow === "copy" && (
-                <button
-                  className={(ended && locked) || perfect ? "primary" : undefined}
-                  data-testid="copy-again"
-                  disabled={!locked && !ended}
-                  title="Play the whole recording again and copy it once more"
-                  onClick={again}
-                >
-                  Copy again
-                </button>
-              )}
-            </div>
-          )}
         </div>
 
         {rec && (
@@ -1957,32 +1960,6 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               )}
             </div>
           </>
-        )}
-
-        {!rec && !recalling && !reading && (
-          <div className="qsocontrols copyfirst">
-            <div className="modeswitch" role="group" aria-label="Kind" data-testid="copy-kind-first">
-              {KINDS.map((k) => (
-                <button key={k.value} aria-pressed={kind === k.value} title={k.note} onClick={() => setKind(k.value)}>
-                  {k.label}
-                </button>
-              ))}
-            </div>
-            <button className="primary" data-testid="copy-new-first" onClick={makeExchange}>
-              Generate QSO
-            </button>
-            <span className="hint">
-              or{" "}
-              <button type="button" className="link" data-testid="copy-text-first" onClick={editText}>
-                write your own
-              </button>
-              ,{" "}
-              <button type="button" className="link" data-testid="copy-open-first" onClick={pickFile}>
-                open a recording or a .txt file
-              </button>
-              , or drop one on the page
-            </span>
-          </div>
         )}
 
         {!rec && !recalling && !reading && (

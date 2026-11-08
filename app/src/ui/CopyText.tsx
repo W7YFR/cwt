@@ -209,8 +209,10 @@ export function CopyText(props: CopyTextProps): React.ReactElement {
 
         <div className="confirm">
           <button onClick={props.onCancel}>Cancel</button>
-          <button data-testid="copy-text-start" disabled={empty} onClick={start}>
-            Save
+          {/* Says what it does: on the QSO page the script starts at once; on
+              the Copy page it is loaded, ready to play. */}
+          <button className="primary" data-testid="copy-text-start" disabled={empty} onClick={start}>
+            {script ? "Start" : "Load"}
           </button>
         </div>
       </div>
