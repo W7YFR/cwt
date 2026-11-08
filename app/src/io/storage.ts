@@ -427,10 +427,6 @@ export interface Prefs {
   /** The newest landing screen this visitor has passed through — see
    *  LANDING_VERSION in ui/Landing.tsx. */
   landingSeen?: number;
-  /** The settings panel was open, so a reload opens it again. */
-  settingsOpen?: boolean;
-  /** Which half of Configuration was on show. */
-  configTab?: string;
   /** Calibration's speed, from saves that hold no `charWpm`. Read by
    *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
@@ -511,8 +507,6 @@ export interface Prefs {
   qsoShowDownload?: boolean;
   /** A report shows beside a script QSO that is over. Absent is off. */
   qsoScriptReport?: boolean;
-  /** The QSO page's settings band was open. */
-  qsoSettingsOpen?: boolean;
   /** Copy mode: your copy locks when you start sending. Absent is on. */
   qsoLockCopy?: boolean;
   /** Copy mode: what a locked copy shows before the QSO ends: your copy, your
@@ -522,8 +516,6 @@ export interface Prefs {
   qsoShowSpeed?: boolean;
   /** The station's lines show the speed it sent them at. Absent is off. */
   qsoShowTheirSpeed?: boolean;
-  /** The Copy page's settings band was open. */
-  copySettingsOpen?: boolean;
   /** How you copy on the Copy page: in a box, or a slot per character.
    *  Absent is a box. */
   copyInput?: "text" | "slots";
@@ -728,8 +720,6 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   session: isSession,
   practicing: isBool,
   landingSeen: isNum,
-  settingsOpen: isBool,
-  configTab: isStr,
   keyerWpm: isNum,
   gainDb: isNum,
   tolerance: isNum,
@@ -780,12 +770,10 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoPlayback: oneOf("never", "always", "end"),
   qsoShowDownload: isBool,
   qsoScriptReport: isBool,
-  qsoSettingsOpen: isBool,
   qsoLockCopy: isBool,
   qsoLockedShows: oneOf("nothing", "grade", "right"),
   qsoShowSpeed: isBool,
   qsoShowTheirSpeed: isBool,
-  copySettingsOpen: isBool,
   copyInput: oneOf("text", "slots"),
   copyLines: oneOf("copy", "sent", "before"),
   copyLock: isBool,
@@ -981,14 +969,6 @@ export function rememberPracticing(on: boolean): void {
   const next = { ...loadPrefs() };
   if (on) next.practicing = true;
   else delete next.practicing;
-  savePrefs(next);
-}
-
-/** Say whether the settings panel is open, so a reload can open it again. */
-export function rememberSettingsOpen(open: boolean): void {
-  const next = { ...loadPrefs() };
-  if (open) next.settingsOpen = true;
-  else delete next.settingsOpen;
   savePrefs(next);
 }
 

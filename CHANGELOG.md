@@ -7,6 +7,17 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- **Settings** (⚙) opens one panel that slides in over the right side of the page, with the same tabs on every page: the page's own settings, **Your copy**, **Sound**, **Speed**, **Microphone**, **You** and **Drills**. It replaces the settings band under the header and the Configuration screen.
+- The header on Send and QSO shows the microphone in use and whether it is calibrated. Click it to open **Microphone** in Settings, where you choose, make and delete calibrations.
+- In Settings, every control starts in one column, with its name to the left. A line separates groups of settings, such as the options of Plain, Zen and Paced, and not the settings inside one.
+- **Stop after each line** on the Copy page is beside **Its lines show**.
+
+### Fixed
+
+- On the Copy and QSO pages, the link in **Script** to fill in a missing detail opens your details, not the last part of Configuration you had open.
+
 ## v1.26.0 — 2026-11-02
 
 ### Added

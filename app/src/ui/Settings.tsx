@@ -1,17 +1,8 @@
-/* Configuration: the things that are set once and then left alone — who you
- * are, and the calibrations.
+/* The app's own tabs in Settings: You, Drills, and the saved calibrations
+ * under Microphone. These are set once and then left alone.
  *
- * Everything the app does to a recording is decided on the screen you are
- * recording from, and that is right — whether a calibration is applied changes
- * every number the review reports, so it belongs beside the button that makes
- * the recording. What does not belong there is housekeeping: deleting a
- * calibration you will never use again, and getting hold of the audio one was
- * measured from.
- *
- * The recordings are the reason this screen exists now rather than later. A
- * calibration that refuses in a room nobody here has ever stood in leaves
- * nothing behind to look at unless the audio is kept, and audio that is kept
- * and cannot be got at again might as well not be.
+ * The calibration recordings are kept so a calibration that failed leaves
+ * something to look at. Each one can be saved as a file or deleted here.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -38,10 +29,8 @@ import {
   getCalibrationAudio,
   listCalibrations,
   loadCustomDrills,
-  loadPrefs,
   loadUser,
   saveCustomDrills,
-  savePrefs,
   saveUser,
   type CalibrationSummary,
   type CustomDrill,
@@ -57,16 +46,6 @@ import {
 } from "./SlotMenu";
 import { breakLines } from "@/morse";
 
-export interface SettingsProps {
-  /** Which calibration is in use, so the one being deleted can be flagged. */
-  profileId: string | undefined;
-  /** The store changed — re-read it. */
-  onProfilesChanged(): void;
-  onClose(): void;
-  /** The tab to open at. Absent, the one last open. */
-  tab?: ConfigTab | undefined;
-}
-
 function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -79,18 +58,6 @@ function saveBlob(blob: Blob, filename: string): void {
 }
 
 const ms = (v: number) => `${(v * 1000).toFixed(1)} ms`;
-
-/** The three parts of Configuration, one on show at a time. */
-export type ConfigTab = "user" | "drills" | "calibration";
-const CONFIG_TABS: readonly { value: ConfigTab; label: string }[] = [
-  { value: "user", label: "User" },
-  { value: "drills", label: "Drills" },
-  { value: "calibration", label: "Calibration" },
-];
-const loadTab = (): ConfigTab => {
-  const t = loadPrefs().configTab;
-  return CONFIG_TABS.find((c) => c.value === t)?.value ?? "user";
-};
 
 /** A calibration's name, made safe to lead a filename with. */
 export function fileSlug(name: string): string {
@@ -111,17 +78,9 @@ export function recordingFilename(
 }
 const day = (iso: string) => iso.slice(0, 10);
 
-export function Settings(props: SettingsProps): React.ReactElement {
-  const { onProfilesChanged } = props;
-  const [profiles, setProfiles] = useState<Profile[]>(() => loadProfiles());
-  const [recordings, setRecordings] = useState<CalibrationSummary[]>([]);
-  const [confirming, setConfirming] = useState<string | null>(null);
-  // Remembered, so a reload with Configuration open comes back to the same half.
-  const [tab, setTabRaw] = useState<ConfigTab>(() => props.tab ?? loadTab());
-  const setTab = (next: ConfigTab) => {
-    setTabRaw(next);
-    savePrefs({ ...loadPrefs(), configTab: next });
-  };
+/** Who you are: the values a note such as "(your call)" fills in. Saved as
+ *  each one changes. */
+export function UserSettings(): React.ReactElement {
   const [user, setUser] = useState<UserInfo>(loadUser);
   const changeUser = useCallback((patch: Partial<UserInfo>) => {
     setUser((u) => {
@@ -130,6 +89,36 @@ export function Settings(props: SettingsProps): React.ReactElement {
       return next;
     });
   }, []);
+  return (
+    <div className="configpanel">
+      <UserSection user={user} set={changeUser} />
+    </div>
+  );
+}
+
+/** Your own drills. */
+export function DrillSettings(): React.ReactElement {
+  const [user] = useState<UserInfo>(loadUser);
+  return (
+    <div className="configpanel">
+      <DrillSection user={user} />
+    </div>
+  );
+}
+
+/** The saved calibrations and the recordings they were measured from. */
+export function CalibrationSettings({
+  profileId,
+  onProfilesChanged,
+}: {
+  /** Which calibration is in use, so the one being deleted can be flagged. */
+  profileId: string | undefined;
+  /** The store changed — re-read it. */
+  onProfilesChanged(): void;
+}): React.ReactElement {
+  const [profiles, setProfiles] = useState<Profile[]>(() => loadProfiles());
+  const [recordings, setRecordings] = useState<CalibrationSummary[]>([]);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     void listCalibrations().then(setRecordings);
@@ -149,135 +138,104 @@ export function Settings(props: SettingsProps): React.ReactElement {
   );
 
   return (
-    <div className="settings">
-      {/* The same panel as the calibration screens: a title, sections under
-          rules, and the way out at the foot. */}
-      <div className="panel wide">
-        <h2>Configuration</h2>
-
-        <div className="modeswitch" role="group" aria-label="Configuration section" data-testid="config-tab">
-          {CONFIG_TABS.map((t) => (
-            <button key={t.value} aria-pressed={tab === t.value} onClick={() => setTab(t.value)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === "user" ? (
-          <UserSection user={user} set={changeUser} />
-        ) : tab === "drills" ? (
-          <DrillSection user={user} />
+    <div className="configpanel">
+      <section className="panelsec">
+        <h3>Saved calibrations</h3>
+        {profiles.length === 0 ? (
+          <p className="lede">None yet. Calibrating from the record screen makes one.</p>
         ) : (
-          <>
-            <section className="panelsec">
-              <h3>Saved calibrations</h3>
-              {profiles.length === 0 ? (
-                <p className="lede">None yet. Calibrating from the record screen makes one.</p>
-              ) : (
-                <ul className="callist" data-testid="callist">
-                  {profiles.map((p) => (
-                    <li key={p.id} data-testid="calrow" data-id={p.id}>
-                      <div className="calmeta">
-                        <strong>{p.nickname}</strong>
-                        <span className="hint">
-                          {ms(p.releaseOffsetSec)} · {p.verdict} · {p.wpm} wpm ·{" "}
-                          {day(p.recordedAt)}
-                          {isAdjusted(p) && " · adjusted by hand"}
-                          {p.id === props.profileId && " · in use"}
-                        </span>
-                        {p.deviceLabel && <span className="hint">{p.deviceLabel}</span>}
-                      </div>
-                      {confirming === p.id ? (
-                        <span className="confirm">
-                          {/* Deleting the one in use is allowed and clears the
-                              selection — see deleteProfile. It is worth saying so
-                              first, because every later recording then reads raw. */}
-                          <span className="hint">
-                            {p.id === props.profileId
-                              ? "This one is in use. Deleting it leaves recordings uncorrected."
-                              : "Delete it?"}
-                          </span>
-                          <button className="danger" onClick={() => remove(p.id)}>
-                            Delete
-                          </button>
-                          <button onClick={() => setConfirming(null)}>Keep</button>
-                        </span>
-                      ) : (
-                        <button
-                          data-testid="delete-profile"
-                          onClick={() => setConfirming(p.id)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section className="panelsec">
-              <h3>Calibration recordings</h3>
-              <p className="lede">
-                The last {KEEP_CALIBRATIONS} attempts, whether or not they produced a
-                calibration. The ones that did not are the useful ones to keep: they
-                are what shows why.
-              </p>
-              {recordings.length === 0 ? (
-                <p className="lede">Nothing recorded yet.</p>
-              ) : (
-                <ul className="callist" data-testid="reclist">
-                  {recordings.map((r) => {
-                    const named = profiles.find((p) => p.id === r.profileId)?.nickname;
-                    return (
-                      <li key={r.id} data-testid="recrow" data-id={r.id} data-reason={r.reason ?? ""}>
-                        <div className="calmeta">
-                          <strong>
-                            {r.reason ? "No calibration" : named ? `Saved as “${named}”` : "Calibrated"}
-                            {r.offsetSec !== null && ` — ${ms(r.offsetSec)}`}
-                          </strong>
-                          <span className="hint">
-                            {day(r.recordedAt)} · {r.wpm} wpm · {r.durationSec.toFixed(0)}s
-                            {r.reason && ` · ${r.reason}`}
-                            {r.deviceLabel && ` · ${r.deviceLabel}`}
-                          </span>
-                        </div>
-                        <span className="rowbuttons">
-                          <button
-                            data-testid="save-recording"
-                            onClick={() => {
-                              void getCalibrationAudio(r.id).then((blob) => {
-                                if (blob) saveBlob(blob, recordingFilename(r, named));
-                              });
-                            }}
-                          >
-                            <IconDownload /> Save
-                          </button>
-                          <button
-                            data-testid="delete-recording"
-                            onClick={() => void forgetCalibration(r.id).then(refresh)}
-                          >
-                            Delete
-                          </button>
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-          </>
+          <ul className="callist" data-testid="callist">
+            {profiles.map((p) => (
+              <li key={p.id} data-testid="calrow" data-id={p.id}>
+                <div className="calmeta">
+                  <strong>{p.nickname}</strong>
+                  <span className="hint">
+                    {ms(p.releaseOffsetSec)} · {p.verdict} · {p.wpm} wpm ·{" "}
+                    {day(p.recordedAt)}
+                    {isAdjusted(p) && " · adjusted by hand"}
+                    {p.id === profileId && " · in use"}
+                  </span>
+                  {p.deviceLabel && <span className="hint">{p.deviceLabel}</span>}
+                </div>
+                {confirming === p.id ? (
+                  <span className="confirm">
+                    {/* Deleting the one in use is allowed and clears the
+                        selection — see deleteProfile. It is worth saying so
+                        first, because every later recording then reads raw. */}
+                    <span className="hint">
+                      {p.id === profileId
+                        ? "This one is in use. Deleting it leaves recordings uncorrected."
+                        : "Delete it?"}
+                    </span>
+                    <button className="danger" onClick={() => remove(p.id)}>
+                      Delete
+                    </button>
+                    <button onClick={() => setConfirming(null)}>Keep</button>
+                  </span>
+                ) : (
+                  <button
+                    data-testid="delete-profile"
+                    onClick={() => setConfirming(p.id)}
+                  >
+                    Delete
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
+      </section>
 
-        {/* Everything is saved as it changes, so there is nothing to confirm:
-            one way out, where the setup card's way on is. */}
-        <div className="panelfoot">
-          <span />
-          <button className="primary" onClick={props.onClose}>
-            Done
-          </button>
-        </div>
-      </div>
+      <section className="panelsec">
+        <h3>Calibration recordings</h3>
+        <p className="lede">
+          The last {KEEP_CALIBRATIONS} attempts, whether or not they produced a
+          calibration. The ones that did not are the useful ones to keep: they
+          are what shows why.
+        </p>
+        {recordings.length === 0 ? (
+          <p className="lede">Nothing recorded yet.</p>
+        ) : (
+          <ul className="callist" data-testid="reclist">
+            {recordings.map((r) => {
+              const named = profiles.find((p) => p.id === r.profileId)?.nickname;
+              return (
+                <li key={r.id} data-testid="recrow" data-id={r.id} data-reason={r.reason ?? ""}>
+                  <div className="calmeta">
+                    <strong>
+                      {r.reason ? "No calibration" : named ? `Saved as “${named}”` : "Calibrated"}
+                      {r.offsetSec !== null && ` — ${ms(r.offsetSec)}`}
+                    </strong>
+                    <span className="hint">
+                      {day(r.recordedAt)} · {r.wpm} wpm · {r.durationSec.toFixed(0)}s
+                      {r.reason && ` · ${r.reason}`}
+                      {r.deviceLabel && ` · ${r.deviceLabel}`}
+                    </span>
+                  </div>
+                  <span className="rowbuttons">
+                    <button
+                      data-testid="save-recording"
+                      onClick={() => {
+                        void getCalibrationAudio(r.id).then((blob) => {
+                          if (blob) saveBlob(blob, recordingFilename(r, named));
+                        });
+                      }}
+                    >
+                      <IconDownload /> Save
+                    </button>
+                    <button
+                      data-testid="delete-recording"
+                      onClick={() => void forgetCalibration(r.id).then(refresh)}
+                    >
+                      Delete
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

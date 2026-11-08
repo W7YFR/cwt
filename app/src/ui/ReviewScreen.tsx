@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { IconDownload, IconUser } from "./Icons";
+import { IconDownload } from "./Icons";
 import { createPlayer, type PlaySide, type Player } from "@/audio/player";
 import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
@@ -22,13 +22,16 @@ import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
 import {
-  ChartSettingsButton,
-  ChartSettingsPanel,
   Controls,
-  SettingsBand,
+  MicrophoneSection,
+  Section,
+  SendSettings,
+  SendSound,
+  SpeedSliders,
   ViewControls,
   fitSpeed,
 } from "./Controls";
+import { MicChip, PageSettings, SettingsButton } from "./SettingsDrawer";
 import { ZenMode } from "./ZenMode";
 import { pacedEnd, pacedStart, recordLimit } from "./pacing";
 import { modeOf, modePatch } from "./mode";
@@ -39,7 +42,6 @@ import { Scores } from "./Scores";
 import { HomeButton } from "./Wordmark";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
-import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
 import { reviewTake } from "@/timing";
 import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
@@ -84,8 +86,6 @@ export interface ReviewScreenProps {
   onDeviceChange(id: string | undefined): void;
   /** Into the calibration wizard, and back here afterwards. */
   onCalibrate(): void;
-  /** Into the configuration screen, and back here afterwards. */
-  onConfigure(): void;
   /** Into the configuration screen at the user's details. */
   onConfigureUser?(): void;
   /** A paste into the message left notes such as "(your call)" with no
@@ -105,58 +105,6 @@ export interface ReviewScreenProps {
   onBack(): void;
   /** Open the other page. Absent, the header has no page switch. */
   onPage?: ((page: Page) => void) | undefined;
-}
-
-/** How long the settings panel takes to roll open or shut; see `.chartsettings`. */
-const ROLL_MS = 200;
-
-function reducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
-/** CSS `ease`, the curve the panel rolls on: cubic-bezier(0.25, 0.1, 0.25, 1),
- *  solved for the curve's y at time `x`. */
-function ease(x: number): number {
-  const [x1, y1, x2, y2] = [0.25, 0.1, 0.25, 1];
-  const at = (t: number, a: number, b: number) =>
-    3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
-  let lo = 0;
-  let hi = 1;
-  for (let i = 0; i < 20; i++) {
-    const mid = (lo + hi) / 2;
-    if (at(mid, x1, x2) < x) lo = mid;
-    else hi = mid;
-  }
-  return at((lo + hi) / 2, y1, y2);
-}
-
-/** Scroll the page to `top` on the panel's own timing and curve, so the roll
- *  and the scroll are one movement. At once when motion is reduced.
- *
- * Scroll anchoring is off while it runs. The panel changes height above the
- * part of the page on show, and anchoring would move the page to make up for
- * it, against the scroll. */
-function scrollPage(scroller: Element, top: number): void {
-  const root = document.documentElement;
-  const from = scroller.scrollTop;
-  const to = Math.max(0, top);
-  if (from === to) return;
-  root.style.overflowAnchor = "none";
-  if (reducedMotion()) {
-    /* Before the panel's change has rendered, so anchoring stays off until
-       two frames later, when it has. */
-    scroller.scrollTop = to;
-    requestAnimationFrame(() => requestAnimationFrame(() => (root.style.overflowAnchor = "")));
-    return;
-  }
-  const t0 = performance.now();
-  const step = (now: number) => {
-    const p = Math.min(1, (now - t0) / ROLL_MS);
-    scroller.scrollTop = from + (to - from) * ease(p);
-    if (p < 1) requestAnimationFrame(step);
-    else root.style.overflowAnchor = "";
-  };
-  requestAnimationFrame(step);
 }
 
 /** Controls that space activates. With one of these focused, space presses it
@@ -201,7 +149,6 @@ export function ReviewScreen({
   onProfileChange,
   onDeviceChange,
   onCalibrate,
-  onConfigure,
   onClear,
   onFile,
   onNewSession,
@@ -212,44 +159,6 @@ export function ReviewScreen({
      while the dialog is up: a key that starts a recording behind an open
      dialog answers a question nobody asked. */
   const [starting, setStarting] = useState(false);
-  /* Whether the settings are on show. Not a setting itself, and never in a
-     saved report: it is where you are looking. But a reload is not a choice
-     to look elsewhere, so it is remembered for the next page load. */
-  const [chartSettings, setChartSettingsRaw] = useState(() => loadPrefs().settingsOpen === true);
-  const setChartSettings = useCallback((open: boolean) => {
-    setChartSettingsRaw(open);
-    rememberSettingsOpen(open);
-  }, []);
-  const headerRef = useRef<HTMLElement | null>(null);
-  const panelRef = useRef<HTMLElement | null>(null);
-  /* Where the page was when opening the settings scrolled it, or null when
-     opening them scrolled nothing. Closing them goes back there. */
-  const returnTo = useRef<number | null>(null);
-
-  /* The header is pinned, so from further down the page the panel opens out of
-     sight above it. Opening scrolls up just far enough to show it, and closing
-     goes back to where you were. */
-  const toggleChartSettings = useCallback(() => {
-    const scroller = document.scrollingElement ?? document.documentElement;
-    const header = headerRef.current;
-    const panel = panelRef.current;
-    if (!chartSettings) {
-      const hidden = header && panel
-        ? header.getBoundingClientRect().bottom - panel.getBoundingClientRect().top
-        : 0;
-      if (hidden > 1) {
-        returnTo.current = scroller.scrollTop;
-        scrollPage(scroller, scroller.scrollTop - hidden);
-      }
-      setChartSettings(true);
-      return;
-    }
-    setChartSettings(false);
-    const back = returnTo.current;
-    returnTo.current = null;
-    if (back !== null) scrollPage(scroller, back);
-  }, [chartSettings, setChartSettings]);
-
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [status, setStatus] = useState("");
   // The playhead moves every frame. Routing it through state would re-render
@@ -836,7 +745,7 @@ export function ReviewScreen({
 
   return (
     <>
-      <header ref={headerRef}>
+      <header>
         {/* The name is the way home. Leaving mid-take would drop the
             recording on the floor. */}
         <HomeButton onHome={onBack} disabled={recording} />
@@ -868,53 +777,68 @@ export function ReviewScreen({
           source={loaded.take.source}
         />
 
-        {/* The corner of the header, and last in it — which is where the eye
-            finds it and so where the tab order has to reach it. Configuration
-            and the cog are one group in the flow, pushed to the right end of
-            the first line: they never split, and the rest of the row takes
-            the width left of them. Configuration comes first, so the cog stays
-            the last stop. */}
-        <div className="cornergroup" inert={recording} data-locked={recording}>
-          <button
-            className="iconbtn cornerbtn"
-            data-testid="advanced"
-            aria-label="Configuration"
-            title="Configuration"
-            onClick={onConfigure}
-          >
-            <IconUser />
-          </button>
-          <ChartSettingsButton
-            open={chartSettings}
-            onToggle={toggleChartSettings}
+        {/* The corner of the header, and last in it: the microphone in use,
+            then Settings, the last stop in the tab order. */}
+        <div className="cornergroup">
+          <MicChip
+            devices={rec.devices}
+            deviceId={deviceId}
+            profiles={profiles}
+            profileId={profileId}
+            applies={loaded.take.source === MIC_SOURCE}
           />
+          <SettingsButton />
         </div>
       </header>
 
-      {/* Always in the tree, open or not: see SettingsBand. */}
-      <SettingsBand open={chartSettings} locked={recording} bandRef={panelRef}>
-        <ChartSettingsPanel
-          settings={settings}
-          runs={stack.length}
-          onChange={onChange}
-          loop={loop}
-          onLoop={() => setLoop((on) => !on)}
-          /* The setup goes behind the settings button, like everything else
-             that is not the loop: which microphone, what to correct it by,
-             and how loud to play it back. */
-          audio={{
-            devices: rec.devices,
-            deviceId,
-            onDeviceChange,
-            profiles,
-            profileId,
-            onProfileChange: chooseProfile,
-            appliesToTake: loaded.take.source === MIC_SOURCE,
-            rereading,
-            onCalibrate,
-          }}
-        />
-      </SettingsBand>
+      <PageSettings
+        locked={recording}
+        tabs={[
+          { id: "page", label: "Send", content: <SendSettings settings={settings} onChange={onChange} /> },
+          {
+            id: "sound",
+            label: "Sound",
+            content: (
+              <SendSound
+                gainDb={settings.gainDb}
+                onGainDb={(gainDb) => onChange({ gainDb })}
+                loop={loop}
+                onLoop={() => setLoop((on) => !on)}
+              />
+            ),
+          },
+          {
+            id: "speed",
+            label: "Speed",
+            content: (
+              <Section name="speed" title="Speed">
+                <div className="panelgroups">
+                  <SpeedSliders charWpm={settings.charWpm} farnsworthWpm={settings.farnsworthWpm} onChange={onChange} />
+                </div>
+              </Section>
+            ),
+          },
+          {
+            id: "microphone",
+            label: "Microphone",
+            content: (
+              <MicrophoneSection
+                audio={{
+                  devices: rec.devices,
+                  deviceId,
+                  onDeviceChange,
+                  profiles,
+                  profileId,
+                  onProfileChange: chooseProfile,
+                  appliesToTake: loaded.take.source === MIC_SOURCE,
+                  rereading,
+                  onCalibrate,
+                }}
+              />
+            ),
+          },
+        ]}
+      />
 
       {/* Locked while a take runs, with the scores, the report, the settings
           panel and the header's corner. What is sent, how fast and against

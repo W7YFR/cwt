@@ -66,13 +66,12 @@ import type { LockedShows } from "@/qso/show";
 import type { Speed } from "@/qso/speed";
 import type { Length } from "@/qso/wording";
 import {
-  ChartSettingsButton,
   Check,
   ChoiceGroup,
   Section,
   SettingRow,
-  SettingsBand,
-  SettingsPanel,
+  SoundSection,
+  Subgroup,
   NoiseSlider,
   QrmSlider,
   QrnSlider,
@@ -80,7 +79,8 @@ import {
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
-import { IconDownload, IconEdit, IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
+import { IconDownload, IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
+import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
@@ -334,7 +334,6 @@ function recallKept(key: string, rec: Recording, input: CopyInput): Kept | null 
 }
 
 type OnOffKey =
-  | "copySettingsOpen"
   | "copyLock"
   | "copyHideCalls"
   | "copyFollow"
@@ -400,7 +399,6 @@ function isBox(el: EventTarget | null): el is HTMLInputElement {
 
 export interface CopyScreenProps {
   onError(message: string): void;
-  onConfigure(): void;
   onPage(page: Page): void;
   /** Back to the start screen. */
   onHome(): void;
@@ -408,8 +406,9 @@ export interface CopyScreenProps {
   fileTarget: React.MutableRefObject<((file: File) => void) | null>;
 }
 
-export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }: CopyScreenProps): React.ReactElement {
-  const [settingsOpen, setSettingsOpen] = useOnOff("copySettingsOpen", false);
+export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenProps): React.ReactElement {
+  const settings = useSettings();
+  const settingsOpen = settings.open;
   const [lock, setLock] = useOnOff("copyLock", true);
   const [hideCalls, setHideCalls] = useOnOff("copyHideCalls", true);
   const [follow, setFollow] = useOnOff("copyFollow", false);
@@ -1619,90 +1618,51 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           </button>
         </div>
         <div className="cornergroup">
-          <button className="iconbtn cornerbtn" aria-label="Configuration" title="Configuration" onClick={onConfigure}>
-            <IconUser />
-          </button>
-          <ChartSettingsButton open={settingsOpen} onToggle={() => setSettingsOpen(!settingsOpen)} />
+          <SettingsButton />
         </div>
       </header>
 
-      <SettingsBand open={settingsOpen}>
-        <SettingsPanel
-          className="formpanel qsopanel"
-          gainDb={gainDb}
-          onGainDb={setGainDb}
-          audioExtra={
-            <>
-              <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
-              <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
-              <QrnSlider qrn={qrn} onChange={setQrn} />
-              <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
-            </>
-          }
-          pageRow={
-            <>
-              <Section name="copy" title="Your copy">
-                <div className="panelgroups">
-                  <ChoiceGroup
-                    id="copy-input"
-                    label="Copy in"
-                    help={INPUT_HELP}
-                    value={inputPref}
-                    options={INPUTS}
-                    onChange={(v) => setInput(v as CopyInput)}
-                  />
-                  <SettingRow label="Slots">
-                    <Check
-                      id="copy-follow"
-                      label="Highlight the active slot"
-                      help={FOLLOW_HELP}
-                      checked={follow}
-                      onChange={setFollow}
-                    />
-                    <Check
-                      id="copy-grade-typing"
-                      label="Grade slots as I type"
-                      help={GRADE_TYPING_HELP}
-                      checked={gradeTyping}
-                      onChange={setGradeTyping}
-                    />
-                    <Check
-                      id="copy-seek-slot"
-                      label="When paused, move to the slot I select"
-                      help={SEEK_SLOT_HELP}
-                      checked={seekSlot}
-                      onChange={setSeekSlot}
-                    />
-                  </SettingRow>
-                  <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
-                  <SettingRow label="When the next line starts">
-                    <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />
-                  </SettingRow>
-                  <ChoiceGroup
-                    id="copy-locked-shows"
-                    label="My locked copy shows"
-                    help={LOCKED_SHOWS_HELP}
-                    value={lockedShows}
-                    options={LOCKED_SHOWS}
-                    onChange={(v) => setLockedShows(v as LockedShows)}
-                  />
-                  <Check
-                    id="copy-allow-edits"
-                    label="Allow edits"
-                    help={ALLOW_EDITS_HELP}
-                    checked={allowEdits}
-                    onChange={setAllowEdits}
-                  />
-                  <ChoiceGroup
-                    id="copy-earlier"
-                    label="When I copy again, show"
-                    help={EARLIER_HELP}
-                    value={earlier}
-                    options={EARLIERS}
-                    onChange={(v) => setEarlier(v as Earlier)}
-                  />
-                </div>
-              </Section>
+      <PageSettings
+        tabs={[
+          {
+            id: "page",
+            label: "Copy",
+            content: (
+              <>
+          <Section name="lines" title="The recording">
+            <div className="panelgroups">
+              <ChoiceGroup
+                id="copy-lines"
+                label="Its lines show"
+                help={LINES_SHOW_HELP}
+                value={linesShow}
+                options={LINES_SHOW}
+                onChange={(v) => setLinesShow(v as LinesShow)}
+              />
+              <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
+              <Check
+                id="copy-hide-calls"
+                label="Hide each call until I copy it"
+                help={HIDE_CALLS_HELP}
+                checked={hideCalls}
+                onChange={setHideCalls}
+              />
+              <Check
+                id="copy-show-speed"
+                label="Show its speed on each line"
+                help={SHOW_SPEED_HELP}
+                checked={showSpeed}
+                onChange={setShowSpeed}
+              />
+              <Check
+                id="copy-show-download"
+                label="Show Download, to save it as audio or text"
+                help={SHOW_DOWNLOAD_HELP}
+                checked={showDownload}
+                onChange={setShowDownload}
+              />
+            </div>
+          </Section>
               <Section name="make" title="Generated QSOs and your text">
                 <div className="panelgroups">
                   <ChoiceGroup
@@ -1737,6 +1697,92 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     options={GAPS}
                     onChange={(v) => setGap(v as Gap)}
                   />
+                </div>
+              </Section>
+              </>
+            ),
+          },
+          { id: "copy", label: "Your copy", content: (
+              <Section name="copy" title="Your copy">
+                <div className="panelgroups">
+                  <ChoiceGroup
+                    id="copy-input"
+                    label="Copy in"
+                    help={INPUT_HELP}
+                    value={inputPref}
+                    options={INPUTS}
+                    onChange={(v) => setInput(v as CopyInput)}
+                  />
+                  <Subgroup label="Slots">
+                    <Check
+                      id="copy-follow"
+                      label="Highlight the active slot"
+                      help={FOLLOW_HELP}
+                      checked={follow}
+                      onChange={setFollow}
+                    />
+                    <Check
+                      id="copy-grade-typing"
+                      label="Grade slots as I type"
+                      help={GRADE_TYPING_HELP}
+                      checked={gradeTyping}
+                      onChange={setGradeTyping}
+                    />
+                    <Check
+                      id="copy-seek-slot"
+                      label="When paused, move to the slot I select"
+                      help={SEEK_SLOT_HELP}
+                      checked={seekSlot}
+                      onChange={setSeekSlot}
+                    />
+                  </Subgroup>
+                  <SettingRow label="When the next line starts">
+                    <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />
+                  </SettingRow>
+                  <ChoiceGroup
+                    id="copy-locked-shows"
+                    label="My locked copy shows"
+                    help={LOCKED_SHOWS_HELP}
+                    value={lockedShows}
+                    options={LOCKED_SHOWS}
+                    onChange={(v) => setLockedShows(v as LockedShows)}
+                  />
+                  <Check
+                    id="copy-allow-edits"
+                    label="Allow edits"
+                    help={ALLOW_EDITS_HELP}
+                    checked={allowEdits}
+                    onChange={setAllowEdits}
+                  />
+                  <ChoiceGroup
+                    id="copy-earlier"
+                    label="When I copy again, show"
+                    help={EARLIER_HELP}
+                    value={earlier}
+                    options={EARLIERS}
+                    onChange={(v) => setEarlier(v as Earlier)}
+                  />
+                </div>
+              </Section>
+          ) },
+          {
+            id: "sound",
+            label: "Sound",
+            content: (
+              <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
+                <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
+                <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
+                <QrnSlider qrn={qrn} onChange={setQrn} />
+                <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+              </SoundSection>
+            ),
+          },
+          {
+            id: "speed",
+            label: "Speed",
+            content: (
+              <Section name="speed" title="Speed">
+                <div className="panelgroups">
                   <ChoiceGroup
                     id="copy-speed"
                     label="Speed"
@@ -1755,45 +1801,10 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                   />
                 </div>
               </Section>
-            </>
-          }
-        >
-          {/* Beside Audio, as Speed is on the QSO page. */}
-          <Section name="lines" title="The recording">
-            <div className="panelgroups">
-              <ChoiceGroup
-                id="copy-lines"
-                label="Its lines show"
-                help={LINES_SHOW_HELP}
-                value={linesShow}
-                options={LINES_SHOW}
-                onChange={(v) => setLinesShow(v as LinesShow)}
-              />
-              <Check
-                id="copy-hide-calls"
-                label="Hide each call until I copy it"
-                help={HIDE_CALLS_HELP}
-                checked={hideCalls}
-                onChange={setHideCalls}
-              />
-              <Check
-                id="copy-show-speed"
-                label="Show its speed on each line"
-                help={SHOW_SPEED_HELP}
-                checked={showSpeed}
-                onChange={setShowSpeed}
-              />
-              <Check
-                id="copy-show-download"
-                label="Show Download, to save it as audio or text"
-                help={SHOW_DOWNLOAD_HELP}
-                checked={showDownload}
-                onChange={setShowDownload}
-              />
-            </div>
-          </Section>
-        </SettingsPanel>
-      </SettingsBand>
+            ),
+          },
+        ]}
+      />
 
       <main className="panel qso copy" data-testid="copy">
         <div className="copytop">
@@ -1949,7 +1960,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
             ) : (
               <p>
                 Open the{" "}
-                <button type="button" className="link" data-testid="copy-guide-settings" onClick={() => setSettingsOpen(true)}>
+                <button type="button" className="link" data-testid="copy-guide-settings" onClick={() => settings.show("page")}>
                   settings
                 </button>{" "}
                 to change the speed of a generated QSO or your own text, and the pause between its lines.
@@ -2083,7 +2094,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           onCancel={() => setTextDraft(null)}
           onConfigureUser={() => {
             setTextDraft(null);
-            onConfigure();
+            settings.show("you");
           }}
         />
       )}

@@ -14,7 +14,7 @@ import { loadDrills, type Drill } from "@/drills";
 import type { Profile } from "@/io/profiles";
 import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
-import { IconCog, IconRecord, IconUpload } from "./Icons";
+import { IconRecord, IconUpload } from "./Icons";
 import { MicDebug } from "./MicDebug";
 import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import type { RecorderHandle } from "./useRecorder";
@@ -32,27 +32,6 @@ export function RecDot(): React.ReactElement {
     <span className="recdot">
       <IconRecord />
     </span>
-  );
-}
-
-/** The way to the configuration screen.
- *
- * Shared and identically placed on both screens, because a control that moves
- * between screens is one somebody has to look for twice. Nothing behind it is
- * needed to use the app — it is where things get tidied up, not where they get
- * decided — so it sits out of the way and stays out of the tab order's path.
- */
-export function Cog({ onClick }: { onClick(): void }): React.ReactElement {
-  return (
-    <button
-      className="iconbtn cornerbtn"
-      onClick={onClick}
-      title="Configuration"
-      aria-label="Configuration"
-      data-testid="cog"
-    >
-      <IconCog />
-    </button>
   );
 }
 

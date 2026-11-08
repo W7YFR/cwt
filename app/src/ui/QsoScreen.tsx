@@ -49,7 +49,8 @@ import { charsOf, copyText, overOfText, plain, type CopyInput, type LineCopy } f
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop, IconUser } from "./Icons";
+import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop } from "./Icons";
+import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
@@ -61,19 +62,18 @@ import { QsoExamples, QsoGuide, QsoHelp } from "./QsoHelp";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
 import {
-  ChartSettingsButton,
   Check,
   ChoiceGroup,
+  MicrophoneSection,
   Section,
   SettingRow,
-  SettingsBand,
+  SoundSection,
   BreakInSlider,
   DEFAULT_BREAK_IN_MS,
   NoiseSlider,
   QrmSlider,
   QrnSlider,
   QsbSlider,
-  SettingsPanel,
   SpeedSliders,
 } from "./Controls";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
@@ -444,7 +444,6 @@ function copiedAll(typed: string, sent: string): boolean {
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(
   key:
-    | "qsoSettingsOpen"
     | "qsoLockCopy"
     | "qsoShowSpeed"
     | "qsoShowTheirSpeed"
@@ -476,7 +475,6 @@ export interface QsoScreenProps {
   /** Open the calibration wizard. */
   onCalibrate(): void;
   onError(message: string): void;
-  onConfigure(): void;
   onPage(page: Page): void;
   /** Back to the start screen. */
   onHome(): void;
@@ -490,7 +488,6 @@ export function QsoScreen({
   onProfileChange,
   onCalibrate,
   onError,
-  onConfigure,
   onPage,
   onHome,
 }: QsoScreenProps): React.ReactElement {
@@ -559,7 +556,9 @@ export function QsoScreen({
     setYourTextRaw(next);
     savePrefs({ ...loadPrefs(), qsoYourText: next });
   };
-  const [settingsOpen, setSettingsOpen] = useOnOff("qsoSettingsOpen", false);
+  const settings = useSettings();
+  const settingsOpen = settings.open;
+  const showSettings = () => settings.show("page");
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
   const [replayOnContinue, setReplayOnContinue] = useOnOff("qsoReplay", true);
   const [showDownload, setShowDownload] = useOnOff("qsoShowDownload", true);
@@ -1940,68 +1939,21 @@ export function QsoScreen({
           </button>
         </div>
         <div className="cornergroup">
-          <button
-            className="iconbtn cornerbtn"
-            aria-label="Configuration"
-            title="Configuration"
-            onClick={onConfigure}
-            disabled={recorder !== null}
-          >
-            <IconUser />
-          </button>
-          <ChartSettingsButton open={settingsOpen} onToggle={() => setSettingsOpen(!settingsOpen)} />
+          <MicChip devices={rec.devices} deviceId={deviceId} profiles={profiles} profileId={profileId} />
+          <SettingsButton />
         </div>
       </header>
 
-      {/* The settings both pages share, then this page's own. */}
-      <SettingsBand open={settingsOpen}>
-        <SettingsPanel
-          className="formpanel qsopanel"
-          audio={{
-            devices: rec.devices,
-            deviceId,
-            onDeviceChange,
-            profiles,
-            profileId,
-            onProfileChange,
-            // Always the microphone here, so a calibration always applies.
-            appliesToTake: true,
-            rereading: false,
-            onCalibrate,
-            // The session holds the microphone open, and its copy is read
-            // through this correction.
-            locked: recorder !== null,
-          }}
-          gainDb={gainDb}
-          onGainDb={setGainDb}
-          audioExtra={
-            <>
-              <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
-              <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
-              <QrnSlider qrn={qrn} onChange={setQrn} />
-              <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
-              <BreakInSlider
-                ms={breakInMs}
-                barred={!hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
-                onChange={setBreakInMs}
-              />
-              <SettingRow label="Between its lines">
-                <Check
-                  id="qso-band-noise"
-                  label="Play the band"
-                  help={BAND_NOISE_HELP}
-                  barred={hasBand ? null : NEEDS_BAND}
-                  checked={bandNoise}
-                  onChange={setBandNoise}
-                />
-              </SettingRow>
-            </>
-          }
-          /* What is set for this page alone, under the audio and the speed,
-             which both pages share. Grouped by what each is about: the
-             station, you, and what comes after a QSO. */
-          pageRow={
-            <>
+      {/* The page's own settings, then the ones Copy shares, then sound and
+          speed. Audio and Speed lock while a session runs: your copy is read
+          at this speed, through this microphone. */}
+      <PageSettings
+        tabs={[
+          {
+            id: "page",
+            label: "QSO",
+            content: (
+              <>
               <Section name="station" title="The other station">
                 <div className="panelgroups">
                   <ChoiceGroup
@@ -2020,21 +1972,6 @@ export function QsoScreen({
                     options={THEIR_TEXTS}
                     onChange={(v) => setTheirText(v as TheirText)}
                   />
-                  <ChoiceGroup
-                    id="qso-copy-input"
-                    label="Enter copy as"
-                    help={COPY_INPUT_HELP}
-                    value={copyInput}
-                    options={COPY_INPUTS}
-                    onChange={(v) => setCopyInput(v as CopyInput)}
-                  />
-                  <Check
-                    id="qso-grade-typing"
-                    label="Grade slots as I type"
-                    help={GRADE_TYPING_HELP}
-                    checked={gradeTyping}
-                    onChange={setGradeTyping}
-                  />
                   <Check
                     id="qso-blur-call"
                     label="Hide its call while I copy"
@@ -2049,35 +1986,8 @@ export function QsoScreen({
                     checked={showTheirSpeed}
                     onChange={setShowTheirSpeed}
                   />
-                  <SettingRow label="When I start sending">
-                    <Check
-                      id="qso-lock-copy"
-                      label="Lock my copy"
-                      help={LOCK_HELP}
-                      checked={lockCopy}
-                      onChange={setLockCopy}
-                    />
-                  </SettingRow>
-                  <ChoiceGroup
-                    id="qso-locked-shows"
-                    label="My locked copy shows"
-                    help={LOCKED_SHOWS_HELP}
-                    value={lockedShows}
-                    options={LOCKED_SHOWS}
-                    onChange={(v) => setLockedShows(v as LockedShows)}
-                  />
-                  <Check
-                    id="qso-allow-edits"
-                    label="Allow edits"
-                    help={ALLOW_EDITS_HELP}
-                    checked={allowEdits}
-                    onChange={setAllowEdits}
-                  />
                 </div>
               </Section>
-              {/* You and After a QSO, one above the other beside The other
-                  station, which is as tall as both. */}
-              <div className="sectioncol">
                 <Section name="you" title="You">
                   <div className="panelgroups">
                     <ChoiceGroup
@@ -2148,12 +2058,86 @@ export function QsoScreen({
                     </SettingRow>
                   </div>
                 </Section>
-              </div>
-            </>
-          }
-        >
-          {/* The practice page's speed sliders. They lock while a session
-              runs: your copy is read at this speed. */}
+              </>
+            ),
+          },
+          {
+            id: "copy",
+            label: "Your copy",
+            content: (
+              <Section name="copy" title="Your copy">
+                <div className="panelgroups">
+                  <ChoiceGroup
+                    id="qso-copy-input"
+                    label="Enter copy as"
+                    help={COPY_INPUT_HELP}
+                    value={copyInput}
+                    options={COPY_INPUTS}
+                    onChange={(v) => setCopyInput(v as CopyInput)}
+                  />
+                  <Check
+                    id="qso-grade-typing"
+                    label="Grade slots as I type"
+                    help={GRADE_TYPING_HELP}
+                    checked={gradeTyping}
+                    onChange={setGradeTyping}
+                  />
+                  <SettingRow label="When I start sending">
+                    <Check
+                      id="qso-lock-copy"
+                      label="Lock my copy"
+                      help={LOCK_HELP}
+                      checked={lockCopy}
+                      onChange={setLockCopy}
+                    />
+                  </SettingRow>
+                  <ChoiceGroup
+                    id="qso-locked-shows"
+                    label="My locked copy shows"
+                    help={LOCKED_SHOWS_HELP}
+                    value={lockedShows}
+                    options={LOCKED_SHOWS}
+                    onChange={(v) => setLockedShows(v as LockedShows)}
+                  />
+                  <Check
+                    id="qso-allow-edits"
+                    label="Allow edits"
+                    help={ALLOW_EDITS_HELP}
+                    checked={allowEdits}
+                    onChange={setAllowEdits}
+                  />
+                </div>
+              </Section>
+            ),
+          },
+          {
+            id: "sound",
+            label: "Sound",
+            content: (
+              <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
+              <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
+              <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
+              <QrnSlider qrn={qrn} onChange={setQrn} />
+              <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+              <BreakInSlider
+                ms={breakInMs}
+                barred={!hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
+                onChange={setBreakInMs}
+              />
+              <SettingRow label="Between its lines">
+                <Check
+                  id="qso-band-noise"
+                  label="Play the band"
+                  help={BAND_NOISE_HELP}
+                  barred={hasBand ? null : NEEDS_BAND}
+                  checked={bandNoise}
+                  onChange={setBandNoise}
+                />
+              </SettingRow>
+              </SoundSection>
+            ),
+          },
+          { id: "speed", label: "Speed", content: (
           <Section name="speed" title="Speed">
             <div className="panelgroups">
               <SpeedSliders
@@ -2164,15 +2148,39 @@ export function QsoScreen({
               />
             </div>
           </Section>
-        </SettingsPanel>
-      </SettingsBand>
+          ) },
+          {
+            id: "microphone",
+            label: "Microphone",
+            content: (
+              <MicrophoneSection
+                audio={{
+                  devices: rec.devices,
+                  deviceId,
+                  onDeviceChange,
+                  profiles,
+                  profileId,
+                  onProfileChange,
+                  // Always the microphone here, so a calibration always applies.
+                  appliesToTake: true,
+                  rereading: false,
+                  onCalibrate,
+                  // The session holds the microphone open, and its copy is read
+                  // through this correction.
+                  locked: recorder !== null,
+                }}
+              />
+            ),
+          },
+        ]}
+      />
 
       {helpOpen && (
         <QsoHelp
           initial={runFormat}
           onShown={setGuideKind}
           onClose={() => setHelpOpen(false)}
-          onSettings={() => setSettingsOpen(true)}
+          onSettings={showSettings}
           settingsOpen={settingsOpen}
         />
       )}
@@ -2270,7 +2278,7 @@ export function QsoScreen({
 
         {guideShown && (
           <div className="qsoguide prose" data-testid="qso-guide">
-            <QsoGuide onSettings={() => setSettingsOpen(true)} settingsOpen={settingsOpen} onShown={setGuideKind} />
+            <QsoGuide onSettings={showSettings} settingsOpen={settingsOpen} onShown={setGuideKind} />
           </div>
         )}
 
@@ -2407,7 +2415,7 @@ export function QsoScreen({
           onCancel={() => setScriptDraft(null)}
           onConfigureUser={() => {
             setScriptDraft(null);
-            onConfigure();
+            settings.show("you");
           }}
         />
       )}
