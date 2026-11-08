@@ -2756,12 +2756,6 @@ header .modeswitch button { white-space: nowrap; }
   line-height: 1.4;
   color: var(--ink-faint);
 }
-.viewpanel.formpanel .setrow { row-gap: 6px; }
-.viewpanel.formpanel .setrow > .caption { align-self: start; line-height: var(--control-h); }
-.viewpanel.formpanel .setrow > .group { grid-column: 2 / -1; display: flex; flex-direction: row; align-items: center; justify-self: stretch; margin: 0; min-height: 0; }
-.viewpanel.formpanel .setrow > .group > .helptip { margin-left: auto; padding-left: 14px; }
-.viewpanel.formpanel .setrow > .group > label.check { min-height: 22px; min-width: 0; flex: 1 1 auto; margin-top: 0; }
-.viewpanel.formpanel .setrow > .group > .helptip { flex: none; }
 /* Speed's names carry their readings, as Overall (Farnsworth) 25 wpm, so its
    name column is wider. */
 .viewpanel.formpanel [data-panel="speed"] .group { grid-template-columns: var(--namecol) auto; }
@@ -2791,9 +2785,8 @@ header .modeswitch button { white-space: nowrap; }
   .viewpanel.formpanel .group > label.check,
   .viewpanel.formpanel .group > .note { grid-column: 1; }
 }
-/* Each section's settings on a panel of their own, a hairline between rows
-   across its width, so a name and the control it goes with read as one row
-   however far apart they sit. Audio's two lines make one panel. */
+/* Each section's settings on a panel of their own. Lines inside it only
+   separate groups of settings; see `.subgroup`. */
 .viewpanel.formpanel .panelrow > .panelgroups {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -2810,6 +2803,21 @@ header .modeswitch button { white-space: nowrap; }
 .viewpanel.formpanel .panelrow > .panelgroups > .subgroup + *,
 .viewpanel.formpanel .panelrow > .panelgroups > * + .subgroup { border-top: 1px solid var(--line); }
 /* The group's name, in the name column beside its first setting. */
+/* A guide line down the name column, under the group's name, as far as its
+   last setting; the names of its settings are indented from it. */
+.viewpanel.formpanel .subgroup::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 38px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+.viewpanel.formpanel .subgroup .group > label:not(.check):not(.field),
+.viewpanel.formpanel .subgroup .group > .caption,
+.viewpanel.formpanel .subgroup .group > label.field .fieldname { padding-left: 14px; }
 .viewpanel.formpanel .subgroup > .subhead {
   position: absolute;
   left: 0;
@@ -2857,13 +2865,7 @@ header .modeswitch button { white-space: nowrap; }
   color: var(--ink-dim);
 }
 .viewpanel.formpanel .group > label.field .unit { margin-left: -8px; }
-/* A number box among a row's options, as Paced's count-in: its name, box
-   and unit on one line in the control column, its name as a checkbox's is. */
-.viewpanel.formpanel .setrow .group > label.field { display: flex; align-items: center; gap: 8px; }
-.viewpanel.formpanel .setrow .group > label.field .fieldname { color: var(--ink); flex-basis: auto; }
-.viewpanel.formpanel .setrow .group > label.field .unit { margin-left: -2px; }
 @media (max-width: 560px) {
-  .viewpanel.formpanel .setrow > .group { grid-column: 1; }
   /* A number box is small: its name, the box and its unit share one line,
      with its question mark at the end as on every row. */
   .viewpanel.formpanel .group > label.field { grid-column: 1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
@@ -2989,11 +2991,16 @@ header .modeswitch button { white-space: nowrap; }
   height: auto;
 }
 .drawertabs button:hover { color: var(--ink); }
+/* Color and the underline only: bold would widen the tab and move the ones
+   after it. */
 .drawertabs button[aria-selected="true"] {
   color: var(--you);
   border-bottom-color: var(--you);
-  font-weight: 600;
 }
+/* Between the page's tabs and the app's. */
+.drawertabs .tabsep { flex: none; width: 1px; margin: 8px 8px 10px; background: var(--line); }
+/* Where the settings on show apply. */
+.drawerscope { margin: -4px 0 -8px; font-size: 12.5px; color: var(--ink-faint); }
 .drawerbody { flex: 1; overflow-y: auto; padding: 16px 20px 28px; display: flex; flex-direction: column; gap: 22px; }
 .drawerslot:empty { display: none; }
 /* The app's tabs head their sections as the page's tabs do. */
@@ -3014,7 +3021,22 @@ header .modeswitch button { white-space: nowrap; }
 .drawer .viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 100%; }
 @media (max-width: 560px) {
   /* No name column on a phone: a group's name heads its settings. */
-  .viewpanel.formpanel .subgroup > .subhead { position: static; display: block; padding-top: 4px; }
+  /* A guide line down the name column, under the group's name, as far as its
+   last setting; the names of its settings are indented from it. */
+.viewpanel.formpanel .subgroup::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 38px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+.viewpanel.formpanel .subgroup .group > label:not(.check):not(.field),
+.viewpanel.formpanel .subgroup .group > .caption,
+.viewpanel.formpanel .subgroup .group > label.field .fieldname { padding-left: 14px; }
+.viewpanel.formpanel .subgroup > .subhead { position: static; display: block; padding-top: 4px; }
   .drawer { width: 100%; border-left: 0; }
   .drawerbody { padding: 14px 16px 24px; }
   .drawer .viewpanel.formpanel .group { grid-template-columns: minmax(0, 1fr) auto; }
@@ -3035,3 +3057,128 @@ header .modeswitch button { white-space: nowrap; }
 @media (max-width: 700px) {
   .micchip .micname, .micchip .micname + span { display: none; }
 }
+
+/* The toolbar: the header's second line, under a rule. The page's actions,
+   then its quick settings, then ⋯. The same on every page. */
+.toolbar {
+  flex-basis: 100%;
+  min-width: 0;
+  order: 3;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+}
+.toolactions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; flex: 1 1 auto; min-width: 0; }
+.toolactions > .recordbar { flex: 0 1 auto; }
+.toolchips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+/* A quick setting: its name, then its value, as one rounded button. */
+.quick { position: relative; }
+.quick .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-h);
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--panel);
+  white-space: nowrap;
+}
+.quick .chipname { color: var(--ink-dim); font-size: 12.5px; }
+.quick .chipvalue { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); text-align: left; }
+.quick .chipcaret { color: var(--ink-faint); font-size: 9px; }
+.quick .chip[aria-expanded="true"] { border-color: var(--you); }
+/* The setting itself, under its chip: the same form as in Settings. */
+.quickpop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: max-content;
+  min-width: 300px;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 12px 16px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
+}
+/* As wide as the setting needs, up to a limit, so a row of choices or a
+   checkbox's words stay on one line. No inner panel: the popover is one. */
+.quickpop .viewpanel.formpanel { --namecol: 0px; gap: 10px; grid-template-columns: minmax(max-content, 1fr); }
+/* No names in the popover: its controls start at the left edge. */
+.quickpop .viewpanel.formpanel[data-names="false"] .group { column-gap: 0; }
+/* Once its width is held, its settings fit inside it and wrap. */
+.quickpop[data-pinned="true"] .viewpanel.formpanel { grid-template-columns: minmax(0, 1fr); }
+/* The popover is at least this wide, and a short one's rows fill it. */
+.quickpop { min-width: 340px; }
+.quickpop .viewpanel.formpanel .panelrow > .panelgroups { background: none; border: 0; padding: 0; }
+/* A note wraps rather than widening the popover past the window. */
+.quickpop .viewpanel.formpanel .group > .note { max-width: 300px; }
+.quickpop .viewpanel.formpanel .panelrow > .uplabel { display: none; }
+/* A slider in a popover takes the whole width under its name and reading. */
+.quickpop .viewpanel.formpanel .group:has(> input[type="range"]) { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+.quickpop .viewpanel.formpanel .group > input[type="range"] { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+.quickpop .viewpanel.formpanel .group:has(> input[type="range"]) > .helptip { grid-column: 2; }
+.quickpop .viewpanel.formpanel [data-panel="speed"] .group { grid-template-columns: var(--namecol) minmax(0, 1fr) auto; }
+.quickpop .viewpanel.formpanel [data-panel="speed"] .group:has(> input[type="range"]) { grid-template-columns: minmax(0, 1fr) auto; }
+.quickpop .viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 100%; }
+.quickpop .viewpanel [data-panel="speed"] label.check { white-space: normal; }
+.quickpop .quickmore { display: block; margin: 8px 2px 0 auto; font-size: 12.5px; }
+/* ⋯: a short list of buttons. */
+.quick.more { margin-left: auto; }
+.quickpop.menu { width: max-content; min-width: 220px; padding: 6px; display: flex; flex-direction: column; gap: 2px; left: auto; }
+.quickpop.menu > button {
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  width: 100%;
+}
+.quickpop.menu > button:hover:not(:disabled) { background: var(--panel-2); }
+.menuhead {
+  padding: 8px 10px 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-faint);
+}
+@media (max-width: 560px) {
+  /* The chips and ⋯ share one line, the chips scrolling sideways. */
+  .toolbar { flex-wrap: nowrap; }
+  .toolchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: 1 1 0; }
+  .quick.more { margin-left: 0; }
+  .quickpop { position: fixed; left: 16px !important; right: 16px; top: auto; width: auto; min-width: 0; }
+  .quickpop .viewpanel.formpanel { grid-template-columns: minmax(0, 1fr); }
+  /* The page's actions in a bar at the foot of the screen, where a thumb
+     reaches them. Across the whole window, past the scrollbar gutters. */
+  .toolactions {
+    position: fixed;
+    bottom: 0;
+    left: calc(50% - 50vw);
+    width: 100vw;
+    z-index: 20;
+    flex-wrap: nowrap;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, .18);
+  }
+  .toolactions > .recordbar { flex-wrap: nowrap; }
+  .toolactions .srcrow { display: none; }
+  /* From the foot of the screen, the drill list opens upward. */
+  .toolactions .drillpicker.floating .drilllist { top: auto; bottom: calc(100% + 6px); }
+  /* Room under the page for the bar. */
+  .app { padding-bottom: 72px; }
+}
+.qsocontrols:empty { display: none; }
+/* The level meter beside Pause and Stop, as wide as the one beside Stop and review. */
+.toolactions > .meter { flex: 0 0 90px; }
+/* A name in a popover stays on one line: the column is sized to it. */
+.quickpop .viewpanel.formpanel .group > .caption,
+.quickpop .viewpanel.formpanel .group > label:not(.check),
+.quickpop .viewpanel.formpanel .group > label.field > .fieldname { white-space: nowrap; }

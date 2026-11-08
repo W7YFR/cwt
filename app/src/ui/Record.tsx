@@ -7,16 +7,14 @@
  * screen's larger arrangement live here too, so the two cannot drift.
  */
 
-import { useMemo, useRef } from "react";
-import { ACCEPTED } from "@/capture/file";
+import { useMemo } from "react";
 import type { InputDevice } from "@/capture/mic";
 import { loadDrills, type Drill } from "@/drills";
 import type { Profile } from "@/io/profiles";
 import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
-import { IconRecord, IconUpload } from "./Icons";
+import { IconRecord } from "./Icons";
 import { MicDebug } from "./MicDebug";
-import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import type { RecorderHandle } from "./useRecorder";
 import { RECORD_MODES, type RecordMode } from "./mode";
 import { MODE_HELP } from "./copy";
@@ -151,19 +149,6 @@ export interface RecordBarProps {
   onNewSession?: (() => void) | undefined;
   /** Start a new session at a drill's text, at the current speeds. */
   onDrill?: ((drill: Drill) => void) | undefined;
-  /** Open a recording from disk.
-   *
-   * Beside dropping one on the page rather than instead of it. The drop target
-   * is the whole window and says nothing about itself until something is being
-   * dragged over it, so on its own it is a feature you have to already know
-   * about. */
-  onFile?: ((file: File) => void) | undefined;
-  /** False once the session has something in it — see the title below. */
-  canOpenFile?: boolean | undefined;
-  /** How the next take records, beside the button that starts it. The
-   *  options of each mode are in Settings. */
-  mode?: RecordMode | undefined;
-  onMode?: ((mode: RecordMode) => void) | undefined;
   /** What the recording is called, for a take that came from a file.
    *
    * Here rather than beside the bar in the review, because it is half of one
@@ -183,13 +168,8 @@ export function RecordBar({
   onClear,
   onNewSession,
   onDrill,
-  onFile,
-  canOpenFile = true,
-  mode,
-  onMode,
   source,
 }: RecordBarProps): React.ReactElement {
-  const fileInput = useRef<HTMLInputElement>(null);
   // Read on mount: the configuration page, where the details and the custom
   // drills change, replaces this screen while it is open.
   const drills = useMemo(loadDrills, []);
@@ -236,39 +216,6 @@ export function RecordBar({
   return (
     <>
       <div className="recordbar">
-        {onFile && (
-          <>
-            {/* Icon only, and first, because opening a file is the rarer of the
-                two ways in — it reads as the smaller sibling of Record rather
-                than as a competing headline. */}
-            <button
-              className="iconbtn"
-              data-testid="open-file"
-              disabled={!canOpenFile}
-              aria-label="Open a recording"
-              title={canOpenFile ? OPEN_FILE_HELP : OPEN_FILE_CLOSED}
-              onClick={() => fileInput.current?.click()}
-            >
-              <IconUpload />
-            </button>
-            {/* The button is the control; this is only the file dialog it
-                opens. Left in the tab order it is a stop on nothing: focus
-                lands on a clipped 1px box with no visible ring. */}
-            <input
-              ref={fileInput}
-              className="visually-hidden"
-              tabIndex={-1}
-              type="file"
-              accept={ACCEPTED}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onFile(file);
-                // Cleared, or choosing the same file twice in a row is silent.
-                e.target.value = "";
-              }}
-            />
-          </>
-        )}
         {/* One button, three things it can mean, because there is only ever one
             of them true and a second button for the rare ones would be two
             controls that are never both useful.
@@ -283,7 +230,7 @@ export function RecordBar({
             asks first, so this is where a first visit meets the question, and
             a red dot that opens a permission prompt is not what it promised. */}
         <button
-          className={rec.needAccess ? undefined : "iconbtn"}
+          className="primary"
           data-testid="record-another"
           onClick={() => void (rec.needAccess ? rec.grantAccess() : rec.start())}
           disabled={rec.busy || rec.blocked || rec.probing}
@@ -302,8 +249,7 @@ export function RecordBar({
                 : "Record another — or press R"
           }
         >
-          <RecDot />
-          {rec.needAccess && " Allow microphone"}
+          <RecDot /> {rec.needAccess ? "Allow microphone" : "Record"}
         </button>
         {/* Not "back": this keeps the session — the message, the speeds, the
             pacing cursor — and drops only what was recorded into it, which is
@@ -319,7 +265,6 @@ export function RecordBar({
           </button>
         )}
         {onDrill && <DrillPicker drills={drills} onPick={onDrill} floating />}
-        {mode && onMode && <ModeSwitch mode={mode} onMode={onMode} />}
         {/* Always here, as on the other pages, so the bar does not move. Off
             with nothing to clear. */}
         <button
@@ -367,7 +312,7 @@ export function RecordBar({
 /** Plain, Paced or Zen: one choice, so one control. A row of pressed and
  *  unpressed buttons rather than a select, because the choice is made often
  *  and all three should be in view. */
-function ModeSwitch({
+export function ModeSwitch({
   mode,
   onMode,
 }: {

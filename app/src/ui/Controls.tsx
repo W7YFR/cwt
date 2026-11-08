@@ -15,6 +15,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffe
 import { createPortal } from "react-dom";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
+import type { RecordMode } from "./mode";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
@@ -33,7 +34,6 @@ import {
   COLLAPSE_RESTS_HELP,
   RUN_SCORES_HELP,
   SHOW_CHART_CONTROLS_HELP,
-  SHOW_DOWNLOADS_HELP,
   SHOW_HINTS_HELP,
   SHOW_RUNS_HELP,
   RUN_SORT_HELP,
@@ -101,6 +101,8 @@ import {
 /** The two speed sliders, character and overall. The practice page and the
  *  QSO page both draw these, so a speed is set the same way on each. */
 /** What the two speeds set. */
+const TOLERANCE_HELP =
+  "How far a mark or a gap may be from its target length and still count as right.";
 const CHAR_SPEED_HELP =
   "How fast the dits and dahs inside each character go, in words per minute.";
 const FARNSWORTH_HELP =
@@ -214,23 +216,6 @@ export function Controls(props: ControlsProps): React.ReactElement {
 
   return (
     <section className="controls" inert={props.locked === true} data-locked={props.locked === true}>
-      <SpeedSliders charWpm={s.charWpm} farnsworthWpm={s.farnsworthWpm} onChange={onChange} />
-
-      <div className="group">
-        <label htmlFor="tol">
-          Tolerance <output id="tol-out">{fmtTolerance(s.tolerance)}</output>
-        </label>
-        <input
-          type="range"
-          id="tol"
-          min={5}
-          max={60}
-          step={1}
-          value={Math.round(s.tolerance * 100)}
-          onChange={(e) => onChange({ tolerance: Number(e.target.value) / 100 })}
-        />
-      </div>
-
       {/* The message and how many of it, on one line. A wrapper, because the
           message group claims a whole row by itself — it is the one control
           here whose useful width has no upper bound — so the two share a line
@@ -306,6 +291,34 @@ export function Controls(props: ControlsProps): React.ReactElement {
         </div>
       </div>
     </section>
+  );
+}
+
+/** How far off a mark may be and still count as right, in percent. */
+export function ToleranceSlider({
+  tolerance,
+  onChange,
+}: {
+  tolerance: number;
+  onChange(tolerance: number): void;
+}): React.ReactElement {
+  const about = useHelp(TOLERANCE_HELP);
+  return (
+    <div className="group">
+      <label htmlFor="tol" title={about.title}>
+        Tolerance <output id="tol-out">{fmtTolerance(tolerance)}</output>
+      </label>
+      <input
+        type="range"
+        id="tol"
+        min={5}
+        max={60}
+        step={1}
+        value={Math.round(tolerance * 100)}
+        onChange={(e) => onChange(Number(e.target.value) / 100)}
+      />
+      {about.tip}
+    </div>
   );
 }
 
@@ -492,6 +505,9 @@ export interface ChartSettingsProps {
 
 export interface ViewControlsProps extends ChartSettingsProps {
   onFit(): void;
+  /** Replay what plays each time it reaches its end. L toggles it too. */
+  loop?: boolean;
+  onLoop?(): void;
 }
 
 /** A select with its caption above it, barred in place when it cannot apply. */
@@ -675,6 +691,19 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
           >
             Fit
           </button>
+          {/* A switch beside the chart it plays, rather than a setting: L
+              toggles it too. */}
+          {props.onLoop && (
+            <button
+              className="loop"
+              data-testid="loop"
+              aria-pressed={props.loop === true}
+              title={LOOP_HELP}
+              onClick={props.onLoop}
+            >
+              Loop
+            </button>
+          )}
         </div>
       </div>
     </section>
@@ -780,6 +809,83 @@ export function MicrophoneSection({ audio }: { audio: AudioSetup }): React.React
   );
 }
 
+/** The options of one way to record: in Settings under While I record, and
+ *  under the mode in the Mode chip. */
+export function ModeOptions({
+  mode,
+  settings: s,
+  onChange,
+}: {
+  mode: RecordMode;
+  settings: ReviewSettings;
+  onChange(patch: Partial<ReviewSettings>): void;
+}): React.ReactElement {
+  if (mode === "plain")
+    return (
+      <>
+      <Check
+        id="plain-follow"
+        label="Scroll the chart with me, and stop when I finish"
+        help={PLAIN_FOLLOW_HELP}
+        checked={s.plainFollow}
+        onChange={(v) => onChange({ plainFollow: v })}
+      />
+      <Check
+        id="plain-grading"
+        label="Grade each character as I key it"
+        help={PLAIN_GRADING_HELP}
+        checked={s.plainGrading}
+        onChange={(v) => onChange({ plainGrading: v })}
+      />
+      </>
+    );
+  if (mode === "zen")
+    return (
+      <>
+      <Check
+        id="zen-progress"
+        label="Show where I am in the message"
+        help={ZEN_PROGRESS_HELP}
+        checked={s.zenProgress}
+        onChange={(v) => onChange({ zenProgress: v })}
+      />
+      <Check
+        id="zen-grading"
+        label="Grade each character as I key it"
+        help={ZEN_GRADING_HELP}
+        checked={s.zenGrading}
+        barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
+        onChange={(v) => onChange({ zenGrading: v })}
+      />
+      </>
+    );
+  return (
+    <>
+      <Check
+        id="pace-absolute"
+        label="Show Absolute time while recording"
+        help={PACE_ABSOLUTE_HELP}
+        checked={s.paceAbsolute}
+        onChange={(v) => onChange({ paceAbsolute: v })}
+      />
+      <div className="group">
+        <NumberField
+          id="pace-lead"
+          name="Count-in"
+          unit="s"
+          spoken="seconds"
+          help={PACE_LEAD_HELP}
+          value={s.paceLeadSec}
+          min={PACE_LEAD_MIN_SEC}
+          max={PACE_LEAD_MAX_SEC}
+          step={1}
+          onChange={(v) => onChange({ paceLeadSec: v })}
+        />
+      </div>
+    </>
+  );
+}
+
 /** The Send page's own settings.
  *
  * Grouped by the question each answers: the two ways to record, what you
@@ -802,60 +908,13 @@ export function SendSettings({
       <Section name="modes" title="While I record">
         <div className="panelgroups">
           <Subgroup label="Plain">
-            <Check
-              id="plain-follow"
-              label="Scroll the chart with me, and stop when I finish"
-              help={PLAIN_FOLLOW_HELP}
-              checked={s.plainFollow}
-              onChange={(v) => onChange({ plainFollow: v })}
-            />
-            <Check
-              id="plain-grading"
-              label="Grade each character as I key it"
-              help={PLAIN_GRADING_HELP}
-              checked={s.plainGrading}
-              onChange={(v) => onChange({ plainGrading: v })}
-            />
+            <ModeOptions mode="plain" settings={s} onChange={onChange} />
           </Subgroup>
           <Subgroup label="Zen">
-            <Check
-              id="zen-progress"
-              label="Show where I am in the message"
-              help={ZEN_PROGRESS_HELP}
-              checked={s.zenProgress}
-              onChange={(v) => onChange({ zenProgress: v })}
-            />
-            <Check
-              id="zen-grading"
-              label="Grade each character as I key it"
-              help={ZEN_GRADING_HELP}
-              checked={s.zenGrading}
-              barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
-              onChange={(v) => onChange({ zenGrading: v })}
-            />
+            <ModeOptions mode="zen" settings={s} onChange={onChange} />
           </Subgroup>
           <Subgroup label="Paced">
-            <Check
-              id="pace-absolute"
-              label="Show Absolute time while recording"
-              help={PACE_ABSOLUTE_HELP}
-              checked={s.paceAbsolute}
-              onChange={(v) => onChange({ paceAbsolute: v })}
-            />
-            <div className="group">
-              <NumberField
-                id="pace-lead"
-                name="Count-in"
-                unit="s"
-                spoken="seconds"
-                help={PACE_LEAD_HELP}
-                value={s.paceLeadSec}
-                min={PACE_LEAD_MIN_SEC}
-                max={PACE_LEAD_MAX_SEC}
-                step={1}
-                onChange={(v) => onChange({ paceLeadSec: v })}
-              />
-            </div>
+            <ModeOptions mode="paced" settings={s} onChange={onChange} />
           </Subgroup>
         </div>
       </Section>
@@ -945,13 +1004,6 @@ export function SendSettings({
             onChange={(v) => onChange({ showChartControls: v })}
           />
           <Check
-            id="show-downloads"
-            label="Show the download buttons"
-            help={SHOW_DOWNLOADS_HELP}
-            checked={s.showDownloads}
-            onChange={(v) => onChange({ showDownloads: v })}
-          />
-          <Check
             id="show-hints"
             label="Show hints"
             help={SHOW_HINTS_HELP}
@@ -971,42 +1023,15 @@ export function SendSettings({
   );
 }
 
-/** The Send page's part of the Sound tab: how loud, and whether playback
- *  starts again when it ends. */
+/** The Send page's part of the Sound tab: how loud. */
 export function SendSound({
   gainDb,
   onGainDb,
-  loop,
-  onLoop,
 }: {
   gainDb: number;
   onGainDb(gainDb: number): void;
-  loop: boolean;
-  onLoop(): void;
 }): React.ReactElement {
-  return (
-    <SoundSection gainDb={gainDb} onGainDb={onGainDb}>
-      <Check id="loop" label="Repeat playback when it ends" help={LOOP_HELP} checked={loop} onChange={onLoop} />
-    </SoundSection>
-  );
-}
-
-/** A setting's name on the left of controls that carry none there, such as
- *  checkboxes, so the row reads like the rest. Several stack in the control
- *  column under the one name. */
-export function SettingRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="group setrow">
-      <span className="caption">{label}</span>
-      {children}
-    </div>
-  );
+  return <SoundSection gainDb={gainDb} onGainDb={onGainDb} />;
 }
 
 /** A few settings that belong together, such as the options of one way to

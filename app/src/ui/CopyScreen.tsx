@@ -69,7 +69,6 @@ import {
   Check,
   ChoiceGroup,
   Section,
-  SettingRow,
   SoundSection,
   Subgroup,
   NoiseSlider,
@@ -79,8 +78,9 @@ import {
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
-import { IconDownload, IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
+import { IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
 import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
+import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
@@ -158,11 +158,6 @@ const GRADE_TYPING_HELP =
 const SEEK_SLOT_HELP =
   "While the recording is paused, it moves to the character of the slot you select. Play " +
   "goes on from there.";
-
-const SHOW_DOWNLOAD_HELP =
-  "Under the QSO, Download saves it as a WAV file, and Download text as a text file you can open " +
-  "in Script. With QSB, noise, QRN or QRM on a generated QSO or your own text, Download " +
-  "clean saves it without them, and Download as heard with them.";
 
 const SHOW_SPEED_HELP =
   "Each line shows the speed it was sent at. For an opened recording, it is measured from the line.";
@@ -416,7 +411,6 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const [seekSlot, setSeekSlot] = useOnOff("copySeekSlot", false);
   const [allowEdits, setAllowEdits] = useOnOff("copyAllowEdits", false);
   const [showSpeed, setShowSpeed] = useOnOff("copyShowSpeed", true);
-  const [showDownload, setShowDownload] = useOnOff("copyShowDownload", true);
   const [atMine, setAtMine] = useOnOff("copyRecordingAtMine", false);
   /** How the next attempt copies. The attempt under way keeps its own. */
   const [inputPref, setInputPref] = useChoice("copyInput", "text");
@@ -1569,57 +1563,178 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
 
   const current = kept ? scoreOf(kept.attempts[attempt]!) : { right: 0, total: 0 };
 
+  /* What the chips and Settings share: one copy of each, drawn wherever it
+     is open. */
+  const makeSection = (
+    <Section name="make" title="Generate QSO">
+      <div className="panelgroups">
+        <ChoiceGroup
+          id="copy-kind"
+          label="Kind"
+          help={KIND_HELP}
+          value={kind}
+          options={KINDS}
+          onChange={(v) => setKind(v as Kind)}
+        />
+        <ChoiceGroup
+          id="copy-run-qsos"
+          label="QSOs in a run"
+          help={RUN_QSOS_HELP}
+          value={String(runQsos)}
+          options={RUN_QSOS}
+          onChange={(v) => setRunQsos(Number(v))}
+        />
+        <ChoiceGroup
+          id="copy-qso-length"
+          label="How much the station sends"
+          help={QSO_LENGTH_HELP}
+          value={qsoLength}
+          options={QSO_LENGTHS}
+          onChange={(v) => setQsoLength(v as Length)}
+        />
+        <ChoiceGroup
+          id="copy-gap"
+          label="Between lines"
+          help={GAP_HELP}
+          value={gap}
+          options={GAPS}
+          onChange={(v) => setGap(v as Gap)}
+        />
+      </div>
+    </Section>
+  );
+  const speedSection = (
+    <Section name="speed" title="Speed">
+      <div className="panelgroups">
+        <ChoiceGroup
+          id="copy-speed"
+          label="Speed"
+          help={SPEED_HELP}
+          value={speedChoice}
+          options={SPEEDS}
+          onChange={(v) => setSpeedChoice(v as SpeedChoice)}
+        />
+        <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
+        <Check
+          id="copy-recording-at-mine"
+          label="Play an opened recording at my speeds"
+          help={AT_MINE_HELP}
+          checked={atMine}
+          onChange={setAtMine}
+        />
+      </div>
+    </Section>
+  );
+  const soundSection = (
+    <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
+      <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
+      <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
+      <QrnSlider qrn={qrn} onChange={setQrn} />
+      <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+    </SoundSection>
+  );
+  const kindLabel = KINDS.find((k) => k.value === kind)!.label;
+  const bandName = anyAdded({ qsbDb, noiseDb, qrn, qrmDb }) ? "On" : "Clean";
+
   return (
     <>
       <header>
         <HomeButton onHome={onHome} />
         <PageSwitch page="copy" onPage={onPage} />
-        {/* One row, as on the Send page: on a narrow screen it takes its own
-            line under the brand. */}
-        <div className="recordbar">
-          <button
-            className={rec ? undefined : "primary"}
-            data-testid="copy-new"
-            disabled={reading || playing !== null}
-            title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
-            onClick={makeExchange}
-          >
-            Generate QSO
-          </button>
-          <button
-            data-testid="copy-text-open"
-            disabled={reading || playing !== null}
-            title="Paste or type a QSO of your own to copy, sent in CW"
-            onClick={editText}
-          >
-            Script
-          </button>
-          {/* Icon only, after Generate QSO and Script: a recording is the rarer way in,
-              as on the Send page. */}
-          <button
-            className="iconbtn copyopen"
-            data-testid="copy-open"
-            disabled={reading}
-            aria-label="Open a recording or a text file"
-            title="Open a recording of CW or a .txt file to copy, or drop one on the page"
-            onClick={pickFile}
-          >
-            <IconUpload />
-          </button>
-          {/* Always here, as on the other pages. Off while the recording plays
-              or before there is one. */}
-          <button
-            data-testid="copy-clear"
-            disabled={!rec || reading || playing !== null}
-            title="Close this QSO and clear every attempt"
-            onClick={clear}
-          >
-            Clear
-          </button>
-        </div>
         <div className="cornergroup">
           <SettingsButton />
         </div>
+
+        <Toolbar
+          actions={
+            <>
+
+              <button
+                className={rec ? undefined : "primary"}
+                data-testid="copy-new"
+                disabled={reading || playing !== null}
+                title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
+                onClick={makeExchange}
+              >
+                Generate QSO
+              </button>
+              <button
+                data-testid="copy-text-open"
+                disabled={reading || playing !== null}
+                title="Paste or type a QSO of your own to copy, sent in CW"
+                onClick={editText}
+              >
+                Script
+              </button>
+              {/* Always here, as on the other pages. Off while the recording plays
+                  or before there is one. */}
+              <button
+                data-testid="copy-clear"
+                disabled={!rec || reading || playing !== null}
+                title="Close this QSO and clear every attempt"
+                onClick={clear}
+              >
+                Clear
+              </button>
+            </>
+          }
+          chips={
+            <>
+              <QuickChip id="make" label="Generate" value={`${kindLabel} ×${runQsos}`} widest={`${longest(KINDS.map((k) => k.label))} ×10`} tab="page">
+                {makeSection}
+              </QuickChip>
+              <QuickChip id="speed" label="Speed" value={speedChoice === "mine" ? fmtSpeed(mine) : "Format"} widest={WIDEST_SPEED} tab="speed">
+                {speedSection}
+              </QuickChip>
+              <QuickChip id="lines" label="Lines" value={LINES_SHOW.find((l) => l.value === linesShow)!.label} widest={longest(LINES_SHOW.map((l) => l.label))} tab="page">
+                <Section name="lines" title="Playback">
+                  <div className="panelgroups">
+                    <ChoiceGroup
+                      id="copy-lines"
+                      label="Each line shows"
+                      help={LINES_SHOW_HELP}
+                      value={linesShow}
+                      options={LINES_SHOW}
+                      onChange={(v) => setLinesShow(v as LinesShow)}
+                    />
+                    <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="band" label="Band" value={bandName} widest="Clean" tab="sound">
+                {soundSection}
+              </QuickChip>
+            </>
+          }
+          more={
+            <>
+              <button type="button" role="menuitem" data-testid="copy-open" disabled={reading} onClick={pickFile}>
+                <IconUpload /> Open a recording or a text file…
+              </button>
+              <MenuHeading>Download</MenuHeading>
+              <DownloadItem
+                label={added ? "Audio, clean" : "Audio"}
+                disabled={!rec}
+                title={added ? "Save the QSO as a WAV file, with nothing added" : "Save the QSO as audio"}
+                onClick={added ? downloadClean : downloadHeard}
+              />
+              {added && (
+                <DownloadItem
+                  label="Audio, as heard"
+                  disabled={!rec}
+                  title="Save the QSO as a WAV file, with the QSB, noise, QRN and QRM you hear"
+                  onClick={downloadHeard}
+                />
+              )}
+              <DownloadItem
+                label="Text"
+                disabled={!rec}
+                title="Save the QSO's lines as a text file, which Script can open"
+                onClick={downloadText}
+              />
+            </>
+          }
+        />
       </header>
 
       <PageSettings
@@ -1627,13 +1742,14 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           {
             id: "page",
             label: "Copy",
+            scope: "Only on the Copy page.",
             content: (
               <>
-          <Section name="lines" title="The recording">
+          <Section name="lines" title="Playback">
             <div className="panelgroups">
               <ChoiceGroup
                 id="copy-lines"
-                label="Its lines show"
+                label="Each line shows"
                 help={LINES_SHOW_HELP}
                 value={linesShow}
                 options={LINES_SHOW}
@@ -1642,68 +1758,26 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
               <Check
                 id="copy-hide-calls"
-                label="Hide each call until I copy it"
+                label="Hide the station's call until I copy it"
                 help={HIDE_CALLS_HELP}
                 checked={hideCalls}
                 onChange={setHideCalls}
               />
               <Check
                 id="copy-show-speed"
-                label="Show its speed on each line"
+                label="Show the station's speed on each line"
                 help={SHOW_SPEED_HELP}
                 checked={showSpeed}
                 onChange={setShowSpeed}
               />
-              <Check
-                id="copy-show-download"
-                label="Show Download, to save it as audio or text"
-                help={SHOW_DOWNLOAD_HELP}
-                checked={showDownload}
-                onChange={setShowDownload}
-              />
             </div>
           </Section>
-              <Section name="make" title="Generated QSOs and your text">
-                <div className="panelgroups">
-                  <ChoiceGroup
-                    id="copy-kind"
-                    label="Kind"
-                    help={KIND_HELP}
-                    value={kind}
-                    options={KINDS}
-                    onChange={(v) => setKind(v as Kind)}
-                  />
-                  <ChoiceGroup
-                    id="copy-run-qsos"
-                    label="QSOs in a run"
-                    help={RUN_QSOS_HELP}
-                    value={String(runQsos)}
-                    options={RUN_QSOS}
-                    onChange={(v) => setRunQsos(Number(v))}
-                  />
-                  <ChoiceGroup
-                    id="copy-qso-length"
-                    label="A standard QSO is"
-                    help={QSO_LENGTH_HELP}
-                    value={qsoLength}
-                    options={QSO_LENGTHS}
-                    onChange={(v) => setQsoLength(v as Length)}
-                  />
-                  <ChoiceGroup
-                    id="copy-gap"
-                    label="Between lines"
-                    help={GAP_HELP}
-                    value={gap}
-                    options={GAPS}
-                    onChange={(v) => setGap(v as Gap)}
-                  />
-                </div>
-              </Section>
+              {makeSection}
               </>
             ),
           },
-          { id: "copy", label: "Your copy", content: (
-              <Section name="copy" title="Your copy">
+          { id: "copy", label: "Typing", scope: "On the Copy page. The QSO page has its own.", content: (
+              <Section name="copy" title="Typing">
                 <div className="panelgroups">
                   <ChoiceGroup
                     id="copy-input"
@@ -1736,9 +1810,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
                       onChange={setSeekSlot}
                     />
                   </Subgroup>
-                  <SettingRow label="When the next line starts">
-                    <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />
-                  </SettingRow>
+                  <Check id="copy-lock" label="Lock my copy when the next line starts" help={LOCK_HELP} checked={lock} onChange={setLock} />
                   <ChoiceGroup
                     id="copy-locked-shows"
                     label="My locked copy shows"
@@ -1768,40 +1840,14 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           {
             id: "sound",
             label: "Sound",
-            content: (
-              <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
-                <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
-                <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
-                <QrnSlider qrn={qrn} onChange={setQrn} />
-                <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
-              </SoundSection>
-            ),
+            scope: "Volume is the same on every page. QSB, Noise, QRN and QRM are the same on the Copy and QSO pages.",
+            content: soundSection,
           },
           {
             id: "speed",
             label: "Speed",
-            content: (
-              <Section name="speed" title="Speed">
-                <div className="panelgroups">
-                  <ChoiceGroup
-                    id="copy-speed"
-                    label="Speed"
-                    help={SPEED_HELP}
-                    value={speedChoice}
-                    options={SPEEDS}
-                    onChange={(v) => setSpeedChoice(v as SpeedChoice)}
-                  />
-                  <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
-                  <Check
-                    id="copy-recording-at-mine"
-                    label="Play an opened recording at my speeds"
-                    help={AT_MINE_HELP}
-                    checked={atMine}
-                    onChange={setAtMine}
-                  />
-                </div>
-              </Section>
-            ),
+            scope: "Only on the Copy page.",
+            content: speedSection,
           },
         ]}
       />
@@ -2000,45 +2046,6 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               <p className="hint qsonote" data-testid="copy-score">
                 {current.right} of {current.total} copied in the lines locked so far.
               </p>
-            )}
-            {showDownload && (
-              <div className="copydownloads" data-testid="copy-downloads">
-                <button
-                  type="button"
-                  data-testid={added ? "copy-download-clean" : "copy-download"}
-                  title={added ? "Save the QSO as a WAV file, with nothing added" : "Save the QSO as audio"}
-                  onClick={added ? downloadClean : downloadHeard}
-                >
-                  <i className="ico">
-                    <IconDownload />
-                  </i>
-                  {added ? "Download clean" : "Download"}
-                </button>
-                {added && (
-                  <button
-                    type="button"
-                    data-testid="copy-download-heard"
-                    title="Save the QSO as a WAV file, with the QSB, noise, QRN and QRM you hear"
-                    onClick={downloadHeard}
-                  >
-                    <i className="ico">
-                      <IconDownload />
-                    </i>
-                    Download as heard
-                  </button>
-                )}
-                <button
-                  type="button"
-                  data-testid="copy-download-text"
-                  title="Save the QSO's lines as a text file, which Script can open"
-                  onClick={downloadText}
-                >
-                  <i className="ico">
-                    <IconDownload />
-                  </i>
-                  Download text
-                </button>
-              </div>
             )}
           </div>
         )}

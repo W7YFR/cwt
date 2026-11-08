@@ -10,7 +10,6 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { IconDownload } from "./Icons";
 import { createPlayer, type PlaySide, type Player } from "@/audio/player";
 import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
@@ -24,19 +23,25 @@ import { ChartView, type ChartHandle } from "./Chart";
 import {
   Controls,
   MicrophoneSection,
+  ModeOptions,
   Section,
   SendSettings,
   SendSound,
   SpeedSliders,
+  ToleranceSlider,
   ViewControls,
   fitSpeed,
 } from "./Controls";
+import { DownloadItem, MenuHeading, OpenFileItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { ACCEPTED } from "@/capture/file";
+import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
+import { fmtGain, fmtSpeed, fmtTolerance } from "./format";
 import { MicChip, PageSettings, SettingsButton } from "./SettingsDrawer";
 import { ZenMode } from "./ZenMode";
 import { pacedEnd, pacedStart, recordLimit } from "./pacing";
-import { modeOf, modePatch } from "./mode";
+import { RECORD_MODES, modeOf, modePatch } from "./mode";
 import { FollowSending } from "./FollowSending";
-import { RecordBar } from "./Record";
+import { ModeSwitch, RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { HomeButton } from "./Wordmark";
@@ -743,6 +748,8 @@ export function ReviewScreen({
     setStatus("");
   }, [review, settings, stem]);
 
+  const modeName = RECORD_MODES.find((m) => m.value === modeOf(settings))!.label;
+
   return (
     <>
       <header>
@@ -750,35 +757,8 @@ export function ReviewScreen({
             recording on the floor. */}
         <HomeButton onHome={onBack} disabled={recording} />
         {onPage && <PageSwitch page="practice" onPage={onPage} disabled={recording} />}
-        <RecordBar
-          rec={rec}
-          appliesToTake={loaded.take.source === MIC_SOURCE}
-          leadLeft={leadLeft}
-          onClear={blank ? undefined : onClear}
-          onFile={onFile}
-          /* A recording carries its own speed, and only the attempt that
-             starts a session gets to set one — so a file can begin a session
-             but never join one. */
-          canOpenFile={blank}
-          mode={modeOf(settings)}
-          onMode={(m) => onChange(modePatch(m))}
-          onNewSession={() => setStarting(true)}
-          onDrill={(d) =>
-            onNewSession({
-              expected: d.text,
-              charWpm: settings.charWpm,
-              farnsworthWpm: Math.min(settings.farnsworthWpm, settings.charWpm),
-              times: settings.times,
-            })
-          }
-          /* Drawn by the bar, on the row it shares with the note about how
-             the file is being read — see `source` there. A filename earns
-             that room; "microphone" does not, and the bar drops it. */
-          source={loaded.take.source}
-        />
-
-        {/* The corner of the header, and last in it: the microphone in use,
-            then Settings, the last stop in the tab order. */}
+        {/* The corner of the header, at the end of its first line: the
+            microphone in use, then Settings. */}
         <div className="cornergroup">
           <MicChip
             devices={rec.devices}
@@ -789,27 +769,111 @@ export function ReviewScreen({
           />
           <SettingsButton />
         </div>
+
+        <Toolbar
+          actions={
+            <>
+              <RecordBar
+                rec={rec}
+                appliesToTake={loaded.take.source === MIC_SOURCE}
+                leadLeft={leadLeft}
+                onClear={blank ? undefined : onClear}
+                onNewSession={() => setStarting(true)}
+                onDrill={(d) =>
+                  onNewSession({
+                    expected: d.text,
+                    charWpm: settings.charWpm,
+                    farnsworthWpm: Math.min(settings.farnsworthWpm, settings.charWpm),
+                    times: settings.times,
+                  })
+                }
+                /* Drawn by the bar, on the row it shares with the note about
+                   how the file is being read. */
+                source={loaded.take.source}
+              />
+              {status && <span className="hint">{status}</span>}
+            </>
+          }
+          chips={
+            <>
+              <QuickChip id="speed" label="Speed" value={fmtSpeed(settings)} widest={WIDEST_SPEED} tab="speed" locked={recording}>
+                <Section name="speed" title="Speed">
+                  <div className="panelgroups">
+                    <SpeedSliders charWpm={settings.charWpm} farnsworthWpm={settings.farnsworthWpm} onChange={onChange} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="mode" label="Mode" value={modeName} widest={longest(RECORD_MODES.map((m) => m.label))} width={460} tab="page" locked={recording}>
+                <Section name="mode" title="Mode">
+                  <div className="panelgroups">
+                    <div className="group">
+                      <span className="caption">Record in</span>
+                      <ModeSwitch mode={modeOf(settings)} onMode={(m) => onChange(modePatch(m))} />
+                    </div>
+                    <ModeOptions mode={modeOf(settings)} settings={settings} onChange={onChange} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="tolerance" label="Tolerance" value={fmtTolerance(settings.tolerance).trim()} widest="60%" tab="page" locked={recording}>
+                <Section name="tolerance" title="Grading">
+                  <div className="panelgroups">
+                    <ToleranceSlider tolerance={settings.tolerance} onChange={(tolerance) => onChange({ tolerance })} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="volume" label="Volume" value={fmtGain(settings.gainDb).trim()} widest="+42 dB" tab="sound">
+                <SendSound gainDb={settings.gainDb} onGainDb={(gainDb) => onChange({ gainDb })} />
+              </QuickChip>
+            </>
+          }
+          more={
+            <>
+              {/* A recording carries its own speed, and only the attempt that
+                  starts a session gets to set one — so a file can begin a
+                  session but never join one. */}
+              <OpenFileItem
+                label="Open a recording…"
+                accept={ACCEPTED}
+                testId="open-file"
+                disabled={!blank || recording}
+                title={blank ? OPEN_FILE_HELP : OPEN_FILE_CLOSED}
+                onFile={onFile}
+              />
+              <MenuHeading>Download</MenuHeading>
+              <DownloadItem label="Your audio" disabled={blank} title="The recording, as made" onClick={() => void downloadYou()} />
+              <DownloadItem
+                label="Target audio"
+                title="Perfect keying of the intended message, rendered at the current speed"
+                onClick={() => void downloadTarget()}
+              />
+              <DownloadItem label="Chart PNG" title="The whole analysis, not just the visible part" onClick={downloadPng} />
+              <DownloadItem
+                label="JSON report"
+                disabled={blank}
+                title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
+                onClick={downloadJson}
+              />
+            </>
+          }
+        />
       </header>
 
       <PageSettings
         locked={recording}
         tabs={[
-          { id: "page", label: "Send", content: <SendSettings settings={settings} onChange={onChange} /> },
+          { id: "page", label: "Send", scope: "Only on the Send page.", content: <SendSettings settings={settings} onChange={onChange} /> },
           {
             id: "sound",
             label: "Sound",
+            scope: "Volume is the same on every page.",
             content: (
-              <SendSound
-                gainDb={settings.gainDb}
-                onGainDb={(gainDb) => onChange({ gainDb })}
-                loop={loop}
-                onLoop={() => setLoop((on) => !on)}
-              />
+              <SendSound gainDb={settings.gainDb} onGainDb={(gainDb) => onChange({ gainDb })} />
             ),
           },
           {
             id: "speed",
             label: "Speed",
+            scope: "The same on the Send and QSO pages.",
             content: (
               <Section name="speed" title="Speed">
                 <div className="panelgroups">
@@ -878,40 +942,6 @@ export function ReviewScreen({
           read the chart. Asked for, though: it is an occasional act, and four
           buttons across the page is a standing invitation to something you do
           rarely. */}
-      {settings.showDownloads && (
-        <div className="downloads">
-          {/* The two that describe a recording are only offered when there is
-              one. The target's audio and the chart are both renderable from
-              the message and the speeds alone. */}
-          <button
-            onClick={() => void downloadYou()}
-            disabled={blank}
-            title="The recording, as made"
-          >
-            <IconDownload /> Your audio
-          </button>
-          <button
-            onClick={() => void downloadTarget()}
-            title="Perfect keying of the intended message, rendered at the current speed"
-          >
-            <IconDownload /> Target audio
-          </button>
-          <button
-            onClick={downloadPng}
-            title="The whole analysis, not just the visible part"
-          >
-            <IconDownload /> Chart PNG
-          </button>
-          <button
-            onClick={downloadJson}
-            disabled={blank}
-            title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
-          >
-            <IconDownload /> JSON report
-          </button>
-          <span className="hint">{status}</span>
-        </div>
-      )}
 
       {starting && (
         <NewSession
@@ -995,6 +1025,8 @@ export function ReviewScreen({
           settings={settings}
           runs={stack.length}
           onChange={onChange}
+          loop={loop}
+          onLoop={() => setLoop((on) => !on)}
           onFit={() => {
             const ppu = handle.chart?.fit();
             if (ppu !== undefined) onChange({ ppu });

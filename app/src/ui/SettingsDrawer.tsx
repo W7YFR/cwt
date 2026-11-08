@@ -1,13 +1,13 @@
 /* Settings: one drawer, behind one button, on every screen.
  *
  * The drawer has the same tabs in the same order everywhere. First come the
- * page's own tabs (the page, Your copy, Sound, Speed), then the tabs that
+ * page's own tabs (the page, Typing, Sound, Speed), then the tabs that
  * belong to the whole app (Microphone, You, Drills). A page fills its tabs
  * from its own state through a portal, so nothing a page sets moves out of
  * the page. The app fills the rest.
  */
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconCog } from "./Icons";
 import { SettingsForm } from "./Controls";
@@ -18,15 +18,19 @@ import type { Profile } from "@/io/profiles";
 export type SettingsTab = "page" | "copy" | "sound" | "speed" | "microphone" | "you" | "drills";
 const ORDER: readonly SettingsTab[] = ["page", "copy", "sound", "speed", "microphone", "you", "drills"];
 /** The app's own tabs, on every screen. */
-const APP_TABS: readonly { id: SettingsTab; label: string }[] = [
-  { id: "microphone", label: "Microphone" },
-  { id: "you", label: "You" },
-  { id: "drills", label: "Drills" },
+const EVERY_PAGE = "The same on every page.";
+const APP_TABS: readonly PageTab[] = [
+  { id: "microphone", label: "Microphone", scope: EVERY_PAGE },
+  { id: "you", label: "You", scope: EVERY_PAGE },
+  { id: "drills", label: "Drills", scope: EVERY_PAGE },
 ];
+const isApp = (id: SettingsTab) => APP_TABS.some((a) => a.id === id);
 
 interface PageTab {
   id: SettingsTab;
   label: string;
+  /** Where its settings apply, said at the top of the tab. */
+  scope?: string;
 }
 
 interface Host {
@@ -92,7 +96,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
 
 /** The tabs on show: the page's, then the app's, in the fixed order. */
 function tabsOf(pageTabs: readonly PageTab[]): PageTab[] {
-  const all = [...pageTabs, ...APP_TABS.filter((a) => !pageTabs.some((p) => p.id === a.id))];
+  const all = [
+    ...pageTabs.filter((p) => !isApp(p.id)),
+    ...APP_TABS,
+  ];
   return ORDER.flatMap((id) => all.filter((t) => t.id === id));
 }
 
@@ -176,6 +183,7 @@ export function SettingsDrawer({
   const host = useSettings();
   const tabs = tabsOf(host.pageTabs);
   const tab = tabOn(host);
+  const scope = tabs.find((t) => t.id === tab)?.scope;
   const pageOwns = host.pageTabs.some((t) => t.id === tab);
   const drawer = useRef<HTMLDivElement | null>(null);
   const opener = useRef<Element | null>(null);
@@ -232,9 +240,10 @@ export function SettingsDrawer({
           </button>
         </div>
         <div className="drawertabs" role="tablist" aria-label="Settings section" data-testid="settings-tab">
-          {tabs.map((t) => (
+          {tabs.map((t, i) => (
+            <Fragment key={t.id}>
+            {i > 0 && isApp(t.id) && !isApp(tabs[i - 1]!.id) && <span className="tabsep" aria-hidden="true" />}
             <button
-              key={t.id}
               role="tab"
               data-tab={t.id}
               aria-selected={t.id === tab}
@@ -242,9 +251,11 @@ export function SettingsDrawer({
             >
               {t.label}
             </button>
+            </Fragment>
           ))}
         </div>
         <div className="drawerbody" data-tab={tab}>
+          {scope && <p className="drawerscope">{scope}</p>}
           {pageOwns && host.locked && <p className="drawerlock">Can't change these while recording.</p>}
           <div className="drawerslot" ref={host.setSlot} inert={pageOwns && host.locked} data-locked={pageOwns && host.locked} />
           {appPart}
@@ -258,6 +269,8 @@ export function SettingsDrawer({
 export interface PageSettingsTab {
   id: SettingsTab;
   label: string;
+  /** Where its settings apply, said at the top of the tab. */
+  scope?: string;
   content: React.ReactNode;
 }
 
@@ -273,9 +286,9 @@ export function PageSettings({
 }): React.ReactElement | null {
   const host = useSettings();
   const { setPageTabs, setLocked } = host;
-  const key = tabs.map((t) => `${t.id}:${t.label}`).join("|");
+  const key = tabs.map((t) => `${t.id}:${t.label}:${t.scope ?? ""}`).join("|");
   useLayoutEffect(() => {
-    setPageTabs(tabs.map(({ id, label }) => ({ id, label })));
+    setPageTabs(tabs.map(({ id, label, scope }) => ({ id, label, ...(scope ? { scope } : {}) })));
     return () => setPageTabs(null);
     // The labels are what matter, and `key` holds them.
     // eslint-disable-next-line react-hooks/exhaustive-deps

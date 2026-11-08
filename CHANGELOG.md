@@ -9,10 +9,17 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- **Settings** (⚙) opens one panel that slides in over the right side of the page, with the same tabs on every page: the page's own settings, **Your copy**, **Sound**, **Speed**, **Microphone**, **You** and **Drills**. It replaces the settings band under the header and the Configuration screen.
+- **Settings** (⚙) opens one panel that slides in over the right side of the page, with the same tabs on every page: the page's own settings, **Typing**, **Sound**, **Speed**, **Microphone**, **You** and **Drills**. It replaces the settings band under the header and the Configuration screen. A line separates the page's tabs from the ones for every page, and each tab says where its settings apply.
 - The header on Send and QSO shows the microphone in use and whether it is calibrated. Click it to open **Microphone** in Settings, where you choose, make and delete calibrations.
-- In Settings, every control starts in one column, with its name to the left. A line separates groups of settings, such as the options of Plain, Zen and Paced, and not the settings inside one.
-- **Stop after each line** on the Copy page is beside **Its lines show**.
+- In Settings, every control starts in one column, with its name to the left. A line separates groups of settings, such as the options of Plain, Zen and Paced. A guide line under a group's name runs beside its settings.
+- Settings name the station where they meant it, such as **The station's lines show** and **How much the station sends**, and Copy and QSO use the same words for the same setting. **Your copy** is now **Typing**, and on the Copy page **The recording** is now **Playback**.
+- **Stop after each line** on the Copy page is under **Playback**.
+- Every page's header has a second line with the page's actions, then its quick settings, then ⋯. The main action comes first: **Record**, **Generate QSO** or **Start**. **Start**, **Pause** and **Stop** on the QSO page moved up into it.
+- Quick settings show their values, such as **Speed 25 wpm** and **Mode Plain**. Click one to change it there; **More in Settings** opens its tab. **Plain**, **Paced** and **Zen** moved into **Mode**.
+- ⋯ holds **Open** and **Download** on the Send and Copy pages. The download buttons, and the settings that showed them, are gone.
+- **Repeat playback when it ends** is now **Loop**, beside **Fit** over the Send chart.
+- **Restart** on the QSO page is now **New QSO**, and its **Clear** is now **Clear log**.
+- On a phone, the page's actions sit in a bar at the foot of the screen.
 
 ### Fixed
 

@@ -51,6 +51,7 @@ import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
+import { QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
@@ -66,7 +67,6 @@ import {
   ChoiceGroup,
   MicrophoneSection,
   Section,
-  SettingRow,
   SoundSection,
   BreakInSlider,
   DEFAULT_BREAK_IN_MS,
@@ -204,9 +204,9 @@ interface Option<T> {
 type LengthChoice = Length | "mixed";
 
 const LENGTHS: ReadonlyArray<Option<LengthChoice>> = [
-  { value: "full", label: "Full", note: "Its report, name and QTH in one line, each sent twice." },
-  { value: "short", label: "Short", note: "Its report, name and QTH in one line, each sent once." },
-  { value: "pieces", label: "Piece by piece", note: "Its report, name and QTH one at a time, a line each." },
+  { value: "full", label: "Full", note: "The station's report, name and QTH in one line, each sent twice." },
+  { value: "short", label: "Short", note: "The station's report, name and QTH in one line, each sent once." },
+  { value: "pieces", label: "Piece by piece", note: "The station's report, name and QTH one at a time, a line each." },
   { value: "mixed", label: "Mixed", note: "Any of these, changing from one station to the next." },
 ];
 const LENGTH_HELP =
@@ -306,7 +306,7 @@ const HINTS_HELP =
   "A suggested reply under the log: one way to answer the station, with your details from User. " +
   "Once copied waits until your copy of the station's line is all right. " +
   "When its lines are not for copying, it shows once the line has played. " +
-  "The station's call and name show as (THEIR CALL) and (THEIR NAME) until you copy them, unless its lines show.";
+  "The station's call and name show as (THEIR CALL) and (THEIR NAME) until you copy them, unless the station's lines show.";
 
 interface Line {
   readonly who: string;
@@ -1909,39 +1909,171 @@ export function QsoScreen({
         ? "waiting"
         : "receiving";
 
+  /* What the chips and Settings share: one copy of each, drawn wherever it
+     is open. */
+  const lengthChoice = (
+    <ChoiceGroup
+      id="qso-length"
+      label="How much the station sends"
+      help={LENGTH_HELP}
+      value={length}
+      options={LENGTHS}
+      onChange={(v) => setLength(v as LengthChoice)}
+    />
+  );
+  const theirTextChoice = (
+    <ChoiceGroup
+      id="qso-their-text"
+      label="The station's lines show"
+      help={THEIR_TEXT_HELP}
+      value={theirText}
+      options={THEIR_TEXTS}
+      onChange={(v) => setTheirText(v as TheirText)}
+    />
+  );
+  const hintsChoice = (
+    <ChoiceGroup
+      id="qso-hints"
+      label="Suggest my reply"
+      help={HINTS_HELP}
+      value={hints}
+      options={HINTS}
+      onChange={(v) => setHints(v as Hints)}
+    />
+  );
+  const speedSection = (
+    <Section name="speed" title="Speed">
+      <div className="panelgroups">
+        <SpeedSliders
+          charWpm={speed.charWpm}
+          farnsworthWpm={speed.farnsworthWpm}
+          onChange={(patch) => setSpeed({ ...speed, ...patch })}
+          locked={recorder !== null}
+        />
+      </div>
+    </Section>
+  );
+  const soundSection = (
+    <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
+    <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
+    <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
+    <QrnSlider qrn={qrn} onChange={setQrn} />
+    <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+    <BreakInSlider
+      ms={breakInMs}
+      barred={!hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
+      onChange={setBreakInMs}
+    />
+    <Check
+      id="qso-band-noise"
+      label="Play the band between the station's lines"
+      help={BAND_NOISE_HELP}
+      barred={hasBand ? null : NEEDS_BAND}
+      checked={bandNoise}
+      onChange={setBandNoise}
+    />
+    </SoundSection>
+  );
+
   return (
     <>
       <header>
         <HomeButton onHome={onHome} disabled={recorder !== null} />
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
-        {/* One row, as on the Send page: on a narrow screen it takes its own
-            line under the brand. */}
-        <div className="recordbar">
-          {/* A QSO of your own, as on the Copy page. Off while a
-              session runs. */}
-          <button
-            data-testid="qso-script"
-            disabled={recorder !== null || starting}
-            title="Paste or type a whole QSO, both sides, and work it line by line"
-            onClick={editScript}
-          >
-            Script
-          </button>
-          {/* Always here, as on the other pages. Off while a session runs or
-              with nothing in the log. */}
-          <button
-            data-testid="qso-clear"
-            disabled={recorder !== null || starting || lines.length === 0}
-            title="Clear the log of every QSO"
-            onClick={clear}
-          >
-            Clear
-          </button>
-        </div>
         <div className="cornergroup">
           <MicChip devices={rec.devices} deviceId={deviceId} profiles={profiles} profileId={profileId} />
           <SettingsButton />
         </div>
+
+        <Toolbar
+          actions={
+            <>
+              {rec.needAccess ? (
+                <button className="primary" disabled={rec.blocked} onClick={() => void rec.grantAccess()}>
+                  Allow the microphone
+                </button>
+              ) : !recorder ? (
+                <>
+                  <button
+                    className="primary"
+                    data-testid={open ? "qso-continue" : "qso-start"}
+                    disabled={rec.probing || rec.blocked || rec.busy || starting}
+                    onClick={open ? resume : start}
+                  >
+                    <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
+                  </button>
+                  {/* Restart clears the log and starts a new QSO with a new
+                      station, as Start does when there is nothing to go on with. */}
+                  {open && !starting && (
+                    <button
+                      data-testid="qso-restart"
+                      disabled={rec.probing || rec.blocked || rec.busy}
+                      onClick={start}
+                    >
+                      New QSO
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button data-testid="qso-pause" onClick={pause}>
+                    Pause
+                  </button>
+                  <button data-testid="qso-stop" onClick={() => void rec.discard()}>
+                    Stop
+                  </button>
+                  <LevelMeter level={rec.level} />
+                </>
+              )}
+
+              {/* A QSO of your own, as on the Copy page. Off while a
+                  session runs. */}
+              <button
+                data-testid="qso-script"
+                disabled={recorder !== null || starting}
+                title="Paste or type a whole QSO, both sides, and work it line by line"
+                onClick={editScript}
+              >
+                Script
+              </button>
+              {/* Always here, as on the other pages. Off while a session runs or
+                  with nothing in the log. */}
+              <button
+                data-testid="qso-clear"
+                disabled={recorder !== null || starting || lines.length === 0}
+                title="Clear the log of every QSO"
+                onClick={clear}
+              >
+                Clear log
+              </button>
+            </>
+          }
+          chips={
+            <>
+              <QuickChip id="speed" label="Speed" value={fmtSpeed(speed)} widest={WIDEST_SPEED} tab="speed" locked={recorder !== null}>
+                {speedSection}
+              </QuickChip>
+              <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} widest={longest(LENGTHS.map((l) => l.label))} tab="page">
+                <Section name="station" title="The other station">
+                  <div className="panelgroups">{lengthChoice}</div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="lines" label="Lines" value={THEIR_TEXTS.find((t) => t.value === theirText)!.label} widest={longest(THEIR_TEXTS.map((t) => t.label))} tab="page">
+                <Section name="lines" title="The other station">
+                  <div className="panelgroups">{theirTextChoice}</div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="hints" label="Reply hint" value={HINTS.find((h) => h.value === hints)!.label} widest={longest(HINTS.map((h) => h.label))} tab="page">
+                <Section name="you" title="You">
+                  <div className="panelgroups">{hintsChoice}</div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="band" label="Band" value={anyAdded({ qsbDb, noiseDb, qrn, qrmDb }) ? "On" : "Clean"} widest="Clean" tab="sound">
+                {soundSection}
+              </QuickChip>
+            </>
+          }
+        />
       </header>
 
       {/* The page's own settings, then the ones Copy shares, then sound and
@@ -1952,36 +2084,23 @@ export function QsoScreen({
           {
             id: "page",
             label: "QSO",
+            scope: "Only on the QSO page.",
             content: (
               <>
               <Section name="station" title="The other station">
                 <div className="panelgroups">
-                  <ChoiceGroup
-                    id="qso-length"
-                    label="How much it sends"
-                    help={LENGTH_HELP}
-                    value={length}
-                    options={LENGTHS}
-                    onChange={(v) => setLength(v as LengthChoice)}
-                  />
-                  <ChoiceGroup
-                    id="qso-their-text"
-                    label="Its lines show"
-                    help={THEIR_TEXT_HELP}
-                    value={theirText}
-                    options={THEIR_TEXTS}
-                    onChange={(v) => setTheirText(v as TheirText)}
-                  />
+                  {lengthChoice}
+                  {theirTextChoice}
                   <Check
                     id="qso-blur-call"
-                    label="Hide its call while I copy"
+                    label="Hide the station's call until I copy it"
                     help={BLUR_CALL_HELP}
                     checked={blurCall}
                     onChange={setBlurCall}
                   />
                   <Check
                     id="qso-show-their-speed"
-                    label="Show its speed on each line"
+                    label="Show the station's speed on each line"
                     help={SHOW_THEIR_SPEED_HELP}
                     checked={showTheirSpeed}
                     onChange={setShowTheirSpeed}
@@ -2006,14 +2125,7 @@ export function QsoScreen({
                       options={YOUR_TEXTS}
                       onChange={(v) => setYourText(v as YourText)}
                     />
-                    <ChoiceGroup
-                      id="qso-hints"
-                      label="Suggest my reply"
-                      help={HINTS_HELP}
-                      value={hints}
-                      options={HINTS}
-                      onChange={(v) => setHints(v as Hints)}
-                    />
+                    {hintsChoice}
                     <Check
                       id="qso-show-speed"
                       label="Show my speed on each line"
@@ -2047,15 +2159,13 @@ export function QsoScreen({
                       checked={scriptReportOn}
                       onChange={setScriptReportOn}
                     />
-                    <SettingRow label="After a pause">
-                      <Check
-                        id="qso-replay"
-                        label="Continue plays the station's last line again"
-                        help={REPLAY_HELP}
-                        checked={replayOnContinue}
-                        onChange={setReplayOnContinue}
-                      />
-                    </SettingRow>
+                    <Check
+                      id="qso-replay"
+                      label="Continue plays the station's last line again"
+                      help={REPLAY_HELP}
+                      checked={replayOnContinue}
+                      onChange={setReplayOnContinue}
+                    />
                   </div>
                 </Section>
               </>
@@ -2063,13 +2173,14 @@ export function QsoScreen({
           },
           {
             id: "copy",
-            label: "Your copy",
+            label: "Typing",
+            scope: "On the QSO page. The Copy page has its own.",
             content: (
-              <Section name="copy" title="Your copy">
+              <Section name="copy" title="Typing">
                 <div className="panelgroups">
                   <ChoiceGroup
                     id="qso-copy-input"
-                    label="Enter copy as"
+                    label="Copy in"
                     help={COPY_INPUT_HELP}
                     value={copyInput}
                     options={COPY_INPUTS}
@@ -2082,15 +2193,13 @@ export function QsoScreen({
                     checked={gradeTyping}
                     onChange={setGradeTyping}
                   />
-                  <SettingRow label="When I start sending">
-                    <Check
-                      id="qso-lock-copy"
-                      label="Lock my copy"
-                      help={LOCK_HELP}
-                      checked={lockCopy}
-                      onChange={setLockCopy}
-                    />
-                  </SettingRow>
+                  <Check
+                    id="qso-lock-copy"
+                    label="Lock my copy when I start sending"
+                    help={LOCK_HELP}
+                    checked={lockCopy}
+                    onChange={setLockCopy}
+                  />
                   <ChoiceGroup
                     id="qso-locked-shows"
                     label="My locked copy shows"
@@ -2113,42 +2222,10 @@ export function QsoScreen({
           {
             id: "sound",
             label: "Sound",
-            content: (
-              <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
-              <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
-              <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
-              <QrnSlider qrn={qrn} onChange={setQrn} />
-              <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
-              <BreakInSlider
-                ms={breakInMs}
-                barred={!hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
-                onChange={setBreakInMs}
-              />
-              <SettingRow label="Between its lines">
-                <Check
-                  id="qso-band-noise"
-                  label="Play the band"
-                  help={BAND_NOISE_HELP}
-                  barred={hasBand ? null : NEEDS_BAND}
-                  checked={bandNoise}
-                  onChange={setBandNoise}
-                />
-              </SettingRow>
-              </SoundSection>
-            ),
+            scope: "Volume is the same on every page. QSB, Noise, QRN and QRM are the same on the Copy and QSO pages.",
+            content: soundSection,
           },
-          { id: "speed", label: "Speed", content: (
-          <Section name="speed" title="Speed">
-            <div className="panelgroups">
-              <SpeedSliders
-                charWpm={speed.charWpm}
-                farnsworthWpm={speed.farnsworthWpm}
-                onChange={(patch) => setSpeed({ ...speed, ...patch })}
-                locked={recorder !== null}
-              />
-            </div>
-          </Section>
-          ) },
+          { id: "speed", label: "Speed", scope: "The same on the Send and QSO pages.", content: speedSection },
           {
             id: "microphone",
             label: "Microphone",
@@ -2200,43 +2277,6 @@ export function QsoScreen({
           </div>
 
           <div className="qsocontrols">
-            {rec.needAccess ? (
-              <button className="primary" disabled={rec.blocked} onClick={() => void rec.grantAccess()}>
-                Allow the microphone
-              </button>
-            ) : !recorder ? (
-              <>
-                <button
-                  className="primary"
-                  data-testid={open ? "qso-continue" : "qso-start"}
-                  disabled={rec.probing || rec.blocked || rec.busy || starting}
-                  onClick={open ? resume : start}
-                >
-                  <RecDot /> {starting ? "Starting…" : open ? "Continue" : "Start"}
-                </button>
-                {/* Restart clears the log and starts a new QSO with a new
-                    station, as Start does when there is nothing to go on with. */}
-                {open && !starting && (
-                  <button
-                    data-testid="qso-restart"
-                    disabled={rec.probing || rec.blocked || rec.busy}
-                    onClick={start}
-                  >
-                    Restart
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <button data-testid="qso-pause" onClick={pause}>
-                  Pause
-                </button>
-                <button data-testid="qso-stop" onClick={() => void rec.discard()}>
-                  Stop
-                </button>
-                <LevelMeter level={rec.level} />
-              </>
-            )}
             <DebugDownload
               current={() =>
                 recorder
