@@ -914,7 +914,8 @@ canvas.resizing { cursor: ew-resize; }
 /* A key, drawn as one. The mono face and the border are what separate "press
    R" from the letter R in a sentence, which matters most for the single
    letter — "R record" in running text reads as a typo. */
-.legend kbd {
+.legend kbd,
+.keylist kbd {
   font-family: var(--mono);
   font-size: 11px;
   line-height: 1;
@@ -3172,3 +3173,18 @@ header .modeswitch button { white-space: nowrap; }
 @media (max-width: 560px) { .toolsep { display: none; } }
 /* A group whose every setting does nothing now dims its name too. */
 .viewpanel.formpanel .subgroup:not(:has(input:not(:disabled), button:not(:disabled):not(.helpdot))) > .subhead { opacity: .45; }
+
+/* Help: the page's guide, then its keys in a list. */
+.helpguide { font-size: 14px; line-height: 1.6; color: var(--ink); }
+.helpguide p, .helpguide ul { margin: 0 0 10px; }
+.keylist { display: flex; flex-direction: column; gap: 18px; }
+.keylist h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.keylist dl { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.keylist .keyrow { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; align-items: baseline; }
+.keylist dt { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.keylist .combo { display: inline-flex; gap: 3px; align-items: baseline; }
+.keylist .or { color: var(--ink-faint); font-size: 12px; margin-right: 3px; }
+.keylist dd { margin: 0; font-size: 13px; color: var(--ink-dim); }
+@media (max-width: 560px) {
+  .keylist .keyrow { grid-template-columns: 120px minmax(0, 1fr); }
+}

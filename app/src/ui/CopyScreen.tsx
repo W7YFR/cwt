@@ -80,6 +80,7 @@ import {
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
 import { IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
 import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
+import { PageHelp, type KeyGroup } from "./Help";
 import { NEEDS_LINES_COPY, NEEDS_SLOTS } from "./copy";
 import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { CopyText } from "./CopyText";
@@ -392,6 +393,53 @@ function attrsOf(over: Over): SentAttrs {
 function isBox(el: EventTarget | null): el is HTMLInputElement {
   return el instanceof HTMLInputElement && !!el.closest(".copylog");
 }
+
+/** What the Copy page is for, in Help. */
+const COPY_GUIDE = (
+  <>
+    <p>Copy a QSO in CW as it plays, and see what you got right.</p>
+    <ul>
+      <li>Generate a QSO, write your own with Script, or open a recording or a text file from ⋯.</li>
+      <li>A new line appears each time a new station starts sending. Type what you hear in it.</li>
+      <li>Your copy of a line locks when the next line starts, or 5 seconds after the end.</li>
+      <li>Copy again plays it all from the start. Your earlier attempts stay on the page.</li>
+      <li>Click a word in a finished line, or select part of it, to hear it again.</li>
+    </ul>
+  </>
+);
+
+/** Every key on the Copy page, in Help. */
+const COPY_KEYS: readonly KeyGroup[] = [
+  {
+    heading: "On the page",
+    rows: [
+      { keys: [["Space"], ["Enter"]], does: "Play or pause" },
+      { keys: [["Esc"]], does: "Pause" },
+      { keys: [["←"], ["→"]], does: "Back or on a word" },
+      { keys: [["Shift", "←"], ["Shift", "→"]], does: "Back or on 5 seconds" },
+      { keys: [[ALT, "R"]], does: "Play the line again" },
+      { keys: [[ALT, "Enter"]], does: "Play from the word you are copying" },
+    ],
+  },
+  {
+    heading: "In a box or a slot",
+    rows: [
+      { keys: [["Enter"]], does: "Play or pause; on a line copied in full, lock it and go on" },
+      { keys: [[MOD, "Enter"]], does: "Lock the line" },
+      { keys: [["Esc"]], does: "Leave the box" },
+      { keys: [[ALT]], does: "Hold it for the page's keys" },
+    ],
+  },
+  {
+    heading: "Slots",
+    rows: [
+      { keys: [["←"], ["→"]], does: "Move a slot" },
+      { keys: [["Space"]], does: "Go to the next word" },
+      { keys: [["Backspace"]], does: "Back one, on an empty slot" },
+      { keys: [[ALT, "L"], [ALT, "W"]], does: "Play the selected letter or word" },
+    ],
+  },
+];
 
 export interface CopyScreenProps {
   onError(message: string): void;
@@ -1648,6 +1696,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
         <HomeButton onHome={onHome} />
         <PageSwitch page="copy" onPage={onPage} />
         <div className="cornergroup">
+          <PageHelp title="Copy" guide={COPY_GUIDE} keys={COPY_KEYS} />
           <SettingsButton />
         </div>
 
@@ -2039,36 +2088,6 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           }}
         />
 
-        {rec && (
-          <div className="copykeys">
-            <p className="legend keys" data-testid="copy-hotkeys">
-              On the page: <kbd>Space</kbd> or <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause
-              &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>R</kbd> play the line again &nbsp;·&nbsp; <kbd>{ALT}</kbd>{" "}
-              <kbd>Enter</kbd> play from your word
-              &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5s
-              {input === "slots" && (
-                <>
-                  {" "}
-                  &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
-                </>
-              )}
-            </p>
-            {/* Only the keys the settings use: none in a box with no boxes. */}
-            {linesShow === "copy" && (
-              <p className="legend keys" data-testid="copy-box-keys">
-                In a box: <kbd>Enter</kbd> play or pause, or lock a line copied in full and go on &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd>{" "}
-                {waits ? "lock the line and go on" : "lock the line"}
-                {input === "slots" && (
-                  <>
-                    {" "}
-                    &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
-                  </>
-                )}
-                &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{ALT}</kbd> for the other keys
-              </p>
-            )}
-          </div>
-        )}
       </main>
       {textDraft && (
         <CopyText

@@ -49,7 +49,7 @@ import { charsOf, copyText, overOfText, plain, type CopyInput, type LineCopy } f
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconDownload, IconEdit, IconHelp, IconPlay, IconStop } from "./Icons";
+import { IconDownload, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
@@ -59,7 +59,8 @@ import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY } f
 import { Graded, RightOnly } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
-import { QsoExamples, QsoGuide, QsoHelp } from "./QsoHelp";
+import { QsoGuide } from "./QsoHelp";
+import { PageHelp, type KeyGroup } from "./Help";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
 import {
@@ -142,22 +143,6 @@ const NEXT_CALL_SEC = [2, 4] as const;
  *  following new lines from there. */
 const END_SLACK_PX = 48;
 
-/** Wide enough for the examples beside the log. The guide's two columns
- *  start at the same width, in base.css. */
-const WIDE_QUERY = "(min-width: 1000px)";
-
-/** Whether the window is wide enough for the examples beside the log. */
-function useWide(): boolean {
-  const [wide, setWide] = useState(() => window.matchMedia?.(WIDE_QUERY).matches ?? false);
-  useEffect(() => {
-    const mq = window.matchMedia?.(WIDE_QUERY);
-    if (!mq) return;
-    const on = () => setWide(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return wide;
-}
 
 /** The lines of the log in their QSOs, in order: each QSO's number and
  *  where its lines are. */
@@ -465,6 +450,41 @@ function useOnOff(
   return [value, set];
 }
 
+/** Every key on the QSO page, in Help. */
+const QSO_KEYS: readonly KeyGroup[] = [
+  {
+    heading: "The session",
+    rows: [
+      { keys: [["R"]], does: "Start, or Continue after a pause" },
+      { keys: [["Enter"]], does: "Pause, or Continue after a pause" },
+      { keys: [["Esc"]], does: "Stop" },
+    ],
+  },
+  {
+    heading: "On the air",
+    rows: [
+      { keys: [["R"]], does: "Start your turn over; in a script, before you key, start the script over" },
+      { keys: [[ALT, "R"]], does: "Play the station's last line again, with Play buttons on Always" },
+    ],
+  },
+  {
+    heading: "In a copy box or a slot",
+    rows: [
+      { keys: [[MOD, "Enter"]], does: "Lock your copy" },
+      { keys: [["Enter"]], does: "Lock it once every character is copied" },
+      { keys: [["Esc"]], does: "Leave the box" },
+    ],
+  },
+  {
+    heading: "Slots",
+    rows: [
+      { keys: [["←"], ["→"]], does: "Move a slot" },
+      { keys: [["Space"]], does: "Go to the next word" },
+      { keys: [["Backspace"]], does: "Back one, on an empty slot" },
+    ],
+  },
+];
+
 export interface QsoScreenProps {
   deviceId: string | undefined;
   onDeviceChange(id: string | undefined): void;
@@ -580,11 +600,6 @@ export function QsoScreen({
   };
   const [showSpeed, setShowSpeed] = useOnOff("qsoShowSpeed", false);
   const [showTheirSpeed, setShowTheirSpeed] = useOnOff("qsoShowTheirSpeed", false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  /** The examples beside the log, chosen with the ?. Only where there is
-   *  room: on a narrow screen the ? opens the guide over the page. */
-  const [sideGuide, setSideGuide] = useOnOff("qsoSideGuide", false);
-  const wide = useWide();
   /** The log's scroll box. It keeps the newest line in view, unless you
    *  have scrolled up to read. */
   const logBox = useRef<HTMLDivElement>(null);
@@ -1883,9 +1898,6 @@ export function QsoScreen({
           ? "Type what you hear."
           : "Listen to the station.";
 
-  /** The format of the run under way, for the guide to show. */
-  const runFormat = isRun(qso.current) ? qso.current.format : undefined;
-  const side = sideGuide && wide && !guideShown;
 
   /* A run under way: its format, the QSOs made, and in an MST the serial
      number you send next. */
@@ -1987,6 +1999,19 @@ export function QsoScreen({
         <PageSwitch page="qso" onPage={onPage} disabled={recorder !== null} />
         <div className="cornergroup">
           <MicChip devices={rec.devices} deviceId={deviceId} profiles={profiles} profileId={profileId} />
+          <PageHelp
+            title="QSO"
+            guide={
+              <QsoGuide
+                /* A run under way shows its own kind first. */
+                initial={isRun(qso.current) ? qso.current.format : undefined}
+                onSettings={showSettings}
+                settingsOpen={settingsOpen}
+                onShown={setGuideKind}
+              />
+            }
+            keys={QSO_KEYS}
+          />
           <SettingsButton />
         </div>
 
@@ -2257,16 +2282,6 @@ export function QsoScreen({
         ]}
       />
 
-      {helpOpen && (
-        <QsoHelp
-          initial={runFormat}
-          onShown={setGuideKind}
-          onClose={() => setHelpOpen(false)}
-          onSettings={showSettings}
-          settingsOpen={settingsOpen}
-        />
-      )}
-
       <main className="panel qso" data-testid="qso">
         <div className="qsotop">
           <div className="copyhead" role="status" aria-live="polite">
@@ -2303,21 +2318,6 @@ export function QsoScreen({
                 The station sends at {fmtSpeed(theirSpeed)}.
               </span>
             )}
-            {/* The guide, when it is not on the page: last in the row, at its
-                right end. */}
-            {!guideShown && (
-              <button
-                type="button"
-                className="iconbtn helpbtn qsohelpbtn"
-                data-testid="qso-help-open"
-                aria-label="Anatomy of a QSO"
-                title="Anatomy of a QSO"
-                aria-pressed={wide ? side : undefined}
-                onClick={() => (wide ? setSideGuide(!sideGuide) : setHelpOpen(true))}
-              >
-                <IconHelp />
-              </button>
-            )}
           </div>
         </div>
 
@@ -2327,7 +2327,7 @@ export function QsoScreen({
           </div>
         )}
 
-        <div className={side ? "qsobody side" : "qsobody"}>
+        <div className="qsobody">
           <div
             className="qsomain"
             ref={logBox}
@@ -2424,31 +2424,7 @@ export function QsoScreen({
               </p>
             )}
 
-            {open && (
-              <p className="legend keys" data-testid="qso-hotkeys">
-                <kbd>R</kbd> or <kbd>Enter</kbd> continue
-              </p>
-            )}
-            {recorder && (
-              <p className="legend keys" data-testid="qso-hotkeys">
-                <kbd>R</kbd> {isScript(qso.current) ? "restart your turn, or the script before you key" : "restart your turn"}{" "}
-                &nbsp;·&nbsp; <kbd>Enter</kbd> pause &nbsp;·&nbsp;{" "}
-                <kbd>Esc</kbd> stop
-                {playback === "always" && (
-                  <>
-                    {" "}
-                    &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>R</kbd> play its last line again
-                  </>
-                )}
-              </p>
-            )}
           </div>
-          {side && (
-            <aside className="qsoside prose" data-testid="qso-side">
-              {/* A new run's format shows when the run starts. */}
-              <QsoExamples key={runFormat ?? "cq"} initial={runFormat} onShown={setGuideKind} />
-            </aside>
-          )}
         </div>
       </main>
       {scriptDraft && (

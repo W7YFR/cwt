@@ -16,7 +16,7 @@
  * does, and closes on Escape, on Close, or on a click outside it.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { EXAMPLE_STATION, GUIDE_IDS, example, exampleYou, type GuideId } from "@/qso/examples";
 import { FORMATS } from "@/qso/formats";
 import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
@@ -184,72 +184,6 @@ export function QsoGuide({
       </div>
 
       <QsoExamples initial={initial} onShown={onShown} />
-    </div>
-  );
-}
-
-/** The guide, over the page, once a QSO has started. */
-export function QsoHelp({
-  onClose,
-  onSettings,
-  settingsOpen,
-  initial,
-  onShown,
-}: {
-  onClose(): void;
-  settingsOpen: boolean;
-  /** The kind to show first: the format of the run under way. */
-  initial?: GuideId | undefined;
-  /** Another kind was chosen. */
-  onShown?: ((shown: GuideId) => void) | undefined;
-  /** Open the settings. The help closes first, so they are in view. */
-  onSettings(): void;
-}): React.ReactElement {
-  const box = useRef<HTMLDivElement>(null);
-
-  /* Focus on the dialog itself: it is a page to read, and Escape reaches a
-     handler on it only with focus inside. */
-  useEffect(() => {
-    box.current?.focus();
-  }, []);
-
-  return (
-    <div
-      className="sheet"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="dialog qsohelp"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="qsohelp-title"
-        data-testid="qso-help"
-        tabIndex={-1}
-        ref={box}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
-      >
-        <h2 id="qsohelp-title">Anatomy of a QSO</h2>
-        <div className="prose">
-          <QsoGuide
-            initial={initial}
-            onShown={onShown}
-            settingsOpen={settingsOpen}
-            onSettings={() => {
-              onClose();
-              onSettings();
-            }}
-          />
-        </div>
-        <div className="confirm">
-          <button className="primary" data-testid="qso-help-close" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

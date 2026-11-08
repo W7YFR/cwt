@@ -7,7 +7,8 @@
  * the page. The app fills the rest.
  */
 
-import { Fragment, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from "react";
+import { Drawer, DrawerTabs } from "./Drawer";
 import { createPortal } from "react-dom";
 import { IconCog } from "./Icons";
 import { SettingsForm } from "./Controls";
@@ -109,13 +110,6 @@ function tabOn(host: Host): SettingsTab {
   return tabs.some((t) => t.id === host.tab) ? host.tab : tabs[0]!.id;
 }
 
-/** How long the drawer takes to slide out; see `.drawerwrap`. */
-const CLOSE_MS = 90;
-
-function reducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
 /** The ⚙ button, at the right end of every header. */
 export function SettingsButton(): React.ReactElement {
   const host = useSettings();
@@ -185,84 +179,33 @@ export function SettingsDrawer({
   const tab = tabOn(host);
   const scope = tabs.find((t) => t.id === tab)?.scope;
   const pageOwns = host.pageTabs.some((t) => t.id === tab);
-  const drawer = useRef<HTMLDivElement | null>(null);
-  const opener = useRef<Element | null>(null);
-  /* In the page while open, and for as long as it takes to slide out. */
-  const [mounted, setMounted] = useState(host.open);
-  useEffect(() => {
-    if (host.open) {
-      setMounted(true);
-      return;
-    }
-    const timer = window.setTimeout(() => setMounted(false), reducedMotion() ? 0 : CLOSE_MS);
-    return () => window.clearTimeout(timer);
-  }, [host.open]);
-
-  useEffect(() => {
-    if (!host.open) return;
-    opener.current = document.activeElement;
-    drawer.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      host.close();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("keydown", onKey, true);
-      (opener.current as HTMLElement | null)?.focus?.();
-    };
-    // Once per opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host.open]);
-
-  if (!mounted) return null;
   const appPart = app(tab);
-  /* On the body, so nothing on the page can confine it. */
-  return createPortal(
-    <div className="drawerwrap" data-state={host.open ? "open" : "closing"}>
-      <div className="drawerscrim" onClick={host.close} />
-      <div
-        className="drawer"
-        id="settings-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-        tabIndex={-1}
-        ref={drawer}
-        data-testid="settings"
-      >
-        <div className="drawerhead">
-          <h2>Settings</h2>
-          <button className="iconbtn drawerclose" aria-label="Close settings" title="Close · Esc" onClick={host.close}>
-            ×
-          </button>
-        </div>
-        <div className="drawertabs" role="tablist" aria-label="Settings section" data-testid="settings-tab">
+  return (
+    <Drawer
+      open={host.open}
+      onClose={host.close}
+      title="Settings"
+      id="settings-drawer"
+      testId="settings"
+      bodyTab={tab}
+      tabs={
+        <DrawerTabs label="Settings section" testId="settings-tab">
           {tabs.map((t, i) => (
             <Fragment key={t.id}>
-            {i > 0 && isApp(t.id) && !isApp(tabs[i - 1]!.id) && <span className="tabsep" aria-hidden="true" />}
-            <button
-              role="tab"
-              data-tab={t.id}
-              aria-selected={t.id === tab}
-              onClick={() => host.setTab(t.id)}
-            >
-              {t.label}
-            </button>
+              {i > 0 && isApp(t.id) && !isApp(tabs[i - 1]!.id) && <span className="tabsep" aria-hidden="true" />}
+              <button role="tab" data-tab={t.id} aria-selected={t.id === tab} onClick={() => host.setTab(t.id)}>
+                {t.label}
+              </button>
             </Fragment>
           ))}
-        </div>
-        <div className="drawerbody" data-tab={tab}>
-          {scope && <p className="drawerscope">{scope}</p>}
-          {pageOwns && host.locked && <p className="drawerlock">Can't change these while recording.</p>}
-          <div className="drawerslot" ref={host.setSlot} inert={pageOwns && host.locked} data-locked={pageOwns && host.locked} />
-          {appPart}
-        </div>
-      </div>
-    </div>,
-    document.body,
+        </DrawerTabs>
+      }
+    >
+      {scope && <p className="drawerscope">{scope}</p>}
+      {pageOwns && host.locked && <p className="drawerlock">Can't change these while recording.</p>}
+      <div className="drawerslot" ref={host.setSlot} inert={pageOwns && host.locked} data-locked={pageOwns && host.locked} />
+      {appPart}
+    </Drawer>
   );
 }
 

@@ -25,6 +25,7 @@ nothing to the site. The next release carries them.
 - **Fit WPM** is now **Use these speeds**. **Intended message** and **Target message** are now **Message**. On the Send page, **Show each run's scores** and **Caption every run** say run, as the chart does.
 - In **Script**, the button that starts the script on the QSO page reads **Start**, and on the Copy page **Load**.
 - On the Send page, picking a drill when the session has runs in it opens **New session** with the drill's text, so you choose whether to clear the runs.
+- **?** beside Settings on every page opens Help: the page's guide, and **Keys**, every key the page answers to. The key lines under each page are gone, and so are the QSO page's own help button and the examples beside its log.
 
 ### Fixed
 

@@ -37,6 +37,7 @@ import { ACCEPTED } from "@/capture/file";
 import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import { fmtGain, fmtSpeed, fmtTolerance } from "./format";
 import { MicChip, PageSettings, SettingsButton } from "./SettingsDrawer";
+import { PageHelp, type KeyGroup } from "./Help";
 import { ZenMode } from "./ZenMode";
 import { pacedEnd, pacedStart, recordLimit } from "./pacing";
 import { RECORD_MODES, modeOf, modePatch } from "./mode";
@@ -111,6 +112,47 @@ export interface ReviewScreenProps {
   /** Open the other page. Absent, the header has no page switch. */
   onPage?: ((page: Page) => void) | undefined;
 }
+
+/** What the Send page is for and how its chart works, in Help. */
+const SEND_GUIDE = (
+  <>
+    <p>Send a message and see how you sent it. Each run is drawn against the target: every dit, dah and gap.</p>
+    <ul>
+      <li>Set the message, then press Record and key it. Stop and review when you finish.</li>
+      <li>Click a character to hear it, or a gap to hear what it separates.</li>
+      <li>Click a run&rsquo;s name to pick it up; its play button plays it.</li>
+      <li>Click the ruler to seek. Drag it to pick a range to play.</li>
+      <li>Scroll to zoom. Drag, or scroll with Shift, to pan. The view follows playback.</li>
+      <li>Use these speeds sets the target speeds to the ones a run was sent at.</li>
+    </ul>
+  </>
+);
+
+/** Every key on the Send page, in Help. */
+const SEND_KEYS: readonly KeyGroup[] = [
+  {
+    heading: "Recording",
+    rows: [
+      { keys: [["R"]], does: "Record, or start a recording over" },
+      { keys: [["Enter"]], does: "Finish the recording and review it" },
+      { keys: [["Esc"]], does: "Cancel the recording" },
+    ],
+  },
+  {
+    heading: "Playing",
+    rows: [
+      { keys: [["Space"]], does: "Play the run on show, or the range; again to stop" },
+      { keys: [["T"]], does: "Play the target; again to stop" },
+      { keys: [["N"], ["P"]], does: "Play the next or the previous run" },
+      { keys: [["L"]], does: "Loop on or off" },
+      { keys: [["Esc"]], does: "Stop playing, then clear the range" },
+    ],
+  },
+  {
+    heading: "The chart",
+    rows: [{ keys: [["Home"], ["End"]], does: "Go to the start or the end of the chart" }],
+  },
+];
 
 /** Controls that space activates. With one of these focused, space presses it
  *  and the transport leaves the key alone. */
@@ -770,6 +812,7 @@ export function ReviewScreen({
             profileId={profileId}
             applies={loaded.take.source === MIC_SOURCE}
           />
+          <PageHelp title="Send" guide={SEND_GUIDE} keys={SEND_KEYS} />
           <SettingsButton />
         </div>
 
@@ -1105,15 +1148,6 @@ export function ReviewScreen({
                 pick a range to play &nbsp;·&nbsp; Esc stops playback, then clears the
                 range &nbsp;·&nbsp; L loops &nbsp;·&nbsp; N and P play the next and previous track &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
-              </p>
-              {/* The recording transport, which is otherwise only discoverable
-                  by pressing a key and seeing what happens. R carries both
-                  halves of one idea — go, from here — so it starts a take and
-                  starts a running one over, and the legend says so rather than
-                  naming half of what the key does. */}
-              <p className="legend keys" data-testid="hotkeys">
-                <kbd>R</kbd> record/restart &nbsp;·&nbsp; <kbd>Enter</kbd> finish
-                &nbsp;·&nbsp; <kbd>Esc</kbd> cancel
               </p>
             </>
           )}
