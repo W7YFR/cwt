@@ -3182,3 +3182,9 @@ header .modeswitch button { white-space: nowrap; }
 .quickpop .viewpanel.formpanel .group > .caption,
 .quickpop .viewpanel.formpanel .group > label:not(.check),
 .quickpop .viewpanel.formpanel .group > label.field > .fieldname { white-space: nowrap; }
+
+/* A choice's notes, stacked in one cell: the chosen one shows, the rest keep
+   their room. */
+.note.notes { display: grid; }
+.note.notes > span { grid-area: 1 / 1; }
+.note.notes > span[data-on="false"] { visibility: hidden; }

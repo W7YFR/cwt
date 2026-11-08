@@ -596,9 +596,16 @@ export function ChoiceGroup({
           </button>
         ))}
       </div>
-      {note && (
-        <span className="note" id={`${id}-note`}>
-          {note}
+      {/* Every choice's note in the same place, only the chosen one in view,
+          so the row is as tall as its tallest note and never changes height
+          when the choice does. */}
+      {options.some((o) => o.note) && (
+        <span className="note notes" id={`${id}-note`}>
+          {options.map((o) => (
+            <span key={o.value} aria-hidden={o.value !== value} data-on={o.value === value}>
+              {o.note ?? ""}
+            </span>
+          ))}
         </span>
       )}
       {about.tip}
