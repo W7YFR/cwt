@@ -17,6 +17,7 @@ nothing to the site. The next release carries them.
 - Every page's header has a second line with the page's actions, then its quick settings, then ⋯. The main action comes first: **Record**, **Generate QSO** or **Start**. **Start**, **Pause** and **Stop** on the QSO page moved up into it.
 - Quick settings show their values, such as **Speed 25 wpm** and **Mode Plain**. Click one to change it there; **More in Settings** opens its tab. **Plain**, **Paced** and **Zen** moved into **Mode**.
 - ⋯ holds **Open** and **Download** on the Send and Copy pages. The download buttons, and the settings that showed them, are gone.
+- On the QSO page, a QSO with no report, such as a **Script** QSO with its report off, uses the full width of the log.
 - Under a finished QSO on the QSO page, ▶ plays it as you heard it, and ⋯ plays it clean or as heard, or downloads it. This replaces the row of **Play** and **Download** buttons, and the **Show Download** setting is gone.
 - **Repeat playback when it ends** is now **Loop**, beside **Fit** over the Send chart.
 - **Restart** on the QSO page is now **New QSO**, and its **Clear** is now **Clear log**.

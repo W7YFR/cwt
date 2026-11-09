@@ -1620,6 +1620,9 @@ export function QsoScreen({
   /** Under a QSO that is over: ▶, which plays it as heard, and ⋯, with the
    *  clean and the heard versions to play or save, then its name. First on
    *  the row, under the start of its lines, where they are seen. */
+  /** No report will come for the QSO under way: a script, with its report
+   *  off. */
+  const noReportDue = isScript(qso.current) && !scriptReportOn;
   const qsoTapeRow = (n: number, at: number): React.ReactElement | null => {
     if (!closed.includes(n)) return null;
     const play = playback !== "never";
@@ -2332,9 +2335,14 @@ export function QsoScreen({
             <ol className="qsolog" data-testid="qso-log">
               {/* Each QSO: its lines, and its report beside them once it is
                   over. A line divides one QSO from the next. */}
-              {qsoGroups(lines).map((group, g, all) => (
+              {qsoGroups(lines).map((group, g, all) => {
+                const report = qsoReport(group.qso);
+                return (
                 <Fragment key={group.at[0]}>
-                  <li className="qsogroup">
+                  {/* The report's column only where a report is or will be:
+                      a QSO under way keeps it, so its lines do not move when
+                      the report comes. */}
+                  <li className={report || (!closed.includes(group.qso) && !noReportDue) ? "qsogroup" : "qsogroup noreport"}>
                     <ol className="qsolines">
                       {group.at.map((i) => {
                         const line = lines[i]!;
@@ -2356,11 +2364,12 @@ export function QsoScreen({
                       })}
                       {qsoTapeRow(group.qso, g)}
                     </ol>
-                    {qsoReport(group.qso)}
+                    {report}
                   </li>
                   {g < all.length - 1 && <li className="qsodivider" role="separator" data-testid="qso-divider" />}
                 </Fragment>
-              ))}
+              );
+              })}
               {/* Not an over already answered: after a reply, the last one is
                   still the copy until the recording starts over. */}
               {recorder &&
@@ -2369,7 +2378,7 @@ export function QsoScreen({
                 copy.turn !== answered.current &&
                 yourText !== "none" &&
                 (copy.text || copy.keying) && (
-                <li className="you live">
+                <li className={noReportDue ? "you live noreport" : "you live"}>
                   <span className="who">{qso.current.you || "You"}</span>
                   <span
                     className={yourText === "hidden" ? "text blurred" : "text"}

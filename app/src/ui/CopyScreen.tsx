@@ -1804,6 +1804,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               <MenuHeading>Download</MenuHeading>
               <DownloadItem
                 label={added ? "Audio, clean" : "Audio"}
+                testId={added ? "copy-download-clean" : "copy-download"}
                 disabled={!rec}
                 title={added ? "Save the QSO as a WAV file, with nothing added" : "Save the QSO as audio"}
                 onClick={added ? downloadClean : downloadHeard}
@@ -1811,6 +1812,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               {added && (
                 <DownloadItem
                   label="Audio, as heard"
+                  testId="copy-download-heard"
                   disabled={!rec}
                   title="Save the QSO as a WAV file, with the QSB, noise, QRN and QRM you hear"
                   onClick={downloadHeard}
@@ -1818,6 +1820,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               )}
               <DownloadItem
                 label="Text"
+                testId="copy-download-text"
                 disabled={!rec}
                 title="Save the QSO's lines as a text file, which Script can open"
                 onClick={downloadText}

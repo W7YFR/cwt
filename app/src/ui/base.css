@@ -2530,6 +2530,8 @@ header .modeswitch button { white-space: nowrap; }
 @container (min-width: 42rem) {
   .qsolog > li.qsogroup { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; column-gap: 32px; align-items: start; }
   .qsolog > li.live { margin-right: calc(20rem + 32px); }
+  .qsolog > li.qsogroup.noreport { grid-template-columns: minmax(0, 1fr); }
+  .qsolog > li.live.noreport { margin-right: 0; }
   .qsolog .qsoreport { padding-left: 24px; border-left: 1px solid var(--line); }
 }
 .qsolines {
@@ -3049,6 +3051,8 @@ header .modeswitch button { white-space: nowrap; }
 }
 .toolactions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; flex: 1 1 auto; min-width: 0; }
 .toolactions > .recordbar { flex: 0 1 auto; }
+/* A file's name and how it is read, on a line of its own under the actions. */
+.toolactions > .srcrow { flex-basis: 100%; }
 .toolchips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 /* A quick setting: its name, then its value, as one rounded button. */
 .quick { position: relative; }
@@ -3195,3 +3199,5 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .qsotape .tapename { font: 12.5px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); }
 .qsolog .qsotape .tapeend { display: flex; align-items: center; gap: 6px; }
 .qsolog .qsotape .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
+/* An item in ⋯ that is not on offer: faint, and the pointer says so. */
+.quickpop.menu > button:disabled { color: var(--ink-faint); cursor: not-allowed; }

@@ -951,6 +951,7 @@ export function SendSettings({
 
       <Section name="grading" title="Grading">
         <div className="panelgroups checks">
+          <ToleranceSlider tolerance={s.tolerance} onChange={(tolerance) => onChange({ tolerance })} />
           <Check
             id="ignore-construction"
             label="Grade only the spacing, for a keyer"
