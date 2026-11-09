@@ -22,7 +22,7 @@ nothing to the site. The next release carries them.
 - On the Copy page, **Start over**, **Show answers** and **Copy again** are in the header, always in the same place. The page with nothing loaded no longer repeats the kind picker and **Generate QSO**.
 - On a phone, the page's actions sit in a bar at the foot of the screen.
 - In Settings, a setting that does nothing with the others as they are is dimmed, and its **?** says why, as for the **Typing** settings when lines are not set to **Copy**.
-- **Fit WPM** is now **Use these speeds**. **Intended message** and **Target message** are now **Message**. On the Send page, **Show each run's scores** and **Caption every run** say run, as the chart does.
+- **Fit WPM** is now **Use these speeds**, and **Intended message** and **Target message** are now **Message**. The Send page's settings say run, as its chart does.
 - On the QSO page, **Restart** is now **New QSO** and **Clear** is **Clear log**. **Script**'s button reads **Start** on the QSO page and **Load** on the Copy page.
 - On the Send page, picking a drill when the session has runs in it opens **New session** with the drill's text, so you choose whether to clear the runs.
 - **?** beside Settings on every page opens Help: the page's guide, and **Keys**, every key the page answers to. The key lines under each page are gone, and so are the QSO page's own help button and the examples beside its log.
