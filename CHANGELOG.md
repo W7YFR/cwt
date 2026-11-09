@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.27.0 — 2026-11-09
+
 ### Changed
 
 - **Settings** (⚙) opens one panel that slides in from the right, with the same tabs on every page: the page's own settings, **Typing**, **Sound**, **Speed**, **Microphone**, **You** and **Drills**. It replaces the settings band and the Configuration screen, and each tab says where its settings apply.
