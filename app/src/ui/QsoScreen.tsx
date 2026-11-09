@@ -958,13 +958,21 @@ export function QsoScreen({
     void rec.discard();
   };
 
+  /** Whether the station's last line in QSO `n` is a line to copy that you
+   *  have not locked. */
+  const copyDue = (n: number) => {
+    const last = [...lines].reverse().find((l) => l.qso === n && !l.you);
+    return !!last && last.mode === "copy" && !last.locked;
+  };
+
   /** QSO `n` of a run is over. Its copy is graded now, or when you start
    *  your next over if there is copy to finish. You go on sending, and the
-   *  next station calls in a few seconds unless you send first. */
+   *  next station calls in a few seconds unless you send first: once your
+   *  copy is locked, with copy to finish. */
   const endInRun = (n: number) => {
     if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) setFinished(n);
     else close(n);
-    setNote("");
+    setNote(copyDue(n) ? "Finish your copy." : "");
     recorder?.restart();
     setPhase("listening");
     waitForNext();
@@ -975,6 +983,10 @@ export function QsoScreen({
   const waitForNext = () => {
     const [lo, hi] = NEXT_CALL_SEC;
     if (nextCall.current !== null) clearTimeout(nextCall.current);
+    nextCall.current = null;
+    // Not until your copy of the station's last line is locked. Locking it
+    // calls this.
+    if (finishedRef.current !== null && copyDue(finishedRef.current)) return;
     nextCall.current = setTimeout(
       () => {
         nextCall.current = null;
@@ -997,6 +1009,24 @@ export function QsoScreen({
     setNote("");
     sendReply(turn.reply!, turn.qso.them, turn.qso.speed, qsoNo.current, null);
   };
+
+  /* Your copy of the station's last line is locked or graded, between QSOs
+     in a run: the next station calls in a few seconds. Opened again to edit,
+     it waits again. */
+  const due = finished !== null && copyDue(finished);
+  useEffect(() => {
+    const now = qso.current;
+    if (!recorder || phase !== "listening" || !isRun(now) || now.stage !== "waiting") return;
+    if (due) {
+      if (nextCall.current !== null) clearTimeout(nextCall.current);
+      nextCall.current = null;
+    } else if (nextCall.current === null) {
+      setNote("");
+      waitForNext();
+    }
+    // On a lock or an unlock, not on each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [due]);
 
   /** A script that opens with the station's line: it sends now. */
   const openScriptNow = () => {

@@ -12,6 +12,10 @@ nothing to the site. The next release carries them.
 - The QSO page plays part of the station's line, as the Copy page does. **Letter** and **Word** play the selected slot's letter or word, and a click or a selection in a line plays that part.
 - On the QSO page, Option+L and Option+W play the selected letter or word, and Option+Enter plays on from the word you are copying. Off a Mac, use Alt.
 
+### Changed
+
+- In a contest or POTA QSO on the QSO page, with the station's lines shown as Copy, the next station calls only once you lock your copy of the last line or press **Grade my copy**.
+
 ### Fixed
 
 - On the QSO page, **Pause** and **Stop** stop a line that plays again, not only the band noise.
