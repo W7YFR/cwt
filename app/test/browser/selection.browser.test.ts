@@ -85,7 +85,6 @@ function mount(over: Partial<ReviewSettings> = {}) {
       onProfileChange: () => {},
       onDeviceChange: () => {},
       onCalibrate: () => {},
-      onConfigure: () => {},
       onFile: () => {},
       onClear: () => {},
       onNewSession: () => {},
@@ -285,18 +284,17 @@ describe("fitting the chart to the window", () => {
 });
 
 describe("the loop switch", () => {
-  it("turns on and off from L and from its box in Audio", () => {
+  it("turns on and off from L and from Loop beside the chart", () => {
     mount();
-    act(() => host.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click());
-    const loop = () => host.querySelector<HTMLInputElement>("#loop")!;
-    expect(host.querySelector("[data-panel='audio']")).toContainElement(loop());
-    expect(loop().checked).toBe(false);
+    const loop = () => host.querySelector<HTMLButtonElement>("[data-testid='loop']")!;
+    expect(host.querySelector(".viewcontrols")).toContainElement(loop());
+    expect(loop().getAttribute("aria-pressed")).toBe("false");
     act(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "l", bubbles: true }));
     });
-    expect(loop().checked).toBe(true);
+    expect(loop().getAttribute("aria-pressed")).toBe("true");
     act(() => loop().click());
-    expect(loop().checked).toBe(false);
+    expect(loop().getAttribute("aria-pressed")).toBe("false");
   });
 });
 

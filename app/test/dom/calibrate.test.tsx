@@ -26,6 +26,7 @@ import { existsSync } from "node:fs";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BOUNDS, Calibrate, STEPS, TOTAL_SEC, outcomeOf } from "@/ui/Calibrate";
+import { SettingsDrawer, SettingsProvider } from "@/ui/SettingsDrawer";
 import type { CalibrationRun } from "@/io/calibration";
 import { DRILLS, cueCount } from "@/io/calibration";
 import { loadProfiles, activeProfile } from "@/io/profiles";
@@ -141,7 +142,6 @@ function renderWizard(over: Partial<React.ComponentProps<typeof Calibrate>> = {}
     onError: vi.fn(),
     onSaved: vi.fn(),
     onClose: vi.fn(),
-    onConfigure: vi.fn(),
     ...over,
   };
   return { ...render(<Calibrate {...props} />), props };
@@ -868,14 +868,28 @@ describe.skipIf(!HAVE)("the calibration wizard", () => {
     });
   });
 
-  it("keeps the way into the configuration screen on the screen it is about", async () => {
-    /* What is behind it is the saved calibrations and the recordings they were
-       measured from — entirely about calibration, so it belongs where
-       calibration is done rather than in the corner of every screen. */
+  it("opens Settings at the microphone, where the saved calibrations are", async () => {
+    /* The screen has no page of its own in Settings, so it opens on the
+       app's first tab: Microphone, with the calibrations and the recordings
+       they were measured from. */
     const user = userEvent.setup();
-    const { props } = renderWizard();
-    await user.click(screen.getByTestId("cog"));
-    expect(props.onConfigure).toHaveBeenCalled();
+    const props = {
+      current: null,
+      deviceId: "webcam",
+      onDeviceChange: vi.fn(),
+      onError: vi.fn(),
+      onSaved: vi.fn(),
+      onClose: vi.fn(),
+    };
+    render(
+      <SettingsProvider>
+        <Calibrate {...props} />
+        <SettingsDrawer app={(tab) => <p data-testid="app-tab">{tab}</p>} />
+      </SettingsProvider>,
+    );
+    await user.click(screen.getByTestId("panel-toggle"));
+    expect(screen.getByTestId("settings")).toBeTruthy();
+    expect(screen.getByTestId("app-tab").textContent).toBe("microphone");
     await settled();
   });
 

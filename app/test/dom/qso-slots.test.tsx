@@ -16,6 +16,7 @@ import {
   send,
   state,
   until,
+  settingsTab,
   useQsoRig,
   yourTurn,
 } from "../qso-rig";
@@ -51,9 +52,7 @@ async function fillRight(): Promise<void> {
 
 /** Choose how you enter copy, in the settings. */
 async function enterAs(label: string): Promise<void> {
-  if ($('[data-testid="panel-toggle"]')?.getAttribute("aria-pressed") !== "true") {
-    await click($('[data-testid="panel-toggle"]'));
-  }
+  await settingsTab("copy");
   const button = $$<HTMLButtonElement>('[data-testid="qso-copy-input"] button').find((b) => b.textContent === label);
   await click(button ?? null);
   expect(button!.getAttribute("aria-pressed")).toBe("true");

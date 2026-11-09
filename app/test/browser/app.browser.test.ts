@@ -128,7 +128,13 @@ function settled<T>(req: IDBRequest<T>): Promise<T> {
 let container: HTMLDivElement;
 let root: Root | null = null;
 
-beforeEach(() => {
+/* A desktop window: these are the Send page's desktop layout. Below 560px
+   the page's actions move to a bar at the foot of the screen, and the
+   phone's own tests are in header-narrow. */
+const DESKTOP: [number, number] = [1280, 900];
+
+beforeEach(async () => {
+  await page.viewport(...DESKTOP);
   /* Mounted through react-dom directly rather than through Testing Library:
      under the browser runner the library is pre-bundled with its own copy of
      React, and hooks called against a second copy fail with a null internals
@@ -371,51 +377,50 @@ describe("the app", () => {
       .toBe("false");
   });
 
-/** Tick a box in the chart settings panel, opening the panel if it is shut.
- *
- * Only if: the cog is a toggle, so opening one that is already open closes it
- * and takes the box being reached for with it. */
-async function tickSetting(id: string): Promise<void> {
-  const cog = () => container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
-  if (cog().getAttribute("aria-pressed") !== "true") {
-    await act(async () => cog().click());
-  }
-  await act(async () => container.querySelector<HTMLInputElement>(`#${id}`)!.click());
+/** Anything on the page, Settings and Help included: they draw on the body,
+ *  over the page. */
+const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel);
+
+/** Open Settings, if it is not, at one of its tabs. Only if: ⚙ is a toggle,
+ *  so pressing it while open closes it. */
+async function settingsTab(tab: string): Promise<void> {
+  const cog = $<HTMLElement>("[data-testid='panel-toggle']")!;
+  if (cog.getAttribute("aria-pressed") !== "true") await act(async () => cog.click());
+  await act(async () => $<HTMLElement>(`[data-testid='settings-tab'] [data-tab='${tab}']`)!.click());
 }
 
-const showDownloads = () => tickSetting("show-downloads");
+/** Tick a box on the Send tab of Settings. */
+async function tickSetting(id: string): Promise<void> {
+  await settingsTab("page");
+  await act(async () => $<HTMLInputElement>(`#${id}`)!.click());
+}
 
-  it("rolls the settings band open instead of dropping it in", async () => {
-    /* It arrives between two things already on screen and pushes the chart
-       down the page. Done instantly that reads as the page having jumped;
-       rolled open the eye follows the chart to where it went.
+/** Open ⋯ in the toolbar. */
+const openMore = () => act(async () => $<HTMLElement>("[data-testid='more']")!.click());
 
-       Which means the band is in the tree closed as well as open — there has
-       to be something to animate from — so what is checked is that a closed
-       one takes no room and cannot be reached: a panel rolled up is not a
-       panel you can land on with a tab key. */
+/** Open a quick setting's chip. */
+const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='chip-${id}']`)!.click());
+
+  it("slides Settings in over the page, and leaves the page where it was", async () => {
+    /* Over the page rather than in it: opening it moves nothing, so the chart
+       is where you left it when it closes. It slides in from the right. */
     await served();
     await mount();
-    const band = () => container.querySelector<HTMLElement>(".chartsettings")!;
-    const cog = () => container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
+    const chart = () => container.querySelector("canvas")!.getBoundingClientRect().top;
+    const before = chart();
+    expect($("[data-testid='settings']"), "not in the page while closed").toBeNull();
 
-    expect(band(), "in the tree while closed").not.toBeNull();
-    expect(band().getBoundingClientRect().height, "closed").toBe(0);
-    expect(band().firstElementChild!.hasAttribute("inert"), "closed").toBe(true);
-    // A real transition to run, not a swap dressed up as one.
-    expect(getComputedStyle(band()).transitionDuration).not.toBe("0s");
-
-    await act(async () => cog().click());
-    const atOnce = band().getBoundingClientRect().height;
-    expect(band().firstElementChild!.hasAttribute("inert"), "open").toBe(false);
+    await act(async () => $<HTMLElement>("[data-testid='panel-toggle']")!.click());
+    const drawer = $<HTMLElement>("[data-testid='settings']")!;
+    expect(drawer).not.toBeNull();
+    expect(getComputedStyle(drawer).animationName).toBe("drawer-in");
+    expect(chart(), "the page did not move").toBe(before);
 
     await act(async () => {
-      await new Promise((res) => setTimeout(res, 400));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await new Promise((res) => setTimeout(res, 300));
     });
-    const open = band().getBoundingClientRect().height;
-    expect(open, "settles at the height of what is in it").toBeGreaterThan(0);
-    // The whole claim: it was not already there when the click returned.
-    expect(atOnce, "arrived rather than rolled").toBeLessThan(open);
+    expect($("[data-testid='settings']"), "gone once it has slid out").toBeNull();
   });
 
   it("shows the grading tables only when they are asked for", async () => {
@@ -449,7 +454,6 @@ const showDownloads = () => tickSetting("show-downloads");
        stays after you have turned instructions off. */
     const notes = {
       howto: () => container.querySelector(".legend.howto"),
-      keys: () => container.querySelector("[data-testid='hotkeys']"),
       deviations: () => container.querySelector("[data-testid='deviation-hint']"),
     };
     for (const [what, at] of Object.entries(notes)) {
@@ -464,38 +468,32 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(container.querySelector(".legend .sw")).not.toBeNull();
   });
 
-  it("says which keys work, since a key is otherwise found by pressing it", async () => {
-    /* R above all: it is what you press to go again, and the review is where
-       you are standing when you decide to. The other two are on the record bar
-       while a take is running, but a legend that named only one key would read
-       as the only one there is. */
+  it("says which keys work, in Help, since a key is otherwise found by pressing it", async () => {
+    /* R above all: it is what you press to go again. Space, T, Home and End
+       were on no screen before Help had a Keys tab. */
     await served();
     await mount();
-    const keys = container.querySelector("[data-testid='hotkeys']")!;
-    expect([...keys.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual([
-      "R",
-      "Enter",
-      "Esc",
-    ]);
+    await act(async () => $<HTMLElement>("[data-testid='help-open']")!.click());
+    await act(async () => $<HTMLElement>("[data-testid='help-tab'] [data-tab='keys']")!.click());
+    const keys = [...document.querySelectorAll("[data-testid='help-keys'] kbd")].map((k) => k.textContent);
+    for (const k of ["R", "Enter", "Esc", "Space", "T", "N", "P", "L", "Home", "End"]) {
+      expect(keys, k).toContain(k);
+    }
   });
 
-  it("offers the downloads only when they are asked for", async () => {
-    /* Getting a file out is an occasional act, and four buttons across the
-       page is a standing invitation to something you do rarely. */
+  it("offers the downloads in ⋯, out of the way", async () => {
+    /* Getting a file out is an occasional act, so it is in ⋯ rather than four
+       buttons across the page. */
     await served();
     await mount();
-    const row = () => container.querySelector(".downloads");
-    expect(row()).toBeNull();
-
-    await showDownloads();
-    expect(row()).not.toBeNull();
-    // All four, and where the rest of the page starts rather than off to the
-    // right on a margin of its own.
-    expect(row()!.querySelectorAll("button")).toHaveLength(4);
-    const left = (el: Element) => el.getBoundingClientRect().left;
-    expect(left(row()!.querySelector("button")!)).toBeLessThan(
-      left(container.querySelector("canvas")!) + 40,
+    expect(container.querySelector(".downloads"), "no row of buttons").toBeNull();
+    await openMore();
+    const items = [...document.querySelectorAll<HTMLButtonElement>(".quickpop.menu button")].map((b) =>
+      b.textContent!.trim(),
     );
+    for (const name of ["Your audio", "Target audio", "Chart PNG", "JSON report"]) {
+      expect(items, name).toContain(name);
+    }
   });
 
   it("actually rasterizes the chart, rather than leaving a blank canvas", async () => {
@@ -517,6 +515,24 @@ const showDownloads = () => tickSetting("show-downloads");
     // app had re-run its own DSP on the audio (which is a synthesized
     // placeholder here, not the real recording) it would say something else.
     expect(container.textContent).toContain(TAKE.source);
+  });
+
+  it("asks before a drill clears the runs, by opening New session with it", async () => {
+    /* A drill picked in the header used to start a new session at once,
+       runs and all. With runs to lose it opens New session, which says they
+       go, with the drill's text in it. */
+    await served();
+    await mount();
+    expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank")).toBe("false");
+    await act(async () => $<HTMLElement>("[data-testid='drill-picker']")!.click());
+    const tree = $<HTMLElement>("[role='tree']")!;
+    await act(async () => {
+      tree.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    const dialog = $<HTMLElement>("[data-testid='new-session']")!;
+    expect(dialog, "New session, not a cleared page").not.toBeNull();
+    expect((dialog.querySelector("#ns-text") as HTMLTextAreaElement).value).not.toBe("");
+    expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"), "the runs are still there").toBe("false");
   });
 
   it("gets you home from the name in the header", async () => {
@@ -779,28 +795,21 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(inner.top - outer.top - top).toBeCloseTo(outer.bottom - bottom - inner.bottom, 0);
   });
 
-  it("reaches the corner button where the eye finds it, last in the header", async () => {
-    /* The button is out of flow, so where it is drawn says nothing about where
-       the keyboard finds it — only its place in the document does, and those
-       two were opposite ends of the header. Tabbing onto the review page put
-       you straight into chart settings, past the way home and every record
-       control, with the focus ring jumping to the far corner first. */
+  it("reaches the header's first line in order, then its actions", async () => {
+    /* Document order is the order Tab walks: no control on the page carries
+       a positive tabindex. The way home first, then the page switch and the
+       corner, ⚙ last of them, then the page's actions on the line below. */
     await served();
     await mount();
-
-    /* Document order, which IS the order Tab walks for everything here: no
-       control on the page carries a positive tabindex, and nothing sets one. */
     const reachable = (root: ParentNode) =>
       [...root.querySelectorAll<HTMLElement>("button, select, input, a[href], [tabindex]")]
         .filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
 
-    const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
-    const inHeader = reachable(container.querySelector<HTMLElement>("header")!);
-
-    expect(inHeader.length, "the header has controls to come first").toBeGreaterThan(1);
-    expect(inHeader.at(-1), "the corner is reached last").toBe(cog);
-
-    // And the first stop on the page is the way home, which the corner took.
+    const header = reachable(container.querySelector<HTMLElement>("header")!);
+    const cog = $<HTMLElement>("[data-testid='panel-toggle']")!;
+    const record = $<HTMLElement>("[data-testid='record-another']")!;
+    expect(header.indexOf(cog), "⚙ comes before the actions").toBeLessThan(header.indexOf(record));
+    expect(header[header.indexOf(cog) + 1], "and the actions follow it").toBe(record);
     expect(reachable(container)[0]).toBe(container.querySelector(".brandmark"));
   });
 
@@ -824,93 +833,47 @@ const showDownloads = () => tickSetting("show-downloads");
     expect(corner.right).toBeCloseTo(content.right, 0);
   });
 
-  it("keeps Configuration beside the cog, open or closed", async () => {
-    /* Grouped with the cog in the flow: the two never split, and the row
-       takes the width left of them rather than running underneath. Always
-       there, so the way to Configuration is not hidden behind the cog. */
-    const [w, h] = [window.innerWidth, window.innerHeight];
-    await page.viewport(1600, 900);
-    try {
-      await served();
-      await mount();
-      const advanced = () => container.querySelector<HTMLElement>("[data-testid='advanced']");
-      const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
-      const row = container.querySelector<HTMLElement>("header .recordbar")!;
-      const first = () => row.querySelector("button")!.getBoundingClientRect();
-      const beside = () => {
-        const a = advanced()!.getBoundingClientRect();
-        const c = cog.getBoundingClientRect();
-        expect(c.left - a.right, "just left of the cog").toBeCloseTo(8, 0);
-        expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
-      };
-      expect(advanced(), "there while settings are closed").not.toBeNull();
-      expect(advanced()!.getAttribute("aria-label")).toBe("Configuration");
-      beside();
-      const before = first();
+  it("keeps ? beside ⚙, and the header still while Settings is open", async () => {
+    /* Help and Settings sit together at the end of the header's first line,
+       and opening Settings lays it over the page: nothing in the header
+       moves. */
+    await served();
+    await mount();
+    const help = $<HTMLElement>("[data-testid='help-open']")!;
+    const cog = $<HTMLElement>("[data-testid='panel-toggle']")!;
+    const a = help.getBoundingClientRect();
+    const c = cog.getBoundingClientRect();
+    expect(c.left - a.right, "just left of ⚙").toBeCloseTo(8, 0);
+    expect(a.top + a.height / 2, "on its center line").toBeCloseTo(c.top + c.height / 2, 0);
 
-      await act(async () => cog.click());
-      const controls = [...container.querySelectorAll<HTMLElement>("header button, header select")];
-      beside();
-      expect(first().top, "the row stays where it was").toBeCloseTo(before.top, 0);
-      expect(first().left).toBeCloseTo(before.left, 0);
-
-      const boxes = controls.map((el) => el.getBoundingClientRect());
-      for (let i = 0; i < boxes.length; i++) {
-        for (let j = i + 1; j < boxes.length; j++) {
-          const [x, y] = [boxes[i]!, boxes[j]!];
-          const overlap = x.left < y.right - 0.5 && y.left < x.right - 0.5 &&
-            x.top < y.bottom - 0.5 && y.top < x.bottom - 0.5;
-          expect(overlap, `controls ${i} and ${j} overlap`).toBe(false);
-        }
-      }
-
-      await act(async () => advanced()!.click());
-      expect(container.querySelector(".settings h2")?.textContent).toBe("Configuration");
-    } finally {
-      // The screen on show re-lays itself out, so the resize is an update too.
-      await act(async () => {
-        await page.viewport(w, h);
-      });
-    }
+    const record = () => $<HTMLElement>("[data-testid='record-another']")!.getBoundingClientRect();
+    const before = record();
+    await act(async () => cog.click());
+    expect(record().top, "the actions stay where they were").toBeCloseTo(before.top, 0);
+    expect(record().left).toBeCloseTo(before.left, 0);
   });
 
-  it("scrolls up to the settings from down the page, and back when they close", async () => {
-    /* The header is pinned, so from further down the page the panel would open
-       out of sight above it. A short window, so the review has room to scroll. */
+  it("opens Settings over the page wherever it is scrolled, and leaves it there", async () => {
+    /* A drawer over the page needs no scrolling to be seen: the page stays
+       where you were reading it, open or closed. A short window, so the review
+       has room to scroll. */
     const [w, h] = [window.innerWidth, window.innerHeight];
     await page.viewport(1400, 420);
     const scroller = document.scrollingElement ?? document.documentElement;
-    const wait = (ms: number) => act(async () => {
-      await new Promise((res) => setTimeout(res, ms));
-    });
     try {
       await served();
       await mount();
-      const cog = container.querySelector<HTMLElement>("[data-testid='panel-toggle']")!;
-      const header = container.querySelector("header")!;
-      const panel = container.querySelector(".chartsettings")!;
-
       scroller.scrollTop = scroller.scrollHeight;
-      await wait(50);
+      await act(async () => {
+        await new Promise((res) => setTimeout(res, 50));
+      });
       const down = scroller.scrollTop;
       expect(down, "the review scrolls").toBeGreaterThan(100);
 
-      await act(async () => cog.click());
-      await wait(900);
-      expect(panel.getBoundingClientRect().top, "just under the header").toBeCloseTo(
-        header.getBoundingClientRect().bottom,
-        0,
-      );
-
-      await act(async () => cog.click());
-      await wait(900);
-      expect(scroller.scrollTop, "back where it was").toBeCloseTo(down, 0);
-
-      // From the top there is nothing to scroll to.
-      scroller.scrollTop = 0;
-      await act(async () => cog.click());
-      await wait(900);
-      expect(scroller.scrollTop).toBe(0);
+      await act(async () => $<HTMLElement>("[data-testid='panel-toggle']")!.click());
+      const drawer = $<HTMLElement>("[data-testid='settings']")!.getBoundingClientRect();
+      expect(drawer.top, "from the top of the window").toBe(0);
+      expect(scroller.scrollTop, "the page stays put").toBe(down);
     } finally {
       await act(async () => {
         await page.viewport(w, h);
@@ -956,15 +919,18 @@ const showDownloads = () => tickSetting("show-downloads");
     await served();
     await mount();
 
+    /** Mode's chip, open, and one of its choices. */
     const zen = () =>
-      [...container.querySelectorAll<HTMLButtonElement>("[data-testid='mode'] button")].find(
+      [...document.querySelectorAll<HTMLButtonElement>("[data-testid='mode'] button")].find(
         (b) => b.textContent === "Zen",
       )!;
 
+    await openChip("mode");
     await act(async () => {
       zen().click();
     });
     expect(zen().getAttribute("aria-pressed")).toBe("true");
+    expect($("[data-testid='chip-mode']")!.textContent).toContain("Zen");
 
     // Past the settings debounce, so the setting has been written.
     await act(async () => {
@@ -977,7 +943,7 @@ const showDownloads = () => tickSetting("show-downloads");
     root = null;
     container.innerHTML = "";
     await mount();
-    expect(zen().getAttribute("aria-pressed"), "the next visit starts on").toBe("true");
+    expect($("[data-testid='chip-mode']")!.textContent, "the next visit starts on").toContain("Zen");
   });
 
   it("opens a first visit at the chosen defaults", async () => {
@@ -985,24 +951,27 @@ const showDownloads = () => tickSetting("show-downloads");
     await act(async () => {
       container.querySelector<HTMLButtonElement>("[data-testid='practice']")!.click();
     });
-    const q = <T extends Element>(sel: string) => container.querySelector<T>(sel)!;
-    const box = (id: string) => q<HTMLInputElement>(`#${id}`);
+    const box = (id: string) => $<HTMLInputElement>(`#${id}`)!;
+    expect(Number(box("times").value), "times").toBe(1);
+    expect($("[data-testid='loop']")!.getAttribute("aria-pressed"), "loop").toBe("false");
+    expect($("[data-testid='chip-mode']")!.textContent, "mode").toContain("Plain");
+
+    await settingsTab("speed");
     expect(Number(box("wpm").value), "character speed").toBe(25);
     expect(Number(box("farns").value), "overall speed").toBe(25);
-    expect(Number(box("tol").value), "tolerance").toBe(30);
-    expect(Number(box("times").value), "times").toBe(1);
+    await settingsTab("sound");
     expect(Number(box("gain").value), "listening level").toBe(0);
+    await settingsTab("page");
+    expect(Number(box("tol").value), "tolerance").toBe(30);
     expect(Number(box("break-sec").value), "break length").toBe(3);
     expect(Number(box("pace-lead").value), "delay start").toBe(3);
     const on = {
-      loop: false,
       "ignore-construction": true,
       "collapse-rests": true,
       "char-markers": false,
       "run-scores": true,
       "caption-all": false,
       "show-chart-controls": true,
-      "show-downloads": false,
       "show-hints": true,
       "advanced-grading": true,
       "plain-follow": true,
@@ -1012,29 +981,22 @@ const showDownloads = () => tickSetting("show-downloads");
       "pace-absolute": true,
     };
     for (const [id, want] of Object.entries(on)) expect(box(id).checked, id).toBe(want);
-    const pressed = [...container.querySelectorAll("[data-testid='mode'] button")].find(
-      (b) => b.getAttribute("aria-pressed") === "true",
-    );
-    expect(pressed?.textContent, "mode").toBe("Plain");
   });
 
   it("holds the settings still as the window is resized", async () => {
-    /* A section is a fixed width: resizing changes how many fit on a line,
-       and nothing else. Each setting is a row of its section: the
-       calibration under the microphone, their selects lined up in the
-       control column, at every width. */
+    /* Settings is a drawer of one width, as wide as the window allows: the
+       calibration on a row under the microphone, their selects lined up in
+       the control column, at every width. */
     const [w, h] = [window.innerWidth, window.innerHeight];
     try {
-      localStorage.setItem("cwt:prefs", JSON.stringify({ settingsOpen: true }));
       await served();
       await mount();
+      await settingsTab("microphone");
       const measure = () => {
-        const widths = [...container.querySelectorAll<HTMLElement>(".viewpanel [data-panel]")]
-          .filter((e) => e.dataset.panel !== "modes")
-          .map((e) => Math.round(e.getBoundingClientRect().width));
-        const mic = container.querySelector("#input-device")!.getBoundingClientRect();
-        const cal = container.querySelector("#calibration")!.getBoundingClientRect();
-        return { widths, below: cal.top >= mic.bottom, offset: Math.abs(cal.left - mic.left) };
+        const mic = $("#input-device")!.getBoundingClientRect();
+        const cal = $("#calibration")!.getBoundingClientRect();
+        const drawer = $("[data-testid='settings']")!.getBoundingClientRect();
+        return { width: Math.round(drawer.width), below: cal.top >= mic.bottom, offset: Math.abs(cal.left - mic.left) };
       };
       const seen = [];
       for (const width of [1400, 1000, 700]) {
@@ -1044,7 +1006,7 @@ const showDownloads = () => tickSetting("show-downloads");
         seen.push(measure());
       }
       for (const m of seen) {
-        expect(m.widths, "every section the same size").toEqual(seen[0]!.widths);
+        expect(m.width, "the drawer the same width").toBe(seen[0]!.width);
         expect(m.below, "the calibration on a row under the microphone").toBe(true);
         expect(m.offset, "their selects lined up").toBeLessThan(2);
       }
@@ -1055,28 +1017,18 @@ const showDownloads = () => tickSetting("show-downloads");
     }
   });
 
-  it("keeps the settings open, or closed, across a reload", async () => {
-    const open = () => container.querySelector(".chartsettings")!.getAttribute("data-open");
-    const toggle = () =>
-      act(async () => {
-        container.querySelector<HTMLButtonElement>("[data-testid='panel-toggle']")!.click();
-      });
-    const reload = async () => {
-      act(() => root!.unmount());
-      root = null;
-      container.innerHTML = "";
-      await mount();
-    };
+  it("opens on the page, with Settings closed, after a reload", async () => {
+    /* Settings is a drawer over the page: a reload is a fresh look at the
+       page, not a return to the drawer. */
     await served();
     await mount();
-    expect(open()).toBe("false");
-    await toggle();
-    expect(open()).toBe("true");
-    await reload();
-    expect(open(), "still open").toBe("true");
-    await toggle();
-    await reload();
-    expect(open(), "still closed").toBe("false");
+    await settingsTab("page");
+    expect($("[data-testid='settings']")).not.toBeNull();
+    act(() => root!.unmount());
+    root = null;
+    container.innerHTML = "";
+    await mount();
+    expect($("[data-testid='settings']")).toBeNull();
   });
 
   it("keeps the zoom it was left at across a reload", async () => {
@@ -1375,7 +1327,8 @@ const showDownloads = () => tickSetting("show-downloads");
       return r.top + r.height / 2;
     };
 
-    for (const row of [".controls", ".viewcontrols"]) {
+    // The message row (the message and Times), and the chart's own.
+    for (const row of [".controls .msgrow", ".viewcontrols"]) {
       const groups = [...container.querySelectorAll<HTMLElement>(`${row} > .group`)];
       // Two is a row: with one attempt and no stack, the chart's row is the
       // axis and the zoom and nothing else.
@@ -1440,11 +1393,8 @@ const showDownloads = () => tickSetting("show-downloads");
   });
 
   it("says how long the target runs at the speeds now set", async () => {
-    /* The same fact as the speed readings beside it, in the form somebody can
-       feel: "yours runs eleven seconds where the target runs nine". It has to
-       follow the sliders, because the target is rendered from them — a figure
-       that stayed put while the speed changed would be describing a different
-       target from the one on the chart. */
+    /* The same fact as the speed readings, in the form somebody can feel. It
+       has to follow the sliders, because the target is rendered from them. */
     await served();
     await mount();
 
@@ -1453,7 +1403,8 @@ const showDownloads = () => tickSetting("show-downloads");
     const before = shown();
     expect(before).toMatch(/^\d+\.\d+s$/);
 
-    const wpm = container.querySelector<HTMLInputElement>("#wpm")!;
+    await openChip("speed");
+    const wpm = $<HTMLInputElement>("#wpm")!;
     await act(async () => {
       setRange(wpm, Number(wpm.value) - 5);
     });
@@ -1558,15 +1509,14 @@ const showDownloads = () => tickSetting("show-downloads");
     it("offers nothing that would act on a recording that is not there", async () => {
       await served();
       await mount();
-      // The download buttons are among the things being checked and are off
-      // unless asked for, so ask.
-      await showDownloads();
       await act(async () => clear().click());
+      // The downloads and Open are in ⋯.
+      await openMore();
 
       // Matched on the accessible name as well as the text, since some of
       // these are icons.
       const named = (re: RegExp) =>
-        [...container.querySelectorAll("button")].find((b) =>
+        [...document.querySelectorAll("button")].find((b) =>
           re.test(`${b.getAttribute("aria-label") ?? ""} ${b.textContent ?? ""}`),
         )!;
       expect(named(/your audio/i).disabled, "download yours").toBe(true);
@@ -1575,7 +1525,7 @@ const showDownloads = () => tickSetting("show-downloads");
       expect(container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.disabled).toBe(true);
 
       // What still works is recording again.
-      expect(named(/record another/i).disabled, "record").toBe(false);
+      expect($<HTMLButtonElement>("[data-testid='record-another']")!.disabled, "record").toBe(false);
       // And opening a file, which is exactly when it is allowed: a cleared
       // session has no speed of its own for a recording to contradict.
       expect(named(/open a recording/i).disabled, "open a file").toBe(false);
@@ -1647,20 +1597,15 @@ const showDownloads = () => tickSetting("show-downloads");
 
   it("offers a recording control on the review itself", async () => {
     // Having just seen where the spacing drifted, the next thing you want is
-    // another go — without losing the speeds and tolerance you just set.
+    // another go, without losing the speeds and tolerance you just set.
     await served();
     await mount();
-    const bar = container.querySelector(".recordbar")!;
-    // By name rather than by text: it is an icon, and the name is what it is
-    // called for anyone who cannot see one.
-    const named = Array.from(bar.querySelectorAll("button")).map(
-      (b) => b.getAttribute("aria-label") ?? b.textContent ?? "",
-    );
-    expect(named.some((n) => /record/i.test(n))).toBe(true);
-    // And a way to open a recording, so the two ways in are not asymmetric —
-    // dropping a file on the page says nothing about itself until you are
-    // already dragging one.
-    expect(named.some((n) => /open a recording/i.test(n))).toBe(true);
+    const record = $<HTMLButtonElement>("[data-testid='record-another']")!;
+    expect(record.textContent).toMatch(/record/i);
+    // And a way to open a recording, in ⋯, so the two ways in are not
+    // asymmetric: dropping a file says nothing about itself.
+    await openMore();
+    expect($("[data-testid='open-file']")).not.toBeNull();
   });
 
   it("comes back to the same recording after a reload", async () => {
@@ -1740,15 +1685,17 @@ const showDownloads = () => tickSetting("show-downloads");
         await act(async () =>
           container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.click(),
         );
+        // In ⋯ on the review.
+        await openMore();
       }
 
-      const inputs = [...container.querySelectorAll<HTMLInputElement>("input[type=file]")];
+      const inputs = [...document.querySelectorAll<HTMLInputElement>("input[type=file]")];
       expect(inputs.length, `the ${screen} screen opens files`).toBeGreaterThan(0);
       for (const input of inputs) {
         expect(input.tabIndex, `the ${screen} dialog is skipped`).toBeLessThan(0);
       }
 
-      const button = container.querySelector<HTMLButtonElement>(opener)!;
+      const button = document.querySelector<HTMLButtonElement>(opener)!;
       expect(button.tabIndex, `the ${screen} button is reachable`).toBeGreaterThanOrEqual(0);
       button.focus();
       expect(document.activeElement, `the ${screen} button takes focus`).toBe(button);
@@ -1765,32 +1712,26 @@ const showDownloads = () => tickSetting("show-downloads");
   });
 
   it("makes a closed upload look closed, not merely quiet", async () => {
-    /* One glyph dims far less convincingly than a phrase does, so the shared
-       disabled opacity was not enough to read as off — it looked like a button
-       that happened to be understated. */
+    /* In ⋯, a closed item is drawn faint, and the pointer says so before the
+       tooltip has to. */
     await served();
     await mount();
-    const open = container.querySelector<HTMLButtonElement>("[data-testid='open-file']")!;
-    expect(open.disabled).toBe(true);
-    /* Copied out, not held: getComputedStyle returns a LIVE declaration, and
-       React flips `disabled` on the same node — so a reference read after the
-       click reports the state after the click, and the two snapshots compare
-       equal however different they looked. */
+    await openMore();
     const look = (el: Element) => {
       const c = getComputedStyle(el);
-      return { bg: c.backgroundColor, ink: c.color, cursor: c.cursor };
+      return { ink: c.color, cursor: c.cursor };
     };
-    const off = look(open);
+    const open = () => $<HTMLButtonElement>("[data-testid='open-file']")!;
+    expect(open().disabled).toBe(true);
+    const off = look(open());
 
-    // Against the same control when it is available.
-    await act(async () =>
-      container.querySelector<HTMLButtonElement>("[data-testid='clear-take']")!.click(),
-    );
-    const on = look(container.querySelector("[data-testid='open-file']")!);
+    // Against the same item when it is on offer.
+    await act(async () => $<HTMLButtonElement>("[data-testid='clear-take']")!.click());
+    if (!$(".quickpop.menu")) await openMore();
+    expect(open().disabled).toBe(false);
+    const on = look(open());
 
-    expect(off.bg).not.toBe(on.bg);
     expect(off.ink).not.toBe(on.ink);
-    // And the pointer says so before the tooltip has to.
     expect(off.cursor).toBe("not-allowed");
   });
 });

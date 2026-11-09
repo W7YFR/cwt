@@ -14,6 +14,7 @@ import {
   open,
   press,
   send,
+  settingsTab,
   slide,
   state,
   unmount,
@@ -29,14 +30,15 @@ vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePla
 useQsoRig();
 
 describe("the listening level", () => {
-  it("is the practice page's, in the Audio settings", async () => {
+  it("is the practice page's, in Sound, beside the microphone in Microphone", async () => {
     mount({ gainDb: 6 });
-    await click($('[data-testid="panel-toggle"]'));
+    // The microphone and its calibration, as on the practice page.
+    await settingsTab("microphone");
+    expect($('[data-panel="microphone"] #input-device')).not.toBeNull();
+    expect($('[data-panel="microphone"] [data-testid="calpick"] #calibration')).not.toBeNull();
+    await settingsTab("sound");
     const level = $<HTMLInputElement>("#gain")!;
-    expect(level.closest('[data-panel="audio"]'), "with the microphone").not.toBeNull();
-    // The Audio settings are the practice page's own, calibration and all.
-    expect($('[data-panel="audio"] #input-device')).not.toBeNull();
-    expect($('[data-panel="audio"] [data-testid="calpick"] #calibration')).not.toBeNull();
+    expect(level.closest('[data-panel="audio"]')).not.toBeNull();
     expect(level.value).toBe("6");
     await slide("gain", 12);
     expect(loadPrefs().gainDb).toBe(12);
@@ -45,32 +47,31 @@ describe("the listening level", () => {
 });
 
 describe("anatomy of a QSO", () => {
-  it("is on the page until the first QSO, then behind the ?", async () => {
+  it("is on the page until the first QSO, and in Help always", async () => {
     mount({});
     const guide = () => $('[data-testid="qso-guide"]');
     expect(guide()?.textContent).toContain("CQ CQ DE KD9XYZ K");
     expect(guide()!.querySelectorAll(".qsoexample").length).toBe(1);
-    expect($('[data-testid="qso-help-open"]'), "no ? while the guide is on the page").toBeNull();
 
     // Its settings link opens the settings. Open, it points at them instead.
     await click($('[data-testid="qso-guide-settings"]'));
     expect($('[data-testid="panel-toggle"]')!.getAttribute("aria-pressed")).toBe("true");
     expect($('[data-testid="qso-guide-settings"]')).toBeNull();
-    expect(guide()!.textContent).toContain(
-      "Change your speed and configure the QSO parameters in the settings panel.",
-    );
+    await press("Escape");
+    expect($('[data-testid="panel-toggle"]')!.getAttribute("aria-pressed")).toBe("false");
 
     await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
     await click($('[data-testid="qso-start"]'));
     await until("the session to start", () => yourTurn());
     expect(guide()).toBeNull();
 
-    await click($('[data-testid="qso-help-open"]'));
-    const help = $('[data-testid="qso-help"]')!;
-    expect(help.querySelector("#qsohelp-title")!.textContent).toBe("Anatomy of a QSO");
-    expect(help.textContent).toContain("CQ CQ DE KD9XYZ K");
+    await click($('[data-testid="help-open"]'));
+    expect($('[data-testid="help"]')!.textContent).toContain("CQ CQ DE KD9XYZ K");
     await press("Escape");
-    expect($('[data-testid="qso-help"]')).toBeNull();
+    await wait(200);
+    expect($('[data-testid="help"]')).toBeNull();
+    // Help's Esc is Help's: the session goes on.
+    expect($('[data-testid="qso-stop"]')).not.toBeNull();
   });
 
   it("changes the page in one step on Start", async () => {
@@ -80,7 +81,6 @@ describe("anatomy of a QSO", () => {
     const parts = () =>
       [
         $('[data-testid="qso-guide"]') ? "guide" : "",
-        $('[data-testid="qso-help-open"]') ? "?" : "",
         $('[data-testid="qso-stop"]') ? "stop" : "",
       ]
         .filter(Boolean)
@@ -89,13 +89,13 @@ describe("anatomy of a QSO", () => {
     await act(async () => {
       $<HTMLButtonElement>('[data-testid="qso-start"]')!.click();
     });
-    for (let t = 0; t < 2000 && seen[seen.length - 1] !== "?+stop"; t += 16) {
+    for (let t = 0; t < 2000 && seen[seen.length - 1] !== "stop"; t += 16) {
       await wait(16);
       const now = parts();
       if (now !== seen[seen.length - 1]) seen.push(now);
     }
     // The guide, then the running session: never one without the other.
-    expect(seen).toEqual(["guide", "?+stop"]);
+    expect(seen).toEqual(["guide", "stop"]);
   });
 
   it("comes back after a session that sent nothing", async () => {
@@ -106,7 +106,6 @@ describe("anatomy of a QSO", () => {
     expect($('[data-testid="qso-guide"]')).toBeNull();
     await click($('[data-testid="qso-stop"]'));
     expect($('[data-testid="qso-guide"]')).not.toBeNull();
-    expect($('[data-testid="qso-help-open"]')).toBeNull();
   });
 });
 
@@ -121,7 +120,6 @@ describe("pausing and going on", () => {
     expect($('[data-testid="qso-stop"]')).toBeNull();
     expect($('[data-testid="qso-continue"]')).not.toBeNull();
     expect($('[data-testid="qso-restart"]')).not.toBeNull();
-    expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual(["R", "Enter"]);
     // Paused, the QSO is not over: the station's call stays as it was.
     expect(note()).toBe("");
 
@@ -146,5 +144,27 @@ describe("pausing and going on", () => {
     });
     expect($('[data-testid="qso-restart"]')).not.toBeNull();
     expect($('[data-testid="qso-guide"]')).toBeNull();
+  });
+});
+
+describe("settings that do nothing as things are", () => {
+  it("dims Typing's settings until the station's lines are copied, and slots' until you copy in slots", async () => {
+    mount({ qsoTheirText: "before" });
+    await settingsTab("copy");
+    const choices = () => $$<HTMLButtonElement>('[data-testid="qso-copy-input"] button');
+    const gradeTyping = () => $<HTMLInputElement>("#qso-grade-typing")!;
+    expect(choices().every((b) => b.disabled), "Copy in, with nothing to copy").toBe(true);
+    expect($<HTMLInputElement>("#qso-lock-copy")!.disabled).toBe(true);
+    // Its ? says why.
+    const tip = $("#qso-lock-copy")!.closest(".group")!.querySelector(".helpdot")!.getAttribute("aria-describedby")!;
+    expect(document.getElementById(tip)!.textContent).toMatch(/^Needs/);
+
+    await settingsTab("page");
+    await click($$<HTMLButtonElement>('[data-testid="qso-their-text"] button').find((b) => b.textContent === "Copy")!);
+    await settingsTab("copy");
+    expect(choices().some((b) => b.disabled)).toBe(false);
+    expect(gradeTyping().disabled, "slots' own, in a box").toBe(true);
+    await click(choices().find((b) => b.textContent === "Slots")!);
+    expect(gradeTyping().disabled).toBe(false);
   });
 });

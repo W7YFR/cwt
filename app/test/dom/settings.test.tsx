@@ -1,4 +1,5 @@
-/* The configuration screen: deleting calibrations, and getting the audio back.
+/* The app's tabs in Settings: You, Drills, and the saved calibrations under
+ * Microphone. Deleting calibrations, and getting the audio back.
  *
  * `deleteProfile` has existed and been tested since profiles did, and nothing
  * called it — a list you can add to and not remove from. What is new here is
@@ -10,7 +11,7 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Settings } from "@/ui/Settings";
+import { CalibrationSettings, DrillSettings, UserSettings } from "@/ui/Settings";
 import { loadProfiles, saveProfile, selectProfile, activeProfile } from "@/io/profiles";
 import {
   loadCustomDrills,
@@ -39,27 +40,25 @@ const PROFILE = (over: Partial<Profile> = {}): Profile => ({
   ...over,
 });
 
-function open(over: Partial<React.ComponentProps<typeof Settings>> = {}) {
-  const props = {
-    profileId: undefined as string | undefined,
-    onProfilesChanged: vi.fn(),
-    onClose: vi.fn(),
-    ...over,
-  };
-  return { ...render(<Settings {...props} />), props };
+/** The You tab. */
+function open() {
+  return render(<UserSettings />);
 }
 
-/** Open on one part of Configuration. */
-function openOn(tab: string, over: Partial<React.ComponentProps<typeof Settings>> = {}) {
-  savePrefs({ ...loadPrefs(), configTab: tab });
-  return open(over);
+/** The Drills tab. */
+function openDrills() {
+  return render(<DrillSettings />);
 }
-const openCalibration = (over: Partial<React.ComponentProps<typeof Settings>> = {}) =>
-  openOn("calibration", over);
+
+/** The saved calibrations, at the foot of the Microphone tab. */
+function openCalibration(over: Partial<React.ComponentProps<typeof CalibrationSettings>> = {}) {
+  const props = { profileId: undefined as string | undefined, onProfilesChanged: vi.fn(), ...over };
+  return { ...render(<CalibrationSettings {...props} />), props };
+}
 
 beforeEach(() => localStorage.clear());
 
-describe("the configuration screen", () => {
+describe("the saved calibrations", () => {
   it("lists what has been saved, with the measurement beside each", async () => {
     /* The name alone cannot tell two positions of one microphone apart — the
        corpus has one webcam measuring 34 ms, 13 ms and 2.5 ms — so every row
@@ -128,40 +127,18 @@ describe("the user section", () => {
   /** Lets the calibration list finish loading inside act. */
   const settle = () => act(async () => {});
 
-  it("comes first; drills and calibration are the other two parts", async () => {
-    const user = userEvent.setup();
-    open();
-    await settle();
+  it("heads each tab with what it holds", async () => {
     const titles = () => screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    const you = open();
+    await settle();
     expect(titles()).toEqual(["User"]);
-
-    await user.click(screen.getByRole("button", { name: "Drills" }));
+    you.unmount();
+    const drills = openDrills();
     expect(titles()).toEqual(["Drills"]);
-
-    await user.click(screen.getByRole("button", { name: "Calibration" }));
+    drills.unmount();
+    openCalibration();
+    await settle();
     expect(titles()).toEqual(["Saved calibrations", "Calibration recordings"]);
-    expect(screen.getByRole("button", { name: "Calibration" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("remembers which part was on show", async () => {
-    const user = userEvent.setup();
-    const { unmount } = open();
-    await settle();
-    await user.click(screen.getByRole("button", { name: "Calibration" }));
-    unmount();
-    open();
-    await settle();
-    expect(screen.getByRole("button", { name: "Calibration" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("closes from one Done, at the foot", async () => {
-    const user = userEvent.setup();
-    const { props } = open();
-    await settle();
-    const done = screen.getAllByRole("button", { name: "Done" });
-    expect(done).toHaveLength(1);
-    await user.click(done[0]!);
-    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
   it("saves each field as it is typed, and reads it back", async () => {
@@ -246,7 +223,7 @@ describe("the drills section", () => {
   }
 
   it("saves the box as one drill, with each line break as a break", async () => {
-    openOn("drills");
+    openDrills();
     await settle();
     const user = await write("cq cq de {CALLSIGN} k\n\n  {callsign}   de k7abc ");
     expect(box().value).toBe("CQ CQ DE {callsign} K\n\n  {callsign}   DE K7ABC ");
@@ -261,7 +238,7 @@ describe("the drills section", () => {
   });
 
   it("refuses a slot it does not know and a symbol with no Morse", async () => {
-    openOn("drills");
+    openDrills();
     await settle();
     await write("HI {nmae}\nHI #");
     expect(screen.getByTestId("drill-problems").textContent).toMatch(/\{nmae\} is not a slot/);
@@ -275,7 +252,7 @@ describe("the drills section", () => {
       { id: "custom/a", text: "AAA" },
       { id: "custom/b", text: "BBB" },
     ]);
-    openOn("drills");
+    openDrills();
     await settle();
     await user.click(screen.getAllByTestId("delete-drill")[0]!);
     expect(loadCustomDrills()).toEqual([{ id: "custom/b", text: "BBB" }]);
@@ -288,7 +265,7 @@ describe("the drills section", () => {
       { id: "custom/a", text: "AAA | BBB" },
       { id: "custom/b", text: "CCC" },
     ]);
-    openOn("drills");
+    openDrills();
     await settle();
     await user.click(screen.getAllByTestId("edit-drill")[0]!);
     expect(box().value).toBe("AAA\nBBB");
@@ -309,7 +286,7 @@ describe("the drills section", () => {
   it("cancels an edit without changing the drill", async () => {
     const user = userEvent.setup();
     saveCustomDrills([{ id: "custom/a", text: "AAA" }]);
-    openOn("drills");
+    openDrills();
     await settle();
     await user.click(screen.getByTestId("edit-drill"));
     await user.type(box(), "B");
@@ -322,7 +299,7 @@ describe("the drills section", () => {
   it("ends the edit when the drill being edited is deleted", async () => {
     const user = userEvent.setup();
     saveCustomDrills([{ id: "custom/a", text: "AAA" }]);
-    openOn("drills");
+    openDrills();
     await settle();
     await user.click(screen.getByTestId("edit-drill"));
     await user.click(screen.getByTestId("delete-drill"));
@@ -333,7 +310,7 @@ describe("the drills section", () => {
 
   it("says which details a saved drill still needs", async () => {
     saveCustomDrills([{ id: "custom/a", text: "DE {callsign}" }]);
-    openOn("drills");
+    openDrills();
     await settle();
     expect(screen.getByTestId("drillrow").textContent).toMatch(/Needs Callsign/);
   });
@@ -341,7 +318,7 @@ describe("the drills section", () => {
   it("lists the slots with the user's values, and adds one at the cursor", async () => {
     const user = userEvent.setup();
     saveUser({ ...loadUser(), callsign: "W7YFR" });
-    openOn("drills");
+    openDrills();
     await settle();
     expect(screen.queryByTestId("drill-help")).toBeNull();
     await user.click(screen.getByTestId("drill-help-toggle"));
@@ -358,7 +335,7 @@ describe("the drills section", () => {
 
   it("adds a slot picked from the menu at the cursor", async () => {
     const user = userEvent.setup();
-    openOn("drills");
+    openDrills();
     await settle();
     await write("DE  K");
     box().setSelectionRange(3, 3);

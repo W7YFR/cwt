@@ -49,15 +49,16 @@ describe("a copy shown right only", () => {
   });
 });
 
-describe("the ? for the guide", () => {
-  it("sits at the right end of its row", async () => {
+describe("the ? for Help", () => {
+  it("sits just left of ⚙, on its center line, in the session too", async () => {
     mount({});
     await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
     await click($('[data-testid="qso-start"]'));
     await until("the session to start", () => yourTurn());
-    const row = $(".qsocontrols")!.getBoundingClientRect();
-    const help = $('[data-testid="qso-help-open"]')!.getBoundingClientRect();
-    expect(row.width, "laid out").toBeGreaterThan(0);
-    expect(Math.abs(row.right - help.right)).toBeLessThanOrEqual(1);
+    const help = $('[data-testid="help-open"]')!.getBoundingClientRect();
+    const cog = $('[data-testid="panel-toggle"]')!.getBoundingClientRect();
+    expect(help.width, "laid out").toBeGreaterThan(0);
+    expect(cog.left - help.right).toBeCloseTo(8, 0);
+    expect(help.top + help.height / 2).toBeCloseTo(cog.top + cog.height / 2, 0);
   });
 });

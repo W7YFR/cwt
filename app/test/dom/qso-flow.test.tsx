@@ -8,10 +8,12 @@ import {
   $,
   $$,
   callIn,
+  click,
   ended,
   key,
   note,
   open,
+  press,
   send,
   state,
   status,
@@ -73,16 +75,14 @@ describe("the session's own words", () => {
     expect(state()).toBe("sending");
     const between = status();
     expect(between).not.toBe("");
-    // The keys, drawn as the practice page draws them.
-    // With the play buttons on every line, Option or Alt and R plays the
+    // The keys are in Help, Option or Alt and R among them, which plays the
     // station's last line.
-    expect($$('[data-testid="qso-hotkeys"] kbd').map((k) => k.textContent)).toEqual([
-      "R",
-      "Enter",
-      "Esc",
-      "Alt",
-      "R",
-    ]);
+    await click($('[data-testid="help-open"]'));
+    await click($('[data-testid="help-tab"] [data-tab="keys"]'));
+    const keys = $$('[data-testid="help-keys"] kbd').map((k) => k.textContent);
+    for (const k of ["R", "Enter", "Esc", "Alt"]) expect(keys, k).toContain(k);
+    await press("Escape");
+    expect(state(), "Help's Esc does not stop the session").toBe("sending");
     await send("CQ CQ DE W7YFR W7YFR K");
     expect(state()).toBe("sending");
     expect(status()).not.toBe(between);

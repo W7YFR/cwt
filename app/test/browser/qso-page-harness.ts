@@ -11,6 +11,7 @@
  * fake clock.
  */
 
+import { withSettings } from "../settings-host";
 import { afterEach, beforeEach, expect } from "vitest";
 import { userEvent } from "vitest/browser";
 import { act, createElement } from "react";
@@ -83,8 +84,10 @@ export async function until(what: string, ok: () => boolean, ms = 30_000): Promi
   throw new Error(`timed out waiting for ${what}`);
 }
 
-export const $ = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel);
-export const $$ = <T extends Element = HTMLElement>(sel: string) => [...host.querySelectorAll<T>(sel)];
+/* The whole document, not the page alone: Settings and Help draw on the
+   body, over the page. */
+export const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel);
+export const $$ = <T extends Element = HTMLElement>(sel: string) => [...document.querySelectorAll<T>(sel)];
 export const status = () => $(".qsostatus")?.textContent ?? "";
 export const note = () => $(".qsonote")?.textContent ?? "";
 /** Where the page is, as its heading's `data-state` says: ready, sending,
@@ -120,7 +123,8 @@ export function mount(prefs: Prefs): void {
   savePrefs({ charWpm: WPM, farnsworthWpm: WPM, qsoLength: "short", ...prefs });
   act(() =>
     root.render(
-      createElement(QsoScreen, {
+      withSettings(
+        createElement(QsoScreen, {
         deviceId: undefined,
         onDeviceChange: () => {},
         profiles: [],
@@ -128,10 +132,10 @@ export function mount(prefs: Prefs): void {
         onProfileChange: () => {},
         onCalibrate: () => {},
         onError: (m: string) => errors.push(m),
-        onConfigure: () => {},
         onPage: () => {},
         onHome: () => {},
       }),
+      ),
     ),
   );
 }

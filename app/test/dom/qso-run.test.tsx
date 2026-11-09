@@ -43,29 +43,12 @@ describe("a run", () => {
     expect(tally()?.dataset.made).toBe("1");
   });
 
-  it("shows the examples beside the log on a wide screen, on the run's format", async () => {
-    vi.stubGlobal("matchMedia", (q: string) => ({
-      matches: q.includes("min-width"),
-      addEventListener() {},
-      removeEventListener() {},
-    }));
-    await open({ qsoTheirText: "before" });
-    await send("CQ SST W7YFR");
-    const help = $('[data-testid="qso-help-open"]')!;
-    await click(help);
-    expect($('[data-testid="qso-help"]'), "no dialog where there is room").toBeNull();
-    expect($('[data-testid="qso-side"] [data-testid="qso-examples"]')?.dataset.shown).toBe("sst");
-    expect(help.getAttribute("aria-pressed")).toBe("true");
-    await click(help);
-    expect($('[data-testid="qso-side"]')).toBeNull();
-  });
-
-  it("opens the guide on the run's format", async () => {
+  it("opens Help's guide on the run's format", async () => {
     await open({ qsoTheirText: "before" });
     await send("CQ POTA DE W7YFR");
     await until("your turn", () => yourTurn());
-    await click($('[data-testid="qso-help-open"]'));
-    expect($('[data-testid="qso-examples"]')?.dataset.shown).toBe("pota");
+    await click($('[data-testid="help-open"]'));
+    expect($('[data-testid="help"] [data-testid="qso-examples"]')?.dataset.shown).toBe("pota");
     await press("Escape");
   });
 });

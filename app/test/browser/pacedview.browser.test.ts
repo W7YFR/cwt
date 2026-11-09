@@ -123,7 +123,6 @@ function mount(over: Partial<ReviewSettings> & { runs?: number; take?: Take }) {
       onProfileChange: () => {},
       onDeviceChange: () => {},
       onCalibrate: () => {},
-      onConfigure: () => {},
       onFile: () => {},
       onClear: () => {},
       onNewSession: () => {},
@@ -424,7 +423,7 @@ describe("picking a run out of the stack", () => {
 
 describe("while a take runs", () => {
   const locked = (sel: string) => host.querySelector(sel)!.hasAttribute("inert");
-  const BANDS = [".controls", ".scoresrow", ".report", ".cornergroup"];
+  const BANDS = [".controls", ".scoresrow", ".report"];
 
   it("locks everything but Stop, Restart and Cancel, and unlocks after", async () => {
     mount({});
@@ -438,6 +437,11 @@ describe("while a take runs", () => {
       expect(b.disabled, label).toBe(false);
       expect(b.closest("[inert]"), label).toBeNull();
     }
+    // The quick settings that the take depends on are off; Volume stays.
+    for (const chip of ["speed", "mode", "tolerance"]) {
+      expect(host.querySelector<HTMLButtonElement>(`[data-testid='chip-${chip}']`)!.disabled, chip).toBe(true);
+    }
+    expect(host.querySelector<HTMLButtonElement>("[data-testid='chip-volume']")!.disabled).toBe(false);
     // How the chart is drawn changes nothing about the take.
     const view = host.querySelector(".viewcontrols");
     if (view) expect(view.hasAttribute("inert")).toBe(false);
