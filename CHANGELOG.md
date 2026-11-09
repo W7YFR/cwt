@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.28.0 — 2026-11-09
+
 ### Added
 
 - The QSO page plays part of the station's line, as the Copy page does. **Letter** and **Word** play the selected slot's letter or word, and a click or a selection in a line plays that part.
