@@ -124,7 +124,7 @@ export function NewSession(props: NewSessionProps): React.ReactElement {
         </p>
 
         <div className="fieldrow">
-          <label htmlFor="ns-text">Target message</label>
+          <label htmlFor="ns-text">Message</label>
           {/* The message holds no slots, so a pick inserts the slot's value. */}
           <SlotMenu
             label="Insert"

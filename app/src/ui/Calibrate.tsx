@@ -47,7 +47,8 @@ import {
 } from "@/io/profiles";
 import type { AudioClip } from "@/types";
 import { IconPlay, IconStop } from "./Icons";
-import { Cog, DevicePicker, LevelMeter, RecDot } from "./Record";
+import { DevicePicker, LevelMeter, RecDot } from "./Record";
+import { SettingsButton } from "./SettingsDrawer";
 import { AppName } from "./Wordmark";
 import { useRecorder } from "./useRecorder";
 
@@ -150,13 +151,6 @@ export interface CalibrateProps {
   /** Saved and selected — the caller re-reads the store. */
   onSaved(profile: Profile): void;
   onClose(): void;
-  /** Into the configuration screen — the saved calibrations and the recordings
-   *  they were measured from.
-   *
-   * Here and nowhere else: what is behind it is entirely about calibration, so
-   * it belongs on the screen where calibration is being done rather than in
-   * the corner of every screen. */
-  onConfigure(): void;
   /** Injected so a test does not have to mock the clock. */
   now?(): Date;
   /** Dev only: open straight on the result for this recording, keyed at
@@ -172,7 +166,7 @@ export interface CalibrateProps {
 export function Calibrate(props: CalibrateProps): React.ReactElement {
   return (
     <>
-      <Cog onClick={props.onConfigure} />
+      <SettingsButton />
       <Wizard {...props} />
     </>
   );

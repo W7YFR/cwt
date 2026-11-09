@@ -13,9 +13,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { IconCog } from "./Icons";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
+import type { RecordMode } from "./mode";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
@@ -34,7 +34,6 @@ import {
   COLLAPSE_RESTS_HELP,
   RUN_SCORES_HELP,
   SHOW_CHART_CONTROLS_HELP,
-  SHOW_DOWNLOADS_HELP,
   SHOW_HINTS_HELP,
   SHOW_RUNS_HELP,
   RUN_SORT_HELP,
@@ -102,6 +101,8 @@ import {
 /** The two speed sliders, character and overall. The practice page and the
  *  QSO page both draw these, so a speed is set the same way on each. */
 /** What the two speeds set. */
+const TOLERANCE_HELP =
+  "How far a mark or a gap may be from its target length and still count as right.";
 const CHAR_SPEED_HELP =
   "How fast the dits and dahs inside each character go, in words per minute.";
 const FARNSWORTH_HELP =
@@ -215,23 +216,6 @@ export function Controls(props: ControlsProps): React.ReactElement {
 
   return (
     <section className="controls" inert={props.locked === true} data-locked={props.locked === true}>
-      <SpeedSliders charWpm={s.charWpm} farnsworthWpm={s.farnsworthWpm} onChange={onChange} />
-
-      <div className="group">
-        <label htmlFor="tol">
-          Tolerance <output id="tol-out">{fmtTolerance(s.tolerance)}</output>
-        </label>
-        <input
-          type="range"
-          id="tol"
-          min={5}
-          max={60}
-          step={1}
-          value={Math.round(s.tolerance * 100)}
-          onChange={(e) => onChange({ tolerance: Number(e.target.value) / 100 })}
-        />
-      </div>
-
       {/* The message and how many of it, on one line. A wrapper, because the
           message group claims a whole row by itself — it is the one control
           here whose useful width has no upper bound — so the two share a line
@@ -239,7 +223,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
           does not. */}
       <div className="msgrow">
         <div className="group grow">
-          <label htmlFor="expected">Intended message</label>
+          <label htmlFor="expected">Message</label>
           {/* Says what the box is FOR, which is the thing worth knowing when it
               is empty: with nothing here there is no source of truth, so the
               grade falls back to the decoder's own reading of you and the
@@ -265,7 +249,7 @@ export function Controls(props: ControlsProps): React.ReactElement {
                 type="button"
                 className="clearbtn"
                 data-testid="clear-expected"
-                aria-label="Clear intended message"
+                aria-label="Clear the message"
                 title="Clear"
                 onClick={() => {
                   onChange({ expected: "" });
@@ -310,6 +294,34 @@ export function Controls(props: ControlsProps): React.ReactElement {
   );
 }
 
+/** How far off a mark may be and still count as right, in percent. */
+export function ToleranceSlider({
+  tolerance,
+  onChange,
+}: {
+  tolerance: number;
+  onChange(tolerance: number): void;
+}): React.ReactElement {
+  const about = useHelp(TOLERANCE_HELP);
+  return (
+    <div className="group">
+      <label htmlFor="tol" title={about.title}>
+        Tolerance <output id="tol-out">{fmtTolerance(tolerance)}</output>
+      </label>
+      <input
+        type="range"
+        id="tol"
+        min={5}
+        max={60}
+        step={1}
+        value={Math.round(tolerance * 100)}
+        onChange={(e) => onChange(Number(e.target.value) / 100)}
+      />
+      {about.tip}
+    </div>
+  );
+}
+
 /** A small number box with its name beside it and its unit after it.
  *
  * Held as text while it is being edited, which is the whole reason this is a
@@ -336,6 +348,17 @@ const TIP_GAP = 6;
  *  the settings band, which clips what overflows it, cannot cut it off. It
  *  opens below, or above where there is no room below, and stays inside the
  *  window either side. */
+/** Where a fixed box can go: the edges of the box `position: fixed`
+ *  measures from, in window coordinates. */
+function fixedFrame(): { left: number; right: number; top: number } {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:0;right:0;top:0;height:0;visibility:hidden;pointer-events:none";
+  document.body.appendChild(probe);
+  const r = probe.getBoundingClientRect();
+  probe.remove();
+  return { left: r.left, right: r.right, top: r.top };
+}
+
 function HelpTip({ text }: { text: string }): React.ReactElement {
   const id = useId();
   const dot = useRef<HTMLButtonElement>(null);
@@ -346,11 +369,16 @@ function HelpTip({ text }: { text: string }): React.ReactElement {
     if (!open || !dot.current || !box.current) return;
     const d = dot.current.getBoundingClientRect();
     const b = box.current.getBoundingClientRect();
-    const room = window.innerWidth - TIP_EDGE;
-    const left = Math.max(TIP_EDGE, Math.min(d.left - 10, room - b.width));
+    /* The page keeps a scrollbar's width free on both sides (see `html` in
+       base.css), and a fixed box is placed inside them, not from the window's
+       edge. Measured, because a browser with overlay scrollbars still keeps
+       the room while reporting none. */
+    const frame = fixedFrame();
+    const room = frame.right - TIP_EDGE;
+    const left = Math.max(frame.left + TIP_EDGE, Math.min(d.left - 10, room - b.width));
     const below = d.bottom + TIP_GAP;
     const top = below + b.height > window.innerHeight - TIP_EDGE ? d.top - TIP_GAP - b.height : below;
-    setAt({ top, left });
+    setAt({ top: top - frame.top, left: left - frame.left });
   }, [open]);
   const show = () => setOpen(true);
   const hide = () => {
@@ -477,6 +505,9 @@ export interface ChartSettingsProps {
 
 export interface ViewControlsProps extends ChartSettingsProps {
   onFit(): void;
+  /** Replay what plays each time it reaches its end. L toggles it too. */
+  loop?: boolean;
+  onLoop?(): void;
 }
 
 /** A select with its caption above it, barred in place when it cannot apply. */
@@ -529,21 +560,24 @@ export function ChoiceGroup({
   help,
   value,
   options,
+  barred = null,
   onChange,
 }: {
   id: string;
   label: string;
   help?: string;
   value: string;
+  /** Why it does nothing now, when another setting rules it out. */
+  barred?: string | null;
   /** Each choice, with a sentence on what it does. The chosen one's shows
    *  under the buttons. */
   options: ReadonlyArray<{ value: string; label: string; note?: string }>;
   onChange(value: string): void;
 }): React.ReactElement {
   const note = options.find((o) => o.value === value)?.note;
-  const about = useHelp(help);
+  const about = useHelp(help === undefined && !barred ? undefined : barredTitle(barred, help ?? ""));
   return (
-    <div className="group choicegroup" title={about.title}>
+    <div className="group choicegroup" title={about.title} data-disabled={barred !== null}>
       <span className="caption" id={`${id}-label`}>
         {label}
       </span>
@@ -559,15 +593,23 @@ export function ChoiceGroup({
             key={o.value}
             type="button"
             aria-pressed={value === o.value}
+            disabled={barred !== null}
             onClick={() => onChange(o.value)}
           >
             {o.label}
           </button>
         ))}
       </div>
-      {note && (
-        <span className="note" id={`${id}-note`}>
-          {note}
+      {/* Every choice's note in the same place, only the chosen one in view,
+          so the row is as tall as its tallest note and never changes height
+          when the choice does. */}
+      {options.some((o) => o.note) && (
+        <span className="note notes" id={`${id}-note`}>
+          {options.map((o) => (
+            <span key={o.value} aria-hidden={o.value !== value} data-on={o.value === value}>
+              {o.note ?? ""}
+            </span>
+          ))}
         </span>
       )}
       {about.tip}
@@ -660,37 +702,22 @@ export function ViewControls(props: ViewControlsProps): React.ReactElement | nul
           >
             Fit
           </button>
+          {/* A switch beside the chart it plays, rather than a setting: L
+              toggles it too. */}
+          {props.onLoop && (
+            <button
+              className="loop"
+              data-testid="loop"
+              aria-pressed={props.loop === true}
+              title={LOOP_HELP}
+              onClick={props.onLoop}
+            >
+              Loop
+            </button>
+          )}
         </div>
       </div>
     </section>
-  );
-}
-
-/** The way in: the button in the corner of the header.
- *
- * In the header rather than on a row of controls, because every row of
- * controls on this page can be switched off — and a way in that goes away with
- * the thing it switched off is a setting nobody can undo. The corner is also
- * the one place that does not move as the page fills and empties. */
-export function ChartSettingsButton({
-  open,
-  onToggle,
-}: {
-  open: boolean;
-  onToggle(): void;
-}): React.ReactElement {
-  return (
-    <button
-      className="iconbtn cornerbtn"
-      data-testid="panel-toggle"
-      aria-pressed={open}
-      aria-controls="view-panel"
-      aria-label="Settings"
-      title="Settings"
-      onClick={onToggle}
-    >
-      <IconCog />
-    </button>
   );
 }
 
@@ -750,196 +777,156 @@ export interface AudioSetup {
   locked?: boolean;
 }
 
-export interface SettingsPanelProps extends ChartSettingsProps {
-  audio?: AudioSetup;
-  /** Replay what plays each time it reaches its end. Not a saved setting: it
-   *  is the transport's, and L toggles it too. */
-  loop?: boolean;
-  onLoop?(): void;
-}
-
-/** The settings band's shell: rolled up or open under the header, and
- *  unreachable while rolled up. Both pages draw their settings in it. */
-export function SettingsBand({
-  open,
-  locked = false,
-  bandRef,
-  children,
-}: {
-  open: boolean;
-  /** Open, but not to be changed: a take is recording. */
-  locked?: boolean;
-  bandRef?: React.Ref<HTMLElement>;
-  children: React.ReactNode;
-}): React.ReactElement {
-  /* Always in the tree, open or not: a band that is only rendered while open
-     has nothing to roll down FROM, and a closed one has to be unreachable
-     rather than merely invisible — `inert` takes it out of the tab order and
-     off the accessibility tree together, which two attributes doing half
-     each would eventually disagree about. */
-  return (
-    <section className="chartsettings" data-open={String(open)} ref={bandRef}>
-      <div inert={!open || locked} data-locked={locked}>
-        {children}
-      </div>
-    </section>
-  );
-}
-
-/** The settings both pages share, and room for each page's own.
- *
- * Audio comes first, on every page: where the sound comes from, what corrects
- * it, and how loud it plays. Then the page's own sections, then a row of its
- * own settings where it has them, then a row of its modes' options, as the
- * practice page has for Plain, Paced and Zen. */
-export function SettingsPanel({
-  audio,
-  gainDb,
-  onGainDb,
-  audioExtra,
-  className,
-  modesTitle,
-  modes,
-  pageRow,
-  children,
-}: {
-  /** The microphone and its calibration. Absent where there is no recorder
-   *  to set them for. */
-  audio?: AudioSetup | undefined;
-  gainDb: number;
-  onGainDb(gainDb: number): void;
-  /** More on the playback line, after the listening level. */
-  audioExtra?: React.ReactNode;
-  className?: string;
-  /** The modes' row: its title, and a Section for each mode with options. */
-  modesTitle?: string;
-  modes?: React.ReactNode;
-  /** A row of Sections for what is set for this page alone, under the
-   *  settings the pages share. */
-  pageRow?: React.ReactNode;
-  children?: React.ReactNode;
-}): React.ReactElement {
+/** A page's settings, as a form: one section after another, each setting a
+ *  row with its name on the left and its control on the right. Each setting's
+ *  explanation is behind a question mark after its name. */
+export function SettingsForm({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
     <HelpTips.Provider value={true}>
-      <div className={className ? `viewpanel ${className}` : "viewpanel"} id="view-panel">
-        <Section name="audio" title="Audio">
-          {/* Two lines: where the sound comes from, then how it plays back. */}
-          {audio && (
-            <div className="panelgroups">
-              <AudioGroups audio={audio} />
-            </div>
-          )}
-          <div className="panelgroups">
-            <ListeningLevel gainDb={gainDb} onChange={onGainDb} />
-            {audioExtra}
-          </div>
-        </Section>
-
-        {children}
-
-        {pageRow && <div className="pagerow">{pageRow}</div>}
-
-        {modes && (
-          <div className="panelrow modes" data-panel="modes" role="group" aria-labelledby="panel-modes">
-            <span className="uplabel" id="panel-modes">
-              {modesTitle}
-            </span>
-            <div className="modesrow">{modes}</div>
-          </div>
-        )}
-      </div>
+      <div className="viewpanel formpanel">{children}</div>
     </HelpTips.Provider>
   );
 }
 
-/** Every setting the control row has no room for, in a band under the header.
- *
- * Grouped by the question each answers: what you hear, what you send, how it
- * is graded, the two ways to record, how the chart is drawn, and what else is
- * on the page. A setting that another one rules out stays in its place,
- * dimmed, with the reason in its tooltip. */
-export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElement {
-  const { settings: s, onChange } = props;
+/** How loud playback is, with what else plays on the page's Sound tab. */
+export function SoundSection({
+  gainDb,
+  onGainDb,
+  children,
+}: {
+  gainDb: number;
+  onGainDb(gainDb: number): void;
+  children?: React.ReactNode;
+}): React.ReactElement {
   return (
-    <SettingsPanel
-      className="formpanel"
-      audio={props.audio}
-      gainDb={s.gainDb}
-      onGainDb={(gainDb) => onChange({ gainDb })}
-      audioExtra={
-        props.onLoop && (
-          <Check
-            id="loop"
-            label="Repeat playback when it ends"
-            help={LOOP_HELP}
-            checked={props.loop ?? false}
-            onChange={() => props.onLoop?.()}
-          />
-        )
-      }
-    >
+    <Section name="audio" title="Sound">
+      <div className="panelgroups">
+        <ListeningLevel gainDb={gainDb} onChange={onGainDb} />
+        {children}
+      </div>
+    </Section>
+  );
+}
+
+/** The microphone and its calibration: the page's part of the Microphone
+ *  tab, where the page has a recorder. */
+export function MicrophoneSection({ audio }: { audio: AudioSetup }): React.ReactElement {
+  return (
+    <Section name="microphone" title="In use">
+      <div className="panelgroups">
+        <AudioGroups audio={audio} />
+      </div>
+    </Section>
+  );
+}
+
+/** The options of one way to record: in Settings under While I record, and
+ *  under the mode in the Mode chip. */
+export function ModeOptions({
+  mode,
+  settings: s,
+  onChange,
+}: {
+  mode: RecordMode;
+  settings: ReviewSettings;
+  onChange(patch: Partial<ReviewSettings>): void;
+}): React.ReactElement {
+  if (mode === "plain")
+    return (
+      <>
+      <Check
+        id="plain-follow"
+        label="Scroll the chart with me, and stop when I finish"
+        help={PLAIN_FOLLOW_HELP}
+        checked={s.plainFollow}
+        onChange={(v) => onChange({ plainFollow: v })}
+      />
+      <Check
+        id="plain-grading"
+        label="Grade each character as I key it"
+        help={PLAIN_GRADING_HELP}
+        checked={s.plainGrading}
+        onChange={(v) => onChange({ plainGrading: v })}
+      />
+      </>
+    );
+  if (mode === "zen")
+    return (
+      <>
+      <Check
+        id="zen-progress"
+        label="Show where I am in the message"
+        help={ZEN_PROGRESS_HELP}
+        checked={s.zenProgress}
+        onChange={(v) => onChange({ zenProgress: v })}
+      />
+      <Check
+        id="zen-grading"
+        label="Grade each character as I key it"
+        help={ZEN_GRADING_HELP}
+        checked={s.zenGrading}
+        barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
+        onChange={(v) => onChange({ zenGrading: v })}
+      />
+      </>
+    );
+  return (
+    <>
+      <Check
+        id="pace-absolute"
+        label="Show Absolute time while recording"
+        help={PACE_ABSOLUTE_HELP}
+        checked={s.paceAbsolute}
+        onChange={(v) => onChange({ paceAbsolute: v })}
+      />
+      <div className="group">
+        <NumberField
+          id="pace-lead"
+          name="Count-in"
+          unit="s"
+          spoken="seconds"
+          help={PACE_LEAD_HELP}
+          value={s.paceLeadSec}
+          min={PACE_LEAD_MIN_SEC}
+          max={PACE_LEAD_MAX_SEC}
+          step={1}
+          onChange={(v) => onChange({ paceLeadSec: v })}
+        />
+      </div>
+    </>
+  );
+}
+
+/** The Send page's own settings.
+ *
+ * Grouped by the question each answers: the two ways to record, what you
+ * send, how it is graded, how the chart is drawn, and what else is on the
+ * page. A setting that another one rules out stays in its place, dimmed,
+ * with the reason in its tooltip. */
+export function SendSettings({
+  settings: s,
+  onChange,
+}: {
+  settings: ReviewSettings;
+  onChange(patch: Partial<ReviewSettings>): void;
+}): React.ReactElement {
+  return (
+    <>
       {/* The options of the three ways to record: the settings changed from
           one sitting to the next. Which mode records is picked beside the
           record button; these are set ahead of it, so they stay live whichever
           is picked. */}
       <Section name="modes" title="While I record">
         <div className="panelgroups">
-          <SettingRow label="Plain">
-            <Check
-              id="plain-follow"
-              label="Scroll the chart with me, and stop when I finish"
-              help={PLAIN_FOLLOW_HELP}
-              checked={s.plainFollow}
-              onChange={(v) => onChange({ plainFollow: v })}
-            />
-            <Check
-              id="plain-grading"
-              label="Grade each character as I key it"
-              help={PLAIN_GRADING_HELP}
-              checked={s.plainGrading}
-              onChange={(v) => onChange({ plainGrading: v })}
-            />
-          </SettingRow>
-          <SettingRow label="Zen">
-            <Check
-              id="zen-progress"
-              label="Show where I am in the message"
-              help={ZEN_PROGRESS_HELP}
-              checked={s.zenProgress}
-              onChange={(v) => onChange({ zenProgress: v })}
-            />
-            <Check
-              id="zen-grading"
-              label="Grade each character as I key it"
-              help={ZEN_GRADING_HELP}
-              checked={s.zenGrading}
-              barred={s.zenProgress ? null : NEEDS_LIVE_PROGRESS}
-              onChange={(v) => onChange({ zenGrading: v })}
-            />
-          </SettingRow>
-          <SettingRow label="Paced">
-            <Check
-              id="pace-absolute"
-              label="Show Absolute time while recording"
-              help={PACE_ABSOLUTE_HELP}
-              checked={s.paceAbsolute}
-              onChange={(v) => onChange({ paceAbsolute: v })}
-            />
-            <div className="group">
-              <NumberField
-                id="pace-lead"
-                name="Count-in"
-                unit="s"
-                spoken="seconds"
-                help={PACE_LEAD_HELP}
-                value={s.paceLeadSec}
-                min={PACE_LEAD_MIN_SEC}
-                max={PACE_LEAD_MAX_SEC}
-                step={1}
-                onChange={(v) => onChange({ paceLeadSec: v })}
-              />
-            </div>
-          </SettingRow>
+          <Subgroup label="Plain">
+            <ModeOptions mode="plain" settings={s} onChange={onChange} />
+          </Subgroup>
+          <Subgroup label="Zen">
+            <ModeOptions mode="zen" settings={s} onChange={onChange} />
+          </Subgroup>
+          <Subgroup label="Paced">
+            <ModeOptions mode="paced" settings={s} onChange={onChange} />
+          </Subgroup>
         </div>
       </Section>
 
@@ -964,6 +951,7 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
 
       <Section name="grading" title="Grading">
         <div className="panelgroups checks">
+          <ToleranceSlider tolerance={s.tolerance} onChange={(tolerance) => onChange({ tolerance })} />
           <Check
             id="ignore-construction"
             label="Grade only the spacing, for a keyer"
@@ -992,14 +980,14 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
           />
           <Check
             id="run-scores"
-            label="Show each attempt's scores"
+            label="Show each run's scores"
             help={RUN_SCORES_HELP}
             checked={s.runScores}
             onChange={(v) => onChange({ runScores: v })}
           />
           <Check
             id="caption-all"
-            label="Caption every attempt"
+            label="Caption every run"
             help={CAPTION_ALL_HELP}
             checked={s.captionAll}
             onChange={(v) => onChange({ captionAll: v })}
@@ -1028,13 +1016,6 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
             onChange={(v) => onChange({ showChartControls: v })}
           />
           <Check
-            id="show-downloads"
-            label="Show the download buttons"
-            help={SHOW_DOWNLOADS_HELP}
-            checked={s.showDownloads}
-            onChange={(v) => onChange({ showDownloads: v })}
-          />
-          <Check
             id="show-hints"
             label="Show hints"
             help={SHOW_HINTS_HELP}
@@ -1050,23 +1031,31 @@ export function ChartSettingsPanel(props: SettingsPanelProps): React.ReactElemen
           />
         </div>
       </Section>
-    </SettingsPanel>
+    </>
   );
 }
 
-/** A setting's name on the left of controls that carry none there, such as
- *  checkboxes, so the row reads like the rest. Several stack in the control
- *  column under the one name. */
-export function SettingRow({
-  label,
-  children,
+/** The Send page's part of the Sound tab: how loud. */
+export function SendSound({
+  gainDb,
+  onGainDb,
 }: {
-  label: string;
-  children: React.ReactNode;
+  gainDb: number;
+  onGainDb(gainDb: number): void;
 }): React.ReactElement {
+  return <SoundSection gainDb={gainDb} onGainDb={onGainDb} />;
+}
+
+/** A few settings that belong together, such as the options of one way to
+ *  record. Its name sits in the name column beside the first of them; a
+ *  setting with a name of its own, such as Count-in, keeps it on its own row.
+ *  Lines separate these groups, not the settings inside one. */
+export function Subgroup({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
   return (
-    <div className="group setrow">
-      <span className="caption">{label}</span>
+    <div className="subgroup" role="group" aria-label={label}>
+      <span className="subhead" aria-hidden="true">
+        {label}
+      </span>
       {children}
     </div>
   );
@@ -1312,7 +1301,7 @@ export function MicrophoneGroup({
 
 /** The microphone and its calibration, each barred in place when there is
  *  nothing to choose. */
-function AudioGroups({ audio }: { audio: AudioSetup }): React.ReactElement {
+export function AudioGroups({ audio }: { audio: AudioSetup }): React.ReactElement {
   const choices = profilesFor([...audio.profiles], audio.deviceId, audio.profileId);
   const active = audio.profiles.find((p) => p.id === audio.profileId) ?? null;
   const calBarred = !audio.appliesToTake

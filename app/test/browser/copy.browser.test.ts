@@ -8,6 +8,7 @@
  * where it is as the real one does, and the page moves on that.
  */
 
+import { withSettings } from "../settings-host";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement, type MutableRefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -118,9 +119,17 @@ async function until(what: string, ok: () => boolean, ms = 20_000): Promise<void
   throw new Error(`timed out waiting for ${what}`);
 }
 
-const $ = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel);
-const $$ = <T extends Element = HTMLElement>(sel: string) => [...host.querySelectorAll<T>(sel)];
+/* The whole document, not the page alone: Settings draws on the body. */
+const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel);
+const $$ = <T extends Element = HTMLElement>(sel: string) => [...document.querySelectorAll<T>(sel)];
 const button = (id: string) => $<HTMLButtonElement>(`[data-testid="${id}"]`)!;
+
+/** Open Settings, if it is not, at one of its tabs: "page", "copy" (Typing),
+ *  "sound" or "speed". */
+async function settingsTab(tab: string): Promise<void> {
+  if (button("panel-toggle").getAttribute("aria-pressed") !== "true") await click(button("panel-toggle"));
+  await click($(`[data-testid="settings-tab"] [data-tab="${tab}"]`));
+}
 /** Where the page is, as its heading's `data-state` says. */
 const state = () => $('[data-testid="copy-state"]')?.dataset.state ?? "";
 const lines = () => $$('[data-testid="copy-line"]');
@@ -162,13 +171,14 @@ function mount(prefs: Prefs = {}): void {
   savePrefs({ ...prefs });
   act(() =>
     root.render(
-      createElement(CopyScreen, {
+      withSettings(
+        createElement(CopyScreen, {
         onError: (m: string) => errors.push(m),
-        onConfigure: () => {},
         onPage: () => {},
         onHome: () => {},
         fileTarget,
       }),
+      ),
     ),
   );
 }
@@ -222,7 +232,9 @@ describe("opening a recording", () => {
     mount();
     await until("the page to settle", () => state() === "none");
     expect($('[data-testid="copy-guide"]')).not.toBeNull();
-    expect($('[data-testid="copy-open-first"]')).not.toBeNull();
+    // Open is in ⋯, in the toolbar, before and after there is a recording.
+    await click(button("more"));
+    expect($('[data-testid="copy-open"]')).not.toBeNull();
     expect(lines()).toHaveLength(0);
   });
 
@@ -481,13 +493,14 @@ describe("Clear", () => {
 describe("copying in another way", () => {
   /** Pick Copy in from the settings: Box or Slots. */
   async function copyIn(label: "Box" | "Slots"): Promise<void> {
+    await settingsTab("copy");
     const pick = $$<HTMLButtonElement>('[data-testid="copy-input"] button').find((b) => b.textContent === label);
     await click(pick ?? null);
   }
   const slots = () => $$('[data-testid="copy-slot"]');
 
   it("takes Copy in at once while nothing is copied", async () => {
-    await open({ copySettingsOpen: true });
+    await open({});
     await copyIn("Slots");
     await playTo(1);
     expect(boxes()).toHaveLength(0);
@@ -495,7 +508,7 @@ describe("copying in another way", () => {
   });
 
   it("keeps the attempt under way as it is, and copies the next attempt the new way", async () => {
-    await open({ copyInput: "slots", copySettingsOpen: true });
+    await open({ copyInput: "slots" });
     await playTo(1);
     await fill(slots()[0] as HTMLInputElement, "C");
     await copyIn("Box");
@@ -513,7 +526,7 @@ describe("copying in another way", () => {
   });
 
   it("shows an attempt made in the box as slots over slots", async () => {
-    await open({ copySettingsOpen: true });
+    await open({});
     await playTo(1);
     await fill(boxes()[0]!, "CQ CQ");
     await enter(boxes()[0]!, true);
@@ -572,7 +585,7 @@ describe("a generated QSO", () => {
   async function makeUp(prefs: Prefs = {}): Promise<void> {
     mount(prefs);
     await until("the page to settle", () => state() === "none");
-    await click(button("copy-new-first"));
+    await click(button("copy-new"));
     await until("the QSO to be ready", () => state() === "ready");
   }
 
@@ -589,7 +602,7 @@ describe("a generated QSO", () => {
     await playTo(1);
     await fill(boxes()[0]!, "CQ CWT");
     const before = length();
-    await click(button("panel-toggle"));
+    await settingsTab("speed");
     await fill($<HTMLInputElement>("#wpm")!, "15");
     await until("the QSO to be sent again", () => length() > before);
     expect(boxes()[0]!.value).toBe("CQ CWT");
@@ -603,7 +616,7 @@ describe("a generated QSO", () => {
     const played = () => new Uint8Array((globalThis as { played?: ArrayBuffer }).played!);
     const clean = played();
     const before = length();
-    await click(button("panel-toggle"));
+    await settingsTab("sound");
     for (const [id, value] of [["qsb", "12"], ["noise", "-20"], ["qrn", "2"], ["qrm", "-20"]] as const) {
       await fill($<HTMLInputElement>(`#${id}`)!, value);
     }
@@ -622,7 +635,7 @@ describe("a generated QSO", () => {
     await makeUp({ copyKind: "pota", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 30, copyFarnsworthWpm: 30 });
     const shown = () => $('[data-testid="copy-sent-speed"]')?.textContent;
     expect(shown()).toBe("30 wpm");
-    await click(button("panel-toggle"));
+    await settingsTab("speed");
     await fill($<HTMLInputElement>("#farns")!, "20");
     expect(shown()).toBe("30/20 wpm");
   });
@@ -634,7 +647,7 @@ describe("a generated QSO", () => {
 
   it("chooses Mine when a slider moves", async () => {
     await makeUp({ copyKind: "pota", copyRunQsos: 1 });
-    await click(button("panel-toggle"));
+    await settingsTab("speed");
     const pressed = () => $('[data-testid="copy-speed"] [aria-pressed="true"]')?.textContent;
     const was = pressed();
     await fill($<HTMLInputElement>("#farns")!, "8");
@@ -671,7 +684,7 @@ describe("an opened recording at my speeds", () => {
     await playTo(1);
     await fill(boxes()[0]!, "CQ CQ");
     const opened = length();
-    await click(button("panel-toggle"));
+    await settingsTab("speed");
     await click(atMine());
     expect(loadPrefs().copyRecordingAtMine).toBe(true);
     await until("the recording to be sent again", () => length() > opened);
@@ -694,7 +707,7 @@ describe("an opened recording at my speeds", () => {
     await open({ ...slow, copyRecordingAtMine: true });
     await wait(100);
     const before = length();
-    await click(button("panel-toggle"));
+    await settingsTab("speed");
     await fill($<HTMLInputElement>("#wpm")!, "30");
     await until("the recording to be sent again", () => length() < before);
   });
@@ -720,7 +733,7 @@ describe("Wait between lines", () => {
   async function locked(prefs: Prefs = {}): Promise<void> {
     mount({ copyKind: "cwt", copyRunQsos: 1, copyWait: true, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, ...prefs });
     await until("the page to settle", () => state() === "none");
-    await click(button("copy-new-first"));
+    await click(button("copy-new"));
     await until("the QSO to be ready", () => state() === "ready");
   }
 
@@ -777,7 +790,7 @@ describe("Wait between lines", () => {
   it("takes a Wait kept from before as Stop after each line, with 1s between lines", async () => {
     mount({ copyGap: "wait" });
     await until("the page to settle", () => state() === "none");
-    await click(button("panel-toggle"));
+    await settingsTab("page");
     expect($<HTMLInputElement>("#copy-wait")!.checked).toBe(true);
     expect($('[data-testid="copy-gap"] [aria-pressed="true"]')!.textContent).toBe("1s");
     await click($<HTMLInputElement>("#copy-wait"));
@@ -1122,8 +1135,14 @@ describe("downloads", () => {
   async function generate(prefs: Prefs = {}): Promise<void> {
     mount({ ...SLOW, ...prefs });
     await until("the page to settle", () => state() === "none");
-    await click(button("copy-new-first"));
+    await click(button("copy-new"));
     await until("the QSO to be ready", () => state() === "ready");
+  }
+
+  /** Click an item in ⋯, opening it first: a click on an item closes it. */
+  async function fromMore(id: string): Promise<void> {
+    await click(button("more"));
+    await click(button(id));
   }
 
   /** The share of samples near silence in a 16-bit WAV. */
@@ -1137,9 +1156,10 @@ describe("downloads", () => {
   it("saves a generated QSO as audio and as text, with nothing added", async () => {
     const files = saved();
     await generate();
+    await click(button("more"));
     expect($('[data-testid="copy-download-heard"]'), "nothing added to hear").toBeNull();
     await click(button("copy-download"));
-    await click(button("copy-download-text"));
+    await fromMore("copy-download-text");
     expect(files.map((f) => f.name)).toEqual([expect.stringMatching(/\.wav$/), expect.stringMatching(/\.txt$/)]);
     const text = await files[1]!.blob.text();
     await playTo(1);
@@ -1150,8 +1170,8 @@ describe("downloads", () => {
   it("saves a QSO with the band clean, and as heard", async () => {
     const files = saved();
     await generate(BAND);
-    await click(button("copy-download-clean"));
-    await click(button("copy-download-heard"));
+    await fromMore("copy-download-clean");
+    await fromMore("copy-download-heard");
     const [clean, heard] = files;
     expect(clean!.name).not.toMatch(/as-heard/);
     expect(heard!.name).toMatch(/-as-heard\.wav$/);
@@ -1162,14 +1182,10 @@ describe("downloads", () => {
   it("saves a recording as it was opened", async () => {
     const files = saved();
     await open();
+    await click(button("more"));
     expect($('[data-testid="copy-download-clean"]')).toBeNull();
     await click(button("copy-download"));
     expect(files[0]!.name).toBe("qso.wav");
-  });
-
-  it("hides the downloads with the setting off", async () => {
-    await generate({ copyShowDownload: false });
-    expect($('[data-testid="copy-downloads"]')).toBeNull();
   });
 });
 

@@ -27,7 +27,10 @@ import type { AudioClip } from "@/types";
 import { APP_VERSION } from "@/build-info";
 import { Calibrate } from "./Calibrate";
 import { LANDING_VERSION, Landing } from "./Landing";
-import { Settings, type ConfigTab } from "./Settings";
+import { CalibrationSettings, DrillSettings, UserSettings } from "./Settings";
+import { SettingsDrawer, SettingsProvider, useSettings } from "./SettingsDrawer";
+import { MicrophoneSection, SettingsForm } from "./Controls";
+import { useInputs } from "./useInputs";
 import { UnsetNotesText, type UnsetNotes } from "./SlotMenu";
 import { ReviewScreen } from "./ReviewScreen";
 import { CopyScreen } from "./CopyScreen";
@@ -46,6 +49,16 @@ import { AppName } from "./Wordmark";
 export const BOOT_MESSAGE_DELAY_MS = 400;
 
 export function App(): React.ReactElement {
+  return (
+    <SettingsProvider>
+      <AppBody />
+    </SettingsProvider>
+  );
+}
+
+function AppBody(): React.ReactElement {
+  const settings = useSettings();
+  const inputs = useInputs();
   const take = useTake();
   const micAccess = useMicAccess();
   const [error, setError] = useState<string | null>(null);
@@ -101,9 +114,6 @@ export function App(): React.ReactElement {
       setCalibrating(true);
     });
   }, []);
-  const [configuring, setConfiguring] = useState(false);
-  /** The tab Configuration opens at, when something asked for one. */
-  const [configTab, setConfigTab] = useState<ConfigTab | undefined>(undefined);
   /* Practice or QSO, kept across a reload. */
   const [page, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
   const setPage = useCallback(
@@ -234,9 +244,7 @@ export function App(): React.ReactElement {
     ? "opening"
     : booting && !take.loaded
       ? "booting"
-      : configuring
-        ? "settings"
-        : calibrating
+      : calibrating
           ? "calibrate"
           : page === "qso"
             ? "qso"
@@ -280,13 +288,27 @@ export function App(): React.ReactElement {
     savePrefs(next);
   }, []);
 
-  /** Into Configuration at the user's details, where the values that fill a
-   *  note are set. */
+  /** Into Settings at You, where the values that fill a note are set. */
   const configureUser = useCallback(() => {
     setError(null);
     setUnset(null);
-    setConfigTab("user");
-    setConfiguring(true);
+    settings.show("you");
+  }, [settings]);
+
+  /** Into the calibration wizard. Settings closes: the wizard is a screen of
+   *  its own. */
+  const calibrate = useCallback(() => {
+    setError(null);
+    settings.close();
+    setCalibrating(true);
+  }, [settings]);
+
+  const profilesChanged = useCallback(() => {
+    setProfiles(loadProfiles());
+    // A profile can be deleted while it is the one in use, in which case the
+    // store clears the selection — and an id that outlives its profile would
+    // leave the app believing it is calibrated while correcting by nothing.
+    setProfileId(activeProfile()?.id);
   }, []);
 
   /* The intended message outlives the take, because practicing the same text
@@ -371,12 +393,12 @@ export function App(): React.ReactElement {
 
   const dropping = useFileDrop({
     onFile: (file) => {
-      if (page === "copy" && !configuring && !calibrating) copyFile.current?.(file);
+      if (page === "copy" && !calibrating) copyFile.current?.(file);
       else if (canOpenFile) void openFile(file);
     },
     onError: setError,
     disabled: opening,
-    text: page === "copy" && !configuring && !calibrating,
+    text: page === "copy" && !calibrating,
   });
 
   return (
@@ -393,7 +415,7 @@ export function App(): React.ReactElement {
           <p>
             {!canOpenFile
               ? OPEN_FILE_CLOSED
-              : page === "copy" && !configuring && !calibrating
+              : page === "copy" && !calibrating
                 ? "Drop a recording or a text file to open it"
                 : "Drop a recording to open it"}
           </p>
@@ -455,33 +477,11 @@ export function App(): React.ReactElement {
         <div className="busy" role="status" aria-live="polite">
           {slowBoot ? "looking for your last session…" : ""}
         </div>
-      ) : configuring ? (
-        <Settings
-          profileId={profileId}
-          onProfilesChanged={() => {
-            const next = loadProfiles();
-            setProfiles(next);
-            // A profile can be deleted while it is the one in use, in which
-            // case the store clears the selection — and an id that outlives
-            // its profile would leave the app believing it is calibrated while
-            // correcting by nothing.
-            setProfileId(activeProfile()?.id);
-          }}
-          tab={configTab}
-          onClose={() => {
-            setConfiguring(false);
-            setConfigTab(undefined);
-          }}
-        />
       ) : calibrating ? (
         <Calibrate
           current={profile}
           example={calExample}
           deviceId={deviceId}
-          onConfigure={() => {
-            setError(null);
-            setConfiguring(true);
-          }}
           onDeviceChange={chooseDevice}
           onError={setError}
           onSaved={(saved) => {
@@ -504,10 +504,6 @@ export function App(): React.ReactElement {
       ) : page === "copy" ? (
         <CopyScreen
           onError={setError}
-          onConfigure={() => {
-            setError(null);
-            setConfiguring(true);
-          }}
           onPage={setPage}
           onHome={goHome}
           fileTarget={copyFile}
@@ -519,15 +515,8 @@ export function App(): React.ReactElement {
           profiles={profiles}
           profileId={profileId}
           onProfileChange={chooseProfile}
-          onCalibrate={() => {
-            setError(null);
-            setCalibrating(true);
-          }}
+          onCalibrate={calibrate}
           onError={setError}
-          onConfigure={() => {
-            setError(null);
-            setConfiguring(true);
-          }}
           onPage={setPage}
           onHome={goHome}
         />
@@ -560,14 +549,7 @@ export function App(): React.ReactElement {
           /* One control, two effects, both wanted: it is the calibration the
              next recording will be made under, and every recording already in
              the session is read again through it. */
-          onCalibrate={() => {
-            setError(null);
-            setCalibrating(true);
-          }}
-          onConfigure={() => {
-            setError(null);
-            setConfiguring(true);
-          }}
+          onCalibrate={calibrate}
           onConfigureUser={configureUser}
           onUnsetNotes={setUnset}
           onFile={(file) => void openFile(file)}
@@ -601,12 +583,42 @@ export function App(): React.ReactElement {
           onDeviceChange={chooseDevice}
           profiles={profiles}
           profileId={profileId}
-          onCalibrate={() => {
-            setError(null);
-            setCalibrating(true);
-          }}
+          onCalibrate={calibrate}
         />
       ))}
+
+      <SettingsDrawer
+        app={(tab) =>
+          tab === "you" ? (
+            <UserSettings />
+          ) : tab === "drills" ? (
+            <DrillSettings />
+          ) : tab === "microphone" ? (
+            <>
+              {/* A screen with no recorder of its own still chooses the
+                  input and the calibration the next take will use. */}
+              {!settings.pageTabs.some((t) => t.id === "microphone") && (
+                <SettingsForm>
+                <MicrophoneSection
+                  audio={{
+                    devices: inputs,
+                    deviceId,
+                    onDeviceChange: chooseDevice,
+                    profiles,
+                    profileId,
+                    onProfileChange: chooseProfile,
+                    appliesToTake: true,
+                    rereading: false,
+                    onCalibrate: calibrate,
+                  }}
+                />
+                </SettingsForm>
+              )}
+              <CalibrationSettings profileId={profileId} onProfilesChanged={profilesChanged} />
+            </>
+          ) : null
+        }
+      />
 
       <Footer />
     </div>

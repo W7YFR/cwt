@@ -10,7 +10,6 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { IconDownload, IconUser } from "./Icons";
 import { createPlayer, type PlaySide, type Player } from "@/audio/player";
 import { encodeWav } from "@/audio/wav";
 import { buildJsonReport } from "@/io/report";
@@ -22,24 +21,33 @@ import type { Review, ReviewSettings } from "@/types";
 import type { AudioClip } from "@/types";
 import { ChartView, type ChartHandle } from "./Chart";
 import {
-  ChartSettingsButton,
-  ChartSettingsPanel,
   Controls,
-  SettingsBand,
+  MicrophoneSection,
+  ModeOptions,
+  Section,
+  SendSettings,
+  SendSound,
+  SpeedSliders,
+  ToleranceSlider,
   ViewControls,
   fitSpeed,
 } from "./Controls";
+import { DownloadItem, MenuHeading, OpenFileItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { ACCEPTED } from "@/capture/file";
+import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
+import { fmtGain, fmtSpeed, fmtTolerance } from "./format";
+import { MicChip, PageSettings, SettingsButton } from "./SettingsDrawer";
+import { PageHelp, type KeyGroup } from "./Help";
 import { ZenMode } from "./ZenMode";
 import { pacedEnd, pacedStart, recordLimit } from "./pacing";
-import { modeOf, modePatch } from "./mode";
+import { RECORD_MODES, modeOf, modePatch } from "./mode";
 import { FollowSending } from "./FollowSending";
-import { RecordBar } from "./Record";
+import { ModeSwitch, RecordBar } from "./Record";
 import { Report } from "./Report";
 import { Scores } from "./Scores";
 import { HomeButton } from "./Wordmark";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { MIC_SOURCE, blankTake, isBlankTake } from "@/io/take";
-import { loadPrefs, rememberSettingsOpen } from "@/io/storage";
 import { reviewTake } from "@/timing";
 import { recentCount, runOrder } from "./runOrder";
 import { NewSession } from "./NewSession";
@@ -84,8 +92,6 @@ export interface ReviewScreenProps {
   onDeviceChange(id: string | undefined): void;
   /** Into the calibration wizard, and back here afterwards. */
   onCalibrate(): void;
-  /** Into the configuration screen, and back here afterwards. */
-  onConfigure(): void;
   /** Into the configuration screen at the user's details. */
   onConfigureUser?(): void;
   /** A paste into the message left notes such as "(your call)" with no
@@ -107,57 +113,46 @@ export interface ReviewScreenProps {
   onPage?: ((page: Page) => void) | undefined;
 }
 
-/** How long the settings panel takes to roll open or shut; see `.chartsettings`. */
-const ROLL_MS = 200;
+/** What the Send page is for and how its chart works, in Help. */
+const SEND_GUIDE = (
+  <>
+    <p>Send a message and see how you sent it. Each run is drawn against the target: every dit, dah and gap.</p>
+    <ul>
+      <li>Set the message, then press Record and key it. Stop and review when you finish.</li>
+      <li>Click a character to hear it, or a gap to hear what it separates.</li>
+      <li>Click a run&rsquo;s name to pick it up; its play button plays it.</li>
+      <li>Click the ruler to seek. Drag it to pick a range to play.</li>
+      <li>Scroll to zoom. Drag, or scroll with Shift, to pan. The view follows playback.</li>
+      <li>Use these speeds sets the target speeds to the ones a run was sent at.</li>
+    </ul>
+  </>
+);
 
-function reducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
-/** CSS `ease`, the curve the panel rolls on: cubic-bezier(0.25, 0.1, 0.25, 1),
- *  solved for the curve's y at time `x`. */
-function ease(x: number): number {
-  const [x1, y1, x2, y2] = [0.25, 0.1, 0.25, 1];
-  const at = (t: number, a: number, b: number) =>
-    3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
-  let lo = 0;
-  let hi = 1;
-  for (let i = 0; i < 20; i++) {
-    const mid = (lo + hi) / 2;
-    if (at(mid, x1, x2) < x) lo = mid;
-    else hi = mid;
-  }
-  return at((lo + hi) / 2, y1, y2);
-}
-
-/** Scroll the page to `top` on the panel's own timing and curve, so the roll
- *  and the scroll are one movement. At once when motion is reduced.
- *
- * Scroll anchoring is off while it runs. The panel changes height above the
- * part of the page on show, and anchoring would move the page to make up for
- * it, against the scroll. */
-function scrollPage(scroller: Element, top: number): void {
-  const root = document.documentElement;
-  const from = scroller.scrollTop;
-  const to = Math.max(0, top);
-  if (from === to) return;
-  root.style.overflowAnchor = "none";
-  if (reducedMotion()) {
-    /* Before the panel's change has rendered, so anchoring stays off until
-       two frames later, when it has. */
-    scroller.scrollTop = to;
-    requestAnimationFrame(() => requestAnimationFrame(() => (root.style.overflowAnchor = "")));
-    return;
-  }
-  const t0 = performance.now();
-  const step = (now: number) => {
-    const p = Math.min(1, (now - t0) / ROLL_MS);
-    scroller.scrollTop = from + (to - from) * ease(p);
-    if (p < 1) requestAnimationFrame(step);
-    else root.style.overflowAnchor = "";
-  };
-  requestAnimationFrame(step);
-}
+/** Every key on the Send page, in Help. */
+const SEND_KEYS: readonly KeyGroup[] = [
+  {
+    heading: "Recording",
+    rows: [
+      { keys: [["R"]], does: "Record, or start a recording over" },
+      { keys: [["Enter"]], does: "Finish the recording and review it" },
+      { keys: [["Esc"]], does: "Cancel the recording" },
+    ],
+  },
+  {
+    heading: "Playing",
+    rows: [
+      { keys: [["Space"]], does: "Play the run on show, or the range; again to stop" },
+      { keys: [["T"]], does: "Play the target; again to stop" },
+      { keys: [["N"], ["P"]], does: "Play the next or the previous run" },
+      { keys: [["L"]], does: "Loop on or off" },
+      { keys: [["Esc"]], does: "Stop playing, then clear the range" },
+    ],
+  },
+  {
+    heading: "The chart",
+    rows: [{ keys: [["Home"], ["End"]], does: "Go to the start or the end of the chart" }],
+  },
+];
 
 /** Controls that space activates. With one of these focused, space presses it
  *  and the transport leaves the key alone. */
@@ -201,7 +196,6 @@ export function ReviewScreen({
   onProfileChange,
   onDeviceChange,
   onCalibrate,
-  onConfigure,
   onClear,
   onFile,
   onNewSession,
@@ -212,44 +206,9 @@ export function ReviewScreen({
      while the dialog is up: a key that starts a recording behind an open
      dialog answers a question nobody asked. */
   const [starting, setStarting] = useState(false);
-  /* Whether the settings are on show. Not a setting itself, and never in a
-     saved report: it is where you are looking. But a reload is not a choice
-     to look elsewhere, so it is remembered for the next page load. */
-  const [chartSettings, setChartSettingsRaw] = useState(() => loadPrefs().settingsOpen === true);
-  const setChartSettings = useCallback((open: boolean) => {
-    setChartSettingsRaw(open);
-    rememberSettingsOpen(open);
-  }, []);
-  const headerRef = useRef<HTMLElement | null>(null);
-  const panelRef = useRef<HTMLElement | null>(null);
-  /* Where the page was when opening the settings scrolled it, or null when
-     opening them scrolled nothing. Closing them goes back there. */
-  const returnTo = useRef<number | null>(null);
-
-  /* The header is pinned, so from further down the page the panel opens out of
-     sight above it. Opening scrolls up just far enough to show it, and closing
-     goes back to where you were. */
-  const toggleChartSettings = useCallback(() => {
-    const scroller = document.scrollingElement ?? document.documentElement;
-    const header = headerRef.current;
-    const panel = panelRef.current;
-    if (!chartSettings) {
-      const hidden = header && panel
-        ? header.getBoundingClientRect().bottom - panel.getBoundingClientRect().top
-        : 0;
-      if (hidden > 1) {
-        returnTo.current = scroller.scrollTop;
-        scrollPage(scroller, scroller.scrollTop - hidden);
-      }
-      setChartSettings(true);
-      return;
-    }
-    setChartSettings(false);
-    const back = returnTo.current;
-    returnTo.current = null;
-    if (back !== null) scrollPage(scroller, back);
-  }, [chartSettings, setChartSettings]);
-
+  /* A drill picked while the session has runs in it: the New session dialog
+     opens with its text, so the runs are not cleared without asking. */
+  const [startWith, setStartWith] = useState<string | null>(null);
   const [playing, setPlaying] = useState<PlaySide | null>(null);
   const [status, setStatus] = useState("");
   // The playhead moves every frame. Routing it through state would re-render
@@ -834,87 +793,167 @@ export function ReviewScreen({
     setStatus("");
   }, [review, settings, stem]);
 
+  const modeName = RECORD_MODES.find((m) => m.value === modeOf(settings))!.label;
+
   return (
     <>
-      <header ref={headerRef}>
+      <header>
         {/* The name is the way home. Leaving mid-take would drop the
             recording on the floor. */}
         <HomeButton onHome={onBack} disabled={recording} />
         {onPage && <PageSwitch page="practice" onPage={onPage} disabled={recording} />}
-        <RecordBar
-          rec={rec}
-          appliesToTake={loaded.take.source === MIC_SOURCE}
-          leadLeft={leadLeft}
-          onClear={blank ? undefined : onClear}
-          onFile={onFile}
-          /* A recording carries its own speed, and only the attempt that
-             starts a session gets to set one — so a file can begin a session
-             but never join one. */
-          canOpenFile={blank}
-          mode={modeOf(settings)}
-          onMode={(m) => onChange(modePatch(m))}
-          onNewSession={() => setStarting(true)}
-          onDrill={(d) =>
-            onNewSession({
-              expected: d.text,
-              charWpm: settings.charWpm,
-              farnsworthWpm: Math.min(settings.farnsworthWpm, settings.charWpm),
-              times: settings.times,
-            })
-          }
-          /* Drawn by the bar, on the row it shares with the note about how
-             the file is being read — see `source` there. A filename earns
-             that room; "microphone" does not, and the bar drops it. */
-          source={loaded.take.source}
-        />
-
-        {/* The corner of the header, and last in it — which is where the eye
-            finds it and so where the tab order has to reach it. Configuration
-            and the cog are one group in the flow, pushed to the right end of
-            the first line: they never split, and the rest of the row takes
-            the width left of them. Configuration comes first, so the cog stays
-            the last stop. */}
-        <div className="cornergroup" inert={recording} data-locked={recording}>
-          <button
-            className="iconbtn cornerbtn"
-            data-testid="advanced"
-            aria-label="Configuration"
-            title="Configuration"
-            onClick={onConfigure}
-          >
-            <IconUser />
-          </button>
-          <ChartSettingsButton
-            open={chartSettings}
-            onToggle={toggleChartSettings}
+        {/* The corner of the header, at the end of its first line: the
+            microphone in use, then Settings. */}
+        <div className="cornergroup">
+          <MicChip
+            devices={rec.devices}
+            deviceId={deviceId}
+            profiles={profiles}
+            profileId={profileId}
+            applies={loaded.take.source === MIC_SOURCE}
           />
+          <PageHelp title="Send" guide={SEND_GUIDE} keys={SEND_KEYS} />
+          <SettingsButton />
         </div>
+
+        <Toolbar
+          actions={
+            <>
+              <RecordBar
+                rec={rec}
+                appliesToTake={loaded.take.source === MIC_SOURCE}
+                leadLeft={leadLeft}
+                onClear={blank ? undefined : onClear}
+                onNewSession={() => setStarting(true)}
+                onDrill={(d) => {
+                  if (!blank) {
+                    setStartWith(d.text);
+                    setStarting(true);
+                    return;
+                  }
+                  onNewSession({
+                    expected: d.text,
+                    charWpm: settings.charWpm,
+                    farnsworthWpm: Math.min(settings.farnsworthWpm, settings.charWpm),
+                    times: settings.times,
+                  });
+                }}
+                /* Drawn by the bar, on the row it shares with the note about
+                   how the file is being read. */
+                source={loaded.take.source}
+              />
+              {status && <span className="hint">{status}</span>}
+            </>
+          }
+          chips={
+            <>
+              <QuickChip id="speed" label="Speed" value={fmtSpeed(settings)} widest={WIDEST_SPEED} tab="speed" locked={recording}>
+                <Section name="speed" title="Speed">
+                  <div className="panelgroups">
+                    <SpeedSliders charWpm={settings.charWpm} farnsworthWpm={settings.farnsworthWpm} onChange={onChange} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="mode" label="Mode" value={modeName} widest={longest(RECORD_MODES.map((m) => m.label))} width={460} tab="page" locked={recording}>
+                <Section name="mode" title="Mode">
+                  <div className="panelgroups">
+                    <div className="group">
+                      <span className="caption">Record in</span>
+                      <ModeSwitch mode={modeOf(settings)} onMode={(m) => onChange(modePatch(m))} />
+                    </div>
+                    <ModeOptions mode={modeOf(settings)} settings={settings} onChange={onChange} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="tolerance" label="Tolerance" value={fmtTolerance(settings.tolerance).trim()} widest="60%" tab="page" locked={recording}>
+                <Section name="tolerance" title="Grading">
+                  <div className="panelgroups">
+                    <ToleranceSlider tolerance={settings.tolerance} onChange={(tolerance) => onChange({ tolerance })} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="volume" label="Volume" value={fmtGain(settings.gainDb).trim()} widest="+42 dB" tab="sound">
+                <SendSound gainDb={settings.gainDb} onGainDb={(gainDb) => onChange({ gainDb })} />
+              </QuickChip>
+            </>
+          }
+          more={
+            <>
+              {/* A recording carries its own speed, and only the attempt that
+                  starts a session gets to set one — so a file can begin a
+                  session but never join one. */}
+              <OpenFileItem
+                label="Open a recording…"
+                accept={ACCEPTED}
+                testId="open-file"
+                disabled={!blank || recording}
+                title={blank ? OPEN_FILE_HELP : OPEN_FILE_CLOSED}
+                onFile={onFile}
+              />
+              <MenuHeading>Download</MenuHeading>
+              <DownloadItem label="Your audio" disabled={blank} title="The recording, as made" onClick={() => void downloadYou()} />
+              <DownloadItem
+                label="Target audio"
+                title="Perfect keying of the message, rendered at the current speed"
+                onClick={() => void downloadTarget()}
+              />
+              <DownloadItem label="Chart PNG" title="The whole analysis, not just the visible part" onClick={downloadPng} />
+              <DownloadItem
+                label="JSON report"
+                disabled={blank}
+                title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
+                onClick={downloadJson}
+              />
+            </>
+          }
+        />
       </header>
 
-      {/* Always in the tree, open or not: see SettingsBand. */}
-      <SettingsBand open={chartSettings} locked={recording} bandRef={panelRef}>
-        <ChartSettingsPanel
-          settings={settings}
-          runs={stack.length}
-          onChange={onChange}
-          loop={loop}
-          onLoop={() => setLoop((on) => !on)}
-          /* The setup goes behind the settings button, like everything else
-             that is not the loop: which microphone, what to correct it by,
-             and how loud to play it back. */
-          audio={{
-            devices: rec.devices,
-            deviceId,
-            onDeviceChange,
-            profiles,
-            profileId,
-            onProfileChange: chooseProfile,
-            appliesToTake: loaded.take.source === MIC_SOURCE,
-            rereading,
-            onCalibrate,
-          }}
-        />
-      </SettingsBand>
+      <PageSettings
+        locked={recording}
+        tabs={[
+          { id: "page", label: "Send", scope: "Only on the Send page.", content: <SendSettings settings={settings} onChange={onChange} /> },
+          {
+            id: "sound",
+            label: "Sound",
+            scope: "Volume is the same on every page.",
+            content: (
+              <SendSound gainDb={settings.gainDb} onGainDb={(gainDb) => onChange({ gainDb })} />
+            ),
+          },
+          {
+            id: "speed",
+            label: "Speed",
+            scope: "The same on the Send and QSO pages.",
+            content: (
+              <Section name="speed" title="Speed">
+                <div className="panelgroups">
+                  <SpeedSliders charWpm={settings.charWpm} farnsworthWpm={settings.farnsworthWpm} onChange={onChange} />
+                </div>
+              </Section>
+            ),
+          },
+          {
+            id: "microphone",
+            label: "Microphone",
+            content: (
+              <MicrophoneSection
+                audio={{
+                  devices: rec.devices,
+                  deviceId,
+                  onDeviceChange,
+                  profiles,
+                  profileId,
+                  onProfileChange: chooseProfile,
+                  appliesToTake: loaded.take.source === MIC_SOURCE,
+                  rereading,
+                  onCalibrate,
+                }}
+              />
+            ),
+          },
+        ]}
+      />
 
       {/* Locked while a take runs, with the scores, the report, the settings
           panel and the header's corner. What is sent, how fast and against
@@ -954,56 +993,27 @@ export function ReviewScreen({
           read the chart. Asked for, though: it is an occasional act, and four
           buttons across the page is a standing invitation to something you do
           rarely. */}
-      {settings.showDownloads && (
-        <div className="downloads">
-          {/* The two that describe a recording are only offered when there is
-              one. The target's audio and the chart are both renderable from
-              the message and the speeds alone. */}
-          <button
-            onClick={() => void downloadYou()}
-            disabled={blank}
-            title="The recording, as made"
-          >
-            <IconDownload /> Your audio
-          </button>
-          <button
-            onClick={() => void downloadTarget()}
-            title="Perfect keying of the intended message, rendered at the current speed"
-          >
-            <IconDownload /> Target audio
-          </button>
-          <button
-            onClick={downloadPng}
-            title="The whole analysis, not just the visible part"
-          >
-            <IconDownload /> Chart PNG
-          </button>
-          <button
-            onClick={downloadJson}
-            disabled={blank}
-            title="Every number on this page as JSON, graded at the settings now set — so sessions stack up into a trend"
-          >
-            <IconDownload /> JSON report
-          </button>
-          <span className="hint">{status}</span>
-        </div>
-      )}
 
       {starting && (
         <NewSession
-          expected={settings.expected}
+          expected={startWith ?? settings.expected}
           charWpm={settings.charWpm}
           farnsworthWpm={settings.farnsworthWpm}
-          onCancel={() => setStarting(false)}
+          onCancel={() => {
+            setStarting(false);
+            setStartWith(null);
+          }}
           onConfigureUser={
             onConfigureUser &&
             (() => {
               setStarting(false);
+              setStartWith(null);
               onConfigureUser();
             })
           }
           onStart={(next, record) => {
             setStarting(false);
+            setStartWith(null);
             onNewSession(next);
             /* The session is declared and the microphone opens on the same
                click. Safe in this order because the state change above lands
@@ -1071,6 +1081,8 @@ export function ReviewScreen({
           settings={settings}
           runs={stack.length}
           onChange={onChange}
+          loop={loop}
+          onLoop={() => setLoop((on) => !on)}
           onFit={() => {
             const ppu = handle.chart?.fit();
             if (ppu !== undefined) onChange({ ppu });
@@ -1136,15 +1148,6 @@ export function ReviewScreen({
                 pick a range to play &nbsp;·&nbsp; Esc stops playback, then clears the
                 range &nbsp;·&nbsp; L loops &nbsp;·&nbsp; N and P play the next and previous track &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; drag or shift-scroll
                 to pan (the view follows playback)
-              </p>
-              {/* The recording transport, which is otherwise only discoverable
-                  by pressing a key and seeing what happens. R carries both
-                  halves of one idea — go, from here — so it starts a take and
-                  starts a running one over, and the legend says so rather than
-                  naming half of what the key does. */}
-              <p className="legend keys" data-testid="hotkeys">
-                <kbd>R</kbd> record/restart &nbsp;·&nbsp; <kbd>Enter</kbd> finish
-                &nbsp;·&nbsp; <kbd>Esc</kbd> cancel
               </p>
             </>
           )}

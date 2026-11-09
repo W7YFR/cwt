@@ -66,13 +66,11 @@ import type { LockedShows } from "@/qso/show";
 import type { Speed } from "@/qso/speed";
 import type { Length } from "@/qso/wording";
 import {
-  ChartSettingsButton,
   Check,
   ChoiceGroup,
   Section,
-  SettingRow,
-  SettingsBand,
-  SettingsPanel,
+  SoundSection,
+  Subgroup,
   NoiseSlider,
   QrmSlider,
   QrnSlider,
@@ -80,7 +78,11 @@ import {
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
-import { IconDownload, IconEdit, IconPause, IconPlay, IconStop, IconUpload, IconUser } from "./Icons";
+import { IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
+import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
+import { PageHelp, type KeyGroup } from "./Help";
+import { NEEDS_LINES_COPY, NEEDS_SLOTS } from "./copy";
+import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
@@ -158,11 +160,6 @@ const GRADE_TYPING_HELP =
 const SEEK_SLOT_HELP =
   "While the recording is paused, it moves to the character of the slot you select. Play " +
   "goes on from there.";
-
-const SHOW_DOWNLOAD_HELP =
-  "Under the QSO, Download saves it as a WAV file, and Download text as a text file you can open " +
-  "in Script. With QSB, noise, QRN or QRM on a generated QSO or your own text, Download " +
-  "clean saves it without them, and Download as heard with them.";
 
 const SHOW_SPEED_HELP =
   "Each line shows the speed it was sent at. For an opened recording, it is measured from the line.";
@@ -334,7 +331,6 @@ function recallKept(key: string, rec: Recording, input: CopyInput): Kept | null 
 }
 
 type OnOffKey =
-  | "copySettingsOpen"
   | "copyLock"
   | "copyHideCalls"
   | "copyFollow"
@@ -398,9 +394,55 @@ function isBox(el: EventTarget | null): el is HTMLInputElement {
   return el instanceof HTMLInputElement && !!el.closest(".copylog");
 }
 
+/** What the Copy page is for, in Help. */
+const COPY_GUIDE = (
+  <>
+    <p>Copy a QSO in CW as it plays, and see what you got right.</p>
+    <ul>
+      <li>Generate a QSO, write your own with Script, or open a recording or a text file from ⋯.</li>
+      <li>A new line appears each time a new station starts sending. Type what you hear in it.</li>
+      <li>Your copy of a line locks when the next line starts, or 5 seconds after the end.</li>
+      <li>Copy again plays it all from the start. Your earlier attempts stay on the page.</li>
+      <li>Click a word in a finished line, or select part of it, to hear it again.</li>
+    </ul>
+  </>
+);
+
+/** Every key on the Copy page, in Help. */
+const COPY_KEYS: readonly KeyGroup[] = [
+  {
+    heading: "On the page",
+    rows: [
+      { keys: [["Space"], ["Enter"]], does: "Play or pause" },
+      { keys: [["Esc"]], does: "Pause" },
+      { keys: [["←"], ["→"]], does: "Back or on a word" },
+      { keys: [["Shift", "←"], ["Shift", "→"]], does: "Back or on 5 seconds" },
+      { keys: [[ALT, "R"]], does: "Play the line again" },
+      { keys: [[ALT, "Enter"]], does: "Play from the word you are copying" },
+    ],
+  },
+  {
+    heading: "In a box or a slot",
+    rows: [
+      { keys: [["Enter"]], does: "Play or pause; on a line copied in full, lock it and go on" },
+      { keys: [[MOD, "Enter"]], does: "Lock the line" },
+      { keys: [["Esc"]], does: "Leave the box" },
+      { keys: [[ALT]], does: "Hold it for the page's keys" },
+    ],
+  },
+  {
+    heading: "Slots",
+    rows: [
+      { keys: [["←"], ["→"]], does: "Move a slot" },
+      { keys: [["Space"]], does: "Go to the next word" },
+      { keys: [["Backspace"]], does: "Back one, on an empty slot" },
+      { keys: [[ALT, "L"], [ALT, "W"]], does: "Play the selected letter or word" },
+    ],
+  },
+];
+
 export interface CopyScreenProps {
   onError(message: string): void;
-  onConfigure(): void;
   onPage(page: Page): void;
   /** Back to the start screen. */
   onHome(): void;
@@ -408,8 +450,9 @@ export interface CopyScreenProps {
   fileTarget: React.MutableRefObject<((file: File) => void) | null>;
 }
 
-export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }: CopyScreenProps): React.ReactElement {
-  const [settingsOpen, setSettingsOpen] = useOnOff("copySettingsOpen", false);
+export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenProps): React.ReactElement {
+  const settings = useSettings();
+  const settingsOpen = settings.open;
   const [lock, setLock] = useOnOff("copyLock", true);
   const [hideCalls, setHideCalls] = useOnOff("copyHideCalls", true);
   const [follow, setFollow] = useOnOff("copyFollow", false);
@@ -417,7 +460,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
   const [seekSlot, setSeekSlot] = useOnOff("copySeekSlot", false);
   const [allowEdits, setAllowEdits] = useOnOff("copyAllowEdits", false);
   const [showSpeed, setShowSpeed] = useOnOff("copyShowSpeed", true);
-  const [showDownload, setShowDownload] = useOnOff("copyShowDownload", true);
   const [atMine, setAtMine] = useOnOff("copyRecordingAtMine", false);
   /** How the next attempt copies. The attempt under way keeps its own. */
   const [inputPref, setInputPref] = useChoice("copyInput", "text");
@@ -1570,116 +1612,300 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
 
   const current = kept ? scoreOf(kept.attempts[attempt]!) : { right: 0, total: 0 };
 
+  /* Why a setting of your copy does nothing now: no copy to type, or no
+     slots to type it in. */
+  const copyBar = linesShow === "copy" ? null : NEEDS_LINES_COPY;
+  const slotsBar = copyBar ?? (inputPref === "slots" ? null : NEEDS_SLOTS);
+
+  /* What the chips and Settings share: one copy of each, drawn wherever it
+     is open. */
+  const makeSection = (
+    <Section name="make" title="Generate QSO">
+      <div className="panelgroups">
+        <ChoiceGroup
+          id="copy-kind"
+          label="Kind"
+          help={KIND_HELP}
+          value={kind}
+          options={KINDS}
+          onChange={(v) => setKind(v as Kind)}
+        />
+        <ChoiceGroup
+          id="copy-run-qsos"
+          label="QSOs in a run"
+          help={RUN_QSOS_HELP}
+          value={String(runQsos)}
+          options={RUN_QSOS}
+          onChange={(v) => setRunQsos(Number(v))}
+        />
+        <ChoiceGroup
+          id="copy-qso-length"
+          label="How much the station sends"
+          help={QSO_LENGTH_HELP}
+          value={qsoLength}
+          options={QSO_LENGTHS}
+          onChange={(v) => setQsoLength(v as Length)}
+        />
+        <ChoiceGroup
+          id="copy-gap"
+          label="Between lines"
+          help={GAP_HELP}
+          value={gap}
+          options={GAPS}
+          onChange={(v) => setGap(v as Gap)}
+        />
+      </div>
+    </Section>
+  );
+  const speedSection = (
+    <Section name="speed" title="Speed">
+      <div className="panelgroups">
+        <ChoiceGroup
+          id="copy-speed"
+          label="Speed"
+          help={SPEED_HELP}
+          value={speedChoice}
+          options={SPEEDS}
+          onChange={(v) => setSpeedChoice(v as SpeedChoice)}
+        />
+        <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
+        <Check
+          id="copy-recording-at-mine"
+          label="Play an opened recording at my speeds"
+          help={AT_MINE_HELP}
+          checked={atMine}
+          onChange={setAtMine}
+        />
+      </div>
+    </Section>
+  );
+  const soundSection = (
+    <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
+      <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
+      <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
+      <QrnSlider qrn={qrn} onChange={setQrn} />
+      <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+    </SoundSection>
+  );
+  const kindLabel = KINDS.find((k) => k.value === kind)!.label;
+  const bandName = anyAdded({ qsbDb, noiseDb, qrn, qrmDb }) ? "On" : "Clean";
+
   return (
     <>
       <header>
         <HomeButton onHome={onHome} />
         <PageSwitch page="copy" onPage={onPage} />
-        {/* One row, as on the Send page: on a narrow screen it takes its own
-            line under the brand. */}
-        <div className="recordbar">
-          <button
-            className={rec ? undefined : "primary"}
-            data-testid="copy-new"
-            disabled={reading || playing !== null}
-            title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
-            onClick={makeExchange}
-          >
-            Generate QSO
-          </button>
-          <button
-            data-testid="copy-text-open"
-            disabled={reading || playing !== null}
-            title="Paste or type a QSO of your own to copy, sent in CW"
-            onClick={editText}
-          >
-            Script
-          </button>
-          {/* Icon only, after Generate QSO and Script: a recording is the rarer way in,
-              as on the Send page. */}
-          <button
-            className="iconbtn copyopen"
-            data-testid="copy-open"
-            disabled={reading}
-            aria-label="Open a recording or a text file"
-            title="Open a recording of CW or a .txt file to copy, or drop one on the page"
-            onClick={pickFile}
-          >
-            <IconUpload />
-          </button>
-          {/* Always here, as on the other pages. Off while the recording plays
-              or before there is one. */}
-          <button
-            data-testid="copy-clear"
-            disabled={!rec || reading || playing !== null}
-            title="Close this QSO and clear every attempt"
-            onClick={clear}
-          >
-            Clear
-          </button>
-        </div>
         <div className="cornergroup">
-          <button className="iconbtn cornerbtn" aria-label="Configuration" title="Configuration" onClick={onConfigure}>
-            <IconUser />
-          </button>
-          <ChartSettingsButton open={settingsOpen} onToggle={() => setSettingsOpen(!settingsOpen)} />
+          <PageHelp title="Copy" guide={COPY_GUIDE} keys={COPY_KEYS} />
+          <SettingsButton />
         </div>
-      </header>
 
-      <SettingsBand open={settingsOpen}>
-        <SettingsPanel
-          className="formpanel qsopanel"
-          gainDb={gainDb}
-          onGainDb={setGainDb}
-          audioExtra={
+        <Toolbar
+          actions={
             <>
-              <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
-              <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
-              <QrnSlider qrn={qrn} onChange={setQrn} />
-              <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+
+              <button
+                className={rec ? undefined : "primary"}
+                data-testid="copy-new"
+                disabled={reading || playing !== null}
+                title={`Generate a new QSO to copy: ${KINDS.find((k) => k.value === kind)!.label}, as the settings have it`}
+                onClick={makeExchange}
+              >
+                Generate QSO
+              </button>
+              <button
+                data-testid="copy-text-open"
+                disabled={reading || playing !== null}
+                title="Paste or type a QSO of your own to copy, sent in CW"
+                onClick={editText}
+              >
+                Script
+              </button>
+              {/* Always here, as on the other pages. Off while the recording plays
+                  or before there is one. */}
+              <button
+                data-testid="copy-clear"
+                disabled={!rec || reading || playing !== null}
+                title="Close this QSO and clear every attempt"
+                onClick={clear}
+              >
+                Clear
+              </button>
+              {/* What acts on your attempts. Always here, so nothing moves;
+                  off until there is a copy to check. */}
+              <span className="toolsep" aria-hidden="true" />
+              <button
+                data-testid="copy-restart"
+                disabled={!rec || !started}
+                title="Clear every attempt and go back to the start"
+                onClick={restart}
+              >
+                Start over
+              </button>
+              <div className="modeswitch" role="group" aria-label="Show answers">
+                <button
+                  aria-pressed={!!kept?.revealed}
+                  data-testid="copy-reveal"
+                  disabled={!rec || !started || !kept}
+                  title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
+                  onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
+                >
+                  Show answers
+                </button>
+              </div>
+              <button
+                className={rec && ((ended && locked) || perfect) ? "primary" : undefined}
+                data-testid="copy-again"
+                disabled={!rec || linesShow !== "copy" || (!locked && !ended)}
+                title={
+                  linesShow === "copy"
+                    ? "Play the whole recording again and copy it once more"
+                    : "Needs Each line shows = Copy"
+                }
+                onClick={again}
+              >
+                Copy again
+              </button>
             </>
           }
-          pageRow={
+          chips={
             <>
-              <Section name="copy" title="Your copy">
+              <QuickChip id="make" label="Generate" value={`${kindLabel} ×${runQsos}`} widest={`${longest(KINDS.map((k) => k.label))} ×10`} tab="page">
+                {makeSection}
+              </QuickChip>
+              <QuickChip id="speed" label="Speed" value={speedChoice === "mine" ? fmtSpeed(mine) : "Format"} widest={WIDEST_SPEED} tab="speed">
+                {speedSection}
+              </QuickChip>
+              <QuickChip id="lines" label="Lines" value={LINES_SHOW.find((l) => l.value === linesShow)!.label} widest={longest(LINES_SHOW.map((l) => l.label))} tab="page">
+                <Section name="lines" title="Playback">
+                  <div className="panelgroups">
+                    <ChoiceGroup
+                      id="copy-lines"
+                      label="Each line shows"
+                      help={LINES_SHOW_HELP}
+                      value={linesShow}
+                      options={LINES_SHOW}
+                      onChange={(v) => setLinesShow(v as LinesShow)}
+                    />
+                    <Check id="copy-wait" barred={copyBar} label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
+                  </div>
+                </Section>
+              </QuickChip>
+              <QuickChip id="band" label="Band" value={bandName} widest="Clean" tab="sound">
+                {soundSection}
+              </QuickChip>
+            </>
+          }
+          more={
+            <>
+              <button type="button" role="menuitem" data-testid="copy-open" disabled={reading} onClick={pickFile}>
+                <IconUpload /> Open a recording or a text file…
+              </button>
+              <MenuHeading>Download</MenuHeading>
+              <DownloadItem
+                label={added ? "Audio, clean" : "Audio"}
+                testId={added ? "copy-download-clean" : "copy-download"}
+                disabled={!rec}
+                title={added ? "Save the QSO as a WAV file, with nothing added" : "Save the QSO as audio"}
+                onClick={added ? downloadClean : downloadHeard}
+              />
+              {added && (
+                <DownloadItem
+                  label="Audio, as heard"
+                  testId="copy-download-heard"
+                  disabled={!rec}
+                  title="Save the QSO as a WAV file, with the QSB, noise, QRN and QRM you hear"
+                  onClick={downloadHeard}
+                />
+              )}
+              <DownloadItem
+                label="Text"
+                testId="copy-download-text"
+                disabled={!rec}
+                title="Save the QSO's lines as a text file, which Script can open"
+                onClick={downloadText}
+              />
+            </>
+          }
+        />
+      </header>
+
+      <PageSettings
+        tabs={[
+          {
+            id: "page",
+            label: "Copy",
+            scope: "Only on the Copy page.",
+            content: (
+              <>
+          <Section name="lines" title="Playback">
+            <div className="panelgroups">
+              <ChoiceGroup
+                id="copy-lines"
+                label="Each line shows"
+                help={LINES_SHOW_HELP}
+                value={linesShow}
+                options={LINES_SHOW}
+                onChange={(v) => setLinesShow(v as LinesShow)}
+              />
+              <Check id="copy-wait" barred={copyBar} label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
+              <Check
+                id="copy-hide-calls"
+                label="Hide the station's call until I copy it"
+                help={HIDE_CALLS_HELP}
+                checked={hideCalls}
+                onChange={setHideCalls}
+              />
+              <Check
+                id="copy-show-speed"
+                label="Show the station's speed on each line"
+                help={SHOW_SPEED_HELP}
+                checked={showSpeed}
+                onChange={setShowSpeed}
+              />
+            </div>
+          </Section>
+              {makeSection}
+              </>
+            ),
+          },
+          { id: "copy", label: "Typing", scope: "On the Copy page. The QSO page has its own.", content: (
+              <Section name="copy" title="Typing">
                 <div className="panelgroups">
                   <ChoiceGroup
-                    id="copy-input"
+                    id="copy-input" barred={copyBar}
                     label="Copy in"
                     help={INPUT_HELP}
                     value={inputPref}
                     options={INPUTS}
                     onChange={(v) => setInput(v as CopyInput)}
                   />
-                  <SettingRow label="Slots">
+                  <Subgroup label="Slots">
                     <Check
-                      id="copy-follow"
+                      id="copy-follow" barred={slotsBar}
                       label="Highlight the active slot"
                       help={FOLLOW_HELP}
                       checked={follow}
                       onChange={setFollow}
                     />
                     <Check
-                      id="copy-grade-typing"
+                      id="copy-grade-typing" barred={slotsBar}
                       label="Grade slots as I type"
                       help={GRADE_TYPING_HELP}
                       checked={gradeTyping}
                       onChange={setGradeTyping}
                     />
                     <Check
-                      id="copy-seek-slot"
+                      id="copy-seek-slot" barred={slotsBar}
                       label="When paused, move to the slot I select"
                       help={SEEK_SLOT_HELP}
                       checked={seekSlot}
                       onChange={setSeekSlot}
                     />
-                  </SettingRow>
-                  <Check id="copy-wait" label="Stop after each line" help={WAIT_HELP} checked={wait} onChange={setWait} />
-                  <SettingRow label="When the next line starts">
-                    <Check id="copy-lock" label="Lock my copy" help={LOCK_HELP} checked={lock} onChange={setLock} />
-                  </SettingRow>
+                  </Subgroup>
+                  <Check id="copy-lock" barred={copyBar} label="Lock my copy when the next line starts" help={LOCK_HELP} checked={lock} onChange={setLock} />
                   <ChoiceGroup
-                    id="copy-locked-shows"
+                    id="copy-locked-shows" barred={copyBar}
                     label="My locked copy shows"
                     help={LOCKED_SHOWS_HELP}
                     value={lockedShows}
@@ -1687,14 +1913,14 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                     onChange={(v) => setLockedShows(v as LockedShows)}
                   />
                   <Check
-                    id="copy-allow-edits"
+                    id="copy-allow-edits" barred={copyBar}
                     label="Allow edits"
                     help={ALLOW_EDITS_HELP}
                     checked={allowEdits}
                     onChange={setAllowEdits}
                   />
                   <ChoiceGroup
-                    id="copy-earlier"
+                    id="copy-earlier" barred={copyBar}
                     label="When I copy again, show"
                     help={EARLIER_HELP}
                     value={earlier}
@@ -1703,97 +1929,21 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                   />
                 </div>
               </Section>
-              <Section name="make" title="Generated QSOs and your text">
-                <div className="panelgroups">
-                  <ChoiceGroup
-                    id="copy-kind"
-                    label="Kind"
-                    help={KIND_HELP}
-                    value={kind}
-                    options={KINDS}
-                    onChange={(v) => setKind(v as Kind)}
-                  />
-                  <ChoiceGroup
-                    id="copy-run-qsos"
-                    label="QSOs in a run"
-                    help={RUN_QSOS_HELP}
-                    value={String(runQsos)}
-                    options={RUN_QSOS}
-                    onChange={(v) => setRunQsos(Number(v))}
-                  />
-                  <ChoiceGroup
-                    id="copy-qso-length"
-                    label="A standard QSO is"
-                    help={QSO_LENGTH_HELP}
-                    value={qsoLength}
-                    options={QSO_LENGTHS}
-                    onChange={(v) => setQsoLength(v as Length)}
-                  />
-                  <ChoiceGroup
-                    id="copy-gap"
-                    label="Between lines"
-                    help={GAP_HELP}
-                    value={gap}
-                    options={GAPS}
-                    onChange={(v) => setGap(v as Gap)}
-                  />
-                  <ChoiceGroup
-                    id="copy-speed"
-                    label="Speed"
-                    help={SPEED_HELP}
-                    value={speedChoice}
-                    options={SPEEDS}
-                    onChange={(v) => setSpeedChoice(v as SpeedChoice)}
-                  />
-                  <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
-                  <Check
-                    id="copy-recording-at-mine"
-                    label="Play an opened recording at my speeds"
-                    help={AT_MINE_HELP}
-                    checked={atMine}
-                    onChange={setAtMine}
-                  />
-                </div>
-              </Section>
-            </>
-          }
-        >
-          {/* Beside Audio, as Speed is on the QSO page. */}
-          <Section name="lines" title="The recording">
-            <div className="panelgroups">
-              <ChoiceGroup
-                id="copy-lines"
-                label="Its lines show"
-                help={LINES_SHOW_HELP}
-                value={linesShow}
-                options={LINES_SHOW}
-                onChange={(v) => setLinesShow(v as LinesShow)}
-              />
-              <Check
-                id="copy-hide-calls"
-                label="Hide each call until I copy it"
-                help={HIDE_CALLS_HELP}
-                checked={hideCalls}
-                onChange={setHideCalls}
-              />
-              <Check
-                id="copy-show-speed"
-                label="Show its speed on each line"
-                help={SHOW_SPEED_HELP}
-                checked={showSpeed}
-                onChange={setShowSpeed}
-              />
-              <Check
-                id="copy-show-download"
-                label="Show Download, to save it as audio or text"
-                help={SHOW_DOWNLOAD_HELP}
-                checked={showDownload}
-                onChange={setShowDownload}
-              />
-            </div>
-          </Section>
-        </SettingsPanel>
-      </SettingsBand>
+          ) },
+          {
+            id: "sound",
+            label: "Sound",
+            scope: "Volume is the same on every page. QSB, Noise, QRN and QRM are the same on the Copy and QSO pages.",
+            content: soundSection,
+          },
+          {
+            id: "speed",
+            label: "Speed",
+            scope: "Only on the Copy page.",
+            content: speedSection,
+          },
+        ]}
+      />
 
       <main className="panel qso copy" data-testid="copy">
         <div className="copytop">
@@ -1806,44 +1956,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
             )}
             <span className="copysay">{status}</span>
           </div>
-          {/* What acts on your attempts, by the line that names the attempt:
-              Start over, Show answers, then Copy again, the next step.
-              Always here once there is a recording, so nothing moves. Off
-              until there is a copy to check. */}
-          {rec && (
-            <div className="copyattempt">
-              <button
-                data-testid="copy-restart"
-                disabled={!started}
-                title="Clear every attempt and go back to the start"
-                onClick={restart}
-              >
-                Start over
-              </button>
-              <div className="modeswitch" role="group" aria-label="Show answers">
-                <button
-                  aria-pressed={!!kept?.revealed}
-                  data-testid="copy-reveal"
-                  disabled={!started || !kept}
-                  title={kept?.revealed ? "Hide what was sent" : "Show what was sent, under your copy of each line"}
-                  onClick={() => kept && setKept({ ...kept, revealed: !kept.revealed })}
-                >
-                  Show answers
-                </button>
-              </div>
-              {linesShow === "copy" && (
-                <button
-                  className={(ended && locked) || perfect ? "primary" : undefined}
-                  data-testid="copy-again"
-                  disabled={!locked && !ended}
-                  title="Play the whole recording again and copy it once more"
-                  onClick={again}
-                >
-                  Copy again
-                </button>
-              )}
-            </div>
-          )}
         </div>
 
         {rec && (
@@ -1903,32 +2015,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
         )}
 
         {!rec && !recalling && !reading && (
-          <div className="qsocontrols copyfirst">
-            <div className="modeswitch" role="group" aria-label="Kind" data-testid="copy-kind-first">
-              {KINDS.map((k) => (
-                <button key={k.value} aria-pressed={kind === k.value} title={k.note} onClick={() => setKind(k.value)}>
-                  {k.label}
-                </button>
-              ))}
-            </div>
-            <button className="primary" data-testid="copy-new-first" onClick={makeExchange}>
-              Generate QSO
-            </button>
-            <span className="hint">
-              or{" "}
-              <button type="button" className="link" data-testid="copy-text-first" onClick={editText}>
-                write your own
-              </button>
-              ,{" "}
-              <button type="button" className="link" data-testid="copy-open-first" onClick={pickFile}>
-                open a recording or a .txt file
-              </button>
-              , or drop one on the page
-            </span>
-          </div>
-        )}
-
-        {!rec && !recalling && !reading && (
           <div className="qsoguide prose" data-testid="copy-guide">
             <p>Copy a QSO in CW as it plays, and see what you got right.</p>
             <ul>
@@ -1949,7 +2035,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
             ) : (
               <p>
                 Open the{" "}
-                <button type="button" className="link" data-testid="copy-guide-settings" onClick={() => setSettingsOpen(true)}>
+                <button type="button" className="link" data-testid="copy-guide-settings" onClick={() => settings.show("page")}>
                   settings
                 </button>{" "}
                 to change the speed of a generated QSO or your own text, and the pause between its lines.
@@ -1990,45 +2076,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
                 {current.right} of {current.total} copied in the lines locked so far.
               </p>
             )}
-            {showDownload && (
-              <div className="copydownloads" data-testid="copy-downloads">
-                <button
-                  type="button"
-                  data-testid={added ? "copy-download-clean" : "copy-download"}
-                  title={added ? "Save the QSO as a WAV file, with nothing added" : "Save the QSO as audio"}
-                  onClick={added ? downloadClean : downloadHeard}
-                >
-                  <i className="ico">
-                    <IconDownload />
-                  </i>
-                  {added ? "Download clean" : "Download"}
-                </button>
-                {added && (
-                  <button
-                    type="button"
-                    data-testid="copy-download-heard"
-                    title="Save the QSO as a WAV file, with the QSB, noise, QRN and QRM you hear"
-                    onClick={downloadHeard}
-                  >
-                    <i className="ico">
-                      <IconDownload />
-                    </i>
-                    Download as heard
-                  </button>
-                )}
-                <button
-                  type="button"
-                  data-testid="copy-download-text"
-                  title="Save the QSO's lines as a text file, which Script can open"
-                  onClick={downloadText}
-                >
-                  <i className="ico">
-                    <IconDownload />
-                  </i>
-                  Download text
-                </button>
-              </div>
-            )}
           </div>
         )}
         <input
@@ -2044,36 +2091,6 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           }}
         />
 
-        {rec && (
-          <div className="copykeys">
-            <p className="legend keys" data-testid="copy-hotkeys">
-              On the page: <kbd>Space</kbd> or <kbd>Enter</kbd> play or pause &nbsp;·&nbsp; <kbd>Esc</kbd> pause
-              &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>R</kbd> play the line again &nbsp;·&nbsp; <kbd>{ALT}</kbd>{" "}
-              <kbd>Enter</kbd> play from your word
-              &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> a word &nbsp;·&nbsp; <kbd>Shift</kbd> <kbd>←</kbd> <kbd>→</kbd> 5s
-              {input === "slots" && (
-                <>
-                  {" "}
-                  &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
-                </>
-              )}
-            </p>
-            {/* Only the keys the settings use: none in a box with no boxes. */}
-            {linesShow === "copy" && (
-              <p className="legend keys" data-testid="copy-box-keys">
-                In a box: <kbd>Enter</kbd> play or pause, or lock a line copied in full and go on &nbsp;·&nbsp; <kbd>{MOD}</kbd> <kbd>Enter</kbd>{" "}
-                {waits ? "lock the line and go on" : "lock the line"}
-                {input === "slots" && (
-                  <>
-                    {" "}
-                    &nbsp;·&nbsp; <kbd>{ALT}</kbd> <kbd>L</kbd> <kbd>{ALT}</kbd> <kbd>W</kbd> the selected letter or word
-                  </>
-                )}
-                &nbsp;·&nbsp; <kbd>Esc</kbd> leave the box &nbsp;·&nbsp; hold <kbd>{ALT}</kbd> for the other keys
-              </p>
-            )}
-          </div>
-        )}
       </main>
       {textDraft && (
         <CopyText
@@ -2083,7 +2100,7 @@ export function CopyScreen({ onError, onConfigure, onPage, onHome, fileTarget }:
           onCancel={() => setTextDraft(null)}
           onConfigureUser={() => {
             setTextDraft(null);
-            onConfigure();
+            settings.show("you");
           }}
         />
       )}

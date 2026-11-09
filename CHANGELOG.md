@@ -7,6 +7,32 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.27.0 — 2026-11-09
+
+### Changed
+
+- **Settings** (⚙) opens one panel that slides in from the right, with the same tabs on every page: the page's own settings, **Typing**, **Sound**, **Speed**, **Microphone**, **You** and **Drills**. It replaces the settings band and the Configuration screen, and each tab says where its settings apply.
+- The header on Send and QSO shows the microphone in use and whether it is calibrated. Click it to open **Microphone** in Settings, where you choose, make and delete calibrations.
+- In Settings, every control starts in one column, with its name to the left. Settings that belong together, such as the options of Plain, Zen and Paced, sit on a lightly shaded block under the group's name.
+- Settings name the station where they meant it, such as **The station's lines show** and **How much the station sends**. **Your copy** is now **Typing**, and on the Copy page **The recording** is now **Playback**, with **Stop after each line** in it.
+- Every page's header has a second line: the page's actions, the main one first, then its quick settings, then ⋯. **Start**, **Pause** and **Stop** on the QSO page moved up into it.
+- Quick settings show their values, such as **Speed 25 wpm**, and change in place when clicked. **Plain**, **Paced** and **Zen** moved into **Mode**.
+- ⋯ holds **Open** and **Download** on the Send and Copy pages. The download buttons, and the settings that showed them, are gone.
+- On the QSO page, a QSO with no report, such as a **Script** QSO with its report off, uses the full width of the log.
+- Under a finished QSO on the QSO page, ▶ plays it as you heard it, and ⋯ plays it clean or as heard, or downloads it. This replaces the row of **Play** and **Download** buttons, and the **Show Download** setting is gone.
+- **Repeat playback when it ends** is now **Loop**, beside **Fit** over the Send chart.
+- On the Copy page, **Start over**, **Show answers** and **Copy again** are in the header, always in the same place. The page with nothing loaded no longer repeats the kind picker and **Generate QSO**.
+- On a phone, the page's actions sit in a bar at the foot of the screen.
+- In Settings, a setting that does nothing with the others as they are is dimmed, and its **?** says why, as for the **Typing** settings when lines are not set to **Copy**.
+- **Fit WPM** is now **Use these speeds**, and **Intended message** and **Target message** are now **Message**. The Send page's settings say run, as its chart does.
+- On the QSO page, **Restart** is now **New QSO** and **Clear** is **Clear log**. **Script**'s button reads **Start** on the QSO page and **Load** on the Copy page.
+- On the Send page, picking a drill when the session has runs in it opens **New session** with the drill's text, so you choose whether to clear the runs.
+- **?** beside Settings on every page opens Help: the page's guide, and **Keys**, every key the page answers to. The key lines under each page are gone, and so are the QSO page's own help button and the examples beside its log.
+
+### Fixed
+
+- On the Copy and QSO pages, the link in **Script** to fill in a missing detail opens your details, not the last part of Configuration you had open.
+
 ## v1.26.0 — 2026-11-02
 
 ### Added

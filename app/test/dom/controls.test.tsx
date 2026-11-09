@@ -9,9 +9,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import {
-  ChartSettingsButton,
-  ChartSettingsPanel,
   Controls,
+  MicrophoneSection,
+  SendSettings,
+  SendSound,
+  SettingsForm,
+  SpeedSliders,
+  ToleranceSlider,
   ViewControls,
 } from "@/ui/Controls";
 import { defaultSettings, TIMES_MAX, TIMES_MIN } from "@/timing";
@@ -38,21 +42,23 @@ function Harness({
     ...defaultSettings(take),
     ...initial,
   });
+  const onChange = (patch: Partial<ReviewSettings>) =>
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      // Mirrors the clamp useTake applies, so the harness cannot pass a
+      // pair of speeds the real app would never produce.
+      if (next.farnsworthWpm > next.charWpm) next.farnsworthWpm = next.charWpm;
+      onSettings?.(next);
+      return next;
+    });
+  /* The message row, and the speed and tolerance it used to hold, now the
+     Speed and Tolerance chips' settings. */
   return (
-    <Controls
-      settings={settings}
-      onChange={(patch) =>
-        setSettings((prev) => {
-          const next = { ...prev, ...patch };
-          // Mirrors the clamp useTake applies, so the harness cannot pass a
-          // pair of speeds the real app would never produce.
-          if (next.farnsworthWpm > next.charWpm) next.farnsworthWpm = next.charWpm;
-          onSettings?.(next);
-          return next;
-        })
-      }
-      fromFile={fromFile === true}
-    />
+    <>
+      <SpeedSliders charWpm={settings.charWpm} farnsworthWpm={settings.farnsworthWpm} onChange={onChange} />
+      <ToleranceSlider tolerance={settings.tolerance} onChange={(tolerance) => onChange({ tolerance })} />
+      <Controls settings={settings} onChange={onChange} fromFile={fromFile === true} />
+    </>
   );
 }
 
@@ -72,9 +78,24 @@ function view(over: Partial<ReviewSettings>, onChange: (p: Partial<ReviewSetting
   );
 }
 
-/** The button and the band it opens, wired together the way the page wires
- *  them — the button lives in the header corner and the band under it, with
- *  the open state between them. */
+/** The Send page's settings as Settings draws them: Sound, the microphone
+ *  where there is one, then the page's own. */
+function SendPanel(props: {
+  settings: ReviewSettings;
+  onChange(patch: Partial<ReviewSettings>): void;
+  audio?: AudioSetup;
+}) {
+  return (
+    <SettingsForm>
+      <SendSound gainDb={props.settings.gainDb} onGainDb={(gainDb) => props.onChange({ gainDb })} />
+      {props.audio && <MicrophoneSection audio={props.audio} />}
+      <SendSettings settings={props.settings} onChange={props.onChange} />
+    </SettingsForm>
+  );
+}
+
+/** A button and the settings it opens, the open state between them, as the
+ *  header's ⚙ and the Settings drawer are. */
 function Panelled(props: {
   settings: ReviewSettings;
   onChange(patch: Partial<ReviewSettings>): void;
@@ -83,8 +104,10 @@ function Panelled(props: {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <ChartSettingsButton open={open} onToggle={() => setOpen((v) => !v)} />
-      {open && <ChartSettingsPanel {...props} />}
+      <button data-testid="panel-toggle" aria-pressed={open} onClick={() => setOpen((v) => !v)}>
+        Settings
+      </button>
+      {open && <SendPanel settings={props.settings} onChange={props.onChange} />}
     </>
   );
 }
@@ -259,7 +282,7 @@ describe("controls", () => {
     const user = userEvent.setup();
     const seen: ReviewSettings[] = [];
     render(<Harness onSettings={(s) => seen.push(s)} />);
-    const box = screen.getByRole("textbox", { name: /Intended message/i });
+    const box = byId("expected");
     await user.clear(box);
     await user.type(box, "cq de w7yfr");
     expect(seen.at(-1)?.expected).toBe("CQ DE W7YFR");
@@ -269,7 +292,7 @@ describe("controls", () => {
     const user = userEvent.setup();
     const seen: ReviewSettings[] = [];
     render(<Harness initial={{ expected: "CQ DE W7YFR" }} onSettings={(s) => seen.push(s)} />);
-    const box = screen.getByRole("textbox", { name: /Intended message/i }) as HTMLInputElement;
+    const box = byId("expected") as HTMLInputElement;
 
     await user.click(screen.getByTestId("clear-expected"));
     expect(seen.at(-1)?.expected).toBe("");
@@ -423,7 +446,6 @@ describe("controls", () => {
 
     const boxes = [
       ["show-chart-controls", true, { showChartControls: false }],
-      ["show-downloads", false, { showDownloads: true }],
       ["show-hints", true, { showHints: false }],
       ["advanced-grading", true, { advancedGrading: false }],
     ] as const;
@@ -472,7 +494,7 @@ describe("controls", () => {
     const { rerender } = render(
       <Controls {...common} settings={{ ...base, expected: "" }} />,
     );
-    const box = screen.getByRole("textbox", { name: /Intended message/i }) as HTMLInputElement;
+    const box = byId("expected") as HTMLInputElement;
     // Worth saying at all: with nothing here the accuracy figure is graded
     // against the decoder's own reading and reads as a tautology.
     expect(box.placeholder).not.toBe("");
@@ -678,10 +700,9 @@ describe("the Audio group", () => {
 
   function panel(audio: Partial<AudioSetup> = {}, fromFile = false) {
     return render(
-      <ChartSettingsPanel
+      <SendPanel
         settings={defaults()}
         onChange={() => {}}
-        runs={1}
         audio={{
           devices: TWO,
           deviceId: undefined,

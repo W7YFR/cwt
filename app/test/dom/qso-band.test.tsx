@@ -8,7 +8,7 @@ import { NOISE_OFF_DB } from "@/audio/qsb";
 import { QRM_OFF_DB } from "@/copy/band";
 import { loadPrefs } from "@/io/storage";
 import { heard } from "../qso-fakes";
-import { $, EXCHANGE, click, ended, key, mount, open, send, slide, theirs, until, useQsoRig, yourTurn } from "../qso-rig";
+import { $, EXCHANGE, click, ended, key, mount, open, send, settingsTab, slide, theirs, until, useQsoRig, yourTurn } from "../qso-rig";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -20,7 +20,7 @@ const input = (id: string) => $<HTMLInputElement>(`#${id}`)!;
 describe("the band's settings", () => {
   it("are in the Audio settings, off to start, and kept", async () => {
     mount({});
-    await click($('[data-testid="panel-toggle"]'));
+    await settingsTab("sound");
     for (const id of ["qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) {
       expect(input(id).closest('[data-panel="audio"]'), id).not.toBeNull();
     }
@@ -118,10 +118,17 @@ describe("downloading a QSO", () => {
     await until("the session to stop", ended);
   }
 
+  /** Open the finished QSO's ⋯. */
+  const more = () => click($('[data-testid="qso-more"]'));
+
   it("offers only Download with nothing added", async () => {
     await qso({});
+    await more();
     expect($('[data-testid="qso-download"]')).not.toBeNull();
     expect($('[data-testid="qso-download-heard"]')).toBeNull();
+    // With nothing added there is one way to play it: ▶.
+    expect($('[data-testid="qso-play-clean"]')).toBeNull();
+    expect($('[data-testid="qso-play-heard"]')).toBeNull();
   });
 
   /** The share of a 16-bit WAV's samples near silence. */
@@ -132,18 +139,18 @@ describe("downloading a QSO", () => {
     return n / pcm.length;
   };
 
-  it("plays the QSO with Play QSO alone, clean, with nothing added", async () => {
+  it("plays the QSO with ▶ alone, clean, with nothing added", async () => {
     await qso({});
-    expect($('[data-testid="qso-play-heard"]')).toBeNull();
     await click($('[data-testid="qso-play"]'));
     expect(quiet(heard.replays.at(-1)!)).toBeGreaterThan(0.2);
   });
 
-  it("plays the QSO clean or as heard, with the band on", async () => {
+  it("plays the QSO as heard with ▶, and clean or as heard from ⋯, with the band on", async () => {
     await qso({ noiseDb: -12 });
-    await click($('[data-testid="qso-play"]'));
+    await more();
+    await click($('[data-testid="qso-play-clean"]'));
     const clean = heard.replays.at(-1)!;
-    await click($('[data-testid="qso-play"]'));
+    await more();
     await click($('[data-testid="qso-play-heard"]'));
     const noisy = heard.replays.at(-1)!;
     expect(noisy).not.toBe(clean);
@@ -151,10 +158,24 @@ describe("downloading a QSO", () => {
     expect(quiet(noisy), "the band in the gaps").toBeLessThan(quiet(clean) / 2);
   });
 
+  it("stops with ▶ whichever version is playing, the clean one too", async () => {
+    await qso({ noiseDb: -12 });
+    await more();
+    await click($('[data-testid="qso-play-clean"]'));
+    const played = heard.replays.length;
+    const play = $('[data-testid="qso-play"]')!;
+    expect(play.getAttribute("aria-label"), "▶ is Stop while it plays").toBe("Stop");
+    await click(play);
+    expect(heard.replays.length, "nothing more played").toBe(played);
+    expect($('[data-testid="qso-play"]')!.getAttribute("aria-label")).not.toBe("Stop");
+  });
+
   it("offers Download as heard with the band on, and saves both", async () => {
     await qso({ noiseDb: -20, qsbDb: 10 });
     const names = saved();
+    await more();
     await click($('[data-testid="qso-download"]'));
+    await more();
     await click($('[data-testid="qso-download-heard"]'));
     expect(names).toHaveLength(2);
     expect(names[0]).toMatch(/\.wav$/);

@@ -115,7 +115,6 @@ function show(rec: RecorderHandle, source?: string) {
           leadLeft: null,
           onClear: () => {},
           onNewSession: () => {},
-          onFile: () => {},
           source,
         }),
       ),

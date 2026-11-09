@@ -14,6 +14,7 @@
  *   vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
  */
 
+import { withSettings } from "./settings-host";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -58,8 +59,10 @@ export async function key(text: string): Promise<void> {
 /** The element the page is mounted in. */
 export const page = (): HTMLDivElement => host;
 
-export const $ = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel);
-export const $$ = <T extends Element = HTMLElement>(sel: string) => [...host.querySelectorAll<T>(sel)];
+/* The whole document, not the page alone: Settings and Help draw on the
+   body, over the page. */
+export const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel);
+export const $$ = <T extends Element = HTMLElement>(sel: string) => [...document.querySelectorAll<T>(sel)];
 export const status = () => $(".qsostatus")?.textContent ?? "";
 export const note = () => $(".qsonote")?.textContent ?? "";
 /** Where the page is, as its heading's `data-state` says: ready, sending,
@@ -102,12 +105,19 @@ export async function press(key: string, mod = false): Promise<void> {
   });
 }
 
-/** Choose what shows of the station's overs, in the settings: one of the
- *  buttons, by its label. */
-export async function showTheirs(label: string): Promise<void> {
+/** Open Settings, if it is not, at one of its tabs: "page", "copy" (Typing),
+ *  "sound", "speed", or "microphone". */
+export async function settingsTab(tab: string): Promise<void> {
   if ($('[data-testid="panel-toggle"]')?.getAttribute("aria-pressed") !== "true") {
     await click($('[data-testid="panel-toggle"]'));
   }
+  await click($(`[data-testid="settings-tab"] [data-tab="${tab}"]`));
+}
+
+/** Choose what shows of the station's overs, in the settings: one of the
+ *  buttons, by its label. */
+export async function showTheirs(label: string): Promise<void> {
+  await settingsTab("page");
   const button = $$<HTMLButtonElement>('[data-testid="qso-their-text"] button').find(
     (b) => b.textContent === label,
   );
@@ -151,7 +161,8 @@ export function mount(prefs: Prefs): void {
   savePrefs({ charWpm: WPM, farnsworthWpm: WPM, qsoLength: "short", ...prefs });
   act(() =>
     root.render(
-      createElement(QsoScreen, {
+      withSettings(
+        createElement(QsoScreen, {
         deviceId: undefined,
         onDeviceChange: () => {},
         profiles: [],
@@ -159,10 +170,10 @@ export function mount(prefs: Prefs): void {
         onProfileChange: () => {},
         onCalibrate: () => {},
         onError: (m: string) => errors.push(m),
-        onConfigure: () => {},
         onPage: () => {},
         onHome: () => {},
       }),
+      ),
     ),
   );
 }

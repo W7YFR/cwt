@@ -14,6 +14,7 @@ import {
   send,
   slide,
   until,
+  settingsTab,
   useQsoRig,
   yourTurn,
 } from "../qso-rig";
@@ -27,9 +28,9 @@ describe("your speed", () => {
   it("is the practice page's speed, on its sliders in the settings, and locks while a session runs", async () => {
     mount({ charWpm: 20, farnsworthWpm: 15 });
     const field = (id: string) => $<HTMLInputElement>(`#${id}`)!;
-    // In the settings, as their own Speed section.
-    expect(field("wpm").closest("[inert]"), "closed with the settings").not.toBeNull();
-    await click($('[data-testid="panel-toggle"]'));
+    // In Settings, on the Speed tab.
+    expect($("#wpm"), "not there with Settings closed").toBeNull();
+    await settingsTab("speed");
     expect(field("wpm").closest('[data-panel="speed"]')).not.toBeNull();
     expect(field("wpm").closest("[inert]"), "open to change").toBeNull();
     expect(field("wpm").value).toBe("20");
@@ -47,9 +48,13 @@ describe("your speed", () => {
     await until("the Start button", () => !$<HTMLButtonElement>('[data-testid="qso-start"]')!.disabled);
     await click($('[data-testid="qso-start"]'));
     await until("the session to start", () => yourTurn());
+    await settingsTab("speed");
     expect(field("wpm").closest("[inert]"), "locked while it runs").not.toBeNull();
+    expect($<HTMLButtonElement>('[data-testid="chip-speed"]')!.disabled, "its chip too").toBe(true);
+    await settingsTab("microphone");
     expect(field("input-device").closest("[inert]"), "the microphone too").not.toBeNull();
     expect(field("calibration").closest("[inert]"), "and its calibration").not.toBeNull();
+    await settingsTab("page");
     expect($('[data-testid="qso-length"]')!.closest("[inert]"), "the rest can still change").toBeNull();
     expect($('[data-testid="qso-their-text"]')!.closest("[inert]"), "and what shows").toBeNull();
   });

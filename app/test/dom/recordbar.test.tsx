@@ -11,7 +11,9 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
-import { RecordBar } from "@/ui/Record";
+import { ModeSwitch, RecordBar } from "@/ui/Record";
+import { OpenFileItem } from "@/ui/Toolbar";
+import { OPEN_FILE_CLOSED } from "@/ui/copy";
 import { modeOf, modePatch } from "@/ui/mode";
 import type { RecorderHandle } from "@/ui/useRecorder";
 
@@ -149,70 +151,69 @@ describe("the record bar in a session", () => {
   });
 });
 
-/* Opening a file from the bar.
+/* Opening a file, from ⋯ in the toolbar.
  *
- * The drop target was already the whole window, but it says nothing about
- * itself until something is being dragged over it — so on its own it is a
- * feature you have to already know about. The asymmetry is the bug: one way in
- * had a button and the other did not.
+ * The drop target is the whole window, but it says nothing about itself until
+ * something is being dragged over it. So there is a way in that does not
+ * require knowing about dropping.
  */
-describe("opening a recording from the bar", () => {
+describe("opening a recording from ⋯", () => {
+  const item = (over: Partial<React.ComponentProps<typeof OpenFileItem>> = {}) =>
+    render(
+      <OpenFileItem
+        label="Open a recording…"
+        accept=".wav"
+        testId="open-file"
+        onFile={() => {}}
+        {...over}
+      />,
+    );
+
   it("offers a way in that does not require knowing about dropping", () => {
-    bar({ onFile: () => {} });
+    item();
     expect(screen.getByTestId("open-file")).toBeEnabled();
+    expect(screen.getByTestId("open-file")).toHaveAccessibleName(/open a recording/i);
   });
 
-  it("comes before recording, and neither carries a word", () => {
-    /* Icons, and in that order: opening a file is the rarer of the two ways
-       in, so it reads as the smaller sibling rather than a competing
-       headline. */
-    bar({ onFile: () => {} });
-    const open = screen.getByTestId("open-file");
-    const record = screen.getByRole("button", { name: /record another/i });
-    /* Drawn rather than typed, so the assertion is on which icon is there.
-       And still no word on either: the icon is the whole of the button. */
-    expect(open.querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("upload");
-    expect(record.querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("record");
-    expect(open.textContent?.trim()).toBe("");
-    expect(record.textContent?.trim()).toBe("");
-    // Named for anyone who cannot see the icon.
-    expect(open).toHaveAccessibleName(/open a recording/i);
-    expect(record).toHaveAccessibleName(/record/i);
-    expect(open.compareDocumentPosition(record) & Node.DOCUMENT_POSITION_FOLLOWING)
-      .toBeTruthy();
-  });
-
-  it("closes once the session has something in it", () => {
+  it("closes once the session has something in it, and says why", () => {
     /* A recording carries its own speed and only the attempt that starts a
        session gets to set one, so a file can begin a session but never join
        one. */
-    bar({ onFile: () => {}, canOpenFile: false });
-    expect(screen.getByTestId("open-file")).toBeDisabled();
+    item({ disabled: true, title: OPEN_FILE_CLOSED });
+    const open = screen.getByTestId("open-file");
+    expect(open).toBeDisabled();
+    expect(open.getAttribute("title")).toBe(OPEN_FILE_CLOSED);
   });
 
-  it("says why it is closed, where a disabled button usually says nothing", () => {
-    bar({ onFile: () => {}, canOpenFile: false });
-    const title = screen.getByTestId("open-file").getAttribute("title") ?? "";
-    expect(title).toMatch(/speed/i);
-    // And what to do about it, rather than only what is wrong.
-    expect(title).toMatch(/clear|new session/i);
-  });
-
-  it("stays out of the bar entirely when there is nowhere to send a file", () => {
-    bar();
-    expect(screen.queryByTestId("open-file")).toBeNull();
+  it("hands the file on", async () => {
+    const onFile = vi.fn();
+    item({ onFile });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["x"], "take.wav", { type: "audio/wav" });
+    await userEvent.setup().upload(input, file);
+    expect(onFile).toHaveBeenCalledWith(file);
   });
 });
 
+/* Record is the page's main action: first, and named. */
+describe("the record button", () => {
+  it("is the primary action, with its name on it", () => {
+    bar();
+    const record = screen.getByTestId("record-another");
+    expect(record).toHaveClass("primary");
+    expect(record.querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("record");
+    expect(record).toHaveAccessibleName(/record/i);
+  });
+});
 
-/* Plain, Paced or Zen, beside the button that records. One control for one
+/* Plain, Paced or Zen, in the Mode chip. One control for one
    choice: the cursor and Zen mode cannot run together, so picking one is the
    whole of the rule. */
 describe("the recording mode", () => {
   it("shows the mode in force, and picks another", async () => {
     const user = userEvent.setup();
     const onMode = vi.fn();
-    bar({ mode: "paced", onMode });
+    render(<ModeSwitch mode="paced" onMode={onMode} />);
     const group = screen.getByRole("group", { name: /recording mode/i });
     const pressed = [...group.querySelectorAll("button")].filter(
       (b) => b.getAttribute("aria-pressed") === "true",

@@ -481,47 +481,6 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   header .pageswitch, header .recordbar { order: 1; }
 }
 
-/* The band the corner button opens, under the header and above everything the
-   settings in it are about.
-
-   It rolls down rather than appearing, because it appears between two things
-   that were already on screen and pushes everything under it down the page —
-   the chart most of all. Done instantly that reads as the page having jumped;
-   rolled open it reads as a band arriving, and the eye follows the chart to
-   where it went instead of having to find it again.
-
-   Through the grid track rather than through a height, which is what makes it
-   work without a number in it: `auto` is not a length and cannot be animated
-   to, and any max-height guessed here would be a guess about how many
-   checkboxes fit on a line at a window width nobody has told us. A single-row
-   grid going 0fr to 1fr resolves to the content's own height at both ends.
-
-   It stays in the tree either way so it has something to animate FROM, which
-   is why the closed band is inert: a panel rolled up is not a panel you can
-   reach with a tab key. */
-.chartsettings {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 200ms ease;
-  margin: 0 20px;
-}
-.chartsettings[data-open="true"] { grid-template-rows: 1fr; }
-/* The clip the roll happens inside. On the track's own child, since that is
-   the box the track is sizing. */
-.chartsettings > div { overflow: hidden; }
-/* A panel, drawn inside the clip so it rolls open whole: its gap above, its
-   border and its corners all arrive with it, and closed it takes no room. */
-.chartsettings .viewpanel {
-  padding: 10px 20px 12px;
-  margin-top: 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-}
-/* Asked not to animate: still opens, just already open. */
-@media (prefers-reduced-motion: reduce) {
-  .chartsettings { transition: none; }
-}
 /* A band of its own under the row. `100%` on a wrapping flex row is what puts
    it there — it cannot share a line with anything, whatever the window is
    doing, so opening it never rearranges the row above. */
@@ -955,7 +914,8 @@ canvas.resizing { cursor: ew-resize; }
 /* A key, drawn as one. The mono face and the border are what separate "press
    R" from the letter R in a sentence, which matters most for the single
    letter — "R record" in running text reads as a typo. */
-.legend kbd {
+.legend kbd,
+.keylist kbd {
   font-family: var(--mono);
   font-size: 11px;
   line-height: 1;
@@ -2058,27 +2018,13 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
 /* The tally is prose, not a message to be compared character by character. */
 .texts dd.plain { font-family: inherit; font-size: 12px; color: var(--ink-dim); }
 
-/* Configuration, and the way in to it.
- *
- * Positioned against the app rather than against either screen, so it lands in
- * the same place on both — a control that moves between screens is one
- * somebody has to look for twice. Above the header's own stacking so it stays
- * clickable over it. */
-.settings {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 28px 20px;
-  width: 100%;
-  box-sizing: border-box;
-}
-/* Three fields to a row, which is all the user details want. */
-.settings .panel { max-width: 780px; gap: 22px; }
-.settings .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
+/* The drawer's own tabs: You, Drills and the calibrations under
+   Microphone. Sections under rules, as the calibration screens have. */
+.configpanel { display: flex; flex-direction: column; gap: 22px; }
+.configpanel .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
+.configpanel .callist li { background: var(--bg); }
 /* Rows sit a shade darker than the panel they are on, the way the calibration
    steps do, or they vanish into it. */
-.panel .callist li { background: var(--bg); }
 .userfields {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -2584,6 +2530,8 @@ header .modeswitch button { white-space: nowrap; }
 @container (min-width: 42rem) {
   .qsolog > li.qsogroup { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; column-gap: 32px; align-items: start; }
   .qsolog > li.live { margin-right: calc(20rem + 32px); }
+  .qsolog > li.qsogroup.noreport { grid-template-columns: minmax(0, 1fr); }
+  .qsolog > li.live.noreport { margin-right: 0; }
   .qsolog .qsoreport { padding-left: 24px; border-left: 1px solid var(--line); }
 }
 .qsolines {
@@ -2614,8 +2562,6 @@ header .modeswitch button { white-space: nowrap; }
 .qsoreport tbody th[scope="row"] { color: var(--ink-dim); }
 .qsoreport td { font-family: var(--mono); color: var(--ink); }
 .qsoreport tr.bad td:last-child { color: var(--bad); }
-.qsolog .qsotape button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
-.qsolog .qsotape .ico { margin-right: 6px; font-style: normal; }
 /* The Copy page's downloads, under the QSO, as the QSO page's are. */
 .copydownloads { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .copydownloads button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -2784,9 +2730,12 @@ header .modeswitch button { white-space: nowrap; }
 .viewpanel.formpanel .panelgroups + .panelgroups { margin-top: 8px; }
 /* A row: the name, then the control. A checkbox's name is beside its box, so
    the box sits in the control column. */
+/* Every control starts at the same place, under every heading: after the
+   name column, whether a row has a name there or not. */
+.viewpanel.formpanel { --namecol: 200px; }
 .viewpanel.formpanel .group {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr) auto;
+  grid-template-columns: var(--namecol) minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 14px;
 }
@@ -2808,15 +2757,9 @@ header .modeswitch button { white-space: nowrap; }
   line-height: 1.4;
   color: var(--ink-faint);
 }
-.viewpanel.formpanel .setrow { row-gap: 6px; }
-.viewpanel.formpanel .setrow > .caption { align-self: start; line-height: 22px; }
-.viewpanel.formpanel .setrow > .group { grid-column: 2 / -1; display: flex; flex-direction: row; align-items: center; justify-self: stretch; margin: 0; min-height: 0; }
-.viewpanel.formpanel .setrow > .group > .helptip { margin-left: auto; padding-left: 14px; }
-.viewpanel.formpanel .setrow > .group > label.check { min-height: 22px; min-width: 0; flex: 1 1 auto; }
-.viewpanel.formpanel .setrow > .group > .helptip { flex: none; }
 /* Speed's names carry their readings, as Overall (Farnsworth) 25 wpm, so its
    name column is wider. */
-.viewpanel.formpanel [data-panel="speed"] .group { grid-template-columns: 200px auto; }
+.viewpanel.formpanel [data-panel="speed"] .group { grid-template-columns: var(--namecol) auto; }
 .viewpanel.formpanel .group > .caption,
 .viewpanel.formpanel .group > label:not(.check) {
   height: auto;
@@ -2843,9 +2786,8 @@ header .modeswitch button { white-space: nowrap; }
   .viewpanel.formpanel .group > label.check,
   .viewpanel.formpanel .group > .note { grid-column: 1; }
 }
-/* Each section's settings on a panel of their own, a hairline between rows
-   across its width, so a name and the control it goes with read as one row
-   however far apart they sit. Audio's two lines make one panel. */
+/* Each section's settings on a panel of their own. Lines inside it only
+   separate groups of settings; see `.subgroup`. */
 .viewpanel.formpanel .panelrow > .panelgroups {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -2853,8 +2795,31 @@ header .modeswitch button { white-space: nowrap; }
   padding: 0 14px;
   gap: 0;
 }
-.viewpanel.formpanel .panelrow > .panelgroups > .group { padding: 9px 0; }
-.viewpanel.formpanel .panelrow > .panelgroups > .group + .group { border-top: 1px solid var(--line); }
+.viewpanel.formpanel .panelrow > .panelgroups { padding: 6px 14px; }
+.viewpanel.formpanel .panelrow > .panelgroups > .group,
+.viewpanel.formpanel .subgroup > .group { padding: 5px 0; }
+/* A line between groups of settings that belong together, and none between
+   the settings inside one. */
+/* A group of settings that belong together, on a faintly shaded block
+   across the row: where it starts and ends is the block's edge. */
+.viewpanel.formpanel .subgroup {
+  position: relative;
+  padding: 4px 8px;
+  margin: 4px -8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+/* The group's name, in the name column beside its first setting. */
+.viewpanel.formpanel .subgroup > .subhead {
+  position: absolute;
+  left: 8px;
+  top: 13px;
+  width: var(--namecol);
+  line-height: 22px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
 /* Up by the section's 4px gap and the border's width, so the two meet in a
    single hairline. */
 .viewpanel.formpanel .panelrow > .panelgroups + .panelgroups {
@@ -2875,15 +2840,12 @@ header .modeswitch button { white-space: nowrap; }
 .viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 100%; min-width: 0; }
 .viewpanel.formpanel .group > .sliderow { display: flex; gap: 8px; min-width: 0; }
 .viewpanel.formpanel .group > .sliderow > select { flex: 1; }
-/* A section of checkboxes alone has no names on the left to line up with,
-   so its boxes start at the left. */
-.viewpanel.formpanel .checks .group > label.check { grid-column: 1 / 3; }
 /* A number box carries its name: the name in the name column, the box and
    its unit in the control column. */
 .viewpanel.formpanel .group > label.field {
   grid-column: 1 / 3;
   display: grid;
-  grid-template-columns: 200px auto auto;
+  grid-template-columns: var(--namecol) auto auto;
   justify-content: start;
   align-items: center;
   column-gap: 14px;
@@ -2895,15 +2857,11 @@ header .modeswitch button { white-space: nowrap; }
   color: var(--ink-dim);
 }
 .viewpanel.formpanel .group > label.field .unit { margin-left: -8px; }
-/* A number box among a row's options, as Paced's count-in: its name, box
-   and unit on one line in the control column, its name as a checkbox's is. */
-.viewpanel.formpanel .setrow .group > label.field { display: flex; align-items: center; gap: 8px; }
-.viewpanel.formpanel .setrow .group > label.field .fieldname { color: var(--ink); flex-basis: auto; }
-.viewpanel.formpanel .setrow .group > label.field .unit { margin-left: -2px; }
 @media (max-width: 560px) {
-  .viewpanel.formpanel .setrow > .group { grid-column: 1; }
-  .viewpanel.formpanel .group > label.field { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-  .viewpanel.formpanel .group > label.field .fieldname { flex-basis: 100%; }
+  /* A number box is small: its name, the box and its unit share one line,
+     with its question mark at the end as on every row. */
+  .viewpanel.formpanel .group > label.field { grid-column: 1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .viewpanel.formpanel .group > label.field .fieldname { margin-right: 6px; }
   .viewpanel.formpanel .group > label.field .unit { margin-left: 0; }
 }
 .viewpanel [data-panel="speed"] label { white-space: nowrap; }
@@ -2956,3 +2914,290 @@ header .modeswitch button { white-space: nowrap; }
 .viewpanel.formpanel .pagerow { align-items: stretch; }
 .viewpanel.formpanel .panelrow > .panelgroups:last-child { flex: 1 1 auto; }
 .viewpanel.formpanel .sectioncol > .panelrow:last-child { flex: 1 1 auto; }
+
+/* Settings: a drawer over the right side of the page, the whole page on a
+   phone. Over the page rather than in it, so opening it moves nothing. */
+/* The whole window, past the scrollbar gutters the page reserves on both
+   sides, so the drawer meets the window's right edge. */
+.drawerwrap { position: fixed; top: 0; bottom: 0; left: calc(50% - 50vw); width: 100vw; z-index: 50; }
+/* It slides in from the right and back out, and the page behind dims and
+   comes back with it. */
+@keyframes drawer-in { from { transform: translateX(100%); } }
+@keyframes drawer-out { to { transform: translateX(100%); } }
+@keyframes scrim-in { from { opacity: 0; } }
+@keyframes scrim-out { to { opacity: 0; } }
+.drawerwrap[data-state="open"] .drawer { animation: drawer-in 220ms cubic-bezier(.2, .8, .2, 1); }
+.drawerwrap[data-state="open"] .drawerscrim { animation: scrim-in 220ms ease-out; }
+.drawerwrap[data-state="closing"] { pointer-events: none; }
+.drawerwrap[data-state="closing"] .drawer { animation: drawer-out 90ms ease-in forwards; }
+.drawerwrap[data-state="closing"] .drawerscrim { animation: scrim-out 90ms ease-in forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .drawerwrap .drawer, .drawerwrap .drawerscrim { animation: none !important; }
+}
+.drawerscrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 40%, rgba(10, 14, 22, .45));
+}
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, .18);
+  outline: none;
+}
+.drawerhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 6px;
+}
+.drawerhead h2 { margin: 0; font-size: 17px; }
+.drawerclose { font-size: 18px; line-height: 1; }
+/* The tabs, as a row of words under a rule: the one on show underlined in
+   the app's blue. They scroll sideways where they do not fit. */
+.drawertabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: none;
+}
+.drawertabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  padding: 8px 10px;
+  margin-bottom: -1px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  height: auto;
+}
+.drawertabs button:hover { color: var(--ink); }
+/* Color and the underline only: bold would widen the tab and move the ones
+   after it. */
+.drawertabs button[aria-selected="true"] {
+  color: var(--you);
+  border-bottom-color: var(--you);
+}
+/* Between the page's tabs and the app's. */
+.drawertabs .tabsep { flex: none; width: 1px; margin: 8px 8px 10px; background: var(--line); }
+/* Where the settings on show apply. */
+.drawerscope { margin: -4px 0 -8px; font-size: 12.5px; color: var(--ink-faint); }
+.drawerbody { flex: 1; overflow-y: auto; padding: 16px 20px 28px; display: flex; flex-direction: column; gap: 22px; }
+.drawerslot:empty { display: none; }
+/* The app's tabs head their sections as the page's tabs do. */
+.drawer .panelsec > h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.drawerslot[data-locked="true"] { opacity: .55; }
+.drawerlock { margin: 0; font-size: 13px; color: var(--warn); }
+/* One column in the drawer, whatever the window: the names on the left, the
+   controls on the right, as wide as the drawer allows. */
+.drawer .viewpanel.formpanel { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+.drawer .viewpanel.formpanel { --namecol: 180px; }
+.drawer .viewpanel.formpanel [data-panel="speed"] .group { grid-template-columns: var(--namecol) minmax(0, 1fr) auto; }
+.drawer .viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 100%; }
+@media (max-width: 560px) {
+  /* No name column on a phone: a group's name heads its settings. */
+  .viewpanel.formpanel .subgroup > .subhead { position: static; display: block; padding-top: 4px; }
+  .drawer { width: 100%; border-left: 0; }
+  .drawerbody { padding: 14px 16px 24px; }
+  .drawer .viewpanel.formpanel .group { grid-template-columns: minmax(0, 1fr) auto; }
+}
+
+/* The microphone in use, in the header corner: a button, so it reads like
+   the calibration chip but opens Settings at Microphone. */
+.micchip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  height: auto;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.micchip:hover { color: var(--ink); border-color: var(--you-quiet); }
+.micchip .micname { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) {
+  .micchip .micname, .micchip .micname + span { display: none; }
+}
+
+/* The toolbar: the header's second line, under a rule. The page's actions,
+   then its quick settings, then ⋯. The same on every page. */
+.toolbar {
+  flex-basis: 100%;
+  min-width: 0;
+  order: 3;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+}
+.toolactions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; flex: 1 1 auto; min-width: 0; }
+.toolactions > .recordbar { flex: 0 1 auto; }
+/* A file's name and how it is read, on a line of its own under the actions. */
+.toolactions > .srcrow { flex-basis: 100%; }
+.toolchips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+/* A quick setting: its name, then its value, as one rounded button. */
+.quick { position: relative; }
+.quick .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-h);
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--panel);
+  white-space: nowrap;
+}
+.quick .chipname { color: var(--ink-dim); font-size: 12.5px; }
+.quick .chipvalue { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); text-align: left; }
+.quick .chipcaret { color: var(--ink-faint); font-size: 9px; }
+.quick .chip[aria-expanded="true"] { border-color: var(--you); }
+/* The setting itself, under its chip: the same form as in Settings. */
+.quickpop {
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: max-content;
+  min-width: 300px;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 12px 16px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
+}
+/* As wide as the setting needs, up to a limit, so a row of choices or a
+   checkbox's words stay on one line. No inner panel: the popover is one. */
+.quickpop .viewpanel.formpanel { --namecol: 0px; gap: 10px; grid-template-columns: minmax(max-content, 1fr); }
+/* No names in the popover: its controls start at the left edge. */
+.quickpop .viewpanel.formpanel[data-names="false"] .group { column-gap: 0; }
+/* Once its width is held, its settings fit inside it and wrap. */
+.quickpop[data-pinned="true"] .viewpanel.formpanel { grid-template-columns: minmax(0, 1fr); }
+/* The popover is at least this wide, and a short one's rows fill it. */
+.quickpop { min-width: 340px; }
+.quickpop .viewpanel.formpanel .panelrow > .panelgroups { background: none; border: 0; padding: 0; }
+/* A note wraps rather than widening the popover past the window. */
+.quickpop .viewpanel.formpanel .group > .note { max-width: 300px; }
+.quickpop .viewpanel.formpanel .panelrow > .uplabel { display: none; }
+/* A slider in a popover takes the whole width under its name and reading. */
+.quickpop .viewpanel.formpanel .group:has(> input[type="range"]) { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+.quickpop .viewpanel.formpanel .group > input[type="range"] { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+.quickpop .viewpanel.formpanel .group:has(> input[type="range"]) > .helptip { grid-column: 2; }
+.quickpop .viewpanel.formpanel [data-panel="speed"] .group { grid-template-columns: var(--namecol) minmax(0, 1fr) auto; }
+.quickpop .viewpanel.formpanel [data-panel="speed"] .group:has(> input[type="range"]) { grid-template-columns: minmax(0, 1fr) auto; }
+.quickpop .viewpanel.formpanel [data-panel="speed"] input[type="range"] { width: 100%; }
+.quickpop .viewpanel [data-panel="speed"] label.check { white-space: normal; }
+.quickpop .quickmore { display: block; margin: 8px 2px 0 auto; font-size: 12.5px; }
+/* ⋯: a short list of buttons. */
+.quick.more { margin-left: auto; }
+.qsolog .qsotape .quick.more { margin-left: 0; }
+.quickpop.menu.up { position: fixed; top: 0; left: 0; }
+.quickpop.menu { width: max-content; min-width: 220px; padding: 6px; display: flex; flex-direction: column; gap: 2px; left: auto; }
+.quickpop.menu > button {
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  width: 100%;
+}
+.quickpop.menu > button:hover:not(:disabled) { background: var(--panel-2); }
+.menuhead {
+  padding: 8px 10px 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-faint);
+}
+@media (max-width: 560px) {
+  /* The chips and ⋯ share one line, the chips scrolling sideways. */
+  .toolbar { flex-wrap: nowrap; }
+  .toolchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: 1 1 0; }
+  .quick.more { margin-left: 0; }
+  .quickpop { position: fixed; left: 16px !important; right: 16px; top: auto; width: auto; min-width: 0; }
+  .quickpop .viewpanel.formpanel { grid-template-columns: minmax(0, 1fr); }
+  /* The page's actions in a bar at the foot of the screen, where a thumb
+     reaches them. Across the whole window, past the scrollbar gutters. */
+  .toolactions {
+    position: fixed;
+    bottom: 0;
+    left: calc(50% - 50vw);
+    width: 100vw;
+    z-index: 20;
+    flex-wrap: wrap;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, .18);
+  }
+  .toolactions > .recordbar { flex-wrap: nowrap; }
+  .toolactions button { white-space: nowrap; }
+  .toolactions .srcrow { display: none; }
+  /* From the foot of the screen, the drill list opens upward. */
+  .toolactions .drillpicker.floating .drilllist { top: auto; bottom: calc(100% + 6px); }
+  /* Room under the page for the bar, two lines of it where a page has that
+     many actions. */
+  .app { padding-bottom: 120px; }
+}
+.qsocontrols:empty { display: none; }
+/* The level meter beside Pause and Stop, as wide as the one beside Stop and review. */
+.toolactions > .meter { flex: 0 0 90px; }
+/* A name in a popover stays on one line: the column is sized to it. */
+.quickpop .viewpanel.formpanel .group > .caption,
+.quickpop .viewpanel.formpanel .group > label:not(.check),
+.quickpop .viewpanel.formpanel .group > label.field > .fieldname { white-space: nowrap; }
+
+/* A choice's notes, stacked in one cell: the chosen one shows, the rest keep
+   their room. */
+.note.notes { display: grid; }
+.note.notes > span { grid-area: 1 / 1; }
+.note.notes > span[data-on="false"] { visibility: hidden; }
+/* Between a page's own actions and the ones on what it holds, as Copy's
+   attempts. */
+.toolsep { width: 1px; height: 22px; background: var(--line); }
+@media (max-width: 560px) { .toolsep { display: none; } }
+/* A group whose every setting does nothing now dims its name too. */
+.viewpanel.formpanel .subgroup:not(:has(input:not(:disabled), button:not(:disabled):not(.helpdot))) > .subhead { opacity: .45; }
+
+/* Help: the page's guide, then its keys in a list. */
+.helpguide { font-size: 14px; line-height: 1.6; color: var(--ink); }
+.helpguide p, .helpguide ul { margin: 0 0 10px; }
+.keylist { display: flex; flex-direction: column; gap: 18px; }
+.keylist h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.keylist dl { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.keylist .keyrow { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; align-items: baseline; }
+.keylist dt { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.keylist .combo { display: inline-flex; gap: 3px; align-items: baseline; }
+.keylist .or { color: var(--ink-faint); font-size: 12px; margin-right: 3px; }
+.keylist dd { margin: 0; font-size: 13px; color: var(--ink-dim); }
+@media (max-width: 560px) {
+  .keylist .keyrow { grid-template-columns: 120px minmax(0, 1fr); }
+}
+
+/* Under a QSO that is over: ▶ and ⋯ first, then its name. */
+.qsolog .qsotape { align-items: center; justify-content: flex-start; }
+.qsolog .qsotape .tapename { font: 12.5px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); }
+.qsolog .qsotape .tapeend { display: flex; align-items: center; gap: 6px; }
+.qsolog .qsotape .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
+/* An item in ⋯ that is not on offer: faint, and the pointer says so. */
+.quickpop.menu > button:disabled { color: var(--ink-faint); cursor: not-allowed; }

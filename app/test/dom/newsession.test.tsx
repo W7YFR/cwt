@@ -34,7 +34,8 @@ function open(over: Partial<React.ComponentProps<typeof NewSession>> = {}) {
   return { onStart, onCancel };
 }
 
-const text = () => screen.getByLabelText(/target message/i) as HTMLTextAreaElement;
+/** The message box, by its id: its label may be reworded. */
+const text = () => document.getElementById("ns-text") as HTMLTextAreaElement;
 
 describe("starting a new session", () => {
   it("opens on the message, which is why you came", () => {
