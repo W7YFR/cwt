@@ -241,7 +241,7 @@ const REPLAY_HELP =
 
 const BLUR_CALL_HELP =
   "While the station's text is blurred, a copy box or off, its call is blurred in the log " +
-  "too, until the QSO ends.";
+  "too, until you copy it or the QSO ends.";
 
 /** When the play buttons show. */
 type Playback = "never" | "always" | "end";
@@ -1928,14 +1928,15 @@ export function QsoScreen({
   };
 
   /** The label of a line: who sent it, blurred when Blur call with copy is
-   *  on and the line's text is not shown as it is. */
+   *  on and the line's text is not shown as it is, until you have the call. */
   const labelOf = (line: Line): React.ReactElement => {
     const mode = theirModeOf(line);
     const blurred =
       blurCall &&
       !line.you &&
       !closed.includes(line.qso) &&
-      (mode === "hidden" || mode === "copy" || mode === "none");
+      (mode === "hidden" || mode === "copy" || mode === "none") &&
+      !identified(line.qso, line.who);
     return blurred ? (
       <span className="who blurred" aria-hidden="true" data-testid="qso-who-blurred">
         {line.who}

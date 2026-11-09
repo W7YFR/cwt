@@ -19,6 +19,7 @@ nothing to the site. The next release carries them.
 ### Fixed
 
 - On the QSO page, **Pause** and **Stop** stop a line that plays again, not only the band noise.
+- With **Hide the station's call until I copy it** on, the station's call stayed blurred after you copied it. It now shows once you copy it.
 
 ## v1.27.0 — 2026-11-09
 
