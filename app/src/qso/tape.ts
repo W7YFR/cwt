@@ -44,6 +44,10 @@ const GAP_SEC = 1;
  *  seconds: short, but long enough not to click. */
 const RAMP_SEC = 0.008;
 
+/** The quiet before and after the station's line on its own, seconds. Its
+ *  characters fall this much later in the audio than in its timeline. */
+export const LINE_PAD_SEC = 0.1;
+
 /** The pause between one line and the next, seconds. */
 const BETWEEN_SEC = 0.6;
 
@@ -119,7 +123,7 @@ function leveled(samples: Float32Array): Float32Array {
 export function lineAudio(line: TapeLine, rate: number): Clip {
   if (!line.you) {
     const timing = targetTiming(line.speed.charWpm, line.speed.farnsworthWpm);
-    const made = synthesize(line.text, timing, { rate, toneHz: line.toneHz, padSec: 0.1 });
+    const made = synthesize(line.text, timing, { rate, toneHz: line.toneHz, padSec: LINE_PAD_SEC });
     return { samples: leveled(made.samples), rate };
   }
   return { samples: leveled(resampled(trimmed(line.clip), rate).samples), rate };

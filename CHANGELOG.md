@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- The QSO page plays part of the station's line, as the Copy page does. **Letter** and **Word** play the selected slot's letter or word, and a click or a selection in a line plays that part.
+- On the QSO page, Option+L and Option+W play the selected letter or word, and Option+Enter plays on from the word you are copying. Off a Mac, use Alt.
+
 ### Fixed
 
 - On the QSO page, **Pause** and **Stop** stop a line that plays again, not only the band noise.

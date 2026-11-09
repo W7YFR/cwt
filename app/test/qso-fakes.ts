@@ -68,14 +68,16 @@ function sample(t: number): number {
 }
 
 /** What the band gate was last told, what each of the station's lines
- *  played with, each replay as a WAV, and whether one plays now, for a test
- *  to read. */
+ *  played with, each replay as a WAV with the part of it played, and
+ *  whether one plays now, for a test to read. */
 export const heard: {
   gate: { band: { samples: Float32Array; rate: number } | null; level: number; armed: boolean; delaySec: number };
   airs: (TargetAir | undefined)[];
   replays: ArrayBuffer[];
+  /** From and to, in seconds, or undefined for the whole of it. */
+  spans: [number | undefined, number | undefined][];
   replaying: boolean;
-} = { gate: { band: null, level: 0, armed: false, delaySec: 0 }, airs: [], replays: [], replaying: false };
+} = { gate: { band: null, level: 0, armed: false, delaySec: 0 }, airs: [], replays: [], spans: [], replaying: false };
 
 /** The band gate, which only remembers. */
 const gate: BandGate = {
@@ -167,8 +169,11 @@ export function fakePlayer<T extends object>(real: T) {
       let gainDb = 0;
       return {
         // A line played again: a second on the fake clock, whatever it holds.
-        async playBuffer(data) {
-          if (data instanceof ArrayBuffer) heard.replays.push(data);
+        async playBuffer(data, from, to) {
+          if (data instanceof ArrayBuffer) {
+            heard.replays.push(data);
+            heard.spans.push([from, to]);
+          }
           teardown();
           replay = true;
           heard.replaying = true;
@@ -238,5 +243,6 @@ export function resetKey(): void {
   heard.gate = { band: null, level: 0, armed: false, delaySec: 0 };
   heard.airs = [];
   heard.replays = [];
+  heard.spans = [];
   heard.replaying = false;
 }

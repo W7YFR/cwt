@@ -43,7 +43,7 @@ import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
-import { anyAdded, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
+import { anyAdded, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
 import { charsOf, copyText, overOfText, plain, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
@@ -56,7 +56,7 @@ import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
 import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY } from "./copy";
-import { Graded, RightOnly } from "./Graded";
+import { Graded, RightOnly, type SentAttrs } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
 import { QsoGuide } from "./QsoHelp";
@@ -113,6 +113,11 @@ const BAND_RATE = 12000;
 
 /** How loud the station plays, at its peak. */
 const THEIR_PEAK = 0.5;
+
+/** A play of part of a line starts this much before it and ends this much
+ *  after, so its first and last characters are heard whole. As on the Copy
+ *  page. */
+const PART_PAD_SEC = 0.15;
 
 const BAND_NOISE_HELP =
   "Noise, QRN and QRM play all through the QSO, as on a radio, not only while the station sends. " +
@@ -249,7 +254,8 @@ const PLAYBACK_HELP =
   "When the play buttons show: on each line, and under a QSO that is over. " +
   "Always shows them on every line. During a QSO they play on your turn, before you start " +
   "sending, and the microphone is not copied while they play. At end " +
-  "shows them once the QSO is over.";
+  "shows them once the QSO is over. Where they show, a click on a word of the station's line " +
+  "plays that word.";
 
 const SCRIPT_REPORT_HELP =
   "Beside a script QSO that is over: how often the station asked you to repeat, how many of your " +
@@ -462,6 +468,7 @@ const QSO_KEYS: readonly KeyGroup[] = [
     rows: [
       { keys: [["R"]], does: "Start your turn over; in a script, before you key, start the script over" },
       { keys: [[ALT, "R"]], does: "Play the station's last line again, with Play buttons on Always" },
+      { keys: [[ALT, "Enter"]], does: "Play from the word you are copying" },
     ],
   },
   {
@@ -478,6 +485,7 @@ const QSO_KEYS: readonly KeyGroup[] = [
       { keys: [["←"], ["→"]], does: "Move a slot" },
       { keys: [["Space"]], does: "Go to the next word" },
       { keys: [["Backspace"]], does: "Back one, on an empty slot" },
+      { keys: [[ALT, "L"], [ALT, "W"]], does: "Play the selected letter or word" },
     ],
   },
 ];
@@ -664,6 +672,9 @@ export function QsoScreen({
   /* Playing a line or a whole QSO again, once the microphone is off. A player
      of its own: the one above moves the QSO on when a line ends. */
   const [replaying, setReplaying] = useState<string | null>(null);
+  /** The slot selected last: its line and its place in the line. Kept
+   *  without a render: the page's next one shows it. */
+  const selected = useRef<{ line: number; slot: number } | null>(null);
   /** What happens when a line played again ends. */
   const replayEnded = useRef<() => void>(() => {});
   const listen = useMemo(
@@ -1419,8 +1430,8 @@ export function QsoScreen({
     return added ? tape([part], tapeRate(), added) : lineAudio(part, tapeRate());
   };
   /** Play `clip`, or stop it if it plays now. With `again`, play it from
-   *  its start even then. */
-  const playClip = (key: string, clip: Clip, again = false) => {
+   *  its start even then. With `span`, only that part of it, in seconds. */
+  const playClip = (key: string, clip: Clip, again = false, span?: readonly [number, number]) => {
     if (replaying === key && !again) {
       listen.stop();
       return;
@@ -1430,7 +1441,7 @@ export function QsoScreen({
     // In a session, the microphone is not read while the line plays, so the
     // line is not copied as your sending.
     if (recorder) setPhase("replaying");
-    void listen.playBuffer(encodeWavBuffer(clip.samples, clip.rate));
+    void listen.playBuffer(encodeWavBuffer(clip.samples, clip.rate), span?.[0], span?.[1]);
   };
   /* The line has played: in a session, your turn starts over, clear of it.
      In a run between QSOs, the next station waits a few seconds more. */
@@ -1443,7 +1454,8 @@ export function QsoScreen({
   };
   /** Option+R anywhere on the page, or Alt+R: the station's last line plays
    *  again, with the play buttons on every line, as Option+R plays the line
-   *  again on the Copy page. */
+   *  again on the Copy page. Option+L, Option+W and Option+Enter play part
+   *  of a line, as there too. */
   const replayLast = () => {
     if (playback !== "always") return;
     let i = lines.length - 1;
@@ -1455,12 +1467,20 @@ export function QsoScreen({
   };
   const replayKey = useRef(replayLast);
   replayKey.current = replayLast;
+  /** Option+L, Option+W and Option+Enter, or Alt off a Mac: part of a line
+   *  plays, as on the Copy page. Bound below, once each is. */
+  const partKeys = useRef({ letter: () => {}, word: () => {}, fromWord: (_el: EventTarget | null) => {} });
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.code !== "KeyR" || ev.repeat || !altOf(ev)) return;
+      if (!altOf(ev)) return;
+      if (ev.code === "KeyR") {
+        if (!ev.repeat) replayKey.current();
+      } else if (ev.code === "KeyL") partKeys.current.letter();
+      else if (ev.code === "KeyW") partKeys.current.word();
+      else if (ev.key === "Enter") partKeys.current.fromWord(ev.target);
+      else return;
       ev.preventDefault();
       ev.stopPropagation();
-      replayKey.current();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -1472,6 +1492,108 @@ export function QsoScreen({
     if (phase !== "listening") return "Plays on your turn";
     if (sending) return "Plays before you start sending";
     return null;
+  };
+  /** Play part of the station's line `i`, from `t0` to `t1` on its
+   *  timeline, as heard. Where its play button is, and when it can play. */
+  const playPart = (i: number, t0: number, t1: number) => {
+    const line = lines[i];
+    if (!line || line.you || playback === "never") return;
+    if (playback === "end" && !closed.includes(line.qso)) return;
+    const part = tapeLineOf(i);
+    if (!part || cannotPlay() !== null) return;
+    const clip = lineHeard(part);
+    const end = clip.samples.length / clip.rate;
+    playClip(`line ${i}`, clip, true, [
+      Math.max(0, LINE_PAD_SEC + t0 - PART_PAD_SEC),
+      Math.min(end, LINE_PAD_SEC + t1 + PART_PAD_SEC),
+    ]);
+  };
+  /** The selected slot's character and its word. */
+  const selectedChar = () => {
+    const sel = selected.current;
+    const line = sel ? lines[sel.line] : undefined;
+    if (!sel || !line || line.you) return null;
+    let k = sel.slot;
+    for (const w of overOf(line).words) {
+      if (k < w.chars.length) return { char: w.chars[k]!, word: w };
+      k -= w.chars.length;
+    }
+    return null;
+  };
+  const playLetter = () => {
+    const at = selectedChar();
+    if (at) playPart(selected.current!.line, at.char.t0, at.char.t1);
+  };
+  const playWord = () => {
+    const at = selectedChar();
+    if (at) playPart(selected.current!.line, at.word.chars[0]!.t0, at.word.chars.at(-1)!.t1);
+  };
+  /** Play on to the end of the line from the start of the word you are
+   *  copying: the word the cursor is in, in a box, or the selected slot's. */
+  const fromWord = (el: EventTarget | null) => {
+    if (el instanceof HTMLInputElement && el.dataset.line !== undefined) {
+      const i = Number(el.dataset.line);
+      const line = lines[i];
+      if (!line || line.you) return;
+      const over = overOf(line);
+      const before = el.value.slice(0, el.selectionStart ?? el.value.length).trimStart();
+      const k = before ? before.split(/\s+/).length - 1 : 0;
+      const word = over.words[Math.min(k, over.words.length - 1)];
+      if (word) playPart(i, word.chars[0]!.t0, over.t1);
+      return;
+    }
+    const at = selectedChar();
+    if (at) playPart(selected.current!.line, at.word.chars[0]!.t0, overOf(lines[selected.current!.line]!).t1);
+  };
+  partKeys.current = { letter: playLetter, word: playWord, fromWord };
+  /** A button that plays the selected slot's letter or word, as on the Copy
+   *  page. A press keeps you in the slot. */
+  const slotPlay = (label: string, title: string, run: () => void, testId: string) => (
+    <button
+      type="button"
+      aria-label={title}
+      title={title}
+      data-testid={testId}
+      disabled={!selectedChar() || cannotPlay() !== null}
+      onMouseDown={(ev) => ev.preventDefault()}
+      onClick={run}
+    >
+      <i className="ico">
+        <IconPlay />
+      </i>
+      {label}
+    </button>
+  );
+  /** A selection in the station's line plays that part of it. A click on
+   *  one of its characters plays its word. */
+  const onLogMouseUp = (ev: React.MouseEvent) => {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      // Within the first line the selection takes in.
+      let i: number | null = null;
+      let from = Infinity;
+      let to = -Infinity;
+      for (const el of (ev.currentTarget as HTMLElement).querySelectorAll<HTMLElement>("[data-line] [data-t0]")) {
+        if (!range.intersectsNode(el)) continue;
+        const at = Number(el.closest<HTMLElement>("[data-line]")!.dataset.line);
+        if (i === null) i = at;
+        if (at !== i) break;
+        from = Math.min(from, Number(el.dataset.t0));
+        to = Math.max(to, Number(el.dataset.t1));
+      }
+      if (i !== null && from < to) playPart(i, from, to);
+      return;
+    }
+    const el = (ev.target as HTMLElement).closest<HTMLElement>("[data-t0]");
+    const row = el?.closest<HTMLElement>("[data-line]");
+    if (!el || !row || el.tagName === "INPUT") return;
+    const i = Number(row.dataset.line);
+    const line = lines[i];
+    if (!line || line.you) return;
+    const t = Number(el.dataset.t0);
+    const word = overOf(line).words.find((w) => w.chars.at(-1)!.t1 >= t);
+    if (word) playPart(i, word.chars[0]!.t0, word.chars.at(-1)!.t1);
   };
   /** The lines of QSO `n`, as the tape needs them, or null when any of their
    *  audio is gone. Cheap: the tape itself is made on a click. */
@@ -1710,6 +1832,31 @@ export function QsoScreen({
     const at = line.sentWpm ?? theirSpeed;
     return overOfText(line.text, at.charWpm, at.farnsworthWpm);
   };
+  /** Where each character of one of the station's lines is in its audio,
+   *  for a click or a selection to play. */
+  const attrsOf = (line: Line): SentAttrs => {
+    const chars = charsOf(overOf(line));
+    return (k) => {
+      const c = chars[k];
+      return c ? { "data-t0": c.t0, "data-t1": c.t1 } : {};
+    };
+  };
+  /** One of the station's lines as it was sent, each character where it
+   *  is in the audio. As plain text when the two do not match. */
+  const sentOf = (line: Line): React.ReactNode => {
+    const over = overOf(line);
+    if (over.text !== line.text.toUpperCase()) return line.text;
+    return over.words.map((w, wi) => (
+      <Fragment key={wi}>
+        {wi > 0 && " "}
+        {w.chars.map((c, ci) => (
+          <span key={ci} data-t0={c.t0} data-t1={c.t1}>
+            {c.char}
+          </span>
+        ))}
+      </Fragment>
+    ));
+  };
   /** Your copy of one of the station's lines, as the slots take it: a slot
    *  for each character of `over`. */
   const lineCopyOf = (line: Line, over: Over): LineCopy => ({
@@ -1776,9 +1923,10 @@ export function QsoScreen({
     // The grade is the record of a copy: it stays, whatever shows now.
     if (over && !line.you && line.mode === "copy") {
       if (sent) return <SlotsLocked over={sent} copy={lineCopyOf(line, sent)} marks sent />;
-      return <Graded sent={line.text} typed={line.typed} />;
+      return <Graded sent={line.text} typed={line.typed} attrs={attrsOf(line)} />;
     }
     if (over || mode === "before") {
+      if (!line.you && line.text) return <span className="text">{sentOf(line)}</span>;
       return <span className="text">{line.text || "(nothing copied)"}</span>;
     }
     if (mode === "none") return <span className="text off">not shown</span>;
@@ -1799,6 +1947,7 @@ export function QsoScreen({
           copy={lineCopyOf(line, sent)}
           label={whoOf(line)}
           onSlots={(next) => setSlots(at, next)}
+          onSelect={(slot) => (selected.current = { line: at, slot })}
           onLock={() => lock(at)}
           grade={gradeTyping}
           onKey={typed}
@@ -1806,8 +1955,8 @@ export function QsoScreen({
       );
     }
     if (mode === "copy" && line.locked) {
-      if (lockedShows === "grade") return <Graded sent={line.text} typed={line.typed} />;
-      if (lockedShows === "right") return <RightOnly sent={line.text} typed={line.typed} />;
+      if (lockedShows === "grade") return <Graded sent={line.text} typed={line.typed} attrs={attrsOf(line)} />;
+      if (lockedShows === "right") return <RightOnly sent={line.text} typed={line.typed} attrs={attrsOf(line)} />;
       return (
         <span className="text locked" data-testid="qso-locked">
           {line.typed.trim() ? line.typed.toUpperCase() : "(nothing copied)"}
@@ -1819,6 +1968,7 @@ export function QsoScreen({
         <input
           className="qsotype"
           data-testid="qso-type"
+          data-line={at}
           aria-label={`Your copy of ${whoOf(line)}`}
           value={line.typed}
           autoFocus
@@ -1833,6 +1983,9 @@ export function QsoScreen({
           onChange={(ev) => setTyped(at, ev.target.value)}
         />
       );
+    }
+    if (!line.you && mode !== "hidden" && playing?.line !== at && line.text) {
+      return <span className="text">{sentOf(line)}</span>;
     }
     const shown = playing?.line === at ? revealed(line.text, playing.shown) : line.text;
     return (
@@ -2311,6 +2464,12 @@ export function QsoScreen({
                 alone. */}
             {/* Only once QRS or QRQ has moved it: a station starts at your speed,
                 and the guide says so. */}
+            {playback === "always" && lines.some((l) => !l.you && l.input === "slots") && (
+              <div className="modeswitch" role="group" aria-label="Play the selected slot">
+                {slotPlay("Letter", `Play the selected letter (${ALT}+L)`, playLetter, "qso-play-letter")}
+                {slotPlay("Word", `Play the selected word (${ALT}+W)`, playWord, "qso-play-word")}
+              </div>
+            )}
             {!same(theirSpeed, speed) && (
               <span className="hint" data-testid="qso-their-speed">
                 The station sends at {fmtSpeed(theirSpeed)}.
@@ -2334,7 +2493,7 @@ export function QsoScreen({
               atEnd.current = box.scrollHeight - box.scrollTop - box.clientHeight < END_SLACK_PX;
             }}
           >
-            <ol className="qsolog" data-testid="qso-log">
+            <ol className="qsolog" data-testid="qso-log" onMouseUp={onLogMouseUp}>
               {/* Each QSO: its lines, and its report beside them once it is
                   over. A line divides one QSO from the next. */}
               {qsoGroups(lines).map((group, g, all) => {
@@ -2349,7 +2508,7 @@ export function QsoScreen({
                       {group.at.map((i) => {
                         const line = lines[i]!;
                         return (
-                          <li key={i} className={line.you ? "you" : "them"}>
+                          <li key={i} className={line.you ? "you" : "them"} data-line={i}>
                             {labelOf(line)}
                             {textOf(line, i)}
                             <span className="lend">

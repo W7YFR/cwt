@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import { NOISE_OFF_DB } from "@/audio/qsb";
 import { QRM_OFF_DB } from "@/copy/band";
 import { qrmLines } from "@/copy/generate";
-import { anyAdded, bandLevel, tape, type Added, type TapeLine } from "@/qso/tape";
+import { overOfText } from "@/copy/lines";
+import { anyAdded, bandLevel, LINE_PAD_SEC, lineAudio, tape, type Added, type TapeLine } from "@/qso/tape";
 
 const RATE = 8000;
 
@@ -101,5 +102,25 @@ describe("whether anything is added", () => {
     expect(anyAdded({ ...NONE, noiseDb: -20 })).toBe(true);
     expect(anyAdded({ ...NONE, qrn: 1 })).toBe(true);
     expect(anyAdded({ ...NONE, qrmDb: -20 })).toBe(true);
+  });
+});
+
+describe("a station's line on its own", () => {
+  it("keys each character where its timeline says, after the line's pad", () => {
+    const text = "CQ TEST <SK>";
+    const line: TapeLine = { you: false, text, speed: { charWpm: 25, farnsworthWpm: 25 }, toneHz: 600, call: "N1AK" };
+    const clip = lineAudio(line, RATE);
+    const at = (t: number) => Math.round((LINE_PAD_SEC + t) * RATE);
+    /** The loudest sample in the 2 ms after `t`. */
+    const peak = (t: number) => {
+      let p = 0;
+      for (let i = at(t); i < at(t) + RATE / 500; i++) p = Math.max(p, Math.abs(clip.samples[i]!));
+      return p;
+    };
+    for (const w of overOfText(text, 25, 25).words) {
+      const c = w.chars[0]!;
+      expect(peak(c.t0 - 0.004), `quiet before ${c.char}`).toBeLessThan(0.01);
+      expect(peak(c.t0 + 0.006), `sound at ${c.char}`).toBeGreaterThan(0.1);
+    }
   });
 });
