@@ -4,7 +4,7 @@
 
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { $, $$, callIn, click, ended, fill, key, mount, open, press, send, state, theirs, unmount, until, useQsoRig, yourTurn } from "../qso-rig";
+import { $, $$, callIn, click, ended, fill, key, mount, open, press, send, state, theirs, unmount, until, useQsoRig, wait, yourTurn } from "../qso-rig";
 import { heard } from "../qso-fakes";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
@@ -109,9 +109,81 @@ describe("the report at the end of a QSO", () => {
     await send(`${call} BOB 1234`);
     const before = theirs().length;
     await key("TU W7YFR");
+    await act(async () => $$<HTMLInputElement>('[data-testid="qso-type"]').at(-1)!.focus());
+    await press("Enter", true);
     await until("the next station", () => theirs().length > before);
     expect($('[data-testid="qso-report"]')).not.toBeNull();
     expect($$('[data-testid="qso-divider"]')).toHaveLength(1);
+  });
+
+  it("waits with copy for the station's last line to be locked, then the next station calls", async () => {
+    await open({ qsoTheirText: "copy", qsoLockCopy: false });
+    await send("CQ CWT W7YFR");
+    const call = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso?.them?.call as string;
+    await send(`${call} BOB 1234`);
+    const before = theirs().length;
+    await key("TU W7YFR");
+    // A second at a time, so the page renders between its timers.
+    for (let s = 0; s < 20; s++) await wait(1000);
+    expect(theirs(), "no one calls yet").toHaveLength(before);
+    expect(ended(), "the session goes on").toBe(false);
+
+    const boxes = $$<HTMLInputElement>('[data-testid="qso-type"]');
+    await act(async () => boxes.at(-1)!.focus());
+    await press("Enter", true);
+    await until("the next station", () => theirs().length > before);
+  });
+
+  it("waits with copy until Grade my copy, then the next station calls", async () => {
+    await open({ qsoTheirText: "copy", qsoLockCopy: false });
+    await send("CQ CWT W7YFR");
+    const call = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso?.them?.call as string;
+    await send(`${call} BOB 1234`);
+    const before = theirs().length;
+    await key("TU W7YFR");
+    await until("the copy to finish", () => $('[data-testid="qso-grade"]') !== null);
+    expect(theirs(), "no one calls yet").toHaveLength(before);
+    await click($('[data-testid="qso-grade"]'));
+    await until("the next station", () => theirs().length > before);
+  });
+
+  /** A CWT QSO worked to its end, then Stop as the next station calls.
+   *  Returns how many of the station's lines the first QSO had. */
+  async function stopAsNextCalls(prefs: Parameters<typeof open>[0], copy?: string): Promise<number> {
+    await open({ qsoLockCopy: false, ...prefs });
+    await send("CQ CWT W7YFR");
+    const call = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso?.them?.call as string;
+    await send(`${call} BOB 1234`);
+    const first = theirs().length;
+    await key("TU W7YFR");
+    const box = () => $$<HTMLInputElement>('[data-testid="qso-type"]').at(-1)!;
+    if (prefs.qsoTheirText === "copy") {
+      await act(async () => box().focus());
+      await press("Enter", true);
+    }
+    await until("the next station", () => theirs().length > first);
+    if (copy) await fill(box(), copy);
+    await click($('[data-testid="qso-stop"]'));
+    await until("the session to stop", ended);
+    return first;
+  }
+
+  it("drops a station that called as you stopped, with nothing copied", async () => {
+    const first = await stopAsNextCalls({ qsoTheirText: "copy" });
+    expect(theirs(), "the caller is gone").toHaveLength(first);
+    expect($$('[data-testid="qso-report"]')).toHaveLength(1);
+    expect($$('[data-testid="qso-divider"]')).toHaveLength(0);
+  });
+
+  it("drops it too with the station's lines shown", async () => {
+    const first = await stopAsNextCalls({ qsoTheirText: "before" });
+    expect(theirs()).toHaveLength(first);
+  });
+
+  it("keeps a station that called as you stopped, once you copied some of it", async () => {
+    const first = await stopAsNextCalls({ qsoTheirText: "copy" }, "k");
+    expect(theirs()).toHaveLength(first + 1);
+    expect($$('[data-testid="qso-report"]')).toHaveLength(2);
   });
 
   it("marks your copy of an item wrong", async () => {
@@ -176,6 +248,15 @@ describe("playing the last line again with Option+R", () => {
     await altR(document.body);
     expect(state(), "the microphone is not read while it plays").not.toBe("sending");
     await until("the line to end", () => yourTurn());
+  });
+
+  it("stops on Pause, with the session", async () => {
+    await open({ qsoTheirText: "before", qsoPlayback: "always" });
+    await send("CQ CWT W7YFR");
+    await altR(document.body);
+    expect(heard.replaying).toBe(true);
+    await click($('[data-testid="qso-pause"]'));
+    expect(heard.replaying, "the line stops").toBe(false);
   });
 
   it("does nothing without the play buttons on every line", async () => {

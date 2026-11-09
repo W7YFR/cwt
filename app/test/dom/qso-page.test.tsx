@@ -9,6 +9,7 @@ import {
   $,
   $$,
   click,
+  fill,
   mount,
   note,
   open,
@@ -166,5 +167,18 @@ describe("settings that do nothing as things are", () => {
     expect(gradeTyping().disabled, "slots' own, in a box").toBe(true);
     await click(choices().find((b) => b.textContent === "Slots")!);
     expect(gradeTyping().disabled).toBe(false);
+  });
+});
+
+describe("hiding the station's call", () => {
+  it("blurs its call until you copy it", async () => {
+    await open({ qsoTheirText: "copy", qsoBlurCall: true });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const call = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso?.them?.call as string;
+    expect($('[data-testid="qso-who-blurred"]')).not.toBeNull();
+
+    await fill($<HTMLInputElement>('[data-testid="qso-type"]')!, call.toLowerCase());
+    expect($('[data-testid="qso-who-blurred"]'), "unblurred").toBeNull();
+    expect($(".qsolog li.them .who")!.textContent).toBe(call);
   });
 });

@@ -7,6 +7,24 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.28.0 — 2026-11-09
+
+### Added
+
+- The QSO page plays part of the station's line, as the Copy page does. **Letter** and **Word** play the selected slot's letter or word, and a click or a selection in a line plays that part.
+- On the QSO page, Option+L and Option+W play the selected letter or word, and Option+Enter plays on from the word you are copying. Off a Mac, use Alt.
+
+### Changed
+
+- In a contest or POTA QSO on the QSO page, with the station's lines shown as Copy, the next station calls only once you lock your copy of the last line or press **Grade my copy**.
+
+### Fixed
+
+- On the QSO page, **Pause** and **Stop** stop a line that plays again, not only the band noise.
+- With **Hide the station's call until I copy it** on, the station's call stayed blurred after you copied it. It now shows once you copy it.
+- In POTA on the QSO page, the suggested reply to a station that has only sent its call no longer starts with BK.
+- On the QSO page, **Stop** as a new station calls no longer logs that station as a QSO you missed. A station you sent nothing to and copied nothing of is dropped from the log.
+
 ## v1.27.0 — 2026-11-09
 
 ### Changed

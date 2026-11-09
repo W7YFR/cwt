@@ -2598,6 +2598,8 @@ header .modeswitch button { white-space: nowrap; }
 /* What was sent plays when it is clicked or selected. */
 .copylog [data-t0] { cursor: pointer; }
 .copylog .sent [data-t0]:hover, .copylog .sentcopy [data-t0]:hover { color: var(--you); }
+.qsolog .them [data-t0] { cursor: pointer; }
+.qsolog .them .text > [data-t0]:hover, .qsolog .them .sentcopy [data-t0]:hover { color: var(--you); }
 /* A line's cell: earlier attempts over this one's copy. */
 .copylog .copycell { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 /* On a phone, too narrow for the station, the copy and the line's end side
