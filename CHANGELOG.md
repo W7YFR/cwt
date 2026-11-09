@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- On the QSO page, **Pause** and **Stop** stop a line that plays again, not only the band noise.
+
 ## v1.27.0 — 2026-11-09
 
 ### Changed

@@ -178,6 +178,15 @@ describe("playing the last line again with Option+R", () => {
     await until("the line to end", () => yourTurn());
   });
 
+  it("stops on Pause, with the session", async () => {
+    await open({ qsoTheirText: "before", qsoPlayback: "always" });
+    await send("CQ CWT W7YFR");
+    await altR(document.body);
+    expect(heard.replaying).toBe(true);
+    await click($('[data-testid="qso-pause"]'));
+    expect(heard.replaying, "the line stops").toBe(false);
+  });
+
   it("does nothing without the play buttons on every line", async () => {
     await open({ qsoTheirText: "copy", qsoPlayback: "end" });
     await send("CQ CWT W7YFR");

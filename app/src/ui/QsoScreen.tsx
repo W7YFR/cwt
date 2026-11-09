@@ -843,6 +843,8 @@ export function QsoScreen({
     if (!hadRecorder.current) return;
     hadRecorder.current = false;
     quiet();
+    // A line played again stops with the session too.
+    listen.stop();
     // Paused: the QSO stays open, to go on with.
     if (pausing.current) {
       pausing.current = false;
