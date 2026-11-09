@@ -64,6 +64,18 @@ describe("a QSO worked from the hints", () => {
     expect(hint(fresh, ME, "cwt")).toBe("CQ CWT W7YFR");
   });
 
+  it("does not open with BK in POTA when the station has only called", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const rand = seeded(seed);
+      const qso = respond(newQso(rand), "CQ POTA DE W7YFR", { rand }).qso;
+      if (!isRun(qso)) throw new Error("not a run");
+      expect(qso.stage).toBe("called");
+      for (let hour = 0; hour < 24; hour++) {
+        expect(hint(qso, ME, null, seededVoice(seed, hour))).not.toMatch(/^BK /);
+      }
+    }
+  });
+
   it("answers what the station asked for", () => {
     const rand = seeded(3);
     let qso = respond(newQso(rand), "CQ MST W7YFR", { rand }).qso;

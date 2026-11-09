@@ -204,7 +204,7 @@ function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
           return pick(v.rand, [
             `${them} UR ${r} ${st} ${st} BK`,
             `${them} ${g} UR ${r} ${r} ${st} ${st} BK`,
-            `BK ${them} TU UR ${r} ${st} ${st} BK`,
+            `${them} TU UR ${r} ${st} ${st} BK`,
             `${them} ${r} ${r} ${st} ${st} BK`,
             `${them} ${g} OM UR ${r} ${r} ${st} ${st} BK`,
           ]);
