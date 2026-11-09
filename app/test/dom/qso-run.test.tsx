@@ -147,6 +147,45 @@ describe("the report at the end of a QSO", () => {
     await until("the next station", () => theirs().length > before);
   });
 
+  /** A CWT QSO worked to its end, then Stop as the next station calls.
+   *  Returns how many of the station's lines the first QSO had. */
+  async function stopAsNextCalls(prefs: Parameters<typeof open>[0], copy?: string): Promise<number> {
+    await open({ qsoLockCopy: false, ...prefs });
+    await send("CQ CWT W7YFR");
+    const call = JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso?.them?.call as string;
+    await send(`${call} BOB 1234`);
+    const first = theirs().length;
+    await key("TU W7YFR");
+    const box = () => $$<HTMLInputElement>('[data-testid="qso-type"]').at(-1)!;
+    if (prefs.qsoTheirText === "copy") {
+      await act(async () => box().focus());
+      await press("Enter", true);
+    }
+    await until("the next station", () => theirs().length > first);
+    if (copy) await fill(box(), copy);
+    await click($('[data-testid="qso-stop"]'));
+    await until("the session to stop", ended);
+    return first;
+  }
+
+  it("drops a station that called as you stopped, with nothing copied", async () => {
+    const first = await stopAsNextCalls({ qsoTheirText: "copy" });
+    expect(theirs(), "the caller is gone").toHaveLength(first);
+    expect($$('[data-testid="qso-report"]')).toHaveLength(1);
+    expect($$('[data-testid="qso-divider"]')).toHaveLength(0);
+  });
+
+  it("drops it too with the station's lines shown", async () => {
+    const first = await stopAsNextCalls({ qsoTheirText: "before" });
+    expect(theirs()).toHaveLength(first);
+  });
+
+  it("keeps a station that called as you stopped, once you copied some of it", async () => {
+    const first = await stopAsNextCalls({ qsoTheirText: "copy" }, "k");
+    expect(theirs()).toHaveLength(first + 1);
+    expect($$('[data-testid="qso-report"]')).toHaveLength(2);
+  });
+
   it("marks your copy of an item wrong", async () => {
     await open({ qsoTheirText: "copy", qsoLockCopy: false });
     await send("CQ CWT W7YFR");

@@ -868,12 +868,21 @@ export function QsoScreen({
       ending.current = false;
       return;
     }
-    // Stopped mid-QSO: its report is of the QSO as far as it went.
     const now = qso.current;
     const n = qsoNo.current;
+    if (finishedRef.current !== null) close(finishedRef.current);
+    // Stopped as a station called, before you sent or copied a thing: it
+    // goes, so it does not show as a QSO you missed.
+    const its = lines.filter((l) => l.qso === n);
+    if (its.length > 0 && its.every((l) => !l.you && !l.typed.trim() && !l.slots?.some((c) => c.trim()))) {
+      setLines((l) => l.filter((line) => line.qso !== n));
+      return;
+    }
+    // Stopped mid-QSO: its report is of the QSO as far as it went.
     setEnds((e) => (e[n] ? e : { ...e, [n]: now }));
     close(n);
-    if (finishedRef.current !== null) close(finishedRef.current);
+    // Read as it is when the session stops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder, quiet, close]);
 
   const source = useMemo(

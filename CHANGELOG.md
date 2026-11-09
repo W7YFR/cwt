@@ -21,6 +21,7 @@ nothing to the site. The next release carries them.
 - On the QSO page, **Pause** and **Stop** stop a line that plays again, not only the band noise.
 - With **Hide the station's call until I copy it** on, the station's call stayed blurred after you copied it. It now shows once you copy it.
 - In POTA on the QSO page, the suggested reply to a station that has only sent its call no longer starts with BK.
+- On the QSO page, **Stop** as a new station calls no longer logs that station as a QSO you missed. A station you sent nothing to and copied nothing of is dropped from the log.
 
 ## v1.27.0 — 2026-11-09
 
