@@ -11,7 +11,7 @@ nothing to the site. The next release carries them.
 
 - In a contest or POTA QSO on the QSO page, a station answered a CQ it could not read your call in, and the report showed your call as missed. Now no station calls until one has copied your call.
 - On the QSO page, the suggested reply no longer scrolls out of view as you start to send.
-- On the QSO page, a short turn such as `BK TU 73 EE` no longer runs its words together or shows a much lower speed than you sent.
+- On the QSO page, a short turn such as `BK TU 73 EE` no longer runs its words together, as you send it or after, or shows a much lower speed than you sent.
 
 ## v1.28.0 — 2026-11-09
 
