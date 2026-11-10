@@ -86,6 +86,10 @@ function labelsFor(values: readonly number[], centers: readonly number[]): numbe
   });
 }
 
+/** Two gap clusters closer than this are one class. A word gap is 7/3 of a
+ *  character gap, and this is about halfway between, in log space. */
+const SAME_CLASS_RATIO = 1.5;
+
 /** Estimate the character-gap length from the inter-character silences.
  *
  * Character gaps usually outnumber word gaps, which outnumber pauses between
@@ -110,18 +114,29 @@ export function dominantGap(inter: readonly number[]): number {
   // spurious short gaps and a couple of intra-character gaps that leaked past
   // the element/character split, while still preferring character gaps over
   // word gaps when the words are short.
+  //
+  // A short over has few gaps, and its character gaps can split into two
+  // small clusters, neither one common enough. Small clusters closer than
+  // SAME_CLASS_RATIO are one class, and count together.
   const bar = Math.max(3, 0.2 * inter.length);
-  let chosen = counts.indexOf(Math.max(...counts)); // fallback: most populous
+  let chosen = [counts.indexOf(Math.max(...counts))]; // fallback: most populous
   const byCenter = centers.map((c, j) => ({ c, j })).sort((a, b) => a.c - b.c);
-  for (const { j } of byCenter) {
+  let run: number[] = [];
+  for (const { c, j } of byCenter) {
     if (counts[j]! >= bar) {
-      chosen = j;
+      chosen = [j];
+      break;
+    }
+    if (run.length > 0 && c - centers[run[0]!]! > Math.log(SAME_CLASS_RATIO)) run = [];
+    run.push(j);
+    if (run.reduce((a, r) => a + counts[r]!, 0) >= bar) {
+      chosen = run;
       break;
     }
   }
 
-  const members = inter.filter((_, i) => labels[i] === chosen);
-  return members.length ? median(members) : Math.exp(centers[chosen]!);
+  const members = inter.filter((_, i) => chosen.includes(labels[i]!));
+  return members.length ? median(members) : Math.exp(centers[chosen[0]!]!);
 }
 
 /** How many character gaps and word gaps the intended text calls for. */
