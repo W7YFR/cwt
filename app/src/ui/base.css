@@ -3201,5 +3201,8 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .qsotape .tapename { font: 12.5px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); }
 .qsolog .qsotape .tapeend { display: flex; align-items: center; gap: 6px; }
 .qsolog .qsotape .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
+/* ⋯ at the end of a line, beside its play button. */
+.qsolog .lend .quick.more { margin-left: 0; }
+.qsolog .lend .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
 /* An item in ⋯ that is not on offer: faint, and the pointer says so. */
 .quickpop.menu > button:disabled { color: var(--ink-faint); cursor: not-allowed; }

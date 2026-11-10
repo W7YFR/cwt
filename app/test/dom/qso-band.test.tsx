@@ -183,3 +183,40 @@ describe("downloading a QSO", () => {
     expect(names[1]).toMatch(/-as-heard\.wav$/);
   });
 });
+
+describe("downloading a line", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function saved(): string[] {
+    const names: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      names.push(this.download);
+    });
+    return names;
+  }
+
+  /** The ⋯ of each line in the log. */
+  const lineMores = () => [...document.querySelectorAll<HTMLElement>('[data-testid="qso-line-more"]')];
+
+  it("saves one line, clean or as heard, from its ⋯", async () => {
+    await open({ noiseDb: -20 });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const names = saved();
+    // The station's answer is the second line.
+    await click(lineMores()[1]!);
+    await click($('[data-testid="qso-line-download"]'));
+    await click(lineMores()[1]!);
+    await click($('[data-testid="qso-line-download-heard"]'));
+    expect(names).toHaveLength(2);
+    expect(names[0]).toMatch(/-line-2\.wav$/);
+    expect(names[1]).toMatch(/-line-2-as-heard\.wav$/);
+  });
+
+  it("offers only Audio with nothing added", async () => {
+    await open({});
+    await send("CQ CQ DE W7YFR W7YFR K");
+    await click(lineMores()[1]!);
+    expect($('[data-testid="qso-line-download"]')).not.toBeNull();
+    expect($('[data-testid="qso-line-download-heard"]')).toBeNull();
+  });
+});

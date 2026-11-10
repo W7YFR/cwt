@@ -21,6 +21,7 @@ well under ~200 KB. Content uses the example callsign `AB1CD` (no real stations)
 | `cq-ab1cd-20wpm-k3ng.wav` | `CQ CQ DE AB1CD K` | 20 wpm, standard spacing; k3ng keyer, programmatically sent (clean, machine-timed) |
 | `cq-de-w7yfr.wav` | `CQ DE W7YFR` | 25 wpm; keyer captured via Audacity, words run together (no word gaps) |
 | `tu-w7yfr-wide-letters.wav` | `TA EEE TU W7YFR` | 25 wpm characters; software keyer via BlackHole, letter gaps 5–9 units and a 9.4-unit word gap before the call, so timing alone runs `TU` into the call. Read by meaning in `segment.test.ts` |
+| `bk-tu-error-sign-73-ee.wav` | `BK TU Z EEE 73 EE` | 25 wpm characters; software keyer via BlackHole, one QSO line. `Z` is a mistake and `EEE` its error sign. The longest letter gap is 379 ms and the shortest word gap 397 ms, so the words are read by meaning in `segment.test.ts`. Downsampled to 8 kHz |
 
 ## Calibration corpora
 

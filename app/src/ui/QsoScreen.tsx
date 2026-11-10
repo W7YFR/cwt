@@ -44,8 +44,9 @@ import type { Speed } from "@/qso/speed";
 import type { Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { anyAdded, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
+import { patternOf } from "@/morse";
 import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
-import { charsOf, copyText, overOfText, plain, type CopyInput, type LineCopy } from "@/copy/lines";
+import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
@@ -263,6 +264,9 @@ const SCRIPT_REPORT_HELP =
 
 const DOWNLOAD_HEARD_HELP =
   "Save the QSO with the QSB, noise, QRN and QRM set now. They are made again, so they are not " +
+  "the same as you heard live.";
+const DOWNLOAD_LINE_HEARD_HELP =
+  "Save the line with the QSB, noise, QRN and QRM set now. They are made again, so they are not " +
   "the same as you heard live.";
 
 const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
@@ -1649,12 +1653,12 @@ export function QsoScreen({
     return parts.length ? parts : null;
   };
   /** Save QSO `n` as a WAV file named for the station, and as heard when
-   *  `heard`. */
-  const download = (n: number, clip: Clip, heard = false) => {
+   *  `heard`. With `line`, the clip is that line of it, counted from 1. */
+  const download = (n: number, clip: Clip, heard = false, line?: number) => {
     const who = lines.find((l) => l.qso === n && !l.you)?.who ?? "qso";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(encodeWav(clip.samples, clip.rate));
-    a.download = `qso-${who.toLowerCase()}-${new Date().toISOString().slice(0, 10)}${heard ? "-as-heard" : ""}.wav`;
+    a.download = `qso-${who.toLowerCase()}-${new Date().toISOString().slice(0, 10)}${line ? `-line-${line}` : ""}${heard ? "-as-heard" : ""}.wav`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
@@ -1680,6 +1684,40 @@ export function QsoScreen({
       >
         {on ? <IconStop /> : <IconPlay />}
       </button>
+    );
+  };
+
+  /** ⋯ at the end of line `i`: the line to save, clean or as heard, as the
+   *  QSO's ⋯ saves the QSO. */
+  const lineMore = (i: number): React.ReactElement => {
+    const line = lines[i]!;
+    const part = tapeLineOf(i);
+    const added = anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
+    const gone = part ? null : "This over's recording was not kept";
+    const nth = lines.filter((l) => l.qso === line.qso).indexOf(line) + 1;
+    /** As heard: the station's fading and the band, made again. */
+    const heard = (): Clip =>
+      tape([part!], tapeRate(), { qsbDb, noiseDb, qrn, qrmDb, seed: Math.floor(Math.random() * 2 ** 31), qrmLines });
+    return (
+      <MoreMenu label="More for this line" testId="qso-line-more" up>
+        <MenuHeading>Download</MenuHeading>
+        <DownloadItem
+          label={added ? "Audio, clean" : "Audio"}
+          testId="qso-line-download"
+          disabled={gone !== null}
+          title={gone ?? undefined}
+          onClick={() => download(line.qso, lineAudio(part!, tapeRate()), false, nth)}
+        />
+        {added && (
+          <DownloadItem
+            label="Audio, as heard"
+            testId="qso-line-download-heard"
+            disabled={gone !== null}
+            title={gone ?? DOWNLOAD_LINE_HEARD_HELP}
+            onClick={() => download(line.qso, heard(), true, nth)}
+          />
+        )}
+      </MoreMenu>
     );
   };
 
@@ -1957,6 +1995,15 @@ export function QsoScreen({
     );
   };
 
+  /** With slots graded as you type, whether your copy of a line in slots
+   *  has nothing wrong. Its dots already say so, so it shows without the
+   *  line sent and the count under it. */
+  const allRight = (line: Line, sent: Over): boolean => {
+    if (!gradeTyping) return false;
+    const copy = lineCopyOf(line, sent);
+    return charsOf(sent).every((c, i) => !patternOf(c.char) || slotRight(c.char, copy.slots[i] ?? ""));
+  };
+
   /** What shows of one line of the log. */
   const textOf = (line: Line, at: number): React.ReactElement => {
     const over = closed.includes(line.qso);
@@ -1964,7 +2011,7 @@ export function QsoScreen({
     const sent = !line.you && line.mode === "copy" && line.input === "slots" ? overOf(line) : null;
     // The grade is the record of a copy: it stays, whatever shows now.
     if (over && !line.you && line.mode === "copy") {
-      if (sent) return <SlotsLocked over={sent} copy={lineCopyOf(line, sent)} marks sent />;
+      if (sent) return <SlotsLocked over={sent} copy={lineCopyOf(line, sent)} marks sent={!allRight(line, sent)} />;
       return <Graded sent={line.text} typed={line.typed} attrs={attrsOf(line)} />;
     }
     if (over || mode === "before") {
@@ -1979,7 +2026,7 @@ export function QsoScreen({
             over={sent}
             copy={lineCopyOf(line, sent)}
             marks={lockedShows !== "nothing"}
-            sent={lockedShows === "grade"}
+            sent={lockedShows === "grade" && !allRight(line, sent)}
           />
         );
       }
@@ -2061,8 +2108,9 @@ export function QsoScreen({
   const nameShown = theirsShown || heard(qsoNo.current, them.name);
   const suggestion =
     // A script always shows what is to be sent next: that is the exercise.
+    // It stays while a line plays again, so the page does not jump.
     recorder &&
-    phase === "listening" &&
+    (phase === "listening" || phase === "replaying") &&
     (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
       ? hint(
           qso.current,
@@ -2563,6 +2611,7 @@ export function QsoScreen({
                               )}
                               {lineEdit(line, i)}
                               {linePlay(i)}
+                              {lineMore(i)}
                             </span>
                           </li>
                         );
@@ -2599,6 +2648,7 @@ export function QsoScreen({
                     {showSpeed && <span className="lwpm">{wpmOf(copy.sentWpm ?? speed)}</span>}
                     {allowEdits && <span className="lspace" />}
                     {playback === "always" && <span className="lspace" />}
+                    <span className="lspace" />
                   </span>
                 </li>
               )}
