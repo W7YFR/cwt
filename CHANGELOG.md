@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.29.0 — 2026-11-10
+
 ### Added
 
 - On the QSO page, each line has a ⋯ menu to download that line's audio, clean or as heard.
