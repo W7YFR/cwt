@@ -101,13 +101,14 @@ export interface Sent {
 export const MEASURE_MIN_MARKS = 20;
 
 /** The sender's own timing, or `timing` while there is too little keying to
- *  measure. */
+ *  measure. A short over can leave its gaps a tie between character gaps
+ *  and word gaps: `timing`'s character gap breaks it. */
 function measured(segments: readonly Segment[], timing: Timing): Timing {
   let marks = 0;
   for (const s of segments) if (s[0] === 1) marks++;
   if (marks < MEASURE_MIN_MARKS) return timing;
   try {
-    return estimateTiming(segments);
+    return estimateTiming(segments, null, timing.charGapSec);
   } catch {
     return timing;
   }

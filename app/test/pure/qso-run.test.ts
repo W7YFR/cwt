@@ -321,6 +321,14 @@ describe("one station after another", () => {
     const turn = answerRun({ ...newRun("cwt", () => 0), them: JIM }, "TU KD9XYZ", FIRST);
     expect([turn.reply, turn.qso.stage]).toEqual(["K4ABC", "called"]);
   });
+
+  it("calls nobody until a station has heard your call", () => {
+    const run = { ...newRun("pota", () => 0), them: JIM };
+    const garbled = answerRun(run, "RQ POTA DE WZ", FIRST);
+    expect([garbled.reply, garbled.qso.stage, (garbled.qso as RunQso).you]).toEqual([null, "waiting", ""]);
+    const heard = answerRun(run, "CQ POTA DE KD9XYZ", FIRST);
+    expect([heard.reply, (heard.qso as RunQso).you]).toEqual(["K4ABC", "KD9XYZ"]);
+  });
 });
 
 describe("the guide's examples", () => {

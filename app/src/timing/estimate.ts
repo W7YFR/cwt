@@ -86,6 +86,10 @@ function labelsFor(values: readonly number[], centers: readonly number[]): numbe
   });
 }
 
+/** Two gap clusters closer than this are one class. A word gap is 7/3 of a
+ *  character gap, and this is about halfway between, in log space. */
+const SAME_CLASS_RATIO = 1.5;
+
 /** Estimate the character-gap length from the inter-character silences.
  *
  * Character gaps usually outnumber word gaps, which outnumber pauses between
@@ -96,7 +100,7 @@ function labelsFor(values: readonly number[], centers: readonly number[]): numbe
  * the lowest cluster holds a substantial share we take *it*.
  *
  * Clustered in log space so a single long pause doesn't drag the means. */
-export function dominantGap(inter: readonly number[]): number {
+export function dominantGap(inter: readonly number[], charGapHint?: number): number {
   if (inter.length <= 2) return median(inter);
 
   const log = inter.map((v) => Math.log(v));
@@ -110,18 +114,41 @@ export function dominantGap(inter: readonly number[]): number {
   // spurious short gaps and a couple of intra-character gaps that leaked past
   // the element/character split, while still preferring character gaps over
   // word gaps when the words are short.
+  //
+  // A short over has few gaps, and its character gaps can split into two
+  // small clusters, neither one common enough. Small clusters closer than
+  // SAME_CLASS_RATIO are one class, and count together.
   const bar = Math.max(3, 0.2 * inter.length);
-  let chosen = counts.indexOf(Math.max(...counts)); // fallback: most populous
+  let chosen = [counts.indexOf(Math.max(...counts))]; // fallback: most populous
   const byCenter = centers.map((c, j) => ({ c, j })).sort((a, b) => a.c - b.c);
-  for (const { j } of byCenter) {
+  let run: number[] = [];
+  for (const { c, j } of byCenter) {
     if (counts[j]! >= bar) {
-      chosen = j;
+      chosen = [j];
+      break;
+    }
+    if (run.length > 0 && c - centers[run[0]!]! > Math.log(SAME_CLASS_RATIO)) run = [];
+    run.push(j);
+    if (run.reduce((a, r) => a + counts[r]!, 0) >= bar) {
+      chosen = run;
       break;
     }
   }
 
-  const members = inter.filter((_, i) => labels[i] === chosen);
-  return members.length ? median(members) : Math.exp(centers[chosen]!);
+  // Shorter gaps were passed over as too few. With `charGapHint`, two or
+  // more of them are the character gap if they are nearer it: the audio
+  // alone cannot tell two character gaps from three word gaps.
+  const first = Math.min(...chosen.map((j) => centers[j]!));
+  const shorter = byCenter.filter(({ c }) => c < first).map(({ j }) => j);
+  const few = inter.filter((_, i) => shorter.includes(labels[i]!));
+  if (charGapHint !== undefined && few.length >= 2) {
+    const many = inter.filter((_, i) => chosen.includes(labels[i]!));
+    const off = (v: number) => Math.abs(Math.log(v / charGapHint));
+    if (off(median(few)) < off(median(many))) chosen = shorter;
+  }
+
+  const members = inter.filter((_, i) => chosen.includes(labels[i]!));
+  return members.length ? median(members) : Math.exp(centers[chosen[0]!]!);
 }
 
 /** How many character gaps and word gaps the intended text calls for. */
@@ -140,10 +167,14 @@ export function gapClasses(text: string): { chars: number; words: number } {
 /** Derive dit length, speeds, and classification thresholds from segments.
  *
  * `expected` is the intended message. It is used for exactly one thing — see
- * the note at the character-gap decision below — and changes nothing else. */
+ * the note at the character-gap decision below — and changes nothing else.
+ * `charGapHint` is the character gap the sender is set to. It breaks a tie
+ * between too few gaps of two kinds, and changes nothing else: see
+ * `dominantGap`. */
 export function estimateTiming(
   segs: readonly Segment[],
   expected?: string | null,
+  charGapHint?: number,
 ): Timing {
   const marks = segs.filter((s) => s[0] === 1).map((s) => s[1]);
   if (marks.length === 0) {
@@ -215,7 +246,7 @@ export function estimateTiming(
   // Where the character-vs-word threshold sits on the measured silences.
   let gapOffset = 0;
   if (inter.length > 0) {
-    charGap = dominantGap(inter) - offset;
+    charGap = dominantGap(inter, charGapHint) - offset;
     gapOffset = offset;
     /* dominantGap returns the most populous inter-character silence and calls
        it the character gap, which holds for ordinary text. It does not hold
