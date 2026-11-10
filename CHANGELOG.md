@@ -7,6 +7,21 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.29.0 — 2026-11-10
+
+### Added
+
+- On the QSO page, each line has a ⋯ menu to download that line's audio, clean or as heard.
+
+### Changed
+
+- With **Grade slots as I type** on, a line you copied with nothing wrong shows only your copy and its dots. The line sent and the count show only when something is wrong.
+
+### Fixed
+
+- On the QSO page, playing a line no longer hides the suggested reply and makes the page jump.
+- On the QSO page with **Lenient** copy, a mistake and its error sign, as in `BK TU Z EEE 73 EE`, no longer run the line's words together, and the station no longer loses the words before the mistake.
+
 ## v1.28.1 — 2026-11-10
 
 ### Fixed

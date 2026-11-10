@@ -65,7 +65,22 @@ describe("the author's keying, wide letter gaps and a short word gap", () => {
     const wav = readWav(join(__dirname, "../data/tu-w7yfr-wide-letters.wav"));
     const timing = targetTiming(25, 20);
     expect(sentSymbols(wav.samples, wav.rate, timing, undefined, true).text).toBe("TA EEETUW7YFR");
-    expect(sentSymbols(wav.samples, wav.rate, timing, undefined, true, undefined, WORDS).text).toBe("TA EEETU W7YFR");
+    expect(sentSymbols(wav.samples, wav.rate, timing, undefined, true, undefined, WORDS).text).toBe("T A EEE TU W7YFR");
+  });
+});
+
+describe("the author's keying, a mistake and its error sign", () => {
+  it("reads BK TU Z EEE 73 EE, the error sign a word of its own", () => {
+    const wav = readWav(join(__dirname, "../data/bk-tu-error-sign-73-ee.wav"));
+    const timing = targetTiming(25, 17);
+    const copy = new LiveCopy(wav.rate, timing, true, undefined, WORDS);
+    copy.push(wav.samples);
+    expect(copy.step().text).toBe("BK TU Z EEE 73 EE");
+  });
+
+  it("counts an error sign as a word, so the gaps around it break", () => {
+    const none = new Set(vocabulary([]));
+    expect(readWords(spaced("XQ|EEE|ZJ", 0.9), none)).toBe("XQ EEE ZJ");
   });
 });
 
@@ -78,7 +93,7 @@ describe("the live copy, given the words of the QSO", () => {
       copy.push(wav.samples);
       return copy.step().text;
     };
-    expect(read(true, WORDS)).toBe("TA EEETU W7YFR");
+    expect(read(true, WORDS)).toBe("T A EEE TU W7YFR");
     expect(read(true)).toBe("TA EEETUW7YFR");
     // Strict reads at your set speed, and the words change nothing.
     expect(read(false, WORDS)).toBe(read(false));

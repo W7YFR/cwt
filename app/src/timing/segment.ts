@@ -26,7 +26,7 @@ export interface Spaced {
 }
 
 /** Below this share of the cut, a gap joins its letters, whatever the words. */
-export const SURE_JOIN = 0.7;
+export const SURE_JOIN = 0.61;
 /** Above this share of the cut, a gap breaks the word, whatever the words.
  *  A textbook word gap is 1.4 of the cut, so it is always a break. */
 export const SURE_BREAK = 1.3;
@@ -44,13 +44,16 @@ const CALL_RE = /^(?:[A-Z0-9]?[A-Z])\d[A-Z]{1,4}$/;
 /** A number, with cut digits (T for 0, N for 9), or a report. */
 const NUMBER_RE = /^(?=.*\d)[0-9TN]+$/;
 
-/** How much a word is worth to a reading: a word it knows, more the longer
- *  it is; one with the shape of a call or a number, its length, so the
- *  timing decides between two such readings; anything else, less than
- *  nothing. */
+/** The error sign as dits read as letters: three E or more. */
+const ERROR_SIGN_RE = /^E{3,}$/;
+
+/** How much a word is worth to a reading: a word it knows, or the error
+ *  sign, more the longer it is; one with the shape of a call or a number,
+ *  its length, so the timing decides between two such readings; anything
+ *  else, less than nothing. */
 function worth(word: string, known: ReadonlySet<string>): number {
   const n = word.length;
-  if (known.has(word)) return n * n;
+  if (known.has(word) || ERROR_SIGN_RE.test(word)) return n * n;
   if (/^<[A-Z]+>$/.test(word)) return 1;
   if (CALL_RE.test(word) || NUMBER_RE.test(word)) return n;
   return -n;

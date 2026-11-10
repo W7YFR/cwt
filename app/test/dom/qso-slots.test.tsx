@@ -176,6 +176,31 @@ describe("grading slots as you type", () => {
     expect(mark(2)).not.toMatch(/cright|cwrong/);
   });
 
+  /** Lock the slots with Enter, every slot filled. */
+  async function lockFull(): Promise<HTMLElement> {
+    slots()[0]!.focus();
+    await press("Enter");
+    return $('[data-testid="copy-slots-locked"]')!;
+  }
+
+  it("shows a copy with nothing wrong without the line sent or the count", async () => {
+    await slotsAnswer({ qsoGradeTyping: true, qsoLockedShows: "grade" });
+    await fillRight();
+    const locked = await lockFull();
+    expect(locked.querySelectorAll(".yourcopy .cright")).toHaveLength(wanted().length);
+    expect(locked.querySelector(".sentcopy")).toBeNull();
+    expect(locked.querySelector(".copied")).toBeNull();
+  });
+
+  it("shows the line sent and the count once something is wrong", async () => {
+    await slotsAnswer({ qsoGradeTyping: true, qsoLockedShows: "grade" });
+    await fillRight();
+    await fill(slots()[0]!, wanted()[0] === "Q" ? "X" : "Q");
+    const locked = await lockFull();
+    expect(locked.querySelector(".sentcopy")).not.toBeNull();
+    expect(locked.querySelector(".copied")).not.toBeNull();
+  });
+
   it("leaves the slots unmarked when off", async () => {
     await slotsAnswer();
     await fill(slots()[0]!, wanted()[0]!);

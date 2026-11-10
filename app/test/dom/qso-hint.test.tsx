@@ -2,7 +2,7 @@
  * driven. */
 
 import { describe, expect, it, vi } from "vitest";
-import { $, $$, callIn, fill, lastSent, open, send, useQsoRig } from "../qso-rig";
+import { $, $$, callIn, click, fill, lastSent, open, send, until, useQsoRig, yourTurn } from "../qso-rig";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -57,5 +57,17 @@ describe("the suggested reply", () => {
     await open({ qsoTheirText: "before", qsoHints: "always", user: USER });
     const call = callIn(await send("CQ SST W7YFR"));
     expect(hint()).toContain(call);
+  });
+
+  it("stays while a line plays again", async () => {
+    await open({ qsoTheirText: "before", qsoHints: "always", qsoPlayback: "always", user: USER });
+    await send("CQ CWT W7YFR");
+    const before = hint();
+    expect(before).not.toBeNull();
+    const play = $$<HTMLButtonElement>('[data-testid="qso-line-play"]');
+    await click(play[play.length - 1]!);
+    expect(hint()).toBe(before);
+    await until("the line to end", () => yourTurn());
+    expect(hint()).toBe(before);
   });
 });
