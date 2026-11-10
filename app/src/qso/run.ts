@@ -3,7 +3,8 @@
  * Your CQ names the format: CQ CWT, CQ SST, CQ MST or CQ POTA (see
  * formats.ts). A station answers with its call. You send its call and your
  * exchange, it sends its own, and your TU ends the QSO. The next station
- * calls when you send anything, or when the page says it is time.
+ * calls when you send anything, or when the page says it is time. Nobody
+ * calls until a station has heard your call once in the run.
  *
  * The station asks again the way a contest operator would:
  *
@@ -481,7 +482,9 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
   switch (qso.stage) {
     case "waiting": {
       // Whatever you send, a CQ, QRZ? or your call, the next station calls.
+      // Until it has heard your call, nobody calls: it waits for your next CQ.
       const you = over.yourCall(c) ?? qso.you;
+      if (!you) return { qso, reply: null, ended: false };
       return callIn({ ...qso, you }, rand);
     }
 

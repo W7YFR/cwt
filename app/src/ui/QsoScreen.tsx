@@ -1011,6 +1011,8 @@ export function QsoScreen({
     const now = qso.current;
     if (!recorder || phase !== "listening" || !isRun(now) || now.stage !== "waiting") return;
     if (isSending(copy.text)) return;
+    // Nobody calls until a station has heard your call.
+    if (!now.you) return;
     const turn = callIn(now);
     qso.current = turn.qso;
     // The QSO before is done with: its copy is graded, and its report shows.
@@ -2072,11 +2074,13 @@ export function QsoScreen({
       : null;
 
   /* A new line, or more of one, keeps the end of the log in view: unless you
-     scrolled up, in which case the log stays where you are reading. */
+     scrolled up, in which case the log stays where you are reading. The
+     character you are keying counts, so your line does not push the
+     suggested reply out of view as you start to send. */
   useLayoutEffect(() => {
     const box = logBox.current;
     if (box && atEnd.current) box.scrollTop = box.scrollHeight;
-  }, [lines, playing, copy.text, note, finished, suggestion]);
+  }, [lines, playing, copy.text, copy.keying, note, finished, suggestion]);
 
   const status = !recorder
     ? open

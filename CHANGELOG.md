@@ -7,6 +7,11 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- In a contest or POTA QSO on the QSO page, a station answered a CQ it could not read your call in, and the report showed your call as missed. Now no station calls until one has copied your call.
+- On the QSO page, the suggested reply no longer scrolls out of view as you start to send.
+
 ## v1.28.0 — 2026-11-09
 
 ### Added
