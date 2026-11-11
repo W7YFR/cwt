@@ -11,6 +11,11 @@ nothing to the site. The next release carries them.
 
 - On the QSO page, **The station's lines show** has **Exchange**. No lines show during a QSO. You type each item of the station's exchange in its own box, and the report grades your copy when the QSO ends.
 
+### Fixed
+
+- In a POTA, CWT, SST or MST QSO with **Lenient** copy, the station no longer sends its call again for one wrong character after it has said yes to your check of its call.
+- In a POTA, CWT, SST or MST QSO, your 73 before the station's exchange now ends the QSO. The station no longer goes on to send its exchange.
+
 ### Development
 
 - `make release` runs from a worktree while another checkout has `main`. It updates, tags and pushes from that checkout, and keeps the branch the worktree holds.
