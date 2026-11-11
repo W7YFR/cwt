@@ -113,7 +113,7 @@ export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "
   return {
     format,
     stage: "waiting",
-    them: randomCaller(rand, not),
+    them: randomCaller(rand, not, FORMATS[format].canada),
     you,
     yourName: "",
     last: "",
@@ -334,6 +334,11 @@ function cut(rst: string): string {
   return rst.replace(/9/g, "N");
 }
 
+/** The report a POTA station sends: 5NN, or 599 for one that sends it so. */
+export function potaReport(them: Station): string {
+  return them.plain ? them.rst : cut(them.rst);
+}
+
 /** The station's own exchange, worded a little differently each time. */
 function exchange(qso: RunQso, rand: Rand, hour: number): string {
   const { them, yourName } = qso;
@@ -351,6 +356,10 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
         join("TU", yourName, name, nr),
         join(g, yourName, name, nr),
         `TU ${name} ${nr} ${nr}`,
+        `R TU ${name} ${nr}`,
+        `TNX ${name} ${nr}`,
+        `${name} ${name} ${nr} ${nr}`,
+        join("FB", yourName, name, nr),
       ]);
     }
     case "sst":
@@ -360,19 +369,37 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
         `R ${name} ${st}`,
         `TU ${name} ${st}`,
         join(g, yourName, "TU", name, st),
+        join("TNX", yourName, name, st),
+        join("R", g, yourName, name, name, st, st),
+        join("FB", yourName, "TNX", name, st),
       ]);
     case "mst": {
       const nr = String(them.serial ?? 1);
-      return pick(rand, [`TU ${name} ${nr}`, `R ${name} ${nr}`, `${name} ${nr}`, join("TU", yourName, name, nr), `TU ${name} ${nr} ${nr}`]);
+      return pick(rand, [
+        `TU ${name} ${nr}`,
+        `R ${name} ${nr}`,
+        `${name} ${nr}`,
+        join("TU", yourName, name, nr),
+        `TU ${name} ${nr} ${nr}`,
+        `R TU ${name} ${nr}`,
+        `TNX ${name} ${nr}`,
+        `${name} ${name} ${nr} ${nr}`,
+      ]);
     }
     case "pota": {
-      const r = cut(them.rst);
+      // A hunter says its state once or twice, and 599 or 5NN by habit.
+      const r = potaReport(them);
       return pick(rand, [
+        `BK TU UR ${r} ${st} BK`,
         `BK TU UR ${r} ${r} ${st} ${st} BK`,
         `R R ${r} ${st} ${st} BK`,
         `${g} TU ${r} ${st} ${st} BK`,
         `BK ${g} OM UR ${r} ${r} ${st} ${st} BK`,
         `TU UR ${r} ${st} BK`,
+        `BK TNX UR ${r} ${r} ${st} BK`,
+        `TU ${r} ${st} ${st} BK`,
+        `BK TU UR ${r} ${st} 73 BK`,
+        `BK ${g} TNX UR ${r} ${st} ${st} BK`,
       ]);
     }
   }
@@ -398,7 +425,7 @@ function valueOf(qso: RunQso, item: Item): string | null {
             ? regionOf(them)
             : null
           : format === "pota"
-            ? cut(them.rst)
+            ? potaReport(them)
             : null
   );
 }
@@ -413,10 +440,17 @@ function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
   return format === "pota" && rand() < 0.25 ? `BK ${value} ${value} BK` : `${value} ${value}`;
 }
 
-/** What the station sends after your TU, or null for nothing. */
+/** What the station sends after your TU, or null for nothing. A hunter
+ *  closes with E E. In an SST, many send 73. In a CWT or an MST, a caller
+ *  sends nothing. */
 function lastWord(qso: RunQso, rand: Rand): string | null {
-  if (qso.format === "pota") return pick(rand, ["73 E E", "E E", "TU 73 E E", "GL 73 E E", "TU 72 E E"]);
-  if (qso.format === "sst") return rand() < 0.5 ? "73" : null;
+  if (qso.format === "pota") {
+    return pick(rand, ["73 E E", "E E", "TU 73 E E", "GL 73 E E", "TU 72 E E", "R 73 E E", "TNX 73 E E", "72 E E", "TU GL E E"]);
+  }
+  if (qso.format === "sst") {
+    const n = qso.yourName;
+    return pick(rand, ["73", null, "TU 73", null, "GL 73", n ? `TNX ${n} 73` : "TNX 73", "73 E E", "E E"]);
+  }
   return null;
 }
 

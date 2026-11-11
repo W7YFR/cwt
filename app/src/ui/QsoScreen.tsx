@@ -41,7 +41,7 @@ import { exchangeReport, itemLabels } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
-import type { Station } from "@/qso/station";
+import { regionOf, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { anyAdded, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { patternOf } from "@/morse";
@@ -2225,9 +2225,14 @@ export function QsoScreen({
      what it sent: the reply must not tell you if your copy is right. */
   const typedItem = (label: string, or: string) =>
     (items[qsoNo.current]?.[label] ?? "").toUpperCase().replace(/\s+/g, " ").trim() || or;
+  const theirRegion = regionOf(them);
   const theirsIn = headless(qsoNo.current)
-    ? { call: typedItem("Call", THEIR_CALL), name: typedItem("Name", THEIR_NAME) }
-    : { call: callShown ? them.call : THEIR_CALL, name: nameShown ? them.name : THEIR_NAME };
+    ? { call: typedItem("Call", THEIR_CALL), name: typedItem("Name", THEIR_NAME), region: typedItem("State", "") }
+    : {
+        call: callShown ? them.call : THEIR_CALL,
+        name: nameShown ? them.name : THEIR_NAME,
+        region: theirsShown || heard(qsoNo.current, theirRegion) ? theirRegion : "",
+      };
   const suggestion =
     // A script always shows what is to be sent next: that is the exercise.
     // It stays while a line plays again, so the page does not jump.

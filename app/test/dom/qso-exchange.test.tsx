@@ -127,7 +127,8 @@ describe("Exchange", () => {
 
   it("puts what you typed in the suggested reply, never what was sent", async () => {
     await open({ qsoTheirText: "exchange", qsoHints: "always", user: USER });
-    await send("CQ CWT W7YFR");
+    // POTA: every reply to a caller starts with its call.
+    await send("CQ POTA W7YFR");
     const { call } = kept().qso.them;
     expect(hint()).not.toContain(call);
     await fill(boxes()[0]!, "K1XYZ");

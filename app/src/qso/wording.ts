@@ -80,6 +80,8 @@ export function callBack(s: Say): string {
     `${s.you} DE ${c} ${c} ${c} K`,
     `DE ${c} ${c} K`,
     `${c} ${c}`,
+    `${s.you} ${s.you} DE ${c} ${c} K`,
+    `${s.you} DE ${c} K`,
   ]);
 }
 
@@ -127,10 +129,18 @@ function report(s: Say): string {
   return pick(s.rand, [`UR RST ${r} ${r}`, `UR ${r} ${r}`, `RST ${r} ${r}`, `UR RST IS ${r} ${r}`]);
 }
 
+/** Its report in a full exchange: now and then UR SIG, and a weak one now
+ *  and then says why, as QSB or QRM. Never with rand 0. */
+function reportWhy(s: Say): string {
+  const said = s.rand() >= 0.85 ? report(s).replace(/^UR( RST)?|^RST/, "UR SIG") : report(s);
+  const weak = s.them.rst < "579" && s.rand() >= 0.6;
+  return words(said, weak ? pick(s.rand, ["WID QSB", "QSB", "SOME QRM", "QRN HR"]) : "");
+}
+
 function nameOf(s: Say): string {
   const n = s.them.name;
   if (short(s)) return pick(s.rand, [`NAME ${n}`, `OP ${n}`, `NAME HR ${n}`]);
-  return pick(s.rand, [`NAME ${n} ${n}`, `NAME HR ${n} ${n}`, `OP ${n} ${n}`, `NAME IS ${n} ${n}`]);
+  return pick(s.rand, [`NAME ${n} ${n}`, `NAME HR ${n} ${n}`, `OP ${n} ${n}`, `NAME IS ${n} ${n}`, `OP HR ${n} ${n}`]);
 }
 
 function qthOf(s: Say): string {
@@ -141,8 +151,32 @@ function qthOf(s: Say): string {
   const city = q.slice(0, at);
   const state = q.slice(at + 1);
   if (short(s)) return pick(s.rand, [`QTH ${q}`, `QTH ${city}`, `QTH HR ${q}`]);
-  return pick(s.rand, [`QTH ${q} ${q}`, `QTH ${city} ${city} ${state}`, `QTH HR ${q} ${q}`, `QTH IS ${q}`]);
+  return pick(s.rand, [`QTH ${q} ${q}`, `QTH ${city} ${city} ${state}`, `QTH HR ${q} ${q}`, `QTH IS ${q}`, `QTH ${city} ${state} ${state}`]);
 }
+
+/** Rigs, antennas and weather, for a word on the station now and then. */
+const RIGS = ["IC7300", "K3", "FT991", "TS590", "KX2", "IC705", "FT710", "K4"];
+const ANTS = ["DIPOLE", "VERT", "YAGI", "LOOP", "EFHW", "G5RV"];
+const WX = ["SUNNY", "CLDY", "RAIN", "SNOW", "WARM", "COLD", "WINDY"];
+
+/** A word on its station or weather, as a full exchange may end with. */
+function remark(s: Say): string {
+  const { rand } = s;
+  const rig = pick(rand, RIGS);
+  const ant = pick(rand, ANTS);
+  const pwr = pick(rand, ["5", "10", "100", "50"]);
+  const temp = String(20 + Math.floor(rand() * 15) * 5);
+  return pick(rand, [
+    `RIG HR ${rig} ES ${ant}`,
+    `RIG ${rig} PWR ${pwr}W ANT ${ant}`,
+    `WX ${pick(rand, WX)} TEMP ${temp}F`,
+    `RIG ${rig} ANT ${ant} <BT> WX ${pick(rand, WX)}`,
+    `HR ${rig} AT ${pwr}W TO ${ant}`,
+  ]);
+}
+
+/** How often a full exchange ends with a word on its station or weather. */
+const REMARK = 0.35;
 
 const ITEM: Readonly<Record<Piece, (s: Say) => string>> = { report, name: nameOf, qth: qthOf };
 
@@ -150,8 +184,8 @@ const ITEM: Readonly<Record<Piece, (s: Say) => string>> = { report, name: nameOf
  *  report. Only then does it thank you for one. */
 function thanks(s: Say, gotReport: boolean): string {
   return gotReport
-    ? pick(s.rand, ["R TNX FER RPT", "R R TNX FER RPT", "FB TNX FER RPT", "R TNX RPT"])
-    : pick(s.rand, ["R", "", "TNX"]);
+    ? pick(s.rand, ["R TNX FER RPT", "R R TNX FER RPT", "FB TNX FER RPT", "R TNX RPT", "TNX FER THE RPT", "R FB TNX FER RPT"])
+    : pick(s.rand, ["R", "", "TNX", "R R", "FB"]);
 }
 
 /** Its exchange: report, name and QTH. In piece by piece, this is the first
@@ -161,9 +195,13 @@ export function exchange(s: Say, gotReport: boolean): string {
   const { rand } = s;
   const c = s.them.call;
   const open = thanks(s, gotReport);
-  const hello = maybe(rand, `${greeting(s.hour)} ${to(s)}`);
-  const parts = [report(s), nameOf(s), qthOf(s)];
+  const g = greeting(s.hour);
+  const hello = maybe(rand, pick(rand, [`${g} ${to(s)}`, `${g} DR ${to(s)}`, `VY ${g} ${to(s)}`]));
+  const parts = [short(s) ? report(s) : reportWhy(s), nameOf(s), qthOf(s)];
   if (rand() >= KEEP) parts.splice(1, 2, parts[2]!, parts[1]!);
+  // A word on its station or weather, now and then. Never with rand 0, so
+  // the plainest exchange stays plain.
+  if (!short(s) && rand() >= 1 - REMARK) parts.push(remark(s));
   // Both calls first by habit. A full exchange ends with them all the same.
   const head = opens(s) ? `${s.you} DE ${c}` : "";
   if (short(s)) {
@@ -251,7 +289,7 @@ export function signFirst(s: Say): string {
   const c = s.them.call;
   const n = to(s);
   if (short(s)) {
-    return pick(s.rand, [`TNX QSO 73 <SK>`, `R TU ${n} 73 GL <SK>`, `FB ${n} 73 <SK>`]);
+    return pick(s.rand, [`TNX QSO 73 <SK>`, `R TU ${n} 73 GL <SK>`, `FB ${n} 73 <SK>`, `TNX ${n} VY 73 <SK>`]);
   }
   return words(
     pick(s.rand, [
@@ -259,6 +297,8 @@ export function signFirst(s: Say): string {
       `R TNX FER QSO ${n} GL ES 73`,
       `FB ${n} TNX FB QSO 73 ES GL`,
       `OK ${n} TNX QSO CUL 73`,
+      `TNX FER THE NICE QSO ${n} GUD DX ES 73`,
+      `VY FB QSO ${n} TNX ES VY 73`,
     ]),
     `${s.you} DE ${c} <SK>`,
   );
@@ -268,16 +308,18 @@ export function signFirst(s: Say): string {
 export function signOff(s: Say): string {
   const c = s.them.call;
   const n = to(s);
-  if (short(s)) return pick(s.rand, [`TU 73 E E`, `73 TU <SK> E E`, `TNX ${n} 73 <SK>`]);
+  if (short(s)) return pick(s.rand, [`TU 73 E E`, `73 TU <SK> E E`, `TNX ${n} 73 <SK>`, `R R 73 GL <SK> E E`]);
   return pick(s.rand, [
     `TU ${n} 73 GL ${s.you} DE ${c} <SK> E E`,
     `R TNX FER QSO ${n} 73 ${s.you} DE ${c} <SK>`,
     `FB ${n} TNX FB QSO CUAGN 73 <SK> E E`,
     `R R TNX ${n} GL ES 73 <SK> E E`,
+    `TNX FER THE NICE QSO ${n} VY 73 GUD DX ${s.you} DE ${c} <SK> E E`,
+    `R R ${n} HPE CUAGN SN 73 <SK> E E`,
   ]);
 }
 
 /** The two dits that close the QSO after your last 73. */
 export function lastDits(s: Say): string {
-  return pick(s.rand, ["E E", "TU E E", "73 E E"]);
+  return pick(s.rand, ["E E", "TU E E", "73 E E", "GL E E", "CUL E E"]);
 }

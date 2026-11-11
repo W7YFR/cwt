@@ -118,8 +118,9 @@ describe("every wording of the hints", () => {
 
   it("works a standard QSO of each length, and the station copies all of you", () => {
     for (const length of ["full", "short", "pieces"] as const) {
-      for (let seed = 1; seed <= 150; seed++) {
-        const rand = seeded(seed);
+      for (let seed = 1; seed <= 600; seed++) {
+        // Seeds spread out: a small seed's first draw is near 0.
+        const rand = seeded(seed * 104729);
         const me: Me = { ...ME, ...places[seed % 2]!, name: names[seed % 3]!, rst: ["599", "579", "559"][seed % 3]! };
         const voice = { rand, hour: seed % 24 };
         const qso = workWorded(newQso(rand), { rand, hour: 10, length, region: me.region }, me, voice, null);
@@ -134,8 +135,9 @@ describe("every wording of the hints", () => {
 
   it("works a run of each format, and the station copies all of you", () => {
     for (const format of FORMAT_IDS) {
-      for (let seed = 1; seed <= 150; seed++) {
-        const rand = seeded(seed);
+      for (let seed = 1; seed <= 600; seed++) {
+        // Seeds spread out: a small seed's first draw is near 0.
+        const rand = seeded(seed * 104729);
         const me: Me = { ...ME, ...places[seed % 2]!, name: names[seed % 3]!, nr: ["", "3001", "291"][seed % 3]! };
         const voice = { rand, hour: seed % 24 };
         const qso = workWorded(newQso(rand), { rand, hour: 10, region: me.region }, me, voice, format);
@@ -144,7 +146,7 @@ describe("every wording of the hints", () => {
         const got = qso.got!;
         const yours = FORMATS[format].yours;
         if (yours.includes("name")) expect(got.name).toBe(me.name);
-        if (yours.includes("report")) expect(got.report).toBe("5NN");
+        if (yours.includes("report")) expect(got.report).toMatch(/^(5NN|599)$/);
         if (format === "sst" || format === "pota" || (format === "cwt" && !me.nr)) expect(got.region).toBe(me.region);
         if (format === "cwt" && me.nr) expect(got.number).toBe(me.nr);
         if (format === "mst") expect(got.number).toBe("1");
