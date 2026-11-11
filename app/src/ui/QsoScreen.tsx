@@ -481,6 +481,7 @@ const QSO_KEYS: readonly KeyGroup[] = [
     heading: "On the air",
     rows: [
       { keys: [["R"]], does: "Start your turn over; in a script, before you key, start the script over" },
+      { keys: [[ALT, "Shift", "R"]], does: "The same as R, from a copy box, a slot or a log box too" },
       { keys: [[ALT, "R"]], does: "Play the station's last line again, with Play buttons on Always" },
       { keys: [[ALT, "Enter"]], does: "Play from the word you are copying" },
     ],
@@ -629,6 +630,8 @@ export function QsoScreen({
   const [closed, setClosed] = useState<readonly number[]>(() => kept?.closed ?? []);
   /** Each QSO that is over, as it ended, for its report. */
   const [ends, setEnds] = useState<Readonly<Record<number, AnyQso>>>(() => kept?.ends ?? {});
+  /** The logbook's rows opened to their lines, by QSO. */
+  const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set());
   /** Your copy of each QSO's items, with the station's lines as Exchange. */
   const [items, setItems] = useState<Readonly<Record<number, Readonly<Record<string, string>>>>>(
     () => kept?.items ?? {},
@@ -1350,6 +1353,7 @@ export function QsoScreen({
     setClosed([]);
     setEnds({});
     setItems({});
+    setOpened(new Set());
     setPlaying(null);
     qsoNo.current = 0;
     closing.current = null;
@@ -1567,6 +1571,13 @@ export function QsoScreen({
   const partKeys = useRef({ letter: () => {}, word: () => {}, fromWord: (_el: EventTarget | null) => {} });
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
+      // Option+Shift+R: R, from anywhere, a box or a slot too.
+      if (ev.altKey && ev.shiftKey && !ev.metaKey && !ev.ctrlKey && ev.code === "KeyR") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!ev.repeat) restartKey();
+        return;
+      }
       if (!altOf(ev)) return;
       if (ev.code === "KeyR") {
         if (!ev.repeat) replayKey.current();
@@ -1579,7 +1590,7 @@ export function QsoScreen({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
+  }, [restartKey]);
   /** Why a line cannot play now, or null when it can. In a session, it plays
    *  on your turn before you start sending. */
   const cannotPlay = (): string | null => {
@@ -1818,16 +1829,17 @@ export function QsoScreen({
     );
   };
 
-  const qsoReport = (n: number): React.ReactElement | null => {
+  /** The exchange of QSO `n`, item by item, once it is over. Null for a
+   *  script, or a QSO the station never answered. */
+  const reportRows = (n: number) => {
     const done = ends[n];
-    if (!closed.includes(n) || !done) return null;
-    if (isScript(done)) return scriptReportOf(done);
+    if (!closed.includes(n) || !done || isScript(done)) return null;
     const theirLines = lines.filter((l) => l.qso === n && !l.you);
     if (theirLines.length === 0) return null;
     const user = loadUser();
     const city = user.qthCity.trim();
     const region = user.qthRegionShort.trim();
-    const rows = exchangeReport(
+    return exchangeReport(
       done,
       theirLines.map((l) => ({ text: l.text, typed: l.mode === "copy" ? typedOf(l) : null })),
       {
@@ -1839,8 +1851,14 @@ export function QsoScreen({
       },
       itemsIn(n) ? (items[n] ?? {}) : undefined,
     );
-    // A script has no exchange items to check.
-    if (rows.length === 0) return null;
+  };
+  /** The report of QSO `n`: both sides, or one. */
+  const qsoReport = (n: number, only?: "you"): React.ReactElement | null => {
+    const done = ends[n];
+    if (!closed.includes(n) || !done) return null;
+    if (isScript(done)) return scriptReportOf(done);
+    const rows = reportRows(n);
+    if (!rows || rows.length === 0) return null;
     const call = done.them.call;
     const group = (from: "them" | "you", sent: string, copied: string) => (
       <>
@@ -1864,7 +1882,7 @@ export function QsoScreen({
       <div className="qsoreport" data-testid="qso-report">
         <table>
           <tbody>
-            {group("them", `${call} sent`, "You copied")}
+            {only !== "you" && group("them", `${call} sent`, "You copied")}
             {group("you", "You sent", `${call} copied`)}
           </tbody>
         </table>
@@ -1877,7 +1895,7 @@ export function QsoScreen({
   /** No report will come for the QSO under way: a script, with its report
    *  off. */
   const noReportDue = isScript(qso.current) && !scriptReportOn;
-  const qsoTapeRow = (n: number, at: number): React.ReactElement | null => {
+  const qsoTapeRow = (n: number, at: number, bare = false): React.ReactElement | null => {
     if (!closed.includes(n)) return null;
     const play = playback !== "never";
     // The row shows while your overs come back after a reload, so the log
@@ -1895,8 +1913,7 @@ export function QsoScreen({
       playClip(playKey(asHeard), asHeard ? tape(parts!, tapeRate(), replayAdded() ?? undefined) : make());
     const playing = replaying === playKey(added) || replaying === playKey(false);
     const name = `QSO ${at + 1}${ends[n] ? ` · ${ends[n]!.them.call}` : ""}`;
-    return (
-      <li className="qsotape" data-testid="qso-tape">
+    const end = (
         <span className="tapeend">
           {play && (
             <button
@@ -1941,6 +1958,12 @@ export function QsoScreen({
             )}
           </MoreMenu>
         </span>
+    );
+    // Its buttons alone, for a row of the logbook.
+    if (bare) return end;
+    return (
+      <li className="qsotape" data-testid="qso-tape">
+        {end}
         <span className="tapename">{name}</span>
       </li>
     );
@@ -2056,56 +2079,44 @@ export function QsoScreen({
   };
 
   /** Your copy of QSO `n`'s items, while it is under way: a box for each,
-   *  where its lines would be. Enter goes to the next box, and in the last
-   *  one, or with Cmd (Ctrl), grades your copy once the QSO is over. */
-  const itemsForm = (n: number): React.ReactElement => {
+   *  the cells of its row in the logbook. Enter goes to the next box, and in
+   *  the last one, or with Cmd (Ctrl), grades your copy once the QSO is over. */
+  const itemBoxes = (n: number): React.ReactElement[] => {
     const labels = itemLabels(ends[n] ?? qso.current);
     const grade = () => {
       if (finished !== n) return;
       close(n);
       setNote("");
     };
-    return (
-      <li className="qsoitems" data-testid="qso-items">
-        <table>
-          <tbody>
-            {labels.map((label, k) => (
-              <tr key={label}>
-                <th scope="row">
-                  <label htmlFor={`qso-item-${n}-${k}`}>{label}</label>
-                </th>
-                <td>
-                  <input
-                    id={`qso-item-${n}-${k}`}
-                    className="qsotype"
-                    data-testid="qso-item"
-                    data-label={label}
-                    value={items[n]?.[label] ?? ""}
-                    autoFocus={k === 0}
-                    spellCheck={false}
-                    autoComplete="off"
-                    onKeyDown={(ev) => {
-                      typed();
-                      if (ev.key === "Escape") ev.stopPropagation();
-                      if (ev.key !== "Enter") return;
-                      ev.preventDefault();
-                      ev.stopPropagation();
-                      const next = document.getElementById(`qso-item-${n}-${k + 1}`);
-                      if (next && !(ev.metaKey || ev.ctrlKey)) next.focus();
-                      else grade();
-                    }}
-                    onChange={(ev) => {
-                      const value = ev.target.value;
-                      setItems((all) => ({ ...all, [n]: { ...all[n], [label]: value } }));
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </li>
-    );
+    return labels.map((label, k) => (
+      <span key={label} className="bookcell">
+        <input
+          id={`qso-item-${n}-${k}`}
+          className="bookbox"
+          data-testid="qso-item"
+          data-label={label}
+          aria-label={label}
+          value={items[n]?.[label] ?? ""}
+          autoFocus={k === 0}
+          spellCheck={false}
+          autoComplete="off"
+          onKeyDown={(ev) => {
+            typed();
+            if (ev.key === "Escape") ev.stopPropagation();
+            if (ev.key !== "Enter") return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            const next = document.getElementById(`qso-item-${n}-${k + 1}`);
+            if (next && !(ev.metaKey || ev.ctrlKey)) next.focus();
+            else grade();
+          }}
+          onChange={(ev) => {
+            const value = ev.target.value;
+            setItems((all) => ({ ...all, [n]: { ...all[n], [label]: value } }));
+          }}
+        />
+      </span>
+    ));
   };
 
   /** What shows of one line of the log. */
@@ -2283,6 +2294,152 @@ export function QsoScreen({
       : phase === "waiting"
         ? "waiting"
         : "receiving";
+
+  /** One line of the log: who sent it, its text, and its end. */
+  const lineItem = (i: number): React.ReactElement => {
+    const line = lines[i]!;
+    return (
+      <li key={i} className={line.you ? "you" : "them"} data-line={i}>
+        {labelOf(line)}
+        {textOf(line, i)}
+        <span className="lend">
+          {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
+            <span className="lwpm" data-testid="qso-line-wpm">
+              {wpmOf(line.sentWpm)}
+            </span>
+          )}
+          {lineEdit(line, i)}
+          {linePlay(i)}
+          {lineMore(i)}
+        </span>
+      </li>
+    );
+  };
+
+  /* With the station's lines as Exchange, the log is a logbook: one row per
+     QSO, the station's items as you copied them. The QSO under way is the
+     last row, with a box for each item. A row opens to its lines and what
+     the station copied of yours. */
+  const book = theirText === "exchange";
+  const bookLabels = (n: number) => itemLabels(ends[n] ?? qso.current);
+  /** The logbook's headings: #, then the items. Again wherever the items
+   *  change, as from a plain CQ to a POTA run. */
+  const bookHead = (labels: readonly string[], key: string): React.ReactElement => (
+    <li key={`head ${key}`} className="bookhead" aria-hidden="true" style={{ "--items": labels.length } as React.CSSProperties}>
+      <span className="bookline">
+        <span className="bookn">#</span>
+        {labels.map((l) => (
+          <span key={l} className="bookcell">
+            {l}
+          </span>
+        ))}
+      </span>
+    </li>
+  );
+  const bookRow = (group: { qso: number; at: number[] }, g: number, all: readonly { qso: number }[]): React.ReactElement | null => {
+    const n = group.qso;
+    const labels = bookLabels(n);
+    const before = g > 0 ? bookLabels(all[g - 1]!.qso) : labels;
+    const head = labels.join() !== before.join() ? bookHead(labels, String(n)) : null;
+    const style = { "--items": labels.length } as React.CSSProperties;
+    if (!closed.includes(n)) {
+      // Under way: its boxes once the station has answered, else nothing yet.
+      if (!headless(n) || !boxesFor(n)) return head;
+      const status =
+        finished === n ? "" : state === "receiving" || state === "waiting" ? "Station sending" : state === "sending" ? "Your turn" : "";
+      return (
+        <Fragment key={group.at[0]}>
+          {head}
+          <li className="bookrow now" data-testid="qso-items" style={style}>
+            <span className="bookline">
+              <span className="bookn">{g + 1}</span>
+              {itemBoxes(n)}
+              <span className="bookend">
+                {status && (
+                  <span className="bookstatus" data-state={state}>
+                    {status}
+                  </span>
+                )}
+              </span>
+            </span>
+          </li>
+        </Fragment>
+      );
+    }
+    const rows = (reportRows(n) ?? []).filter((r) => r.from === "them");
+    const counted = rows.filter((r) => r.sent !== "");
+    const right = counted.filter((r) => r.ok === true).length;
+    const isOpen = opened.has(n);
+    const toggle = () =>
+      setOpened((o) => {
+        const next = new Set(o);
+        if (next.has(n)) next.delete(n);
+        else next.add(n);
+        return next;
+      });
+    const call = ends[n]?.them.call ?? "";
+    return (
+      <Fragment key={group.at[0]}>
+        {head}
+        <li className={isOpen ? "bookrow done open" : "bookrow done"} data-testid="qso-book-row" style={style}>
+          <span
+            className="bookline"
+            onClick={(e) => {
+              // The row opens on a click, but not one on its buttons.
+              if ((e.target as Element).closest("button, [role=menu], [role=menuitem]")) return;
+              toggle();
+            }}
+          >
+            <span className="bookn">{g + 1}</span>
+            {labels.map((label, k) => {
+              const r = rows[k];
+              if (!r || r.sent === "") {
+                return (
+                  <span key={label} className="bookcell" data-ok="null">
+                    —
+                  </span>
+                );
+              }
+              return (
+                <span key={label} className={r.ok === false ? "bookcell bad" : "bookcell"} data-ok={String(r.ok)}>
+                  {r.copied === null ? "—" : r.copied || <span className="missed">(missed)</span>}
+                  {r.ok === false && <span className="booksent">sent {r.sent}</span>}
+                </span>
+              );
+            })}
+            <span className="bookend">
+              {counted.length > 0 && (
+                <span className={right === counted.length ? "bookscore all" : "bookscore"} data-testid="qso-book-score">
+                  {right} of {counted.length}
+                </span>
+              )}
+              {qsoTapeRow(n, g, true)}
+              <button
+                type="button"
+                className="iconbtn booktoggle"
+                data-testid="qso-book-toggle"
+                aria-expanded={isOpen}
+                aria-label={isOpen ? `Close QSO ${g + 1}` : `Open QSO ${g + 1} · ${call}`}
+                onClick={toggle}
+              >
+                ▸
+              </button>
+            </span>
+          </span>
+          {/* Its lines and the rest of its report, open or closed by the
+              height of a grid row, so the change can move. */}
+          <div className="bookmore" inert={!isOpen}>
+            <div className="bookinner">
+              <div className="bookbody">
+                <ol className="qsolines">{group.at.map(lineItem)}</ol>
+                {qsoReport(n, "you")}
+              </div>
+            </div>
+          </div>
+        </li>
+      </Fragment>
+    );
+  };
 
   /* Why a setting of your copy does nothing now: no copy to type, or no
      slots to type it in. */
@@ -2702,7 +2859,9 @@ export function QsoScreen({
             <ol className="qsolog" data-testid="qso-log" onMouseUp={onLogMouseUp}>
               {/* Each QSO: its lines, and its report beside them once it is
                   over. A line divides one QSO from the next. */}
+              {book && bookHead(bookLabels(qsoGroups(lines)[0]?.qso ?? qsoNo.current), "first")}
               {qsoGroups(lines).map((group, g, all) => {
+                if (book && !isScript(ends[group.qso] ?? qso.current)) return bookRow(group, g, all);
                 const report = qsoReport(group.qso);
                 return (
                 <Fragment key={group.at[0]}>
@@ -2711,25 +2870,7 @@ export function QsoScreen({
                       the report comes. */}
                   <li className={report || (!closed.includes(group.qso) && !noReportDue) ? "qsogroup" : "qsogroup noreport"}>
                     <ol className="qsolines">
-                      {headless(group.qso) ? boxesFor(group.qso) && itemsForm(group.qso) : group.at.map((i) => {
-                        const line = lines[i]!;
-                        return (
-                          <li key={i} className={line.you ? "you" : "them"} data-line={i}>
-                            {labelOf(line)}
-                            {textOf(line, i)}
-                            <span className="lend">
-                              {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
-                                <span className="lwpm" data-testid="qso-line-wpm">
-                                  {wpmOf(line.sentWpm)}
-                                </span>
-                              )}
-                              {lineEdit(line, i)}
-                              {linePlay(i)}
-                              {lineMore(i)}
-                            </span>
-                          </li>
-                        );
-                      })}
+                      {group.at.map(lineItem)}
                       {qsoTapeRow(group.qso, g)}
                     </ol>
                     {report}
