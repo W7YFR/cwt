@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- On the QSO page, **The station's lines show** has **Exchange**. No lines show during a QSO, and the log is a logbook: one row per QSO, with a box for each item of the station's exchange. When the QSO ends, the row shows your copy and its score, and opens to the QSO's lines.
+- On the QSO page, **The station's lines show** has **Exchange**: no lines show, and you type each item of the station's exchange in a row of a logbook. When the QSO ends, the row shows your copy and its score, and opens to the QSO's lines.
 - On the QSO page, ⌥⇧R (Alt+Shift+R off a Mac) starts your turn over, as R does, also from a copy box, a slot or an Exchange box.
 
 ### Fixed
