@@ -2562,6 +2562,90 @@ header .modeswitch button { white-space: nowrap; }
 .qsoreport tbody th[scope="row"] { color: var(--ink-dim); }
 .qsoreport td { font-family: var(--mono); color: var(--ink); }
 .qsoreport tr.bad td:last-child { color: var(--bad); }
+/* The logbook, with the station's lines as Exchange: one row per QSO, the
+   station's items as you copied them, the QSO under way last with a box for
+   each. A row opens to its lines and what the station copied of yours. */
+/* Columns in rem, not ch: the headings, the cells and the boxes differ in
+   size, and must line up. */
+.qsolog > li.bookhead, .qsolog > li.bookrow { display: block; list-style: none; padding: 0; }
+.qsolog .bookline {
+  display: grid;
+  grid-template-columns: 2.5rem repeat(var(--items, 3), minmax(0, 11rem)) minmax(0, 1fr) auto;
+  column-gap: 16px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font: 16px var(--mono);
+}
+.qsolog .bookhead .bookline { padding: 0 0 8px; font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); }
+.qsolog .bookn { color: var(--ink-faint); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; padding-top: 2px; }
+.qsolog .bookcell { min-width: 0; overflow-wrap: anywhere; }
+.qsolog .bookcell.bad { color: var(--bad); }
+.qsolog .bookcell .missed { color: var(--bad); font-size: 13px; }
+.qsolog .booksent { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 12px; }
+.qsolog .bookend { grid-column: -2; display: flex; align-items: center; gap: 6px; justify-self: end; }
+.qsolog .bookscore { font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); margin-right: 4px; }
+.qsolog .bookscore.all { color: var(--ok); }
+.qsolog .bookend .tapeend { display: flex; align-items: center; gap: 6px; }
+.qsolog .bookend .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
+.qsolog .booktoggle { width: 24px; height: 24px; font-size: 13px; transition: transform 200ms ease; }
+.qsolog .bookrow.open .booktoggle { transform: rotate(90deg); }
+.qsolog .bookrow.done .bookline { cursor: pointer; }
+.qsolog .bookrow.done .bookline:hover { background: color-mix(in srgb, var(--panel-2) 50%, transparent); }
+/* The QSO under way: the boxes are its cells. */
+.qsolog .bookrow.now .bookline { border-bottom: 0; padding-top: 12px; }
+.qsolog .bookrow.now .bookn { padding-top: 9px; }
+.qsolog .bookbox {
+  box-sizing: border-box;
+  width: 100%;
+  font: 18px var(--mono);
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.qsolog .bookbox:focus { outline: none; border-color: var(--you); box-shadow: 0 0 0 2px color-mix(in srgb, var(--you) 25%, transparent); }
+.qsolog .bookstatus { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-dim); padding-top: 9px; }
+.qsolog .bookstatus[data-state="receiving"]::before, .qsolog .bookstatus[data-state="waiting"]::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--you);
+  vertical-align: 1px;
+  animation: bookpulse 1.2s ease-in-out infinite;
+}
+@keyframes bookpulse { 50% { opacity: 0.3; } }
+/* A row's lines and the rest of its report: the grid row grows from 0 to
+   its height, so opening and closing move. */
+.qsolog .bookmore { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms ease; }
+.qsolog .bookrow.open .bookmore { grid-template-rows: 1fr; }
+/* Padding inside the part that is cut, so a closed row takes no room. */
+.qsolog .bookinner { min-height: 0; overflow: hidden; }
+.qsolog .bookbody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 32px;
+  padding: 10px 0 14px calc(2.5rem + 16px);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-2) 40%, transparent);
+}
+.qsolog .bookbody .qsoreport { padding: 0 16px 0 0; border-left: 0; }
+/* Narrow: the cells share the width, and the row's end goes under them. */
+@container (max-width: 34rem) {
+  .qsolog .bookline { grid-template-columns: 1.75rem repeat(var(--items, 3), minmax(0, 1fr)); column-gap: 10px; }
+  .qsolog .bookend { grid-column: 2 / -1; justify-self: start; margin-top: 6px; }
+  .qsolog .bookend:empty { display: none; }
+  .qsolog .bookbody { grid-template-columns: minmax(0, 1fr); row-gap: 12px; padding-left: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qsolog .bookmore, .qsolog .booktoggle { transition: none; }
+  .qsolog .bookstatus::before { animation: none; }
+}
 /* The Copy page's downloads, under the QSO, as the QSO page's are. */
 .copydownloads { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .copydownloads button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }

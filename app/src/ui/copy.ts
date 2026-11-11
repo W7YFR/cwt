@@ -255,6 +255,7 @@ export const NEEDS_BAND = "Needs Noise, QRN or QRM on.";
 export const NEEDS_LINES_COPY = "Needs Each line shows = Copy.";
 export const NEEDS_THEIR_LINES_COPY = "Needs The station's lines show = Copy.";
 export const NEEDS_SLOTS = "Needs Copy in = Slots.";
+export const NOT_WITH_EXCHANGE = "Not with The station's lines show = Exchange.";
 export const NEEDS_BAND_BETWEEN = "Needs Play the band.";
 
 export const LOOP_HELP =

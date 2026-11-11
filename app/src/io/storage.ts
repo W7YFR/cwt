@@ -473,7 +473,7 @@ export interface Prefs {
   /** How much the QSO page's station says in each over. Absent is full. */
   qsoLength?: "full" | "short" | "pieces" | "mixed";
   /** How the station's overs show on the QSO page. Absent is whole. */
-  qsoTheirText?: "before" | "sent" | "hidden" | "copy" | "none";
+  qsoTheirText?: "before" | "sent" | "hidden" | "copy" | "exchange" | "none";
   /** Copy mode: you type the station's lines in a box or in slots. Absent
    *  is a box. */
   qsoCopyInput?: "text" | "slots";
@@ -755,7 +755,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   page: oneOf("practice", "copy", "qso"),
   qsoCopy: oneOf("strict", "lenient"),
   qsoLength: oneOf("full", "short", "pieces", "mixed"),
-  qsoTheirText: oneOf("before", "sent", "hidden", "copy", "none"),
+  qsoTheirText: oneOf("before", "sent", "hidden", "copy", "exchange", "none"),
   qsoCopyInput: oneOf("text", "slots"),
   qsoGuide: oneOf("cq", "cwt", "sst", "mst", "pota"),
   qsoSideGuide: isBool,

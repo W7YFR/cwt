@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { answer, newQso, type Qso } from "@/qso/cq";
-import { exchangeReport, type Meant, type TheirLine } from "@/qso/report";
+import { exchangeReport, itemLabels, theirItems, type Meant, type TheirLine } from "@/qso/report";
 import { answerRun, callIn, newRun, type RunQso } from "@/qso/run";
 import type { Station } from "@/qso/station";
 
@@ -92,5 +92,44 @@ describe("a run's report", () => {
       "you Name: ROB > ROB",
       "you State: OR > OR",
     ]);
+  });
+});
+
+describe("items typed in boxes (Exchange)", () => {
+  const cwt = (): RunQso => {
+    let q: RunQso = callIn({ ...newRun("cwt", () => 0), them: JIM, you: "W7YFR" }, () => 0).qso as RunQso;
+    return answerRun(q, "K4ABC ROB OR", { ...FIRST, region: "OR" }).qso as RunQso;
+  };
+  const lines: TheirLine[] = [
+    { text: "K4ABC", typed: null },
+    { text: "TU JIM 2345", typed: null },
+  ];
+
+  it("grades each item by what you typed in its box, in any case", () => {
+    const typed = { Call: "k4abc", Name: "JIN", "Number or state": "2345" };
+    expect(shown(exchangeReport(cwt(), lines, ME, typed)).slice(0, 3)).toEqual([
+      "them Call: K4ABC > K4ABC",
+      "them Name: JIM > JIN ✗",
+      "them Number: 2345 > 2345",
+    ]);
+  });
+
+  it("marks an empty box missed", () => {
+    expect(exchangeReport(cwt(), lines, ME, {}).find((r) => r.label === "Name")).toMatchObject({ copied: "", ok: false });
+  });
+
+  it("takes 599 for 5NN, and 5NN for 599", () => {
+    let q: RunQso = callIn({ ...newRun("pota", () => 0), them: JIM, you: "W7YFR" }, () => 0).qso as RunQso;
+    q = answerRun(q, "K4ABC UR 5NN OR OR BK", { ...FIRST, region: "OR" }).qso as RunQso;
+    const sent: TheirLine[] = [{ text: "K4ABC", typed: null }, { text: "BK TU UR 57N 57N GA GA BK", typed: null }];
+    const report = (r: string) => exchangeReport(q, sent, ME, { Call: "K4ABC", Report: r, State: "GA" }).find((x) => x.label === "Report");
+    expect(report("579")?.ok).toBe(true);
+    expect(report("57N")?.ok).toBe(true);
+    expect(report("589")?.ok).toBe(false);
+  });
+
+  it("labels a CWT's number or state as one box", () => {
+    expect(theirItems(cwt()).map((i) => i.label)).toEqual(["Call", "Name", "Number"]);
+    expect(itemLabels(cwt())).toEqual(["Call", "Name", "Number or state"]);
   });
 });

@@ -352,3 +352,43 @@ describe("the guide's examples", () => {
     expect(example("cq", you)[0]!.text).toBe("CQ CQ DE W7YFR K");
   });
 });
+
+describe("its call a character off, after it said yes to your check (#135)", () => {
+  const lenient: RunContext = { ...FIRST, ear: { lenient: true, saved: "" } };
+  const pota: Station = { ...JIM, call: "AJ9EN", rst: "569", qth: "RENO NV" };
+
+  it("is taken with lenient copy, and the station sends its exchange", () => {
+    const { replies, qso } = work(called("pota", pota), ["AJ9EN ?", "A 19 E N GE UR 5NN 5NN WA WA BK"], lenient);
+    expect(replies[0]).toMatch(/^(RR|R R|YES|R R YES)$/);
+    expect(replies[1]).not.toBe("AJ9EN AJ9EN");
+    expect(qso.stage).toBe("exchanged");
+  });
+
+  it("is put right with strict copy, or before your check", () => {
+    expect(work(called("pota", pota), ["AJ9EN ?", "A19EN GE UR 5NN 5NN WA WA BK"]).replies[1]).toBe("AJ9EN AJ9EN");
+    expect(work(called("pota", pota), ["A19EN GE UR 5NN 5NN WA WA BK"], lenient).replies[0]).toBe("AJ9EN AJ9EN");
+  });
+});
+
+describe("a sign-off before its exchange (#136)", () => {
+  it("ends the QSO, with its own sign-off and no exchange", () => {
+    for (const format of ["pota", "cwt", "sst", "mst"] as const) {
+      const { replies, qso, ended } = work(called(format), ["73"]);
+      expect(ended, format).toBe(true);
+      expect(qso.stage, format).toBe("called");
+      expect(replies[0] ?? "", format).not.toMatch(/BK$|5NN|JIM|2345|GA/);
+    }
+  });
+
+  it("after it put you right on its call, as 73 EE", () => {
+    const pota: Station = { ...JIM, call: "AJ9EN" };
+    const { ended } = work(called("pota", pota), ["A19EN GE UR 5NN 5NN WA WA BK", "73 EE"]);
+    expect(ended).toBe(true);
+  });
+
+  it("is not a sign-off with your exchange in it", () => {
+    const { qso, ended } = work(called("cwt"), ["K4ABC ROB WA 73"]);
+    expect(ended).toBe(false);
+    expect(qso.stage).toBe("exchanged");
+  });
+});

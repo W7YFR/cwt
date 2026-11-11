@@ -27,6 +27,7 @@ app/.vitest/
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/changelog-check/
+!.claude/skills/finalize/
 CLAUDE.local.md
 
 # Local audio scratch (recordings live elsewhere; don't commit samples)

@@ -103,29 +103,81 @@ function copiedOf(lines: readonly TheirLine[], value: string): string | null {
   return best;
 }
 
+/** A report as you typed it against one as sent: 599 for 5NN is right. */
+const sameItem = (label: string, a: string, b: string) =>
+  label === "Report" ? same(a.replace(/N/gi, "9"), b.replace(/N/gi, "9")) : same(a.toUpperCase(), b);
+
 /** One of the station's items. One it never sent, as a QSO stopped early,
- *  has nothing to check. */
-function theirRow(lines: readonly TheirLine[], label: string, value: string): ReportRow {
+ *  has nothing to check. With `typed`, your copy is what you typed in its
+ *  box, not what you copied in its lines. */
+function theirRow(lines: readonly TheirLine[], item: Item, typed?: string): ReportRow {
+  const { label, value } = item;
   const sent = lines.some((l) => copiedIn({ text: l.text, typed: "" }, value) !== null);
   if (!sent) return { from: "them", label, sent: "", copied: null, ok: null };
+  if (typed !== undefined) {
+    const copied = typed.toUpperCase().replace(/\s+/g, " ").trim();
+    return { from: "them", label, sent: value, copied, ok: sameItem(label, copied, value) };
+  }
   const copied = copiedOf(lines, value);
   return { from: "them", label, sent: value, copied, ok: copied === null ? null : same(copied, value) };
+}
+
+/** One of the station's items: its name in the report, and what it sends. */
+export interface Item {
+  readonly label: string;
+  readonly value: string;
+}
+
+/** The station's items in `qso`, in the report's order: what you copy of
+ *  its exchange. A script has none. `lines` tells a report sent as 5NN. */
+export function theirItems(qso: AnyQso, lines: readonly { readonly text: string }[] = []): Item[] {
+  if (isScript(qso)) return [];
+  const { them } = qso;
+  if (!isRun(qso)) {
+    // 599 goes out as 5NN now and then: whichever its lines hold.
+    const rst = lines.some((l) => l.text.split(/\s+/).includes("5NN")) && them.rst === "599" ? "5NN" : them.rst;
+    return [
+      { label: "Call", value: them.call },
+      { label: "Report", value: rst },
+      { label: "Name", value: them.name },
+      { label: "QTH", value: them.qth },
+    ];
+  }
+  const st = regionOf(them);
+  const items: Item[] = [{ label: "Call", value: them.call }];
+  switch (qso.format) {
+    case "cwt":
+      items.push({ label: "Name", value: them.name });
+      items.push(them.nr ? { label: "Number", value: them.nr } : { label: "State", value: st });
+      break;
+    case "sst":
+      items.push({ label: "Name", value: them.name }, { label: "State", value: st });
+      break;
+    case "mst":
+      items.push({ label: "Name", value: them.name }, { label: "Number", value: String(them.serial ?? 1) });
+      break;
+    case "pota":
+      items.push({ label: "Report", value: them.rst.replace(/9/g, "N") }, { label: "State", value: st });
+      break;
+  }
+  return items;
+}
+
+/** The labels of the boxes to copy the station's items in, for a QSO of
+ *  this kind. A CWT's number or state shows as one box, so the label does
+ *  not tell which the station sends. */
+export function itemLabels(qso: AnyQso): string[] {
+  const cwt = isRun(qso) && qso.format === "cwt";
+  return theirItems(qso).map((i) => (cwt && (i.label === "Number" || i.label === "State") ? "Number or state" : i.label));
 }
 
 function yourRow(label: string, meant: string, took: string, check = true): ReportRow {
   return { from: "you", label, sent: meant, copied: took, ok: check && meant ? same(took, meant) : null };
 }
 
-/** The station's items in a standard QSO, with the report as it sent it. */
-function standardRows(qso: Qso, lines: readonly TheirLine[], me: Meant): ReportRow[] {
-  const { them } = qso;
-  // 599 goes out as 5NN now and then: whichever its lines hold.
-  const rst = lines.some((l) => l.text.split(/\s+/).includes("5NN")) && them.rst === "599" ? "5NN" : them.rst;
+/** The items of a standard QSO, both ways. */
+function standardRows(qso: Qso, me: Meant): ReportRow[] {
   return [
-    theirRow(lines, "Call", them.call),
-    theirRow(lines, "Report", rst),
-    theirRow(lines, "Name", them.name),
-    theirRow(lines, "QTH", them.qth),
     yourRow("Call", me.call, qso.you),
     yourRow("Report", "", qso.yourReport ?? "", false),
     yourRow("Name", me.name, qso.yourName),
@@ -134,27 +186,10 @@ function standardRows(qso: Qso, lines: readonly TheirLine[], me: Meant): ReportR
 }
 
 /** The items of a run's exchange, both ways. */
-function runRows(qso: RunQso, lines: readonly TheirLine[], me: Meant): ReportRow[] {
-  const { them, format } = qso;
+function runRows(qso: RunQso, me: Meant): ReportRow[] {
+  const { format } = qso;
   const got = qso.got ?? { name: "", number: "", region: "", report: "" };
-  const st = regionOf(them);
-  const rows: ReportRow[] = [theirRow(lines, "Call", them.call)];
-  switch (format) {
-    case "cwt":
-      rows.push(theirRow(lines, "Name", them.name));
-      rows.push(them.nr ? theirRow(lines, "Number", them.nr) : theirRow(lines, "State", st));
-      break;
-    case "sst":
-      rows.push(theirRow(lines, "Name", them.name), theirRow(lines, "State", st));
-      break;
-    case "mst":
-      rows.push(theirRow(lines, "Name", them.name), theirRow(lines, "Number", String(them.serial ?? 1)));
-      break;
-    case "pota":
-      rows.push(theirRow(lines, "Report", them.rst.replace(/9/g, "N")), theirRow(lines, "State", st));
-      break;
-  }
-  rows.push(yourRow("Call", me.call, qso.you));
+  const rows: ReportRow[] = [yourRow("Call", me.call, qso.you)];
   for (const item of FORMATS[format].yours) {
     if (item === "name") rows.push(yourRow("Name", me.name, got.name));
     if (item === "report") rows.push(yourRow("Report", "", got.report, false));
@@ -173,11 +208,21 @@ function runRows(qso: RunQso, lines: readonly TheirLine[], me: Meant): ReportRow
 
 /** The exchange of `qso`, item by item, both ways. A QSO stopped before the
  *  station took any of your exchange has nothing of yours to check: you may
- *  not have sent it. */
-export function exchangeReport(qso: AnyQso, lines: readonly TheirLine[], me: Meant): ReportRow[] {
+ *  not have sent it. With `typed`, your copy of the station's items is what
+ *  you typed in a box for each, by label. */
+export function exchangeReport(
+  qso: AnyQso,
+  lines: readonly TheirLine[],
+  me: Meant,
+  typed?: Readonly<Record<string, string>>,
+): ReportRow[] {
   // A script has no exchange items to check, only its lines.
   if (isScript(qso)) return [];
-  const rows = isRun(qso) ? runRows(qso, lines, me) : standardRows(qso, lines, me);
+  const labels = itemLabels(qso);
+  const theirs = theirItems(qso, lines).map((item, i) =>
+    theirRow(lines, item, typed && (typed[labels[i]!] ?? "")),
+  );
+  const rows = [...theirs, ...(isRun(qso) ? runRows(qso, me) : standardRows(qso, me))];
   const early = isRun(qso) ? qso.stage !== "exchanged" : ["cq", "asking", "called"].includes(qso.stage);
   const none = rows.every((r) => r.from !== "you" || r.label === "Call" || !r.copied);
   if (!early || !none) return rows;

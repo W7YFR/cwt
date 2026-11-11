@@ -7,11 +7,24 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.30.0 — 2026-11-11
+
+### Added
+
+- On the QSO page, **The station's lines show** has **Exchange**: no lines show, and you type each item of the station's exchange in a row of a logbook. When the QSO ends, the row shows your copy and its score, and opens to the QSO's lines.
+- On the QSO page, ⌥⇧R (Alt+Shift+R off a Mac) starts your turn over, as R does, also from a copy box, a slot or an Exchange box.
+
+### Fixed
+
+- In a POTA, CWT, SST or MST QSO with **Lenient** copy, the station no longer sends its call again for one wrong character after it has said yes to your check of its call.
+- In a POTA, CWT, SST or MST QSO, your 73 before the station's exchange now ends the QSO. The station no longer goes on to send its exchange.
+
 ### Development
 
 - `make release` runs from a worktree while another checkout has `main`. It updates, tags and pushes from that checkout, and keeps the branch the worktree holds.
 - `make restart` stops this repo's dev server, wherever it runs, and serves the current checkout at localhost:5173.
 - `make restart` no longer refuses to stop a dev server whose worktree was removed while it ran.
+- The `finalize` skill commits the branch, checks the changelog, opens the pull request, fixes CI failures, merges when green and runs `make release`.
 
 ## v1.29.0 — 2026-11-10
 

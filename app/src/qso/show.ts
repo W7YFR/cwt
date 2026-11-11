@@ -7,7 +7,7 @@
 import { CHAR_TO_MORSE, SYMBOL_RE, canonicalChar } from "@/morse";
 
 /** How the station's overs show. */
-export type TheirText = "before" | "sent" | "hidden" | "copy" | "none";
+export type TheirText = "before" | "sent" | "hidden" | "copy" | "exchange" | "none";
 
 /** How your own overs show. */
 export type YourText = "sent" | "hidden" | "none";

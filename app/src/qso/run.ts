@@ -79,6 +79,8 @@ export interface RunQso {
   readonly got?: Heard;
   /** Its last over was AGN?, which is not kept as `last`. */
   readonly askedAgn?: boolean;
+  /** It said yes to your check of its call, as AJ9EN ?. */
+  readonly callChecked?: boolean;
 }
 
 export type AnyQso = Qso | RunQso | ScriptQso;
@@ -468,6 +470,9 @@ function holdsItem(format: FormatId, heard: Heard): boolean {
   return items.some((item) => heard[item] !== "");
 }
 
+/** Words that sign off, and the E E after them. */
+const SIGN_OFF = new Set(["73", "SK", "<SK>", "CUL", "CU", "CUAGN", "GL", "GB", "EE", "E", "TU"]);
+
 /** The station's answer to one over you sent, in a run. */
 export function answerRun(qso: RunQso, heard: string, context: RunContext = {}): RunTurn {
   const { ear = STRICT, rand = Math.random, hour = new Date().getHours(), region = "" } = context;
@@ -496,7 +501,7 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       // keyed apart too, as K7B YX?.
       const confirms =
         over.hasExactly(`${c}?`) || over.words.some((w, i) => w === c && over.words[i + 1] === "?");
-      if (confirms) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
+      if (confirms) return say({ ...qso, callChecked: true }, pick(rand, ["RR", "R R", "YES", "R R YES"]));
       // Part of its call with a ?: it sends its call again. Keyed apart,
       // as W 4 ?, the words before the ? read as one.
       const checks = over.words.some((w, i) => {
@@ -525,10 +530,21 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
           : answered;
       const had = qso.got ?? NOTHING;
       const got = merged(had, fresh);
+      // You sign off before it has sent its exchange, as 73 or GL: it signs
+      // off too, and the QSO ends without its exchange. Not when the over
+      // also holds an item of yours: 73 alone is not a number.
+      const kept = words.filter((w) => !SIGN_OFF.has(w));
+      if (over.closing() && !holdsItem(qso.format, heardIn(qso.format, kept, region, them.name, ear.lenient))) {
+        const reply = lastWord(qso, rand);
+        return { qso: { ...qso, got, last: reply ?? qso.last }, reply, ended: true };
+      }
       // Its call sent wrong: another call, or its own a character off, as
       // NBMZA for N6MZA. It puts you right, and keeps the rest of your
-      // exchange, so its call alone next time goes on.
-      const off = !exact && (calls.length > 0 || offCall(over.words, c));
+      // exchange, so its call alone next time goes on. Once it has said yes
+      // to your check of its call, lenient copy takes a character off as a
+      // slip.
+      const slip = ear.lenient && qso.callChecked === true;
+      const off = !exact && (calls.length > 0 || (!slip && offCall(over.words, c)));
       if (off) return say({ ...qso, got }, `${c} ${c}`);
       const missing = lacking(qso.format, got);
       const before = { ...qso, got };
