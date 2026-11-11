@@ -81,6 +81,9 @@ export interface RunQso {
   readonly askedAgn?: boolean;
   /** It said yes to your check of its call, as AJ9EN ?. */
   readonly callChecked?: boolean;
+  /** Its last line was one item of its exchange, sent again because you
+   *  asked for it, as OH OH for QTH?. Absent otherwise. */
+  readonly answered?: Item;
 }
 
 export type AnyQso = Qso | RunQso | ScriptQso;
@@ -137,8 +140,9 @@ export function callIn(qso: RunQso, rand: Rand = Math.random): RunTurn {
   return say(qso, pick(rand, [c, `${c} ${c}`]), "called");
 }
 
-function say(qso: RunQso, reply: string, stage: RunStage = qso.stage): RunTurn {
-  return { qso: { ...qso, stage, last: reply, askedAgn: false }, reply, ended: false };
+function say(qso: RunQso, reply: string, stage: RunStage = qso.stage, answered?: Item): RunTurn {
+  const { answered: _, ...rest } = qso;
+  return { qso: { ...rest, stage, last: reply, askedAgn: false, ...(answered ? { answered } : {}) }, reply, ended: false };
 }
 
 /** Words around an exchange that are not part of it. */
@@ -623,8 +627,12 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       if (checksRight(qso, over)) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
       if (asksCall(over)) return say(qso, `${c} ${c}`);
       const item = askedItem(over);
-      if (item) return say(qso, itemOf(qso, item, rand) ?? qso.last);
-      if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last);
+      if (item) {
+        const value = itemOf(qso, item, rand);
+        return value ? say(qso, value, qso.stage, item) : say(qso, qso.last);
+      }
+      // AGN gets its last line again, an item it answered too.
+      if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last, qso.stage, qso.answered);
       const reply = lastWord(qso, rand);
       return { qso: { ...qso, last: reply ?? qso.last }, reply, ended: true };
     }

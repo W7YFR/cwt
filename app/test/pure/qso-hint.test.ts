@@ -4,9 +4,10 @@
 import { describe, expect, it } from "vitest";
 import { newQso } from "@/qso/cq";
 import { FORMATS, FORMAT_IDS, type FormatId } from "@/qso/formats";
-import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME, type Me, type Voice } from "@/qso/hint";
+import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME, THEIR_STATE, type Me, type Voice } from "@/qso/hint";
 import { isScript } from "@/qso/script";
-import { isRun, respond, type AnyQso, type RunContext } from "@/qso/run";
+import { answerRun, isRun, newRun, respond, type AnyQso, type RunContext, type RunQso } from "@/qso/run";
+import type { Station } from "@/qso/station";
 
 const ME: Me = { call: "W7YFR", name: "ROB", qth: "PORTLAND OR", region: "OR", nr: "" };
 
@@ -194,5 +195,49 @@ describe("you, as the hints send you", () => {
       ...ME,
       nr: "3001",
     });
+  });
+});
+
+describe("your sign-off after the station sent an item again", () => {
+  const W8XY: Station = { call: "W8XY", name: "BOB", qth: "DAYTON OH", rst: "559", toneHz: 600, nr: "1234" };
+  /** The station's exchange sent, then `ask` from you, and its answer. */
+  const asked = (format: FormatId, ask: string): RunQso => {
+    const sent: RunQso = { ...newRun(format, seeded(1)), them: W8XY, stage: "exchanged", you: "W7YFR" };
+    const turn = answerRun(sent, ask, { rand: () => 0 });
+    expect(turn.ended, ask).toBe(false);
+    return turn.qso as RunQso;
+  };
+  const voices = Array.from({ length: 40 }, (_, i) => ({ rand: seeded((i + 1) * 104729), hour: 12 }));
+
+  it("says back the state you asked for, as you have it, and ends the QSO", () => {
+    for (const format of ["pota", "sst"] as const) {
+      const qso = asked(format, "QTH?");
+      for (const voice of voices) {
+        const sent = hint(qso, ME, null, voice, { call: "W8XY", name: "BOB", region: "OH" });
+        expect(sent.split(" "), sent).toContain("OH");
+        expect(answerRun(qso, sent, { rand: () => 0 }).ended, sent).toBe(true);
+        const before = hint(qso, ME, null, voice, { call: "W8XY", name: "BOB", region: "" });
+        expect(before, "not yet copied").toContain(THEIR_STATE);
+        expect(before.split(" ")).not.toContain("OH");
+      }
+    }
+  });
+
+  it("says back the name you asked for", () => {
+    const qso = asked("cwt", "NAME?");
+    for (const voice of voices) expect(hint(qso, ME, null, voice, { call: "W8XY", name: "BOB" }).split(" ")).toContain("BOB");
+  });
+
+  it("acknowledges a report it cannot say back", () => {
+    const qso = asked("pota", "RST?");
+    for (const voice of voices) expect(hint(qso, ME, null, voice, { call: "W8XY", name: "BOB", region: "OH" })).toMatch(/^(BK )?RR? ?R? ?(TU|TNX)/);
+  });
+
+  it("keeps the item through AGN, and drops it when its last line answered nothing", () => {
+    const qso = asked("pota", "QTH?");
+    expect((answerRun(qso, "AGN", { rand: () => 0 }).qso as RunQso).answered).toBe("region");
+    const checked = answerRun(qso, "OH?", { rand: () => 0 });
+    expect(checked.reply).toMatch(/^(RR|R R|YES|R R YES)$/);
+    expect((checked.qso as RunQso).answered).toBeUndefined();
   });
 });

@@ -177,6 +177,25 @@ function answerTo(qso: RunQso, me: Me, v: Voice): string | null {
   return pick(v.rand, [`${value} ${value}`, `${value} ${value} ${value}`, `R ${value} ${value}`]);
 }
 
+/** Your sign-off in a run after the station sent an item again because
+ *  you asked for it: the item said back, as RR TU OH 73 E E for QTH?. It
+ *  says back only what the hint can hold as you copied it: the state and
+ *  the name. A report or a number gets R R alone. Null when the station's
+ *  last line answered nothing. */
+function confirming(qso: RunQso, me: Me, v: Voice, who: Them): string | null {
+  const item = qso.answered;
+  if (!item) return null;
+  const { call } = me;
+  const said = item === "region" ? who.region || THEIR_STATE : item === "name" ? who.name : "";
+  if (qso.format === "pota") {
+    if (!said) return pick(v.rand, ["RR TU 73 E E", "R R TNX 73 E E", "BK R R TU 73 E E"]);
+    return pick(v.rand, [`RR TU ${said} 73 E E`, `R R ${said} TU 73 E E`, `R ${said} TU 72 ${call} E E`, `BK R R ${said} TNX 73 E E`]);
+  }
+  if (!said) return pick(v.rand, [`R R TU ${call}`, `RR TU ${call}`]);
+  const sst = qso.format === "sst";
+  return pick(v.rand, [`R ${said} TU ${call}`, `RR ${said} TU ${call}`, sst ? `R R ${said} TU 73 ${call}` : `R ${said} TU GL ${call}`]);
+}
+
 /** Your next over in a run. */
 function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
   const { call } = me;
@@ -235,6 +254,8 @@ function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
       break;
     }
     case "exchanged": {
+      const confirm = confirming(qso, me, v, who);
+      if (confirm) return confirm;
       if (qso.format === "pota") {
         // The hunter's state said back, once you have it: BK TU WA ES 73.
         const st = who.region ?? "";
@@ -265,6 +286,7 @@ export interface Them {
 /** What shows for the station's call and name while you have not copied them. */
 export const THEIR_CALL = "(THEIR CALL)";
 export const THEIR_NAME = "(THEIR NAME)";
+export const THEIR_STATE = "(THEIR STATE)";
 
 /** What you could send next in `qso`. A first CQ is for `start`, the kind
  *  of QSO the guide shows: a plain CQ, or a format's. `voice` picks the
