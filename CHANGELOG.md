@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.30.0 — 2026-11-11
+
 ### Added
 
 - On the QSO page, **The station's lines show** has **Exchange**: no lines show, and you type each item of the station's exchange in a row of a logbook. When the QSO ends, the row shows your copy and its score, and opens to the QSO's lines.
