@@ -20,6 +20,25 @@ node_modules: package.json ## (internal) install JS dependencies
 dev: node_modules ## Run the app with hot reload at localhost:5173
 	npm run dev
 
+# The dev server for this checkout, in place of this repo's dev server
+# wherever it runs: in another worktree, or in the main checkout. The port is
+# fixed, so the browser keeps its settings. It stops only a server of this
+# repo, and leaves anything else on the port alone.
+.PHONY: restart
+restart: node_modules ## Stop this repo's dev server, wherever it runs, and serve this checkout at localhost:5173
+	@set -e; \
+	repo=$$(git rev-parse --path-format=absolute --git-common-dir); \
+	pid=$$(lsof -nP -iTCP:5173 -sTCP:LISTEN -t 2>/dev/null | head -1); \
+	if [ -n "$$pid" ]; then \
+		dir=$$(lsof -a -p "$$pid" -d cwd -Fn | sed -n 's/^n//p'); \
+		[ "$$(git -C "$$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$$repo" ] \
+			|| { echo "Port 5173 is in use by another program, in $$dir — stop it first"; exit 1; }; \
+		echo "Stopping the dev server in $$dir"; \
+		kill "$$pid"; \
+		for i in $$(seq 50); do lsof -nP -iTCP:5173 -sTCP:LISTEN -t >/dev/null 2>&1 || break; sleep 0.1; done; \
+	fi; \
+	npm run dev
+
 # The microphone is offered to secure contexts only, so a phone on the LAN —
 # which reaches this machine by address, not as localhost — gets no microphone
 # at all over plain http. This issues a certificate from a local authority and
