@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.31.0 — 2026-11-11
+
 ### Changed
 
 - On the QSO page and in the Copy page's generated QSOs, stations come from every US state and Canadian province, most often from the busy states. A call's digit matches its state most of the time.
