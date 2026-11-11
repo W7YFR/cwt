@@ -1208,6 +1208,18 @@ export function QsoScreen({
     setNote("");
   }, [finished, sending, close]);
 
+  /* The QSO is over and every box holds something: your copy is graded once
+     you stop typing, with no Enter. */
+  useEffect(() => {
+    if (finished === null || typing || !itemsIn(finished)) return;
+    const typedIn = items[finished] ?? {};
+    if (!itemLabels(ends[finished] ?? qso.current).every((label) => (typedIn[label] ?? "").trim())) return;
+    close(finished);
+    setNote("");
+    // On the end of the QSO, a pause in typing, or a box changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished, typing, items]);
+
   /* You have started sending: with Lock on, your copy of the station's overs
      can no longer change. */
   useEffect(() => {
