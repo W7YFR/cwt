@@ -11,6 +11,7 @@ nothing to the site. The next release carries them.
 
 - `make release` runs from a worktree while another checkout has `main`. It updates, tags and pushes from that checkout, and keeps the branch the worktree holds.
 - `make restart` stops this repo's dev server, wherever it runs, and serves the current checkout at localhost:5173.
+- `make restart` no longer refuses to stop a dev server whose worktree was removed while it ran.
 
 ## v1.29.0 — 2026-11-10
 

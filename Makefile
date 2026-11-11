@@ -23,7 +23,9 @@ dev: node_modules ## Run the app with hot reload at localhost:5173
 # The dev server for this checkout, in place of this repo's dev server
 # wherever it runs: in another worktree, or in the main checkout. The port is
 # fixed, so the browser keeps its settings. It stops only a server of this
-# repo, and leaves anything else on the port alone.
+# repo, and leaves anything else on the port alone. A dev server whose checkout
+# was removed, as a worktree removed while it ran, cannot be told apart by its
+# repo, so a Vite server in a folder that no longer exists is stopped too.
 .PHONY: restart
 restart: node_modules ## Stop this repo's dev server, wherever it runs, and serve this checkout at localhost:5173
 	@set -e; \
@@ -31,9 +33,14 @@ restart: node_modules ## Stop this repo's dev server, wherever it runs, and serv
 	pid=$$(lsof -nP -iTCP:5173 -sTCP:LISTEN -t 2>/dev/null | head -1); \
 	if [ -n "$$pid" ]; then \
 		dir=$$(lsof -a -p "$$pid" -d cwd -Fn | sed -n 's/^n//p'); \
-		[ "$$(git -C "$$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$$repo" ] \
-			|| { echo "Port 5173 is in use by another program, in $$dir — stop it first"; exit 1; }; \
-		echo "Stopping the dev server in $$dir"; \
+		if [ ! -d "$$dir" ] && ps -o command= -p "$$pid" | grep -q '/node_modules/\.bin/vite'; then \
+			echo "Stopping a dev server in a removed checkout, $$dir"; \
+		elif [ "$$(git -C "$$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$$repo" ]; then \
+			echo "Stopping the dev server in $$dir"; \
+		else \
+			echo "Port 5173 is in use by $$(basename "$$(ps -o comm= -p "$$pid")"), a program in $$dir — stop it first"; \
+			exit 1; \
+		fi; \
 		kill "$$pid"; \
 		for i in $$(seq 50); do lsof -nP -iTCP:5173 -sTCP:LISTEN -t >/dev/null 2>&1 || break; sleep 0.1; done; \
 	fi; \
