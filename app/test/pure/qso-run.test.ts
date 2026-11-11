@@ -112,7 +112,7 @@ describe("a QSO in each format", () => {
 
   it("POTA: a report and a region each way, and the hunter's dits", () => {
     const { replies } = work(called("pota"), ["K4ABC GE UR 5NN NE NE BK", "BK TU 73 EE"]);
-    expect(replies).toEqual(["BK TU UR 5NN 5NN GA GA BK", "73 E E"]);
+    expect(replies).toEqual(["BK TU UR 5NN GA BK", "73 E E"]);
   });
 
   it("takes the station's name before yours as a greeting", () => {
@@ -162,18 +162,18 @@ describe("the station asks again", () => {
 
   it("keeps what you sent before, and does not ask for it again", () => {
     // The report keyed apart, then sent alone after RST?.
-    expect(work(called("pota"), ["K4ABC UR 5 NN WA WA BK"]).replies).toEqual(["BK TU UR 5NN 5NN GA GA BK"]);
+    expect(work(called("pota"), ["K4ABC UR 5 NN WA WA BK"]).replies).toEqual(["BK TU UR 5NN GA BK"]);
     expect(work(called("pota"), ["K4ABC WA WA BK", "5NN 5NN K"]).replies).toEqual([
       "RST?",
-      "BK TU UR 5NN 5NN GA GA BK",
+      "BK TU UR 5NN GA BK",
     ]);
-    expect(work(called("pota"), ["K4ABC 5NN BK", "WA WA"]).replies).toEqual(["QTH?", "BK TU UR 5NN 5NN GA GA BK"]);
+    expect(work(called("pota"), ["K4ABC 5NN BK", "WA WA"]).replies).toEqual(["QTH?", "BK TU UR 5NN GA BK"]);
   });
 
   it("reads words run together with lenient copy, and not with strict", () => {
     const LENIENT: RunContext = { ...FIRST, ear: { lenient: true, saved: "" } };
-    expect(work(called("pota"), ["K4ABC UR5NN WA WA BK"], LENIENT).replies).toEqual(["BK TU UR 5NN 5NN GA GA BK"]);
-    expect(work(called("pota"), ["K4ABC UR 5NNWAWA BK"], LENIENT).replies).toEqual(["BK TU UR 5NN 5NN GA GA BK"]);
+    expect(work(called("pota"), ["K4ABC UR5NN WA WA BK"], LENIENT).replies).toEqual(["BK TU UR 5NN GA BK"]);
+    expect(work(called("pota"), ["K4ABC UR 5NNWAWA BK"], LENIENT).replies).toEqual(["BK TU UR 5NN GA BK"]);
     expect(work(called("cwt"), ["K4ABC TOM1234"], LENIENT).replies).toEqual(["TU JIM 2345"]);
     expect(work(called("pota"), ["K4ABC UR5NN WA WA BK"]).replies).toEqual(["RST?"]);
   });
@@ -249,7 +249,7 @@ describe("the station asks again", () => {
     expect(work(called("pota"), ["K4A BC?"], LENIENT).replies).toEqual(["RR"]);
     expect(work(called("pota"), ["K4A BC?"]).replies, "Strict copy").toEqual(["K4ABC K4ABC"]);
     // Then your exchange goes on as ever.
-    expect(work(called("pota"), ["K4ABC?", "UR 5NN WA WA BK"]).replies[1]).toBe("BK TU UR 5NN 5NN GA GA BK");
+    expect(work(called("pota"), ["K4ABC?", "UR 5NN WA WA BK"]).replies[1]).toBe("BK TU UR 5NN GA BK");
   });
 
   it("says yes to items of its exchange sent back right with a ?", () => {
@@ -339,7 +339,7 @@ describe("the guide's examples", () => {
     expect(example("sst").map((l) => l.text)).toEqual(["CQ SST KD9XYZ", "K4ABC", "K4ABC TOM NE", "GE TOM JIM GA", "TU KD9XYZ", "73"]);
     expect(example("mst").map((l) => l.text)).toEqual(["CQ MST KD9XYZ", "K4ABC", "K4ABC TOM 1", "TU JIM 23", "TU KD9XYZ"]);
     expect(example("pota").map((l) => l.text)).toEqual([
-      "CQ POTA DE KD9XYZ", "K4ABC", "K4ABC GE UR 5NN NE NE BK", "BK TU UR 5NN 5NN GA GA BK", "BK TU 73 EE", "73 E E",
+      "CQ POTA KD9XYZ", "K4ABC", "K4ABC TNX UR 599 NE BK", "BK TU UR 599 GA BK", "BK TU GA ES 73 KD9XYZ E E", "73 E E",
     ]);
   });
 

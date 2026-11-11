@@ -16,7 +16,7 @@
 
 import type { Qso } from "./cq";
 import { FORMATS } from "./formats";
-import { isRun, type AnyQso, type RunQso } from "./run";
+import { isRun, potaReport, type AnyQso, type RunQso } from "./run";
 import { isScript } from "./script";
 import { gradeCopy } from "./show";
 import { regionOf } from "./station";
@@ -157,7 +157,7 @@ export function theirItems(qso: AnyQso, lines: readonly { readonly text: string 
       items.push({ label: "Name", value: them.name }, { label: "Number", value: String(them.serial ?? 1) });
       break;
     case "pota":
-      items.push({ label: "Report", value: them.rst.replace(/9/g, "N") }, { label: "State", value: st });
+      items.push({ label: "Report", value: potaReport(them) }, { label: "State", value: st });
       break;
   }
   return items;

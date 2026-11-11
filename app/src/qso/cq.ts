@@ -264,7 +264,7 @@ export const KNOWN = new Set([
   "LIC", "HAM", "SINCE", "CALL", "QRZ", "QRS", "QRQ", "QSB", "QRM", "QRN", "QRP", "AGN", "PSE",
   "SRI", "GL", "CUL", "CUAGN", "GB", "HPE", "NW", "MY", "THE", "A", "I", "IN", "AT", "ON",
   "TO", "WID", "ABT", "OLD", "NEW", "KEY", "BUG", "PADDLE", "MNI", "DR", "SIG", "SIGS", "WKD",
-  "QSO", "FIRST", "TIME", "RETIRED", "WORK", "SO", "BUT", "NOT", "NO", "YES", "HI", "WATT",
+  "QSO", "FIRST", "TIME", "RETIRED", "WORK", "SO", "BUT", "NOT", "NO", "YES", "HI", "WATT", "DX",
 ]);
 
 /** How many words after DE it looks for your call. */

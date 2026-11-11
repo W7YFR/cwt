@@ -7,6 +7,15 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.31.0 — 2026-11-11
+
+### Changed
+
+- On the QSO page and in the Copy page's generated QSOs, stations come from every US state and Canadian province, most often from the busy states. A call's digit matches its state most of the time.
+- The station's lines and the suggested reply vary more in every kind of QSO. A POTA hunter sends 599 or 5NN and its state once or twice, and your suggested sign-off says its state back once you have copied it.
+- In a QSO from a plain CQ, the station now and then mentions its rig, antenna or weather, and why a weak report is weak.
+- The guide's POTA example sends `TNX UR 599` and the state once, and closes with `ES 73`, your call and `E E`.
+
 ## v1.30.0 — 2026-11-11
 
 ### Added
