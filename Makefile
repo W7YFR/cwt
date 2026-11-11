@@ -129,6 +129,9 @@ tag: ## Tag the current version at HEAD (on main, after merging)
 # A merge that changed no build input kept the version, so it gets no tag.
 # Run from a branch, it stops unless that branch's pull request is merged.
 # Run from main, it offers the branch that main's last merge names.
+# Run from a worktree while another checkout has main, it does the main steps
+# in that checkout. Git cannot delete a branch a worktree holds, so the branch
+# is kept: remove the worktree and its branch in Orca.
 # It offers the delete only when main contains the branch. `git branch -d`
 # alone is not enough: it also deletes a branch that its upstream contains,
 # and `make pr` sets an upstream.
@@ -142,7 +145,14 @@ release: ## After merging: update main, tag and push its version, delete the bra
 			|| { echo "No pull request found for $$branch — open one with 'make pr', or run this from main"; exit 1; }; \
 		[ "$$state" = MERGED ] || { echo "The pull request for $$branch is $$state, not merged — merge it first"; exit 1; }; \
 	fi; \
-	git switch main; \
+	main_dir=$$(git worktree list --porcelain | awk '/^worktree /{d=substr($$0,10)} $$0=="branch refs/heads/main"{print d}'); \
+	if [ -n "$$main_dir" ] && [ "$$main_dir" != "$$(git rev-parse --show-toplevel)" ]; then \
+		echo "main is checked out in $$main_dir; releasing from there"; \
+		cd "$$main_dir"; \
+		git diff --quiet HEAD || { echo "Uncommitted changes in $$main_dir — commit or stash first"; exit 1; }; \
+	else \
+		git switch main; \
+	fi; \
 	git pull --ff-only; \
 	v=$$(node -p "require('./package.json').version"); \
 	if git rev-parse -q --verify "refs/tags/v$$v" >/dev/null; then \
@@ -160,6 +170,11 @@ release: ## After merging: update main, tag and push its version, delete the bra
 		branch=$$(node --input-type=module -e 'import { branchFromMerge } from "./scripts/version.mjs"; console.log(branchFromMerge(process.argv[1]) ?? "")' "$$(git log -1 --format=%s)"); \
 	fi; \
 	if [ -n "$$branch" ] && [ "$$branch" != main ] && git show-ref -q --verify "refs/heads/$$branch"; then \
+		held=$$(git worktree list --porcelain | awk -v b="branch refs/heads/$$branch" '/^worktree /{d=substr($$0,10)} $$0==b{print d}'); \
+		if [ -n "$$held" ]; then \
+			echo "$$branch is checked out in $$held; kept. Remove the worktree and its branch in Orca."; \
+			exit 0; \
+		fi; \
 		if ! git merge-base --is-ancestor "$$branch" main; then \
 			echo "$$branch is not merged into main; kept"; \
 			exit 0; \
