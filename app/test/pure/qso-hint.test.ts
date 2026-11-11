@@ -241,3 +241,16 @@ describe("your sign-off after the station sent an item again", () => {
     expect((checked.qso as RunQso).answered).toBeUndefined();
   });
 });
+
+describe("the CQ between QSOs of a run", () => {
+  const waiting = { ...newRun("pota", seeded(1)), you: "W7YFR" } as RunQso;
+
+  it("is for the run's own format, unless the preferred mode is another", () => {
+    expect(hint(waiting, ME)).toMatch(/^CQ .*POTA/);
+    expect(hint(waiting, ME, "pota")).toMatch(/^CQ .*POTA/);
+    expect(hint(waiting, ME, "sst")).toMatch(/^CQ SST/);
+    const plain = hint(waiting, ME, null);
+    expect(plain).toMatch(/^CQ /);
+    expect(plain).not.toMatch(/POTA|SST|MST|CWT/);
+  });
+});

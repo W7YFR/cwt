@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- On the QSO page, **Preferred mode** in the settings row chooses CQ, POTA, SST, MST or CWT. The suggested reply calls CQ for it, and the guide's Examples show the same choice. A CQ that starts another kind changes it.
+
 ### Changed
 
 - On the QSO page and in the Copy page's generated QSOs, stations come from every US state and Canadian province, most often from the busy states. A call's digit matches its state most of the time.

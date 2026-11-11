@@ -85,6 +85,14 @@ import { useRecorder } from "./useRecorder";
 import { HomeButton } from "./Wordmark";
 
 
+/** The kind of QSO under way, once the station has answered your CQ: a
+ *  format, or CQ for a standard QSO. Null before that, and in a script. */
+function kindOf(q: AnyQso): GuideId | null {
+  if (isScript(q)) return null;
+  if (isRun(q)) return q.stage === "waiting" ? null : q.format;
+  return q.stage === "cq" ? null : "cq";
+}
+
 function same(a: Speed, b: Speed): boolean {
   return a.charWpm === b.charWpm && a.farnsworthWpm === b.farnsworthWpm;
 }
@@ -300,6 +308,16 @@ const HINTS: ReadonlyArray<Option<Hints>> = [
     note: "A suggested reply shows once you copy the station's line right.",
   },
 ];
+const KINDS: ReadonlyArray<Option<GuideId>> = [
+  { value: "cq", label: "CQ", note: "A plain CQ: a casual QSO with one station." },
+  { value: "pota", label: "POTA", note: "You at a park: a report and your state." },
+  { value: "sst", label: "SST", note: "A slow contest: your name and state." },
+  { value: "mst", label: "MST", note: "A medium-speed contest: your name and a serial number." },
+  { value: "cwt", label: "CWT", note: "A fast contest: your name and CWops number, or your state." },
+];
+const KIND_HELP =
+  "The kind of QSO the suggested reply calls CQ for, and the one the guide's Examples show. " +
+  "A CQ that starts another kind changes it.";
 const HINTS_HELP =
   "A suggested reply under the log: one way to answer the station, with your details from User. " +
   "Once copied waits until your copy of the station's line is all right. " +
@@ -583,9 +601,14 @@ export function QsoScreen({
       l.map((line) => (!line.you && line.mode === "copy" && !line.locked ? { ...line, input: next } : line)),
     );
   };
-  /** The kind of QSO the guide's examples show. A first suggested CQ is for
-   *  it. */
-  const [guideKind, setGuideKind] = useState<GuideId>(() => loadPrefs().qsoGuide ?? "cq");
+  /** The preferred mode: the kind of QSO a suggested CQ is for, and the one
+   *  the guide's examples show. The QSO page's switch and the Examples set
+   *  it, and so does a CQ that starts another kind. */
+  const [guideKind, setGuideKindRaw] = useState<GuideId>(() => loadPrefs().qsoGuide ?? "cq");
+  const setGuideKind = (next: GuideId) => {
+    setGuideKindRaw(next);
+    savePrefs({ ...loadPrefs(), qsoGuide: next });
+  };
   const [hints, setHintsRaw] = useState<Hints>(() => loadPrefs().qsoHints ?? "off");
   const setHints = (next: Hints) => {
     setHintsRaw(next);
@@ -1291,6 +1314,9 @@ export function QsoScreen({
     };
 
     qso.current = turn.ended ? following(turn.qso, Math.random, speed) : turn.qso;
+    // A CQ that started another kind of QSO makes it the preferred mode.
+    const started = kindOf(turn.qso);
+    if (started && started !== guideKind) setGuideKind(started);
     if (turn.ended) {
       const done = turn.qso;
       setEnds((e) => ({ ...e, [n]: done }));
@@ -2473,6 +2499,16 @@ export function QsoScreen({
       onChange={(v) => setTheirText(v as TheirText)}
     />
   );
+  const kindChoice = (
+    <ChoiceGroup
+      id="qso-kind"
+      label="Preferred mode"
+      help={KIND_HELP}
+      value={guideKind}
+      options={KINDS}
+      onChange={(v) => setGuideKind(v as GuideId)}
+    />
+  );
   const hintsChoice = (
     <ChoiceGroup
       id="qso-hints"
@@ -2527,13 +2563,7 @@ export function QsoScreen({
           <PageHelp
             title="QSO"
             guide={
-              <QsoGuide
-                /* A run under way shows its own kind first. */
-                initial={isRun(qso.current) ? qso.current.format : undefined}
-                onSettings={showSettings}
-                settingsOpen={settingsOpen}
-                onShown={setGuideKind}
-              />
+              <QsoGuide onSettings={showSettings} settingsOpen={settingsOpen} shown={guideKind} onShown={setGuideKind} />
             }
             keys={QSO_KEYS}
           />
@@ -2607,6 +2637,11 @@ export function QsoScreen({
             <>
               <QuickChip id="speed" label="Speed" value={fmtSpeed(speed)} widest={WIDEST_SPEED} tab="speed" locked={recorder !== null}>
                 {speedSection}
+              </QuickChip>
+              <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} widest="POTA" tab="page">
+                <Section name="you" title="You">
+                  <div className="panelgroups">{kindChoice}</div>
+                </Section>
               </QuickChip>
               <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} widest={longest(LENGTHS.map((l) => l.label))} tab="page">
                 <Section name="station" title="The other station">
@@ -2682,6 +2717,7 @@ export function QsoScreen({
                       onChange={(v) => setYourText(v as YourText)}
                     />
                     {hintsChoice}
+                    {kindChoice}
                     <Check
                       id="qso-show-speed"
                       label="Show my speed on each line"
@@ -2851,7 +2887,7 @@ export function QsoScreen({
 
         {guideShown && (
           <div className="qsoguide prose" data-testid="qso-guide">
-            <QsoGuide onSettings={showSettings} settingsOpen={settingsOpen} onShown={setGuideKind} />
+            <QsoGuide onSettings={showSettings} settingsOpen={settingsOpen} shown={guideKind} onShown={setGuideKind} />
           </div>
         )}
 

@@ -108,6 +108,17 @@ function cqFor(format: FormatId, call: string, v: Voice): string {
   return pick(v.rand, [`CQ ${w} ${call}`, `CQ ${w} ${call} ${call}`, `CQ ${w} DE ${call}`, `${w} ${call}`]);
 }
 
+/** A plain CQ, for a standard QSO. */
+function plainCq(call: string, v: Voice): string {
+  return pick(v.rand, [
+    `CQ CQ DE ${call} ${call} K`,
+    `CQ CQ CQ DE ${call} ${call} ${call} K`,
+    `CQ CQ DE ${call} ${call} ${call} K`,
+    `CQ CQ CQ DE ${call} ${call} K`,
+    `CQ DE ${call} ${call} K`,
+  ]);
+}
+
 /** Your next over in a standard QSO. Before a station answers, the CQ is for
  *  `start`: a plain CQ, or a format's. */
 function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them): string {
@@ -117,13 +128,7 @@ function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them)
   switch (qso.stage) {
     case "cq":
       if (start) return cqFor(start, call, v);
-      return pick(v.rand, [
-        `CQ CQ DE ${call} ${call} K`,
-        `CQ CQ CQ DE ${call} ${call} ${call} K`,
-        `CQ CQ DE ${call} ${call} ${call} K`,
-        `CQ CQ CQ DE ${call} ${call} K`,
-        `CQ DE ${call} ${call} K`,
-      ]);
+      return plainCq(call, v);
     case "asking":
       return pick(v.rand, [`DE ${call} ${call} K`, `${call} ${call} ${call} K`, `DE ${call} ${call} ${call} K`]);
     case "called": {
@@ -196,13 +201,15 @@ function confirming(qso: RunQso, me: Me, v: Voice, who: Them): string | null {
   return pick(v.rand, [`R ${said} TU ${call}`, `RR ${said} TU ${call}`, sst ? `R R ${said} TU 73 ${call}` : `R ${said} TU GL ${call}`]);
 }
 
-/** Your next over in a run. */
-function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
+/** Your next over in a run. Between its QSOs, the CQ is for `start` when
+ *  given: a plain CQ for null, or another format's. */
+function run(qso: RunQso, me: Me, v: Voice, who: Them, start?: FormatId | null): string {
   const { call } = me;
   const them = who.call;
   switch (qso.stage) {
     case "waiting":
-      return cqFor(qso.format, call, v);
+      if (start === null) return plainCq(call, v);
+      return cqFor(start ?? qso.format, call, v);
     case "called": {
       const again = answerTo(qso, me, v);
       if (again) return again;
@@ -288,14 +295,15 @@ export const THEIR_CALL = "(THEIR CALL)";
 export const THEIR_NAME = "(THEIR NAME)";
 export const THEIR_STATE = "(THEIR STATE)";
 
-/** What you could send next in `qso`. A first CQ is for `start`, the kind
- *  of QSO the guide shows: a plain CQ, or a format's. `voice` picks the
+/** What you could send next in `qso`. A CQ is for `start`, the preferred
+ *  mode: a plain CQ for null, or a format's. Absent: a run's CQ is for its
+ *  own format, and a first CQ is plain. `voice` picks the
  *  wording: the plainest, unless given. `them` is the station's call and name
  *  as the hint sends them: its own, unless given, as THEIR_CALL. */
 export function hint(
   qso: AnyQso,
   me: Me,
-  start: FormatId | null = null,
+  start?: FormatId | null,
   voice: Voice = PLAIN,
   them: Them = { call: qso.them.call, name: qso.them.name, region: regionOf(qso.them) },
 ): string {
@@ -306,5 +314,5 @@ export function hint(
       word ? line.replace(new RegExp(`(?<=^|\\s)${word.replace(/[/.]/g, "\\$&")}(?=\\s|$)`, "g"), to) : line;
     return swap(swap(yourLine(qso) ?? "", qso.them.call, them.call), qso.them.name, them.name);
   }
-  return isRun(qso) ? run(qso, me, voice, them) : standard(qso, me, start, voice, them);
+  return isRun(qso) ? run(qso, me, voice, them, start) : standard(qso, me, start ?? null, voice, them);
 }
