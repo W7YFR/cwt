@@ -2832,7 +2832,10 @@ export function QsoScreen({
                 alone. */}
             {/* Only once QRS or QRQ has moved it: a station starts at your speed,
                 and the guide says so. */}
-            {playback === "always" && lines.some((l) => !l.you && l.input === "slots") && (
+            {/* Only with slots on the page: Exchange and the other modes show
+                none, so there is nothing to select. */}
+            {playback === "always" &&
+              lines.some((l) => !l.you && l.input === "slots" && theirModeOf(l) === "copy") && (
               <div className="modeswitch" role="group" aria-label="Play the selected slot">
                 {slotPlay("Letter", `Play the selected letter (${ALT}+L)`, playLetter, "qso-play-letter")}
                 {slotPlay("Word", `Play the selected word (${ALT}+W)`, playWord, "qso-play-word")}

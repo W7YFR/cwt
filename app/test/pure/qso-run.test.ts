@@ -339,7 +339,7 @@ describe("the guide's examples", () => {
     expect(example("sst").map((l) => l.text)).toEqual(["CQ SST KD9XYZ", "K4ABC", "K4ABC TOM NE", "GE TOM JIM GA", "TU KD9XYZ", "73"]);
     expect(example("mst").map((l) => l.text)).toEqual(["CQ MST KD9XYZ", "K4ABC", "K4ABC TOM 1", "TU JIM 23", "TU KD9XYZ"]);
     expect(example("pota").map((l) => l.text)).toEqual([
-      "CQ POTA KD9XYZ", "K4ABC", "K4ABC TNX UR 599 NE BK", "BK TU UR 599 GA BK", "BK TU GA ES 73 KD9XYZ E E", "73 E E",
+      "CQ POTA KD9XYZ", "K4ABC", "K4ABC TNX UR 599 NE BK", "BK TU UR 5NN GA BK", "BK TU GA ES 73 KD9XYZ E E", "73 E E",
     ]);
   });
 

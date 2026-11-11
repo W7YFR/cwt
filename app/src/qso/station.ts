@@ -24,8 +24,6 @@ export interface Station {
   readonly nr?: string;
   /** In an MST, its serial number for this QSO. */
   readonly serial?: number;
-  /** In a POTA QSO, it sends its report as 599, not 5NN. Absent: 5NN. */
-  readonly plain?: boolean;
 }
 
 /** The state or province at the end of `qth`: OR, from SALEM OR. */
@@ -245,9 +243,6 @@ export function randomStation(rand: Rand, not = "", canada = CANADA): Station {
   };
 }
 
-/** How many POTA stations send their report as 599, not 5NN. */
-const PLAIN = 0.4;
-
 /** How many CWT stations are CWops members. The rest send their region. */
 const MEMBERS = 0.8;
 
@@ -260,6 +255,5 @@ export function randomCaller(rand: Rand, not = "", canada = CANADA): Station {
     ...station,
     nr: rand() < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : "",
     serial: 1 + Math.floor(rand() * 150),
-    plain: rand() < PLAIN,
   };
 }

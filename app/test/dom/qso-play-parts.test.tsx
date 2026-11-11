@@ -8,7 +8,7 @@ import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { keyableSymbols } from "@/morse";
 import { heard } from "../qso-fakes";
-import { $, EXCHANGE, click, fill, lastSent, open, send, theirs, until, useQsoRig, yourTurn } from "../qso-rig";
+import { $, EXCHANGE, click, fill, key, lastSent, open, send, theirs, until, useQsoRig, yourTurn } from "../qso-rig";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -80,6 +80,24 @@ describe("the selected slot's letter and word", () => {
     await click($('[data-testid="qso-play-word"]'));
     expect(lastSpan()[0]).toBeCloseTo(letter[0], 6);
     expect(lastSpan()[1]).toBeGreaterThanOrEqual(letter[1]);
+  });
+
+  it("show while slots show", async () => {
+    await slotsAnswer();
+    expect($('[data-testid="qso-play-letter"]')).not.toBeNull();
+  });
+
+  it("do not show in Exchange, which has no slots", async () => {
+    await open({ qsoPlayback: "always", qsoTheirText: "exchange", qsoCopyInput: "slots" });
+    // Its lines do not show, so its answer is read from the kept session.
+    const answered = () =>
+      (JSON.parse(localStorage.getItem("cwt:qso") ?? "null")?.lines ?? []).some((l: { you: boolean }) => !l.you);
+    await key("CQ CWT W7YFR");
+    await until("an answer", answered);
+    await until("your turn", yourTurn);
+    expect($('[data-testid="qso-item"]'), "Exchange's boxes").not.toBeNull();
+    expect($('[data-testid="qso-play-letter"]')).toBeNull();
+    expect($('[data-testid="qso-play-word"]')).toBeNull();
   });
 
   it("play on from the selected slot's word to the end of the line on Option+Enter", async () => {

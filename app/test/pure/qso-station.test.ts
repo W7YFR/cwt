@@ -66,15 +66,19 @@ describe("the stations that call", () => {
 });
 
 describe("a POTA hunter", () => {
-  const plain: Station = { call: "W7YFR", name: "ROB", qth: "SPOKANE WA", rst: "599", toneHz: 600, plain: true };
+  const plain: Station = { call: "W7YFR", name: "ROB", qth: "SPOKANE WA", rst: "599", toneHz: 600 };
 
-  it("sends 599 or 5NN by habit, and its report is graded as sent", () => {
+  it("sends 599 or 5NN line by line, and its report is graded as its lines hold it", () => {
     const qso: RunQso = { ...newRun("pota", seeded(1)), them: plain, stage: "called", you: "KE7G" };
-    const turn = answerRun(qso, "W7YFR TNX UR 599 OR BK", { rand: () => 0, region: "OR" });
-    expect(turn.reply).toBe("BK TU UR 599 WA BK");
-    expect(theirItems(turn.qso).find((i) => i.label === "Report")!.value).toBe("599");
-    const cut = { ...qso, them: { ...plain, plain: false } };
-    expect(answerRun(cut, "W7YFR TNX UR 599 OR BK", { rand: () => 0, region: "OR" }).reply).toBe("BK TU UR 5NN WA BK");
+    const replies = Array.from({ length: 100 }, (_, i) =>
+      answerRun(qso, "W7YFR TNX UR 599 OR BK", { rand: seeded((i + 1) * 104729), region: "OR" }),
+    );
+    const forms = new Set(replies.map((t) => (t.reply!.split(" ").includes("599") ? "599" : "5NN")));
+    expect(forms).toEqual(new Set(["599", "5NN"]));
+    for (const t of replies) {
+      const value = theirItems(t.qso, [{ text: t.reply! }]).find((i) => i.label === "Report")!.value;
+      expect(t.reply!.split(" "), t.reply!).toContain(value);
+    }
   });
 
   it("hears its state said back in your sign-off only once you have it", () => {

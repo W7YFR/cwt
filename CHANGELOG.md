@@ -14,6 +14,10 @@ nothing to the site. The next release carries them.
 - In a QSO from a plain CQ, the station now and then mentions its rig, antenna or weather, and why a weak report is weak.
 - The guide's POTA example sends `TNX UR 599` and the state once, and closes with `ES 73`, your call and `E E`.
 
+### Fixed
+
+- On the QSO page, the **Letter** and **Word** buttons no longer show in **Exchange**, where they could never play.
+
 ## v1.31.0 — 2026-11-14
 
 ### Added

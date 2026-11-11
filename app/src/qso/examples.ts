@@ -35,7 +35,6 @@ export const EXAMPLE_STATION: Station = {
   toneHz: 600,
   nr: "2345",
   serial: 23,
-  plain: true,
 };
 
 /** You, in the examples. */

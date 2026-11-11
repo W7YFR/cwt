@@ -334,9 +334,20 @@ function cut(rst: string): string {
   return rst.replace(/9/g, "N");
 }
 
-/** The report a POTA station sends: 5NN, or 599 for one that sends it so. */
-export function potaReport(them: Station): string {
-  return them.plain ? them.rst : cut(them.rst);
+/** How often a POTA station sends its report as 599, not 5NN. */
+const PLAIN = 0.4;
+
+/** The report a POTA station sends in one line: 5NN, or now and then 599. */
+function potaReport(them: Station, rand: Rand): string {
+  return rand() >= 1 - PLAIN ? them.rst : cut(them.rst);
+}
+
+/** The report a POTA station sent, as its lines hold it: 5NN, or 599 when
+ *  only that form is in them. */
+export function potaReportIn(them: Station, lines: readonly { readonly text: string }[]): string {
+  const said = (form: string) => lines.some((l) => l.text.split(/\s+/).includes(form));
+  const short = cut(them.rst);
+  return !said(short) && said(them.rst) ? them.rst : short;
 }
 
 /** The station's own exchange, worded a little differently each time. */
@@ -387,8 +398,8 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
       ]);
     }
     case "pota": {
-      // A hunter says its state once or twice, and 599 or 5NN by habit.
-      const r = potaReport(them);
+      // A hunter says its state once or twice, and 599 or 5NN.
+      const r = potaReport(them, rand);
       return pick(rand, [
         `BK TU UR ${r} ${st} BK`,
         `BK TU UR ${r} ${r} ${st} ${st} BK`,
@@ -407,7 +418,7 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
 
 /** One item of the station's exchange, or null when its exchange has no
  *  such item. */
-function valueOf(qso: RunQso, item: Item): string | null {
+function valueOf(qso: RunQso, item: Item, rand: Rand): string | null {
   const { them, format } = qso;
   return (
     item === "name"
@@ -425,7 +436,7 @@ function valueOf(qso: RunQso, item: Item): string | null {
             ? regionOf(them)
             : null
           : format === "pota"
-            ? potaReport(them)
+            ? potaReport(them, rand)
             : null
   );
 }
@@ -434,7 +445,7 @@ function valueOf(qso: RunQso, item: Item): string | null {
  *  when its exchange has no such item. A POTA station now and then puts BK
  *  around it. */
 function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
-  const value = valueOf(qso, item);
+  const value = valueOf(qso, item, rand);
   if (value === null) return null;
   const { format } = qso;
   return format === "pota" && rand() < 0.25 ? `BK ${value} ${value} BK` : `${value} ${value}`;
@@ -479,7 +490,7 @@ const CHECK_AROUND = new Set([...TURN_WORDS, "R", "RR", "UR", "RST", "QTH", "NR"
 function checksRight(qso: RunQso, over: Over): boolean {
   if (!over.words.some((w) => w.endsWith("?"))) return false;
   const values = new Set(
-    (Object.keys(ASK) as Item[]).flatMap((item) => valueOf(qso, item) ?? []).map(cut),
+    (Object.keys(ASK) as Item[]).flatMap((item) => valueOf(qso, item, () => 0) ?? []).map(cut),
   );
   const checked = over.words.map((w) => w.replace(/\?+$/, "")).filter((w) => w && !CHECK_AROUND.has(w));
   return checked.length > 0 && checked.every((w) => values.has(cut(w)));
