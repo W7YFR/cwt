@@ -2562,6 +2562,13 @@ header .modeswitch button { white-space: nowrap; }
 .qsoreport tbody th[scope="row"] { color: var(--ink-dim); }
 .qsoreport td { font-family: var(--mono); color: var(--ink); }
 .qsoreport tr.bad td:last-child { color: var(--bad); }
+/* Your copy of a QSO's items, with the station's lines as Exchange: a box
+   for each, where its lines would be, labelled as the report labels them. */
+.qsolog .qsoitems { padding-left: calc(8ch + 12px); }
+.qsoitems table { width: auto; border-collapse: collapse; }
+.qsoitems th, .qsoitems td { padding: 3px 12px 3px 0; border-bottom: 0; text-align: left; font-weight: 400; }
+.qsoitems th { color: var(--ink-dim); font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; white-space: nowrap; }
+.qsoitems .qsotype { width: 16ch; font-family: var(--mono); }
 /* The Copy page's downloads, under the QSO, as the QSO page's are. */
 .copydownloads { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .copydownloads button { font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; }

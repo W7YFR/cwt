@@ -37,7 +37,7 @@ import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
 import { fromTop, isScript, newScript, openScript, scriptReport, stationFirst, type ScriptQso } from "@/qso/script";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
-import { exchangeReport } from "@/qso/report";
+import { exchangeReport, itemLabels } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
@@ -56,7 +56,7 @@ import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDE
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
-import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY } from "./copy";
+import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NOT_WITH_EXCHANGE } from "./copy";
 import { Graded, RightOnly, type SentAttrs } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
@@ -222,11 +222,17 @@ const THEIR_TEXTS: ReadonlyArray<Option<TheirText>> = [
   { value: "sent", label: "As sent", note: "Each letter shows as it is sent." },
   { value: "hidden", label: "Blurred", note: "Each line shows blurred until the QSO ends." },
   { value: "copy", label: "Copy", note: "Type what you hear, graded when the QSO ends." },
+  {
+    value: "exchange",
+    label: "Exchange",
+    note: "No lines show. Type each item of the station's exchange in its box, graded when the QSO ends.",
+  },
   { value: "none", label: "Off", note: "Nothing shows until the QSO ends." },
 ];
 const THEIR_TEXT_HELP =
   "What shows of the station's lines: whole as soon as one starts, each character as it is " +
-  "sent, the same blurred, a box to type your copy in, or nothing. A change applies to the " +
+  "sent, the same blurred, a box to type your copy in, a box for each item of its exchange " +
+  "with no lines shown, or nothing. A change applies to the " +
   "lines already shown, and what you typed stays. All of it shows when the QSO ends.";
 const COPY_INPUTS: ReadonlyArray<Option<CopyInput>> = [
   { value: "text", label: "Box", note: "Type each line in a box, as you hear it." },
@@ -345,6 +351,9 @@ interface Kept {
   /** Each QSO that is over, as it ended, for its report. Absent in a log
    *  kept before there were reports. */
   readonly ends?: Readonly<Record<number, AnyQso>>;
+  /** Your copy of each QSO's items, typed with the station's lines as
+   *  Exchange, by QSO and label. Absent in a log kept before there was. */
+  readonly items?: Readonly<Record<number, Readonly<Record<string, string>>>>;
 }
 
 /** A reply the station is about to send, before it goes in the log. */
@@ -390,6 +399,7 @@ function recallKept(): Kept | null {
     piecesStation: k.piecesStation === true,
     pending: typeof k.pending?.reply === "string" ? k.pending : null,
     ends: typeof k.ends === "object" && k.ends !== null ? k.ends : {},
+    items: typeof k.items === "object" && k.items !== null ? k.items : {},
     note: typeof k.note === "string" ? k.note : "",
   };
 }
@@ -619,6 +629,10 @@ export function QsoScreen({
   const [closed, setClosed] = useState<readonly number[]>(() => kept?.closed ?? []);
   /** Each QSO that is over, as it ended, for its report. */
   const [ends, setEnds] = useState<Readonly<Record<number, AnyQso>>>(() => kept?.ends ?? {});
+  /** Your copy of each QSO's items, with the station's lines as Exchange. */
+  const [items, setItems] = useState<Readonly<Record<number, Readonly<Record<string, string>>>>>(
+    () => kept?.items ?? {},
+  );
   /** A QSO that ends once the reply now playing ends. */
   const closing = useRef<number | null>(null);
   /** A QSO that has ended with your copy not yet graded. It closes when you
@@ -639,6 +653,24 @@ export function QsoScreen({
   const pending = useRef<Pending | null>(kept?.pending ?? null);
   const finishedRef = useRef<number | null>(null);
   finishedRef.current = finished;
+  const closedRef = useRef(closed);
+  closedRef.current = closed;
+  /** Whether you copy QSO `n` as items in boxes: the station's lines show
+   *  as Exchange, or did as it sent them. A script has no items. */
+  const itemsIn = (n: number): boolean => {
+    if (isScript(ends[n] ?? qso.current)) return false;
+    return (
+      items[n] !== undefined ||
+      lines.some((l) => l.qso === n && !l.you && l.mode === "exchange") ||
+      (theirText === "exchange" && !closed.includes(n))
+    );
+  };
+  /** Whether the lines of QSO `n` are hidden for its items: Exchange, and
+   *  not over. */
+  const headless = (n: number): boolean => theirText === "exchange" && !closed.includes(n) && itemsIn(n);
+  /** Whether QSO `n` shows its boxes: its lines are hidden, and the station
+   *  has answered. Before that, nothing you send is a QSO yet. */
+  const boxesFor = (n: number): boolean => headless(n) && lines.some((l) => l.qso === n && !l.you);
 
   /** End QSO `n`: everything in it shows, and your copy is graded. */
   const close = useCallback((n: number) => {
@@ -960,7 +992,7 @@ export function QsoScreen({
   /** QSO `n` is over, and the session stops, so it can be played back.
    *  With copy to grade, it waits for you to finish typing. */
   const endQso = (n: number) => {
-    if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) {
+    if (copyIn(n)) {
       setFinished(n);
       setNote("Finish your copy.");
     } else {
@@ -971,9 +1003,13 @@ export function QsoScreen({
     void rec.discard();
   };
 
+  /** Whether QSO `n` has copy of yours to grade: a line to copy, or items
+   *  to fill in. */
+  const copyIn = (n: number) => lines.some((l) => l.qso === n && !l.you && l.mode === "copy") || itemsIn(n);
   /** Whether the station's last line in QSO `n` is a line to copy that you
-   *  have not locked. */
+   *  have not locked, or its items are still open to fill in. */
   const copyDue = (n: number) => {
+    if (itemsIn(n)) return !closedRef.current.includes(n);
     const last = [...lines].reverse().find((l) => l.qso === n && !l.you);
     return !!last && last.mode === "copy" && !last.locked;
   };
@@ -983,7 +1019,7 @@ export function QsoScreen({
    *  next station calls in a few seconds unless you send first: once your
    *  copy is locked, with copy to finish. */
   const endInRun = (n: number) => {
-    if (lines.some((l) => l.qso === n && !l.you && l.mode === "copy")) setFinished(n);
+    if (copyIn(n)) setFinished(n);
     else close(n);
     setNote(copyDue(n) ? "Finish your copy." : "");
     recorder?.restart();
@@ -1301,6 +1337,7 @@ export function QsoScreen({
     setNote("");
     setClosed([]);
     setEnds({});
+    setItems({});
     setPlaying(null);
     qsoNo.current = 0;
     closing.current = null;
@@ -1399,10 +1436,11 @@ export function QsoScreen({
             stopped,
             pending: pending.current,
             ends,
+            items,
           },
     );
     // The phase, for a reply that is due: it is kept as soon as it is.
-  }, [lines, closed, finished, theirSpeed, note, stopped, phase, ends]);
+  }, [lines, closed, finished, theirSpeed, note, stopped, phase, ends, items]);
 
   /** Paused, or a reload came back to a session under way: Continue goes
    *  on with it, where Start would clear the log. */
@@ -1787,6 +1825,7 @@ export function QsoScreen({
         region,
         nr: user.cwopsNumber.trim(),
       },
+      itemsIn(n) ? (items[n] ?? {}) : undefined,
     );
     // A script has no exchange items to check.
     if (rows.length === 0) return null;
@@ -1984,7 +2023,7 @@ export function QsoScreen({
       blurCall &&
       !line.you &&
       !closed.includes(line.qso) &&
-      (mode === "hidden" || mode === "copy" || mode === "none") &&
+      (mode === "hidden" || mode === "copy" || mode === "exchange" || mode === "none") &&
       !identified(line.qso, line.who);
     return blurred ? (
       <span className="who blurred" aria-hidden="true" data-testid="qso-who-blurred">
@@ -2004,6 +2043,59 @@ export function QsoScreen({
     return charsOf(sent).every((c, i) => !patternOf(c.char) || slotRight(c.char, copy.slots[i] ?? ""));
   };
 
+  /** Your copy of QSO `n`'s items, while it is under way: a box for each,
+   *  where its lines would be. Enter goes to the next box, and in the last
+   *  one, or with Cmd (Ctrl), grades your copy once the QSO is over. */
+  const itemsForm = (n: number): React.ReactElement => {
+    const labels = itemLabels(ends[n] ?? qso.current);
+    const grade = () => {
+      if (finished !== n) return;
+      close(n);
+      setNote("");
+    };
+    return (
+      <li className="qsoitems" data-testid="qso-items">
+        <table>
+          <tbody>
+            {labels.map((label, k) => (
+              <tr key={label}>
+                <th scope="row">
+                  <label htmlFor={`qso-item-${n}-${k}`}>{label}</label>
+                </th>
+                <td>
+                  <input
+                    id={`qso-item-${n}-${k}`}
+                    className="qsotype"
+                    data-testid="qso-item"
+                    data-label={label}
+                    value={items[n]?.[label] ?? ""}
+                    autoFocus={k === 0}
+                    spellCheck={false}
+                    autoComplete="off"
+                    onKeyDown={(ev) => {
+                      typed();
+                      if (ev.key === "Escape") ev.stopPropagation();
+                      if (ev.key !== "Enter") return;
+                      ev.preventDefault();
+                      ev.stopPropagation();
+                      const next = document.getElementById(`qso-item-${n}-${k + 1}`);
+                      if (next && !(ev.metaKey || ev.ctrlKey)) next.focus();
+                      else grade();
+                    }}
+                    onChange={(ev) => {
+                      const value = ev.target.value;
+                      setItems((all) => ({ ...all, [n]: { ...all[n], [label]: value } }));
+                    }}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </li>
+    );
+  };
+
   /** What shows of one line of the log. */
   const textOf = (line: Line, at: number): React.ReactElement => {
     const over = closed.includes(line.qso);
@@ -2018,7 +2110,7 @@ export function QsoScreen({
       if (!line.you && line.text) return <span className="text">{sentOf(line)}</span>;
       return <span className="text">{line.text || "(nothing copied)"}</span>;
     }
-    if (mode === "none") return <span className="text off">not shown</span>;
+    if (mode === "none" || mode === "exchange") return <span className="text off">not shown</span>;
     if (mode === "copy" && sent) {
       if (line.locked) {
         return (
@@ -2106,6 +2198,13 @@ export function QsoScreen({
   );
   const callShown = theirsShown || identified(qsoNo.current, them.call);
   const nameShown = theirsShown || heard(qsoNo.current, them.name);
+  /* With the station's items in boxes, the reply uses what you typed, never
+     what it sent: the reply must not tell you if your copy is right. */
+  const typedItem = (label: string, or: string) =>
+    (items[qsoNo.current]?.[label] ?? "").toUpperCase().replace(/\s+/g, " ").trim() || or;
+  const theirsIn = headless(qsoNo.current)
+    ? { call: typedItem("Call", THEIR_CALL), name: typedItem("Name", THEIR_NAME) }
+    : { call: callShown ? them.call : THEIR_CALL, name: nameShown ? them.name : THEIR_NAME };
   const suggestion =
     // A script always shows what is to be sent next: that is the exercise.
     // It stays while a line plays again, so the page does not jump.
@@ -2117,7 +2216,7 @@ export function QsoScreen({
           meOf(loadUser()),
           guideKind === "cq" ? null : guideKind,
           seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
-          { call: callShown ? them.call : THEIR_CALL, name: nameShown ? them.name : THEIR_NAME },
+          theirsIn,
         )
       : null;
 
@@ -2146,7 +2245,9 @@ export function QsoScreen({
         ? "The station is about to answer."
         : theirText === "copy"
           ? "Type what you hear."
-          : "Listen to the station.";
+          : theirText === "exchange"
+            ? "Type each item as you hear it."
+            : "Listen to the station.";
 
 
   /* A run under way: its format, the QSOs made, and in an MST the serial
@@ -2401,6 +2502,7 @@ export function QsoScreen({
                       id="qso-your-text"
                       label="My lines show"
                       help={YOUR_TEXT_HELP}
+                      barred={theirText === "exchange" ? NOT_WITH_EXCHANGE : null}
                       value={yourText}
                       options={YOUR_TEXTS}
                       onChange={(v) => setYourText(v as YourText)}
@@ -2597,7 +2699,7 @@ export function QsoScreen({
                       the report comes. */}
                   <li className={report || (!closed.includes(group.qso) && !noReportDue) ? "qsogroup" : "qsogroup noreport"}>
                     <ol className="qsolines">
-                      {group.at.map((i) => {
+                      {headless(group.qso) ? boxesFor(group.qso) && itemsForm(group.qso) : group.at.map((i) => {
                         const line = lines[i]!;
                         return (
                           <li key={i} className={line.you ? "you" : "them"} data-line={i}>
@@ -2631,6 +2733,7 @@ export function QsoScreen({
                 !typing &&
                 copy.turn !== answered.current &&
                 yourText !== "none" &&
+                !headless(qsoNo.current) &&
                 (copy.text || copy.keying) && (
                 <li className={noReportDue ? "you live noreport" : "you live"}>
                   <span className="who">{qso.current.you || "You"}</span>

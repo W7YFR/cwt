@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- On the QSO page, **The station's lines show** has **Exchange**. No lines show during a QSO. You type each item of the station's exchange in its own box, and the report grades your copy when the QSO ends.
+
 ### Development
 
 - `make release` runs from a worktree while another checkout has `main`. It updates, tags and pushes from that checkout, and keeps the branch the worktree holds.
