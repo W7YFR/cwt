@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.31.0 — 2026-11-14
+
 ### Added
 
 - **Drill** has a Pangrams group: the CWops pangrams for sending practice, short to long.
