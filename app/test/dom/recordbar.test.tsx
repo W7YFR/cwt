@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
+import { saveOpenDrillGroups } from "@/io/storage";
 import { ModeSwitch, RecordBar } from "@/ui/Record";
 import { OpenFileItem } from "@/ui/Toolbar";
 import { OPEN_FILE_CLOSED } from "@/ui/copy";
@@ -105,6 +106,7 @@ describe("the record bar in a session", () => {
   it("starts a session at a picked drill", async () => {
     const user = userEvent.setup();
     const onDrill = vi.fn();
+    saveOpenDrillGroups([DRILLS[2]!.path[0], DRILLS[2]!.path.join(" › ")]);
     bar({ onDrill });
     await user.click(screen.getByTestId("drill-picker"));
     await user.click(screen.getByTestId(`drill-option-${DRILLS[2]!.id}`));

@@ -466,6 +466,8 @@ export interface Prefs {
   user?: Partial<UserInfo>;
   /** Drills the user wrote, in the order they were saved. */
   customDrills?: CustomDrill[];
+  /** The drill picker's open groups, by name. Absent is all closed. */
+  openDrillGroups?: string[];
   /** Which page is open: practice (Send), Copy or QSO. Absent is practice. */
   page?: "practice" | "copy" | "qso";
   /** How the QSO page reads your sending. Absent is lenient. */
@@ -656,6 +658,15 @@ export function saveCustomDrills(customDrills: CustomDrill[]): void {
   savePrefs({ ...loadPrefs(), customDrills });
 }
 
+/** The drill picker's open groups, by name. */
+export function loadOpenDrillGroups(): string[] {
+  return loadPrefs().openDrillGroups ?? [];
+}
+
+export function saveOpenDrillGroups(openDrillGroups: readonly string[]): void {
+  savePrefs({ ...loadPrefs(), openDrillGroups: [...openDrillGroups] });
+}
+
 /* What each preference has to look like coming back off the wire.
  *
  * `Prefs` is a description of what we wrote, not a guarantee about what we will
@@ -752,6 +763,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   runSort: isStr,
   user: isUser,
   customDrills: isCustomDrills,
+  openDrillGroups: (v) => Array.isArray(v) && v.every(isStr),
   page: oneOf("practice", "copy", "qso"),
   qsoCopy: oneOf("strict", "lenient"),
   qsoLength: oneOf("full", "short", "pieces", "mixed"),

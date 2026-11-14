@@ -10,11 +10,11 @@
  * always the record button.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
-import { saveCustomDrills, saveUser, EMPTY_USER } from "@/io/storage";
+import { loadOpenDrillGroups, saveCustomDrills, saveOpenDrillGroups, saveUser, EMPTY_USER } from "@/io/storage";
 import { normalizeMessage } from "@/morse";
 import { NewSession } from "@/ui/NewSession";
 
@@ -241,7 +241,13 @@ describe("starting a new session", () => {
 
   describe("picking a drill", () => {
     const drill = DRILLS[1]!;
-    beforeEach(() => localStorage.clear());
+    beforeEach(() => {
+      localStorage.clear();
+      saveOpenDrillGroups([
+        ...new Set(DRILLS.flatMap((d) => [d.path[0], `${d.path[0]} › ${d.path[1]}`])),
+        "Custom",
+      ]);
+    });
 
     it("fills the message and hands it over on Save", async () => {
       const user = userEvent.setup();
@@ -378,11 +384,99 @@ describe("starting a new session", () => {
       expect(text().value).toBe("CQ DE W7YFR");
     });
 
+    it("starts with every group collapsed", async () => {
+      localStorage.clear();
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      expect(screen.queryByTestId(`drill-option-${drill.id}`)).toBeNull();
+      for (const group of screen.getAllByRole("treeitem", { expanded: false })) {
+        expect(group).toHaveAttribute("aria-level", "1");
+      }
+      expect(screen.queryAllByRole("treeitem", { expanded: true })).toHaveLength(0);
+    });
+
+    it("keeps the groups the user opened open the next time", async () => {
+      localStorage.clear();
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.click(screen.getByTestId("drill-group-pangrams"));
+      await user.click(screen.getByTestId("drill-section-pangrams-short"));
+      expect(loadOpenDrillGroups()).toEqual(["Pangrams", "Pangrams › Short"]);
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.click(screen.getByTestId("drill-picker"));
+      expect(screen.getByTestId("drill-option-pangram/short/1")).toBeTruthy();
+      expect(screen.getByTestId("drill-section-pangrams-medium")).toBeTruthy();
+      expect(screen.queryByTestId("drill-option-pangram/medium/1")).toBeNull();
+      expect(screen.queryByTestId(`drill-option-${drill.id}`)).toBeNull();
+    });
+
+    it("collapses a section from its header, and Left moves to it from a drill", async () => {
+      const user = userEvent.setup();
+      open();
+      await user.click(screen.getByTestId("drill-picker"));
+      await user.click(screen.getByTestId("drill-section-daily-sending-warm-up"));
+      expect(screen.queryByTestId(`drill-option-${drill.id}`)).toBeNull();
+      expect(screen.getByRole("treeitem", { name: "Daily Sending › Warm Up" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      expect(screen.getByTestId("drill-group-daily-sending")).toBeTruthy();
+      await user.keyboard("{Enter}");
+      expect(screen.getByTestId(`drill-option-${drill.id}`)).toBeTruthy();
+      await user.keyboard("{ArrowDown}{ArrowLeft}");
+      const section = screen.getByRole("treeitem", { name: "Daily Sending › Warm Up" });
+      expect(screen.getByRole("tree").getAttribute("aria-activedescendant")).toBe(section.id);
+    });
+
+    describe("at random", () => {
+      const pangrams = DRILLS.filter((d) => d.path[0] === "Pangrams");
+      afterEach(() => vi.restoreAllMocks());
+
+      it("picks from every drill on Random drill, but none that is missing details", async () => {
+        vi.spyOn(Math, "random").mockReturnValue(0.999);
+        const user = userEvent.setup();
+        open();
+        await user.click(screen.getByTestId("drill-picker"));
+        await user.click(screen.getByTestId("drill-random"));
+        expect(text().value).toBe(pangrams.at(-1)!.text);
+      });
+
+      it("picks from one section with its die, and leaves the section as it was", async () => {
+        vi.spyOn(Math, "random").mockReturnValue(0);
+        const user = userEvent.setup();
+        open();
+        await user.click(screen.getByTestId("drill-picker"));
+        await user.click(screen.getByTestId("drill-random-pangrams-medium"));
+        expect(text().value).toBe(pangrams[12]!.text);
+        expect(loadOpenDrillGroups()).toContain("Pangrams › Medium");
+      });
+
+      it("picks from a group with Shift+Enter on its row", async () => {
+        localStorage.clear();
+        vi.spyOn(Math, "random").mockReturnValue(0);
+        const user = userEvent.setup();
+        open();
+        await user.click(screen.getByTestId("drill-picker"));
+        await user.keyboard("{Shift>}{Enter}{/Shift}");
+        expect(text().value).toBe(DRILLS[0]!.text);
+      });
+
+      it("turns a die off when no drill under it can be picked", async () => {
+        const user = userEvent.setup();
+        open();
+        await user.click(screen.getByTestId("drill-picker"));
+        expect(screen.getByTestId("drill-random-qso")).toBeDisabled();
+        expect(screen.getByTestId("drill-random-pangrams")).toBeEnabled();
+      });
+    });
+
     it("groups the options under their section", async () => {
       const user = userEvent.setup();
       open();
       await user.click(screen.getByTestId("drill-picker"));
-      const warm = screen.getByRole("group", { name: "Daily Sending › Warm Up" });
+      const warm = screen.getByRole("treeitem", { name: "Daily Sending › Warm Up" });
       const inSection = DRILLS.filter((d) => d.path[0] === "Daily Sending" && d.path[1] === "Warm Up");
       expect(warm.querySelectorAll('[role="treeitem"]').length).toBe(inSection.length);
     });

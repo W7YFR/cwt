@@ -61,10 +61,26 @@ describe("the drill catalog", () => {
 
   it("groups by path in catalog order", () => {
     const groups = groupDrills(DRILLS);
-    expect(groups.map((g) => g.name)).toEqual(["Daily Sending", "QSO"]);
+    expect(groups.map((g) => g.name)).toEqual(["Daily Sending", "QSO", "Pangrams"]);
     expect(groups[0]!.sections.map((s) => s.name)).toEqual(["Warm Up", "Exercise", "Drill"]);
     expect(groups[1]!.sections.map((s) => s.name)).toEqual(["CQ", "Name & QTH", "Exchange"]);
+    expect(groups[2]!.sections.map((s) => s.name)).toEqual(["Short", "Medium", "Long"]);
     expect(groups.flatMap((g) => g.sections.flatMap((s) => s.drills))).toEqual(DRILLS);
+  });
+});
+
+describe("the pangrams", () => {
+  const pangrams = DRILLS.filter((d) => d.path[0] === "Pangrams");
+
+  it("holds all of them, short to long", () => {
+    expect(pangrams).toHaveLength(36);
+    expect(pangrams[0]!.text).toBe("SPHINX OF BLACK QUARTZ, JUDGE MY VOW");
+  });
+
+  it("uses every letter in each", () => {
+    for (const d of pangrams) {
+      expect(new Set(d.text.replace(/[^A-Z]/g, "")).size, d.text).toBe(26);
+    }
   });
 });
 

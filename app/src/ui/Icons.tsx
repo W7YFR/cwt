@@ -196,3 +196,19 @@ export function IconEdit(): React.ReactElement {
     </Icon>
   );
 }
+
+/** A die showing five: pick one at random. */
+export function IconDice(): React.ReactElement {
+  return (
+    <Icon name="dice" stroke>
+      <rect x="2.2" y="2.2" width="11.6" height="11.6" rx="2.4" />
+      <g fill="currentColor" stroke="none">
+        <circle cx="5.4" cy="5.4" r="1.05" />
+        <circle cx="10.6" cy="5.4" r="1.05" />
+        <circle cx="8" cy="8" r="1.05" />
+        <circle cx="5.4" cy="10.6" r="1.05" />
+        <circle cx="10.6" cy="10.6" r="1.05" />
+      </g>
+    </Icon>
+  );
+}
