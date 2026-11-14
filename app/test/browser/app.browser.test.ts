@@ -526,9 +526,12 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
     expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank")).toBe("false");
     await act(async () => $<HTMLElement>("[data-testid='drill-picker']")!.click());
     const tree = $<HTMLElement>("[role='tree']")!;
-    await act(async () => {
-      tree.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    });
+    // The first group and its first section open, and Enter picks its first drill.
+    for (const key of ["ArrowRight", "ArrowDown", "ArrowRight", "ArrowDown", "Enter"]) {
+      await act(async () => {
+        tree.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      });
+    }
     const dialog = $<HTMLElement>("[data-testid='new-session']")!;
     expect(dialog, "New session, not a cleared page").not.toBeNull();
     expect((dialog.querySelector("#ns-text") as HTMLTextAreaElement).value).not.toBe("");

@@ -80,10 +80,12 @@ html { scrollbar-color: color-mix(in srgb, var(--ink-faint) 45%, transparent) tr
    moves when the bar comes, and the reading in it keeps clear of the bar. A
    message set in the middle keeps the same room on both sides, so it stays in
    the middle. */
-.dialog, .drilllist, .micdebug, .soundpath .prose, .qsohelp .prose, .qsomain, .qsoside, .qsoguide {
+.dialog, .micdebug, .soundpath .prose, .qsohelp .prose, .qsomain, .qsoside, .qsoguide {
   scrollbar-gutter: stable;
 }
 .zenmessage { scrollbar-gutter: stable both-edges; }
+/* Not the drill list: with its groups closed it does not scroll, and the room
+   for a bar shows as an empty strip. */
 .soundpath .prose, .qsohelp .prose { padding-right: 12px; }
 
 body {
@@ -1415,7 +1417,7 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   cursor: pointer;
   user-select: none;
 }
-.drillgroup .caret {
+.drillgroup .caret, .drillsection .caret {
   flex: 0 0 auto;
   width: 10px;
   height: 6px;
@@ -1426,13 +1428,22 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   stroke-linejoin: round;
   transition: transform .12s;
 }
-[aria-expanded="false"] > .drillgroup .caret { transform: rotate(-90deg); }
+[aria-expanded="false"] > :is(.drillgroup, .drillsection) .caret { transform: rotate(-90deg); }
+/* Its caret sits under the group's name. */
 .drillsection {
-  padding: 6px 10px 2px 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px 0 23px;
+  border-left: 3px solid transparent;
   font-size: 11px;
   color: var(--ink-faint);
+  cursor: pointer;
+  user-select: none;
 }
-.drilllist [aria-level="2"] {
+/* A drill in a section sits under the section's name. */
+.drilllist .drill {
   padding: 4px 10px 4px 26px;
   border-left: 3px solid transparent;
   font-family: var(--mono);
@@ -1443,6 +1454,24 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   text-overflow: ellipsis;
   cursor: pointer;
 }
+.drilllist .drill[aria-level="3"] { padding-left: 39px; }
+/* Random drill: a header row, but it scrolls away with the rest. */
+.drillgroup.drillrandom { position: static; }
+.drillrandom .icon { font-size: 12px; }
+/* The die at the end of a header. Quiet until pointed at. */
+.drillpicker .drilldice {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+.drillpicker .drilldice:hover:not(:disabled) { color: var(--you); }
+.drillpicker .drilldice:disabled { opacity: .35; }
 .drilllist [aria-disabled="true"] { color: var(--ink-faint); cursor: default; }
 .drilllist [data-active="true"] {
   background: var(--panel-2);

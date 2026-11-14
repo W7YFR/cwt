@@ -7,6 +7,18 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.31.0 — 2026-11-14
+
+### Added
+
+- **Drill** has a Pangrams group: the CWops pangrams for sending practice, short to long.
+- **Drill** has **Random drill**, which picks a drill at random. The die on a group or section picks one from it.
+
+### Changed
+
+- The groups and sections in **Drill** start closed, and one you open stays open the next time.
+- In **Drill**, a group or section header highlights under the mouse, and the list leaves no empty strip for a scroll bar.
+
 ## v1.30.0 — 2026-11-11
 
 ### Added

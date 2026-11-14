@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EMPTY_USER, saveUser } from "@/io/storage";
+import { EMPTY_USER, saveOpenDrillGroups, saveUser } from "@/io/storage";
 import { CopyText } from "@/ui/CopyText";
 
 function open(over: Partial<React.ComponentProps<typeof CopyText>> = {}) {
@@ -178,6 +178,7 @@ describe("your details in the text", () => {
 
   it("fills the text from a drill", async () => {
     const user = userEvent.setup();
+    saveOpenDrillGroups(["QSO", "QSO › CQ"]);
     open({ text: "CQ" });
     await user.click(screen.getByTestId("drill-picker"));
     await user.click(screen.getByTestId("drill-option-qso/cq/1"));
