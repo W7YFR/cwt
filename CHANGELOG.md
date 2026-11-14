@@ -14,7 +14,8 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- The groups and sections in **Drill** start closed. One you open stays open the next time. Their headers highlight under the mouse, as a drill does.
+- The groups and sections in **Drill** start closed, and one you open stays open the next time.
+- In **Drill**, a group or section header highlights under the mouse, and the list leaves no empty strip for a scroll bar.
 
 ## v1.30.0 — 2026-11-11
 
