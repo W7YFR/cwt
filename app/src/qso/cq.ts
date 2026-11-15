@@ -157,7 +157,7 @@ function unglue(word: string): string[] {
 }
 
 /** The words of an over with each error sign applied: the sign and the word
- *  before it are gone.
+ *  before it are gone. A lone dit letter just before the sign is that word.
  *
  * A run of dits keyed unevenly reads as several words, as in EEE E E. The
  * whole run is one sign when it adds up to six dits or holds a sign: it
@@ -168,7 +168,12 @@ export function erased(words: readonly string[]): string[] {
   let run: string[] = [];
   const flush = () => {
     const sign = run.some(isErrorSign) || run.reduce((n, w) => n + ditCount(w), 0) >= 6;
-    if (sign) out.pop();
+    // A lone dit letter keyed just before a sign, as the H of QTH H EEE
+    // SEATTLE, is the slip the sign erases, not part of it.
+    const slip = run.length >= 2 && run[0]!.length === 1 && isErrorSign(run.slice(1).join(""));
+    if (slip) {
+      /* the letter and the sign go; the word before stays */
+    } else if (sign) out.pop();
     else out.push(...run);
     run = [];
   };

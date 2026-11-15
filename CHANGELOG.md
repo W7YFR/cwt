@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- On the QSO page, **Preferred mode** in the settings row chooses CQ, POTA, SST, MST or CWT. The suggested reply calls CQ for it, and the guide's Examples show the same choice. A CQ that starts another kind changes it.
+- On the QSO page, **Preferred mode** in the settings row chooses CQ, POTA, SST, MST or CWT. The suggested reply calls CQ for it, and the guide's Examples show the same choice. A CQ that starts another kind changes it. Its panel shows that kind's example QSO.
 
 ### Changed
 
@@ -17,11 +17,20 @@ nothing to the site. The next release carries them.
 - The station's lines and the suggested reply vary more in every kind of QSO. A POTA hunter sends 599 or 5NN and its state once or twice, and your suggested sign-off says its state back once you have copied it.
 - In a POTA, CWT, SST or MST QSO, when the station sends an item again because you asked for it, the suggested reply says it back, as `RR TU OH 73 E E` after `QTH?`.
 - In a QSO from a plain CQ, the station now and then mentions its rig, antenna or weather, and why a weak report is weak.
+- With **Station** set to **Piece by piece**, the suggested reply sends your exchange one item at a time. Once yours is all sent, it asks for the station's next item, by name once the station has sent it.
+- After the station's 73 in a QSO from a plain CQ, the suggested reply mostly carries both calls, as `K4LCI DE W7YFR TU FER FB QSO 73 ES CUL E E`.
+- In **Exchange**, an open row's report shows what the station sent and you copied, as well as what you sent.
 - The guide's POTA example sends `TNX UR 599` and the state once, and closes with `ES 73`, your call and `E E`.
 
 ### Fixed
 
 - On the QSO page, the **Letter** and **Word** buttons no longer show in **Exchange**, where they could never play.
+- The station no longer loses the word before an error sign that follows a stray dit, as the `QTH` in `QTH H EEE SEATTLE WA`.
+- In **Exchange**, a row's open button is a chevron, centered open or closed. It no longer looks like the play button.
+
+### Development
+
+- With `?micdebug`, **Save session** on the QSO page saves every line, the suggested reply before each of yours, the settings and the clean audio in one file.
 
 ## v1.31.0 — 2026-11-14
 

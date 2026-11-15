@@ -7,8 +7,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   EXCHANGE,
   $,
+  $$,
   click,
   fill,
+  key,
   open,
   page,
   press,
@@ -17,6 +19,7 @@ import {
   until,
   mount,
   useQsoRig,
+  wait,
   yourTurn,
 } from "../qso-rig";
 import "@/ui/base.css";
@@ -60,5 +63,55 @@ describe("the ? for Help", () => {
     expect(help.width, "laid out").toBeGreaterThan(0);
     expect(cog.left - help.right).toBeCloseTo(8, 0);
     expect(help.top + help.height / 2).toBeCloseTo(cog.top + cog.height / 2, 0);
+  });
+});
+
+describe("an Exchange row's open button", () => {
+  /** The session as kept: its lines and the station. */
+  const kept = () =>
+    JSON.parse(localStorage.getItem("cwt:qso") ?? "null") as {
+      lines: { you: boolean }[];
+      qso: { them: { call: string; name: string } };
+      finished: number | null;
+    };
+  /** Key `text`, then wait for the station's next line and your turn. */
+  const sendKept = async (text: string) => {
+    const theirs = () => (kept()?.lines ?? []).filter((l) => !l.you).length;
+    const before = theirs();
+    await key(text);
+    await until(`an answer to ${text}`, () => theirs() > before);
+    await until("the turn to come back", () => yourTurn());
+  };
+  /** How far the icon's center is from the button's, in px, each way. */
+  const offCenter = () => {
+    const button = $('[data-testid="qso-book-toggle"]')!.getBoundingClientRect();
+    const icon = $('[data-testid="qso-book-toggle"] svg')!.getBoundingClientRect();
+    return [
+      Math.abs(icon.left + icon.width / 2 - (button.left + button.width / 2)),
+      Math.abs(icon.top + icon.height / 2 - (button.top + button.height / 2)),
+    ];
+  };
+
+  it("is a chevron, centered closed and open", async () => {
+    await open({ qsoTheirText: "exchange", user: { callsign: "W7YFR", name: "ROB", qthRegionShort: "OR" } });
+    await sendKept("CQ CWT W7YFR");
+    const { call } = kept().qso.them;
+    await sendKept(`${call} ROB OR`);
+    await key("TU W7YFR");
+    await until("the QSO's end", () => kept().finished !== null);
+    // Every box filled once the QSO is over grades it, and its row shows.
+    for (const box of $$<HTMLInputElement>('[data-testid="qso-item"]')) await fill(box, "X");
+    await until("the row", () => $('[data-testid="qso-book-toggle"]') !== null);
+
+    expect($('[data-testid="qso-book-toggle"]')!.textContent).toBe("");
+    const [x0, y0] = offCenter();
+    expect(x0, "closed").toBeLessThan(1);
+    expect(y0, "closed").toBeLessThan(1);
+    await click($('[data-testid="qso-book-toggle"]'));
+    // Past the turn's animation.
+    await wait(400);
+    const [x, y] = offCenter();
+    expect(x, "open").toBeLessThan(1);
+    expect(y, "open").toBeLessThan(1);
   });
 });

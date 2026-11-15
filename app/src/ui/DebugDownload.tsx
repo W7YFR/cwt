@@ -8,7 +8,7 @@
  */
 
 import { APP_VERSION } from "@/build-info";
-import { encodeWav } from "@/audio/wav";
+import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { useSyncExternalStore } from "react";
 import {
   MIC_DEBUG_EVENT,
@@ -91,17 +91,48 @@ function saveAudio(current: DebugAudio | null): void {
   saveBlob(encodeWav(samples, rate), `${stemNow()}.wav`);
 }
 
+/** A page's session in one file, for sharing: its state as JSON, with its
+ *  clean audio as a WAV inside, in base64. One file, so one click. */
+async function saveSession(session: { data: unknown; audio: { samples: Float32Array; rate: number } | null }): Promise<void> {
+  let wav: string | null = null;
+  if (session.audio) {
+    const bytes = new Uint8Array(encodeWavBuffer(session.audio.samples, session.audio.rate));
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    wav = btoa(binary);
+  }
+  const text = JSON.stringify(
+    { cwt: APP_VERSION, page: location.href, saved: new Date().toISOString(), ...(session.data as object), wav },
+    null,
+    1,
+  );
+  saveBlob(new Blob([text], { type: "application/json" }), `${stemNow()}-session.json`);
+}
+
 /** `current` is the over still being sent, if any: an over that never ends,
- *  as a garbled one may not, is saved too. */
+ *  as a garbled one may not, is saved too. `session`, where given, is the
+ *  page's whole session, for Save session. */
 export function DebugDownload({
   current,
+  session,
 }: {
   current(): DebugAudio | null;
+  session?: () => { data: unknown; audio: { samples: Float32Array; rate: number } | null };
 }): React.ReactElement | null {
   const on = useSyncExternalStore(subscribe, micDebugOn);
   if (!on) return null;
   return (
     <>
+      {session && (
+        <button
+          type="button"
+          data-testid="debug-session"
+          title="Every line, the suggested reply before each of yours, the settings and the clean audio, in one file"
+          onClick={() => void saveSession(session())}
+        >
+          Save session
+        </button>
+      )}
       <button type="button" data-testid="debug-log" onClick={() => saveLog(current())}>
         Save log
       </button>

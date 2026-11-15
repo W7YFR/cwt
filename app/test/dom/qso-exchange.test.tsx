@@ -105,6 +105,10 @@ describe("Exchange", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(rows()[0]!.querySelectorAll(".bookmore li.them").length).toBeGreaterThan(0);
     expect(rows()[0]!.querySelector(".bookmore")!.hasAttribute("inert")).toBe(false);
+    // Its report, both ways: the station's items, then yours.
+    const sides = [...rows()[0]!.querySelectorAll('[data-testid="qso-report"] tbody tr:not(.side)')];
+    expect(sides.length).toBeGreaterThan(0);
+    expect(rows()[0]!.querySelectorAll('[data-testid="qso-report"] tr.side')).toHaveLength(2);
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
   });

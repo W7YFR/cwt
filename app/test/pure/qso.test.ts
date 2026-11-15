@@ -132,6 +132,8 @@ describe("reading an over", () => {
   it("drops the word before each error sign", () => {
     expect(erased(wordsOf("DE W7YR EEE W7YFR K"))).toEqual(["DE", "W7YFR", "K"]);
     expect(erased(wordsOf("<HH> CQ"))).toEqual(["CQ"]);
+    // A lone dit letter before the sign is the slip: QTH stays.
+    expect(erased(wordsOf("QTH H EEE SEATTLE WA"))).toEqual(["QTH", "SEATTLE", "WA"]);
     expect(erased(wordsOf("TU 73 E E"))).toEqual(["TU", "73", "E", "E"]);
     expect(erased(wordsOf("TOM 55 E E"))).toEqual(["TOM", "55", "E", "E"]);
   });

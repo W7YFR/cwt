@@ -19,7 +19,7 @@ import { isRun, type AnyQso, type RunQso } from "./run";
 import { isScript, yourLine } from "./script";
 import { REGIONS } from "./formats";
 import { pick, regionOf, type Rand } from "./station";
-import { greeting, type Piece } from "./wording";
+import { greeting, LABEL, PIECES, type Piece } from "./wording";
 
 /** You, as the hints send you. */
 export interface Me {
@@ -39,6 +39,9 @@ export interface Voice {
   readonly rand: Rand;
   /** Your local hour, 0 to 23, for GM, GA or GE. */
   readonly hour: number;
+  /** In a standard QSO, the station goes piece by piece, so you do too:
+   *  your exchange one item a turn. Absent: all at once. */
+  readonly pieces?: boolean;
 }
 
 /** The first wording of every over. */
@@ -138,6 +141,8 @@ function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them)
       const bt = v.rand() < 0.8 ? "" : "<BT>";
       const ask = pick(v.rand, ["", "HW?", "HW CPY?"]);
       const tail = ask ? `${ask} ${them} DE ${call}` : "";
+      // Piece by piece: your report alone, and the station sends its own.
+      if (v.pieces) return words(them, "DE", call, hello, pieceOf("report", me, v), end());
       return words(them, "DE", call, hello, bt, ...order.map((p) => pieceOf(p, me, v)), tail, end());
     }
     case "pieces":
@@ -148,10 +153,18 @@ function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them)
         const head = pick(v.rand, [`${them} DE ${call}`, "R", `R R ${them} DE ${call}`, "TNX"]);
         return words(head, ...owed.map((p) => pieceOf(p, me, v)), end());
       }
+      // Its name once it has sent it, else OM.
+      const sent = sentPieces(qso);
+      const n = sent.includes("name") ? who.name : "";
       if (qso.stage === "pieces") {
-        return pick(v.rand, [`R TNX ${them} DE ${call} K`, "R R FB K", `QSL ${them} DE ${call} KN`, "R TNX OM BK", "R R SOLID CPY BK"]);
+        // Your next piece, which the station answers with its own. Once
+        // yours are all sent, ask for its next one.
+        const mine = PIECES.find((p) => !qso.got.includes(p));
+        const ack = pick(v.rand, ["R TNX", "R", "FB", "R R"]);
+        if (mine) return words(ack, n, pieceOf(mine, me, v), end());
+        const theirs = PIECES.find((p) => !sent.includes(p));
+        if (theirs) return words(ack, n || "OM", pick(v.rand, [`UR ${LABEL[theirs]}?`, `PSE UR ${LABEL[theirs]}?`]), end());
       }
-      const n = who.name;
       return pick(v.rand, [
         `TNX ${n} 73 SK`,
         `R TNX FER QSO ${n} 73 <SK>`,
@@ -161,10 +174,18 @@ function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them)
         `TNX FER FB QSO ${n} VY 73 GUD DX ${them} DE ${call} <SK>`,
         `R R ${n} TNX FER THE QSO HPE CUAGN 73 <SK>`,
         `OK ${n} TNX ES 73 CUL ${them} DE ${call} SK`,
-      ]);
+      ].map((t) => t.replace(/\s+/g, " ")));
     }
     case "signing":
-      return pick(v.rand, ["TU 73 E E", "73 E E", "TU E E", `73 ${them} DE ${call} <SK> E E`, `TU ${who.name} 73 E E`, "GL 73 E E"]);
+      // Its 73 came first. Yours carries the calls, as a formal QSO does.
+      return pick(v.rand, [
+        `${them} DE ${call} TU FER FB QSO 73 ES CUL E E`,
+        `TU ${who.name} 73 ${them} DE ${call} <SK> E E`,
+        `R R TNX ${who.name} GL 73 ${them} DE ${call} E E`,
+        `73 ${them} DE ${call} <SK> E E`,
+        `FB ${who.name} TNX FER QSO VY 73 ${them} DE ${call} <SK> E E`,
+        "TU 73 E E",
+      ]);
   }
 }
 

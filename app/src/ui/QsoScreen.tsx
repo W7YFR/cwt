@@ -50,7 +50,7 @@ import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type L
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconEdit, IconPlay, IconStop } from "./Icons";
+import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
@@ -60,7 +60,7 @@ import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NO
 import { Graded, RightOnly, type SentAttrs } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
-import { QsoGuide } from "./QsoHelp";
+import { ExampleLines, QsoGuide } from "./QsoHelp";
 import { PageHelp, type KeyGroup } from "./Help";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
@@ -348,6 +348,9 @@ interface Line {
   /** The tone the station sent it at, for the station's overs. Absent in a
    *  log kept before it was. */
   readonly toneHz?: number;
+  /** Your lines: the suggested reply when you began it, shown or not, for
+   *  the debug save. Absent when there was none. */
+  readonly hint?: string;
 }
 
 /** What a reload brings back of the session: the log and the QSO under
@@ -649,6 +652,8 @@ export function QsoScreen({
   const qso = useRef<AnyQso>(kept?.qso ?? newQso(Math.random, "", speed));
   /** Which QSO of the session is running, counted from 0. */
   const qsoNo = useRef(kept?.qsoNo ?? 0);
+  /** The suggested reply on your turn, shown or not, as of the last render. */
+  const replyRef = useRef<string | null>(null);
   /** The QSOs that are over. Their overs all show. */
   const [closed, setClosed] = useState<readonly number[]>(() => kept?.closed ?? []);
   /** Each QSO that is over, as it ended, for its report. */
@@ -1311,6 +1316,7 @@ export function QsoScreen({
       mode: "before",
       locked: false,
       sentWpm: copy.sentWpm,
+      ...(replyRef.current ? { hint: replyRef.current } : {}),
     };
 
     qso.current = turn.ended ? following(turn.qso, Math.random, speed) : turn.qso;
@@ -1878,8 +1884,9 @@ export function QsoScreen({
       itemsIn(n) ? (items[n] ?? {}) : undefined,
     );
   };
-  /** The report of QSO `n`: both sides, or one. */
-  const qsoReport = (n: number, only?: "you"): React.ReactElement | null => {
+  /** The report of QSO `n`: what the station sent and you copied, and what
+   *  you sent and it copied. */
+  const qsoReport = (n: number): React.ReactElement | null => {
     const done = ends[n];
     if (!closed.includes(n) || !done) return null;
     if (isScript(done)) return scriptReportOf(done);
@@ -1908,7 +1915,7 @@ export function QsoScreen({
       <div className="qsoreport" data-testid="qso-report">
         <table>
           <tbody>
-            {only !== "you" && group("them", `${call} sent`, "You copied")}
+            {group("them", `${call} sent`, "You copied")}
             {group("you", "You sent", `${call} copied`)}
           </tbody>
         </table>
@@ -2259,19 +2266,28 @@ export function QsoScreen({
         name: nameShown ? them.name : THEIR_NAME,
         region: theirsShown || heard(qsoNo.current, theirRegion) ? theirRegion : "",
       };
-  const suggestion =
-    // A script always shows what is to be sent next: that is the exercise.
-    // It stays while a line plays again, so the page does not jump.
-    recorder &&
-    (phase === "listening" || phase === "replaying") &&
-    (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
+  /** The suggested reply for your turn, shown or not: the debug save keeps
+   *  it with your line. */
+  const reply =
+    recorder && (phase === "listening" || phase === "replaying")
       ? hint(
           qso.current,
           meOf(loadUser()),
           guideKind === "cq" ? null : guideKind,
-          seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+          {
+            ...seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+            // A station that goes piece by piece: your exchange goes so too.
+            pieces: length === "pieces" || (length === "mixed" && piecesStation.current),
+          },
           theirsIn,
         )
+      : null;
+  replyRef.current = reply;
+  const suggestion =
+    // A script always shows what is to be sent next: that is the exercise.
+    // It stays while a line plays again, so the page does not jump.
+    reply !== null && (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
+      ? reply
       : null;
 
   /* A new line, or more of one, keeps the end of the log in view: unless you
@@ -2453,7 +2469,10 @@ export function QsoScreen({
                 aria-label={isOpen ? `Close QSO ${g + 1}` : `Open QSO ${g + 1} · ${call}`}
                 onClick={toggle}
               >
-                ▸
+                {/* A chevron, not ▸: that reads as Play beside the play button. */}
+                <i className="ico">
+                  <IconChevron />
+                </i>
               </button>
             </span>
           </span>
@@ -2463,7 +2482,7 @@ export function QsoScreen({
             <div className="bookinner">
               <div className="bookbody">
                 <ol className="qsolines">{group.at.map(lineItem)}</ol>
-                {qsoReport(n, "you")}
+                {qsoReport(n)}
               </div>
             </div>
           </div>
@@ -2641,6 +2660,7 @@ export function QsoScreen({
               <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} widest="POTA" tab="page">
                 <Section name="you" title="You">
                   <div className="panelgroups">{kindChoice}</div>
+                  <ExampleLines shown={guideKind} testId="qso-kind-example" />
                 </Section>
               </QuickChip>
               <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} widest={longest(LENGTHS.map((l) => l.label))} tab="page">
@@ -2853,6 +2873,23 @@ export function QsoScreen({
 
           <div className="qsocontrols">
             <DebugDownload
+              session={() => {
+                // Every line, the QSOs as the station had them, your copy in
+                // Exchange's boxes, your settings, and the session's clean audio.
+                const parts = lines.map((_, i) => tapeLineOf(i)).filter((p): p is TapeLine => p !== null);
+                return {
+                  data: {
+                    prefs: loadPrefs(),
+                    user: loadUser(),
+                    lines,
+                    ends,
+                    current: qso.current,
+                    items,
+                    closed,
+                  },
+                  audio: parts.length ? tape(parts, tapeRate()) : null,
+                };
+              }}
               current={() =>
                 recorder
                   ? {

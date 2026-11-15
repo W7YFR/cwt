@@ -109,25 +109,32 @@ export function QsoExamples({
   /** Another kind was chosen. */
   onShown(shown: GuideId): void;
 }): React.ReactElement {
-  // Read each time: User may have changed in the settings.
-  const you = exampleYou(loadUser());
-  const lines = example(shown, you);
   return (
     <section className="qsoexamples" data-testid="qso-examples" data-shown={shown}>
       <h3 id="qso-examples-label">Examples</h3>
       <KindSwitch shown={shown} onShown={onShown} labelledBy="qso-examples-label" testId="qso-guide-kinds" />
       <About id={shown} />
-      <ol className="qsoexample" data-testid="qso-example">
-        {lines.map((line, i) => (
-          <li key={i} className={line.you ? "you" : "them"}>
-            <span className="who">{line.you ? "You" : EXAMPLE_STATION.call}</span>
-            <span className="text">
-              <code>{line.text}</code>
-            </span>
-          </li>
-        ))}
-      </ol>
+      <ExampleLines shown={shown} />
     </section>
+  );
+}
+
+/** The example QSO of one kind, line by line, with no words about it. In the
+ *  Examples, and under Preferred mode as a reminder. */
+export function ExampleLines({ shown, testId = "qso-example" }: { shown: GuideId; testId?: string }): React.ReactElement {
+  // Read each time: User may have changed in the settings.
+  const lines = example(shown, exampleYou(loadUser()));
+  return (
+    <ol className="qsoexample" data-testid={testId} data-shown={shown}>
+      {lines.map((line, i) => (
+        <li key={i} className={line.you ? "you" : "them"}>
+          <span className="who">{line.you ? "You" : EXAMPLE_STATION.call}</span>
+          <span className="text">
+            <code>{line.text}</code>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

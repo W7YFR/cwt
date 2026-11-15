@@ -318,6 +318,9 @@ describe("the guide's examples", () => {
     // In the order the Examples offer them: CQ, POTA, SST, MST, CWT.
     await click(chipKinds()[2]!);
     expect(shown(), "the chip sets the Examples").toBe("sst");
+    const reminder = $('[data-testid="qso-kind-example"]')!;
+    expect(reminder.dataset.shown, "its example QSO shows in the chip").toBe("sst");
+    expect(reminder.querySelectorAll("li").length).toBeGreaterThan(2);
     await click(kind("cwt"));
     expect(pressed(), "the Examples set the chip").toBe(4);
     expect(JSON.parse(localStorage.getItem("cwt:prefs") ?? "{}").qsoGuide).toBe("cwt");

@@ -184,8 +184,8 @@ const ITEM: Readonly<Record<Piece, (s: Say) => string>> = { report, name: nameOf
  *  report. Only then does it thank you for one. */
 function thanks(s: Say, gotReport: boolean): string {
   return gotReport
-    ? pick(s.rand, ["R TNX FER RPT", "R R TNX FER RPT", "FB TNX FER RPT", "R TNX RPT", "TNX FER THE RPT", "R FB TNX FER RPT"])
-    : pick(s.rand, ["R", "", "TNX", "R R", "FB"]);
+    ? pick(s.rand, ["R TNX FER RPT", "R R TNX FER RPT", "FB TNX FER RPT", "R TNX RPT", "TNX FER THE RPT", "R R TNX RPT"])
+    : pick(s.rand, ["R", "", "TNX", "R R", "OK"]);
 }
 
 /** Its exchange: report, name and QTH. In piece by piece, this is the first
@@ -234,7 +234,7 @@ export function piece(s: Say, at: number, open: string): string {
 /** How it acknowledges a piece of yours: R, TNX or FB, with your name when
  *  it has it. */
 export function gotPiece(s: Say): string {
-  return pick(s.rand, ["R", "TNX", `FB ${to(s)}`, "R R"]);
+  return pick(s.rand, ["R", "TNX", `FB ${to(s)}`, "R R", "OK", `R TNX ${to(s)}`, "QSL"]);
 }
 
 /** What it sends for a question about one thing. */

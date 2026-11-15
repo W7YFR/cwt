@@ -72,3 +72,41 @@ describe("the suggested reply", () => {
     expect(hint()).toBe(before);
   });
 });
+
+describe("Save session, with the debug buttons on", () => {
+  it("saves every line, the suggested reply before each of yours, and the clean audio, in one file", async () => {
+    window.history.replaceState({}, "", "/?micdebug");
+    const saved: Blob[] = [];
+    const real = URL.createObjectURL;
+    URL.createObjectURL = (b: Blob | MediaSource) => {
+      saved.push(b as Blob);
+      return "blob:saved";
+    };
+    try {
+      await open({ qsoTheirText: "before", qsoHints: "off", user: USER });
+      const call = callIn(await send("CQ SST W7YFR"));
+      await send(`${call} ROB OR`);
+      await click($('[data-testid="debug-session"]'));
+      await until("the file", () => saved.length > 0);
+      // jsdom's Blob has no text(): read it as a FileReader would.
+      const text = await new Promise<string>((done) => {
+        const reader = new FileReader();
+        reader.onload = () => done(reader.result as string);
+        reader.readAsText(saved[0]!);
+      });
+      const file = JSON.parse(text) as {
+        lines: { you: boolean; text: string; hint?: string }[];
+        wav: string | null;
+      };
+      const yours = file.lines.filter((l) => l.you);
+      expect(yours.length).toBe(2);
+      // Kept even with the suggested reply off.
+      expect(yours.every((l) => typeof l.hint === "string" && l.hint.length > 0)).toBe(true);
+      expect(file.lines.some((l) => !l.you)).toBe(true);
+      expect(file.wav, "the clean audio").toMatch(/^UklGR/);
+    } finally {
+      URL.createObjectURL = real;
+      window.history.replaceState({}, "", "/");
+    }
+  });
+});

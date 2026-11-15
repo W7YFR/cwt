@@ -2,9 +2,9 @@
  * format and every length. */
 
 import { describe, expect, it } from "vitest";
-import { newQso } from "@/qso/cq";
+import { answer, newQso, type Qso } from "@/qso/cq";
 import { FORMATS, FORMAT_IDS, type FormatId } from "@/qso/formats";
-import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME, THEIR_STATE, type Me, type Voice } from "@/qso/hint";
+import { hint, meOf, PLAIN, seededVoice, THEIR_CALL, THEIR_NAME, THEIR_STATE, type Me, type Voice } from "@/qso/hint";
 import { isScript } from "@/qso/script";
 import { answerRun, isRun, newRun, respond, type AnyQso, type RunContext, type RunQso } from "@/qso/run";
 import type { Station } from "@/qso/station";
@@ -252,5 +252,50 @@ describe("the CQ between QSOs of a run", () => {
     const plain = hint(waiting, ME, null);
     expect(plain).toMatch(/^CQ /);
     expect(plain).not.toMatch(/POTA|SST|MST|CWT/);
+  });
+});
+
+describe("a standard QSO piece by piece, from the hints", () => {
+  const K4LCI = { call: "K4LCI", name: "ED", qth: "ROANOKE VA", rst: "569", toneHz: 600 };
+
+  it("sends your exchange one piece a turn, and the station copies all of you", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rand = seeded(seed * 104729);
+      const voice = { rand, hour: 12, pieces: true };
+      let qso: Qso = { ...newQso(rand), them: K4LCI };
+      let ended = false;
+      for (let n = 0; n < 12 && !ended; n++) {
+        const sent = hint(qso, ME, null, voice);
+        if (qso.stage === "called" || qso.stage === "pieces") {
+          // Never more than one piece of yours in a line.
+          const labels = ["RST", "NAME", "OP", "QTH"].filter((l) => sent.split(" ").includes(l) && !sent.includes(`${l}?`));
+          expect(labels.length, sent).toBeLessThanOrEqual(1);
+        }
+        const turn = answer(qso, sent, { rand, hour: 12, length: "pieces" });
+        expect(turn.reply ?? "", `the answer to "${sent}"`).not.toMatch(ASKS_AGAIN);
+        ended = turn.ended;
+        qso = turn.qso;
+      }
+      expect(ended).toBe(true);
+      expect(qso.yourName).toBe(ME.name);
+      expect(qso.yourQth).toBe(ME.qth);
+    }
+  });
+
+  it("uses its name once it has sent it, and asks for its next piece once yours are sent", () => {
+    let qso: Qso = { ...newQso(() => 0), them: K4LCI };
+    for (const t of ["CQ CQ DE W7YFR K", "K4LCI DE W7YFR UR 599 599 NAME ROB ROB QTH SEATTLE WA K"]) {
+      qso = answer(qso, t, { rand: () => 0, length: "pieces" }).qso;
+    }
+    expect(hint(qso, ME, null, PLAIN)).toMatch(/UR NAME\? K$/);
+    qso = answer(qso, hint(qso, ME, null, PLAIN), { rand: () => 0, length: "pieces" }).qso;
+    // It answers NAME? and goes on to its QTH: your next line is to ED.
+    expect(hint(qso, ME, null, PLAIN).split(" ")).toContain("ED");
+  });
+
+  it("signs with both calls after the station's 73, most of the time", () => {
+    const signing = { ...newQso(() => 0), them: K4LCI, stage: "signing" as const, you: "W7YFR" };
+    const lines = Array.from({ length: 60 }, (_, i) => hint(signing, ME, null, { rand: seeded((i + 1) * 104729), hour: 12 }));
+    expect(lines.filter((l) => l.includes("K4LCI DE W7YFR")).length).toBeGreaterThan(lines.length / 2);
   });
 });

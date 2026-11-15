@@ -2617,8 +2617,9 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .bookscore.all { color: var(--ok); }
 .qsolog .bookend .tapeend { display: flex; align-items: center; gap: 6px; }
 .qsolog .bookend .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
-.qsolog .booktoggle { width: 24px; height: 24px; font-size: 13px; transition: transform 200ms ease; }
-.qsolog .bookrow.open .booktoggle { transform: rotate(90deg); }
+.qsolog .booktoggle { width: 24px; height: 24px; }
+.qsolog .booktoggle .ico { display: inline-flex; width: auto; transition: transform 200ms ease; }
+.qsolog .bookrow.open .booktoggle .ico { transform: rotate(180deg); }
 .qsolog .bookrow.done .bookline { cursor: pointer; }
 .qsolog .bookrow.done .bookline:hover { background: color-mix(in srgb, var(--panel-2) 50%, transparent); }
 /* The QSO under way: the boxes are its cells. */
@@ -2672,7 +2673,7 @@ header .modeswitch button { white-space: nowrap; }
   .qsolog .bookbody { grid-template-columns: minmax(0, 1fr); row-gap: 12px; padding-left: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .qsolog .bookmore, .qsolog .booktoggle { transition: none; }
+  .qsolog .bookmore, .qsolog .booktoggle .ico { transition: none; }
   .qsolog .bookstatus::before { animation: none; }
 }
 /* The Copy page's downloads, under the QSO, as the QSO page's are. */
