@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.32.0 — 2026-11-15
+
 ### Added
 
 - On the QSO page, **Preferred mode** in the settings row chooses CQ, POTA, SST, MST or CWT. The suggested reply calls CQ for it, and the guide's Examples show the same choice. A CQ that starts another kind changes it. Its panel shows that kind's example QSO.
