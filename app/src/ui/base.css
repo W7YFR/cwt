@@ -2435,6 +2435,9 @@ button.cal { font-size: 11px; padding: 3px 8px; }
 .qsolog .who { flex: 0 0 8ch; color: var(--ink-dim); }
 .qsolog .text { min-width: 0; overflow-wrap: anywhere; }
 .qsolog .you .text { color: var(--you); }
+/* The reply suggested before one of yours, as the suggested reply under the
+   log shows it: the page's font, not the log's. */
+.qsolog .pasthint { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 .qsolog .live .keying { color: var(--ink-faint); }
 .qsonote { margin: 0; }
 /* The guide on the page, before the first QSO: read as the help reads. */

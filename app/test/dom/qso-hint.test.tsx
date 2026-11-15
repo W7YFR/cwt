@@ -1,6 +1,7 @@
 /* The suggested reply on the QSO page. See qso-rig.tsx for how the page is
  * driven. */
 
+import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { $, $$, callIn, click, fill, lastSent, open, send, until, useQsoRig, yourTurn } from "../qso-rig";
 
@@ -70,6 +71,41 @@ describe("the suggested reply", () => {
     expect(hint()).toBe(before);
     await until("the line to end", () => yourTurn());
     expect(hint()).toBe(before);
+  });
+});
+
+/** A helper on the console's `__cwt`, called as it would be there. */
+const cwt = (name: string, ...args: unknown[]) =>
+  act(async () => {
+    (window as unknown as { __cwt: Record<string, (...a: unknown[]) => unknown> }).__cwt[name]!(...args);
+  });
+
+describe("__cwt.suggestedReplies() on the console", () => {
+  it("shows the reply suggested before each line you sent, above it, with the suggested reply off", async () => {
+    await open({ qsoTheirText: "before", qsoHints: "off", user: USER });
+    const call = callIn(await send("CQ SST W7YFR"));
+    await send(`${call} ROB OR`);
+    expect($('[data-testid="qso-past-hint"]'), "not until asked").toBeNull();
+    // Lines sent before it was called show theirs too.
+    await cwt("suggestedReplies");
+    const log = [...$$('[data-testid="qso-past-hint"], li[data-line]')];
+    const past = log.filter((li) => li.matches('[data-testid="qso-past-hint"]'));
+    expect(past).toHaveLength(2);
+    for (const li of past) expect(log[log.indexOf(li) + 1]!.classList.contains("you")).toBe(true);
+    await cwt("suggestedReplies", false);
+    expect($('[data-testid="qso-past-hint"]')).toBeNull();
+  });
+
+  it("is listed by __cwt.help(), with the other helpers", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      await cwt("help");
+      const text = String(info.mock.calls.at(-1)?.[0]);
+      expect(text).toContain("__cwt.suggestedReplies");
+      expect(text).toContain("__cwt.micDebug");
+    } finally {
+      info.mockRestore();
+    }
   });
 });
 

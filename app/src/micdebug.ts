@@ -13,13 +13,15 @@
  * The lines, and the last of the audio the decoder was given, are kept in
  * memory all the time, in rings that drop the oldest, and printed nowhere.
  * A fault is noticed after it starts, so what led up to it has to be there
- * already when somebody asks. The flag, or `__cwtMicDebug(true)` typed into
+ * already when somebody asks. The flag, or `__cwt.micDebug()` typed into
  * the console, turns the printing on, prints what is kept, and shows the
  * buttons that save it. Nothing leaves the page unless it is saved.
  *
  * Not `console.error`, and not only because the tests fail on that: none of
  * these is a fault. They are a transcript.
  */
+
+import { addHelper } from "@/devtools";
 
 /** The tab's own switch, set from the console, so a reload keeps it. */
 const SESSION_KEY = "cwt:micdebug";
@@ -136,15 +138,16 @@ export function debugAudio(): DebugAudio[] {
   }));
 }
 
-/* The console's way in: `__cwtMicDebug(true)` or `__cwtMicDebug(false)`. */
-if (typeof window !== "undefined") {
-  (window as unknown as { __cwtMicDebug?: (on?: boolean) => string }).__cwtMicDebug = (on = true) => {
+/* The console's way in: `__cwt.micDebug()` or `__cwt.micDebug(false)`. */
+addHelper(
+  "micDebug",
+  "micDebug() prints the microphone's transcript and shows the QSO page's Save buttons, " +
+    "for this tab, as ?micdebug does. micDebug(false) turns it off.",
+  (on = true) => {
     setMicDebug(on);
-    return on
-      ? "Mic debug on. The QSO page shows Save log and Save audio."
-      : "Mic debug off.";
-  };
-}
+    return on ? "Mic debug on. The QSO page shows Save log and Save audio." : "Mic debug off.";
+  },
+);
 
 /** A device list, flattened to something readable in a console line.
  *

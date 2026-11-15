@@ -12,7 +12,7 @@
  * everything hidden shows, and your copy is graded.
  */
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPlayer } from "@/audio/player";
 import { fadeOf, NOISE_OFF_DB, seedOf, type Fade } from "@/audio/qsb";
 import type { Band } from "@/audio/player";
@@ -32,6 +32,7 @@ import {
   saveSpeed,
 } from "@/io/storage";
 import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
+import { REPLIES_EVENT, suggestedRepliesOn } from "@/devtools";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
@@ -377,6 +378,12 @@ interface Kept {
   readonly items?: Readonly<Record<number, Readonly<Record<string, string>>>>;
 }
 
+/** The console's switch for the suggested replies in the log, followed. */
+function onReplies(changed: () => void): () => void {
+  window.addEventListener(REPLIES_EVENT, changed);
+  return () => window.removeEventListener(REPLIES_EVENT, changed);
+}
+
 /** A reply the station is about to send, before it goes in the log. */
 interface Pending {
   readonly reply: string;
@@ -635,6 +642,8 @@ export function QsoScreen({
   };
   const [lockCopy, setLockCopy] = useOnOff("qsoLockCopy", true);
   const [gradeTyping, setGradeTyping] = useOnOff("qsoGradeTyping", false);
+  // Set from the console: __cwt.suggestedReplies().
+  const pastHints = useSyncExternalStore(onReplies, suggestedRepliesOn);
   const [allowEdits, setAllowEdits] = useOnOff("qsoAllowEdits", false);
   const [lockedShows, setLockedShowsRaw] = useState<LockedShows>(
     () => loadPrefs().qsoLockedShows ?? "nothing",
@@ -1308,7 +1317,8 @@ export function QsoScreen({
     const them = turn.qso.them;
     const n = qsoNo.current;
     const sent: Line = {
-      who: turn.qso.you || "You",
+      // Your own call: what the station copied of it shows in the report.
+      who: user.callsign.trim().toUpperCase() || turn.qso.you || "You",
       text: heard,
       you: true,
       qso: n,
@@ -2346,20 +2356,30 @@ export function QsoScreen({
   const lineItem = (i: number): React.ReactElement => {
     const line = lines[i]!;
     return (
-      <li key={i} className={line.you ? "you" : "them"} data-line={i}>
-        {labelOf(line)}
-        {textOf(line, i)}
-        <span className="lend">
-          {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
-            <span className="lwpm" data-testid="qso-line-wpm">
-              {wpmOf(line.sentWpm)}
-            </span>
-          )}
-          {lineEdit(line, i)}
-          {linePlay(i)}
-          {lineMore(i)}
-        </span>
-      </li>
+      <Fragment key={i}>
+        {/* The reply suggested before this one of yours, above it. */}
+        {pastHints && line.you && line.hint && (
+          <li className="pasthint" data-testid="qso-past-hint">
+            <p className="qsohint">
+              Suggested reply:<code>{line.hint}</code>
+            </p>
+          </li>
+        )}
+        <li className={line.you ? "you" : "them"} data-line={i}>
+          {labelOf(line)}
+          {textOf(line, i)}
+          <span className="lend">
+            {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
+              <span className="lwpm" data-testid="qso-line-wpm">
+                {wpmOf(line.sentWpm)}
+              </span>
+            )}
+            {lineEdit(line, i)}
+            {linePlay(i)}
+            {lineMore(i)}
+          </span>
+        </li>
+      </Fragment>
     );
   };
 

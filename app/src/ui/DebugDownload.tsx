@@ -3,7 +3,7 @@
  * For a fault seen on the deployed site and nowhere else: the transcript says
  * what the browser and the page did, and the audio is each over as the
  * decoder was given it, so the same audio can be decoded again here. Shown
- * with `?micdebug`, or once `__cwtMicDebug(true)` is typed into the console;
+ * with `?micdebug`, or once `__cwt.micDebug()` is typed into the console;
  * what was kept before then is saved too.
  */
 
@@ -18,7 +18,7 @@ import {
   type DebugAudio,
 } from "@/micdebug";
 
-/** The switch, followed: `__cwtMicDebug(true)` shows the buttons at once. */
+/** The switch, followed: `__cwt.micDebug()` shows the buttons at once. */
 function subscribe(changed: () => void): () => void {
   window.addEventListener(MIC_DEBUG_EVENT, changed);
   return () => window.removeEventListener(MIC_DEBUG_EVENT, changed);

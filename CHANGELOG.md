@@ -28,11 +28,14 @@ nothing to the site. The next release carries them.
 
 - On the QSO page, the **Letter** and **Word** buttons no longer show in **Exchange**, where they could never play.
 - The station no longer loses the word before an error sign that follows a stray dit, as the `QTH` in `QTH H EEE SEATTLE WA`.
+- With **Lenient** copy, your call keyed again letter by letter, as `D E W 7 3 EEEE W 7 Y F R`, no longer changes the call the station copied to a wrong one. Your lines in the log always show your own call.
+- In a POTA QSO, the station takes your state from after your report. A `TNX` keyed apart before it, as `TN X UR 5NN WA`, no longer reads as Tennessee.
 - In **Exchange**, a row's open button is a chevron, centered open or closed. It no longer looks like the play button.
 
 ### Development
 
 - With `?micdebug`, **Save session** on the QSO page saves every line, the suggested reply before each of yours, the settings and the clean audio in one file.
+- The browser console's `__cwt` object holds the debug helpers, and `__cwt.help()` lists them. `__cwt.suggestedReplies()` shows the reply suggested before each of your lines in the QSO log. `__cwt.micDebug()` replaces `__cwtMicDebug()`.
 
 ## v1.31.0 — 2026-11-14
 
