@@ -194,7 +194,11 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   // A region that is also a greeting, as GA, counts once it comes after
   // the name, or after the report where there is no name.
   const from = named ? (name ? words.indexOf(name) : -1) : words.findIndex((w) => REPORT_IN.test(w));
-  const region = regionIn(after, mine, lenient) || (from >= 0 ? greetingRegionIn(words.slice(from + 1)) : "");
+  // With no name, the region comes after the report: in TN X UR 5NN WA, a
+  // TNX keyed apart, the region is WA, not TN.
+  const afterReport = !named && from >= 0 ? regionIn(words.slice(from + 1), mine, lenient) : "";
+  const region =
+    afterReport || regionIn(after, mine, lenient) || (from >= 0 ? greetingRegionIn(words.slice(from + 1)) : "");
   return { name, number, region, report };
 }
 

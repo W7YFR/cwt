@@ -297,7 +297,7 @@ export function signFirst(s: Say): string {
       `R TNX FER QSO ${n} GL ES 73`,
       `FB ${n} TNX FB QSO 73 ES GL`,
       `OK ${n} TNX QSO CUL 73`,
-      `TNX FER THE NICE QSO ${n} GUD DX ES 73`,
+      `TNX FER THE NICE QSO ${n} GL ES 73`,
       `VY FB QSO ${n} TNX ES VY 73`,
     ]),
     `${s.you} DE ${c} <SK>`,
@@ -314,7 +314,7 @@ export function signOff(s: Say): string {
     `R TNX FER QSO ${n} 73 ${s.you} DE ${c} <SK>`,
     `FB ${n} TNX FB QSO CUAGN 73 <SK> E E`,
     `R R TNX ${n} GL ES 73 <SK> E E`,
-    `TNX FER THE NICE QSO ${n} VY 73 GUD DX ${s.you} DE ${c} <SK> E E`,
+    `TNX FER THE NICE QSO ${n} VY 73 GL ${s.you} DE ${c} <SK> E E`,
     `R R ${n} HPE CUAGN SN 73 <SK> E E`,
   ]);
 }

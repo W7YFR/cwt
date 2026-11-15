@@ -399,8 +399,9 @@ export class Over {
 
   /** The calls sent after DE, each one as often as it was sent: DE W7YFR
    *  W7YFR gives it twice. A fragment left from a mistake, as the W in DE W
-   *  W7YFR W7YFR, is passed over. Run-together ones too, when lenient. */
-  private deCalls(them: string): string[] {
+   *  W7YFR W7YFR, is passed over. Run-together ones too, when lenient: with
+   *  `loose`, any; without, only a call also sent as a word, as in D E W7YFR. */
+  private deCalls(them: string, loose = true): string[] {
     const { words } = this;
     const out: string[] = [];
     for (let i = 0; i < words.length; i++) {
@@ -414,15 +415,17 @@ export class Over {
     }
     if (out.length || !this.ear.lenient) return out;
     for (const m of this.joined.matchAll(RUN_DE_RE)) {
+      if (!loose && !this.words.includes(m[1]!)) continue;
       if (!this.isThem(m[1]!, them)) out.push(m[1]!);
     }
     return out;
   }
 
   /** The call you sent after DE: the one sent most, and of those the last.
-   *  A call sent wrong and then sent again right comes out right. */
-  deCall(them: string): string | null {
-    const calls = this.deCalls(them);
+   *  A call sent wrong and then sent again right comes out right. `loose`
+   *  as for deCalls. */
+  deCall(them: string, loose = true): string | null {
+    const calls = this.deCalls(them, loose);
     let best: string | null = null;
     let most = 0;
     for (const c of calls) {
@@ -808,8 +811,10 @@ export function answer(qso: Qso, heard: string, context: Context = {}): Turn {
     mirror,
   });
 
-  // Your call after DE, once the station has one, replaces it.
-  const fixed = qso.stage === "cq" || qso.stage === "asking" ? null : over.deCall(them.call);
+  // Your call after DE, once the station has one, replaces it. Letters run
+  // together, as DEW7W7YFR from a call keyed again, read too loosely to
+  // replace one it holds.
+  const fixed = qso.stage === "cq" || qso.stage === "asking" ? null : over.deCall(them.call, !qso.you);
   if (fixed) qso = { ...qso, you: fixed };
 
   const paced = pace(qso, over, (slower) => wording.cannotChange(voice(qso), slower));

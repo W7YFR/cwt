@@ -132,6 +132,11 @@ describe("a QSO in each format", () => {
     expect(work(called("sst"), ["K4ABC TOM", "GA GA"]).qso.got?.region).toBe("GA");
   });
 
+  it("reads a POTA region after the report, not a TNX keyed apart before it", () => {
+    expect(work(called("pota"), ["K4ABC TN X UR 5NN WA BK"]).qso.got?.region).toBe("WA");
+    expect(work(called("pota"), ["K4ABC TN X UR 5NN WA BK"], { ...FIRST, ear: { lenient: true, saved: "" } }).qso.got?.region).toBe("WA");
+  });
+
   it("reads a number shaped like a report or a 73, unless another comes with it", () => {
     expect(work(called("cwt"), ["K4ABC TOM 291"]).qso.got?.number).toBe("291");
     expect(work(called("cwt"), ["K4ABC TOM 73"]).qso.got?.number).toBe("73");

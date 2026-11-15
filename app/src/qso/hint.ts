@@ -171,7 +171,7 @@ function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them)
         `FB ${n} TNX FER QSO HPE CUAGN 73 ${them} DE ${call} <SK>`,
         `R R TU ${n} GL ES 73 <SK>`,
         `TNX FB QSO ${n} 73 ${them} DE ${call} SK`,
-        `TNX FER FB QSO ${n} VY 73 GUD DX ${them} DE ${call} <SK>`,
+        `TNX FER FB QSO ${n} VY 73 GL ${them} DE ${call} <SK>`,
         `R R ${n} TNX FER THE QSO HPE CUAGN 73 <SK>`,
         `OK ${n} TNX ES 73 CUL ${them} DE ${call} SK`,
       ].map((t) => t.replace(/\s+/g, " ")));
