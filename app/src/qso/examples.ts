@@ -113,6 +113,6 @@ export function example(id: GuideId, you: ExampleYou = EXAMPLE_YOU): ExampleLine
     case "mst":
       return run(id, you, [`CQ MST ${call}`, `K4ABC ${name} 1`, `TU ${call}`]);
     case "pota":
-      return run(id, you, [`CQ POTA DE ${call}`, `K4ABC GE UR 5NN ${region} ${region} BK`, "BK TU 73 EE"]);
+      return run(id, you, [`CQ POTA ${call}`, `K4ABC TNX UR 599 ${region} BK`, `BK TU GA ES 73 ${call} E E`]);
   }
 }

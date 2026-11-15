@@ -23,13 +23,15 @@ export interface Format {
   readonly yours: readonly Item[];
   /** The effective speeds its stations send at, slowest and fastest. */
   readonly wpm: readonly [number, number];
+  /** How many of its stations are in Canada, 0 to 1. */
+  readonly canada: number;
 }
 
 export const FORMATS: Readonly<Record<FormatId, Format>> = {
-  cwt: { id: "cwt", word: "CWT", yours: ["name", "number"], wpm: [26, 32] },
-  sst: { id: "sst", word: "SST", yours: ["name", "region"], wpm: [14, 20] },
-  mst: { id: "mst", word: "MST", yours: ["name", "number"], wpm: [20, 25] },
-  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 25] },
+  cwt: { id: "cwt", word: "CWT", yours: ["name", "number"], wpm: [26, 32], canada: 0.08 },
+  sst: { id: "sst", word: "SST", yours: ["name", "region"], wpm: [14, 20], canada: 0.08 },
+  mst: { id: "mst", word: "MST", yours: ["name", "number"], wpm: [20, 25], canada: 0.08 },
+  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 25], canada: 0.03 },
 };
 
 export const FORMAT_IDS = Object.keys(FORMATS) as FormatId[];

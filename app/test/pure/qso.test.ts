@@ -132,6 +132,8 @@ describe("reading an over", () => {
   it("drops the word before each error sign", () => {
     expect(erased(wordsOf("DE W7YR EEE W7YFR K"))).toEqual(["DE", "W7YFR", "K"]);
     expect(erased(wordsOf("<HH> CQ"))).toEqual(["CQ"]);
+    // A lone dit letter before the sign is the slip: QTH stays.
+    expect(erased(wordsOf("QTH H EEE SEATTLE WA"))).toEqual(["QTH", "SEATTLE", "WA"]);
     expect(erased(wordsOf("TU 73 E E"))).toEqual(["TU", "73", "E", "E"]);
     expect(erased(wordsOf("TOM 55 E E"))).toEqual(["TOM", "55", "E", "E"]);
   });
@@ -734,6 +736,18 @@ describe("the station moves on only once the current part is settled", () => {
     expect(t.reply).toBe(`W7YFR DE ${c} UR RST? KN`);
     expect(t.qso.piece).toBe(1);
     expect(answer(t.qso, "R UR 579 579 KN", ctx).reply).toMatch(/ NAME /);
+  });
+
+  it("keeps the call it holds through your call keyed again, letter by letter", () => {
+    // The sign-off from the K4LCI-style log: DE W 7 3 EEEE W 7 Y F R.
+    let q = called(LENIENT);
+    const c = q.them.call;
+    q = answer(q, `${c} DE W7FR UR 5NN 5NN K`, LENIENT).qso;
+    expect(q.you).toBe("W7FR");
+    q = answer(q, "TNX FER QSO 73 D E W 7 3 EEEE W 7 Y F R <SK>", LENIENT).qso;
+    expect(q.you, "not W7W from DEW7W7YFR").toBe("W7FR");
+    q = answer(q, `${c} DE W7YFR TU 73`, LENIENT).qso;
+    expect(q.you, "a whole call after DE still replaces it").toBe("W7YFR");
   });
 
   it("sends the current piece again for a question it cannot place", () => {

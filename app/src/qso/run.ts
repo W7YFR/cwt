@@ -81,6 +81,9 @@ export interface RunQso {
   readonly askedAgn?: boolean;
   /** It said yes to your check of its call, as AJ9EN ?. */
   readonly callChecked?: boolean;
+  /** Its last line was one item of its exchange, sent again because you
+   *  asked for it, as OH OH for QTH?. Absent otherwise. */
+  readonly answered?: Item;
 }
 
 export type AnyQso = Qso | RunQso | ScriptQso;
@@ -113,7 +116,7 @@ export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "
   return {
     format,
     stage: "waiting",
-    them: randomCaller(rand, not),
+    them: randomCaller(rand, not, FORMATS[format].canada),
     you,
     yourName: "",
     last: "",
@@ -137,8 +140,9 @@ export function callIn(qso: RunQso, rand: Rand = Math.random): RunTurn {
   return say(qso, pick(rand, [c, `${c} ${c}`]), "called");
 }
 
-function say(qso: RunQso, reply: string, stage: RunStage = qso.stage): RunTurn {
-  return { qso: { ...qso, stage, last: reply, askedAgn: false }, reply, ended: false };
+function say(qso: RunQso, reply: string, stage: RunStage = qso.stage, answered?: Item): RunTurn {
+  const { answered: _, ...rest } = qso;
+  return { qso: { ...rest, stage, last: reply, askedAgn: false, ...(answered ? { answered } : {}) }, reply, ended: false };
 }
 
 /** Words around an exchange that are not part of it. */
@@ -190,7 +194,11 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   // A region that is also a greeting, as GA, counts once it comes after
   // the name, or after the report where there is no name.
   const from = named ? (name ? words.indexOf(name) : -1) : words.findIndex((w) => REPORT_IN.test(w));
-  const region = regionIn(after, mine, lenient) || (from >= 0 ? greetingRegionIn(words.slice(from + 1)) : "");
+  // With no name, the region comes after the report: in TN X UR 5NN WA, a
+  // TNX keyed apart, the region is WA, not TN.
+  const afterReport = !named && from >= 0 ? regionIn(words.slice(from + 1), mine, lenient) : "";
+  const region =
+    afterReport || regionIn(after, mine, lenient) || (from >= 0 ? greetingRegionIn(words.slice(from + 1)) : "");
   return { name, number, region, report };
 }
 
@@ -334,6 +342,22 @@ function cut(rst: string): string {
   return rst.replace(/9/g, "N");
 }
 
+/** How often a POTA station sends its report as 599, not 5NN. */
+const PLAIN = 0.4;
+
+/** The report a POTA station sends in one line: 5NN, or now and then 599. */
+function potaReport(them: Station, rand: Rand): string {
+  return rand() >= 1 - PLAIN ? them.rst : cut(them.rst);
+}
+
+/** The report a POTA station sent, as its lines hold it: 5NN, or 599 when
+ *  only that form is in them. */
+export function potaReportIn(them: Station, lines: readonly { readonly text: string }[]): string {
+  const said = (form: string) => lines.some((l) => l.text.split(/\s+/).includes(form));
+  const short = cut(them.rst);
+  return !said(short) && said(them.rst) ? them.rst : short;
+}
+
 /** The station's own exchange, worded a little differently each time. */
 function exchange(qso: RunQso, rand: Rand, hour: number): string {
   const { them, yourName } = qso;
@@ -351,6 +375,10 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
         join("TU", yourName, name, nr),
         join(g, yourName, name, nr),
         `TU ${name} ${nr} ${nr}`,
+        `R TU ${name} ${nr}`,
+        `TNX ${name} ${nr}`,
+        `${name} ${name} ${nr} ${nr}`,
+        join("FB", yourName, name, nr),
       ]);
     }
     case "sst":
@@ -360,19 +388,37 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
         `R ${name} ${st}`,
         `TU ${name} ${st}`,
         join(g, yourName, "TU", name, st),
+        join("TNX", yourName, name, st),
+        join("R", g, yourName, name, name, st, st),
+        join("FB", yourName, "TNX", name, st),
       ]);
     case "mst": {
       const nr = String(them.serial ?? 1);
-      return pick(rand, [`TU ${name} ${nr}`, `R ${name} ${nr}`, `${name} ${nr}`, join("TU", yourName, name, nr), `TU ${name} ${nr} ${nr}`]);
+      return pick(rand, [
+        `TU ${name} ${nr}`,
+        `R ${name} ${nr}`,
+        `${name} ${nr}`,
+        join("TU", yourName, name, nr),
+        `TU ${name} ${nr} ${nr}`,
+        `R TU ${name} ${nr}`,
+        `TNX ${name} ${nr}`,
+        `${name} ${name} ${nr} ${nr}`,
+      ]);
     }
     case "pota": {
-      const r = cut(them.rst);
+      // A hunter says its state once or twice, and 599 or 5NN.
+      const r = potaReport(them, rand);
       return pick(rand, [
+        `BK TU UR ${r} ${st} BK`,
         `BK TU UR ${r} ${r} ${st} ${st} BK`,
         `R R ${r} ${st} ${st} BK`,
         `${g} TU ${r} ${st} ${st} BK`,
         `BK ${g} OM UR ${r} ${r} ${st} ${st} BK`,
         `TU UR ${r} ${st} BK`,
+        `BK TNX UR ${r} ${r} ${st} BK`,
+        `TU ${r} ${st} ${st} BK`,
+        `BK TU UR ${r} ${st} 73 BK`,
+        `BK ${g} TNX UR ${r} ${st} ${st} BK`,
       ]);
     }
   }
@@ -380,7 +426,7 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
 
 /** One item of the station's exchange, or null when its exchange has no
  *  such item. */
-function valueOf(qso: RunQso, item: Item): string | null {
+function valueOf(qso: RunQso, item: Item, rand: Rand): string | null {
   const { them, format } = qso;
   return (
     item === "name"
@@ -398,7 +444,7 @@ function valueOf(qso: RunQso, item: Item): string | null {
             ? regionOf(them)
             : null
           : format === "pota"
-            ? cut(them.rst)
+            ? potaReport(them, rand)
             : null
   );
 }
@@ -407,16 +453,23 @@ function valueOf(qso: RunQso, item: Item): string | null {
  *  when its exchange has no such item. A POTA station now and then puts BK
  *  around it. */
 function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
-  const value = valueOf(qso, item);
+  const value = valueOf(qso, item, rand);
   if (value === null) return null;
   const { format } = qso;
   return format === "pota" && rand() < 0.25 ? `BK ${value} ${value} BK` : `${value} ${value}`;
 }
 
-/** What the station sends after your TU, or null for nothing. */
+/** What the station sends after your TU, or null for nothing. A hunter
+ *  closes with E E. In an SST, many send 73. In a CWT or an MST, a caller
+ *  sends nothing. */
 function lastWord(qso: RunQso, rand: Rand): string | null {
-  if (qso.format === "pota") return pick(rand, ["73 E E", "E E", "TU 73 E E", "GL 73 E E", "TU 72 E E"]);
-  if (qso.format === "sst") return rand() < 0.5 ? "73" : null;
+  if (qso.format === "pota") {
+    return pick(rand, ["73 E E", "E E", "TU 73 E E", "GL 73 E E", "TU 72 E E", "R 73 E E", "TNX 73 E E", "72 E E", "TU GL E E"]);
+  }
+  if (qso.format === "sst") {
+    const n = qso.yourName;
+    return pick(rand, ["73", null, "TU 73", null, "GL 73", n ? `TNX ${n} 73` : "TNX 73", "73 E E", "E E"]);
+  }
   return null;
 }
 
@@ -445,7 +498,7 @@ const CHECK_AROUND = new Set([...TURN_WORDS, "R", "RR", "UR", "RST", "QTH", "NR"
 function checksRight(qso: RunQso, over: Over): boolean {
   if (!over.words.some((w) => w.endsWith("?"))) return false;
   const values = new Set(
-    (Object.keys(ASK) as Item[]).flatMap((item) => valueOf(qso, item) ?? []).map(cut),
+    (Object.keys(ASK) as Item[]).flatMap((item) => valueOf(qso, item, () => 0) ?? []).map(cut),
   );
   const checked = over.words.map((w) => w.replace(/\?+$/, "")).filter((w) => w && !CHECK_AROUND.has(w));
   return checked.length > 0 && checked.every((w) => values.has(cut(w)));
@@ -578,8 +631,12 @@ export function answerRun(qso: RunQso, heard: string, context: RunContext = {}):
       if (checksRight(qso, over)) return say(qso, pick(rand, ["RR", "R R", "YES", "R R YES"]));
       if (asksCall(over)) return say(qso, `${c} ${c}`);
       const item = askedItem(over);
-      if (item) return say(qso, itemOf(qso, item, rand) ?? qso.last);
-      if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last);
+      if (item) {
+        const value = itemOf(qso, item, rand);
+        return value ? say(qso, value, qso.stage, item) : say(qso, qso.last);
+      }
+      // AGN gets its last line again, an item it answered too.
+      if (asksAgain(over) && !over.has("TU")) return say(qso, qso.last, qso.stage, qso.answered);
       const reply = lastWord(qso, rand);
       return { qso: { ...qso, last: reply ?? qso.last }, reply, ended: true };
     }

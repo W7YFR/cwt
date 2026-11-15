@@ -2,11 +2,12 @@
  * format and every length. */
 
 import { describe, expect, it } from "vitest";
-import { newQso } from "@/qso/cq";
+import { answer, newQso, type Qso } from "@/qso/cq";
 import { FORMATS, FORMAT_IDS, type FormatId } from "@/qso/formats";
-import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME, type Me, type Voice } from "@/qso/hint";
+import { hint, meOf, PLAIN, seededVoice, THEIR_CALL, THEIR_NAME, THEIR_STATE, type Me, type Voice } from "@/qso/hint";
 import { isScript } from "@/qso/script";
-import { isRun, respond, type AnyQso, type RunContext } from "@/qso/run";
+import { answerRun, isRun, newRun, respond, type AnyQso, type RunContext, type RunQso } from "@/qso/run";
+import type { Station } from "@/qso/station";
 
 const ME: Me = { call: "W7YFR", name: "ROB", qth: "PORTLAND OR", region: "OR", nr: "" };
 
@@ -118,8 +119,9 @@ describe("every wording of the hints", () => {
 
   it("works a standard QSO of each length, and the station copies all of you", () => {
     for (const length of ["full", "short", "pieces"] as const) {
-      for (let seed = 1; seed <= 150; seed++) {
-        const rand = seeded(seed);
+      for (let seed = 1; seed <= 600; seed++) {
+        // Seeds spread out: a small seed's first draw is near 0.
+        const rand = seeded(seed * 104729);
         const me: Me = { ...ME, ...places[seed % 2]!, name: names[seed % 3]!, rst: ["599", "579", "559"][seed % 3]! };
         const voice = { rand, hour: seed % 24 };
         const qso = workWorded(newQso(rand), { rand, hour: 10, length, region: me.region }, me, voice, null);
@@ -134,8 +136,9 @@ describe("every wording of the hints", () => {
 
   it("works a run of each format, and the station copies all of you", () => {
     for (const format of FORMAT_IDS) {
-      for (let seed = 1; seed <= 150; seed++) {
-        const rand = seeded(seed);
+      for (let seed = 1; seed <= 600; seed++) {
+        // Seeds spread out: a small seed's first draw is near 0.
+        const rand = seeded(seed * 104729);
         const me: Me = { ...ME, ...places[seed % 2]!, name: names[seed % 3]!, nr: ["", "3001", "291"][seed % 3]! };
         const voice = { rand, hour: seed % 24 };
         const qso = workWorded(newQso(rand), { rand, hour: 10, region: me.region }, me, voice, format);
@@ -144,7 +147,7 @@ describe("every wording of the hints", () => {
         const got = qso.got!;
         const yours = FORMATS[format].yours;
         if (yours.includes("name")) expect(got.name).toBe(me.name);
-        if (yours.includes("report")) expect(got.report).toBe("5NN");
+        if (yours.includes("report")) expect(got.report).toMatch(/^(5NN|599)$/);
         if (format === "sst" || format === "pota" || (format === "cwt" && !me.nr)) expect(got.region).toBe(me.region);
         if (format === "cwt" && me.nr) expect(got.number).toBe(me.nr);
         if (format === "mst") expect(got.number).toBe("1");
@@ -192,5 +195,107 @@ describe("you, as the hints send you", () => {
       ...ME,
       nr: "3001",
     });
+  });
+});
+
+describe("your sign-off after the station sent an item again", () => {
+  const W8XY: Station = { call: "W8XY", name: "BOB", qth: "DAYTON OH", rst: "559", toneHz: 600, nr: "1234" };
+  /** The station's exchange sent, then `ask` from you, and its answer. */
+  const asked = (format: FormatId, ask: string): RunQso => {
+    const sent: RunQso = { ...newRun(format, seeded(1)), them: W8XY, stage: "exchanged", you: "W7YFR" };
+    const turn = answerRun(sent, ask, { rand: () => 0 });
+    expect(turn.ended, ask).toBe(false);
+    return turn.qso as RunQso;
+  };
+  const voices = Array.from({ length: 40 }, (_, i) => ({ rand: seeded((i + 1) * 104729), hour: 12 }));
+
+  it("says back the state you asked for, as you have it, and ends the QSO", () => {
+    for (const format of ["pota", "sst"] as const) {
+      const qso = asked(format, "QTH?");
+      for (const voice of voices) {
+        const sent = hint(qso, ME, null, voice, { call: "W8XY", name: "BOB", region: "OH" });
+        expect(sent.split(" "), sent).toContain("OH");
+        expect(answerRun(qso, sent, { rand: () => 0 }).ended, sent).toBe(true);
+        const before = hint(qso, ME, null, voice, { call: "W8XY", name: "BOB", region: "" });
+        expect(before, "not yet copied").toContain(THEIR_STATE);
+        expect(before.split(" ")).not.toContain("OH");
+      }
+    }
+  });
+
+  it("says back the name you asked for", () => {
+    const qso = asked("cwt", "NAME?");
+    for (const voice of voices) expect(hint(qso, ME, null, voice, { call: "W8XY", name: "BOB" }).split(" ")).toContain("BOB");
+  });
+
+  it("acknowledges a report it cannot say back", () => {
+    const qso = asked("pota", "RST?");
+    for (const voice of voices) expect(hint(qso, ME, null, voice, { call: "W8XY", name: "BOB", region: "OH" })).toMatch(/^(BK )?RR? ?R? ?(TU|TNX)/);
+  });
+
+  it("keeps the item through AGN, and drops it when its last line answered nothing", () => {
+    const qso = asked("pota", "QTH?");
+    expect((answerRun(qso, "AGN", { rand: () => 0 }).qso as RunQso).answered).toBe("region");
+    const checked = answerRun(qso, "OH?", { rand: () => 0 });
+    expect(checked.reply).toMatch(/^(RR|R R|YES|R R YES)$/);
+    expect((checked.qso as RunQso).answered).toBeUndefined();
+  });
+});
+
+describe("the CQ between QSOs of a run", () => {
+  const waiting = { ...newRun("pota", seeded(1)), you: "W7YFR" } as RunQso;
+
+  it("is for the run's own format, unless the preferred mode is another", () => {
+    expect(hint(waiting, ME)).toMatch(/^CQ .*POTA/);
+    expect(hint(waiting, ME, "pota")).toMatch(/^CQ .*POTA/);
+    expect(hint(waiting, ME, "sst")).toMatch(/^CQ SST/);
+    const plain = hint(waiting, ME, null);
+    expect(plain).toMatch(/^CQ /);
+    expect(plain).not.toMatch(/POTA|SST|MST|CWT/);
+  });
+});
+
+describe("a standard QSO piece by piece, from the hints", () => {
+  const K4LCI = { call: "K4LCI", name: "ED", qth: "ROANOKE VA", rst: "569", toneHz: 600 };
+
+  it("sends your exchange one piece a turn, and the station copies all of you", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rand = seeded(seed * 104729);
+      const voice = { rand, hour: 12, pieces: true };
+      let qso: Qso = { ...newQso(rand), them: K4LCI };
+      let ended = false;
+      for (let n = 0; n < 12 && !ended; n++) {
+        const sent = hint(qso, ME, null, voice);
+        if (qso.stage === "called" || qso.stage === "pieces") {
+          // Never more than one piece of yours in a line.
+          const labels = ["RST", "NAME", "OP", "QTH"].filter((l) => sent.split(" ").includes(l) && !sent.includes(`${l}?`));
+          expect(labels.length, sent).toBeLessThanOrEqual(1);
+        }
+        const turn = answer(qso, sent, { rand, hour: 12, length: "pieces" });
+        expect(turn.reply ?? "", `the answer to "${sent}"`).not.toMatch(ASKS_AGAIN);
+        ended = turn.ended;
+        qso = turn.qso;
+      }
+      expect(ended).toBe(true);
+      expect(qso.yourName).toBe(ME.name);
+      expect(qso.yourQth).toBe(ME.qth);
+    }
+  });
+
+  it("uses its name once it has sent it, and asks for its next piece once yours are sent", () => {
+    let qso: Qso = { ...newQso(() => 0), them: K4LCI };
+    for (const t of ["CQ CQ DE W7YFR K", "K4LCI DE W7YFR UR 599 599 NAME ROB ROB QTH SEATTLE WA K"]) {
+      qso = answer(qso, t, { rand: () => 0, length: "pieces" }).qso;
+    }
+    expect(hint(qso, ME, null, PLAIN)).toMatch(/UR NAME\? K$/);
+    qso = answer(qso, hint(qso, ME, null, PLAIN), { rand: () => 0, length: "pieces" }).qso;
+    // It answers NAME? and goes on to its QTH: your next line is to ED.
+    expect(hint(qso, ME, null, PLAIN).split(" ")).toContain("ED");
+  });
+
+  it("signs with both calls after the station's 73, most of the time", () => {
+    const signing = { ...newQso(() => 0), them: K4LCI, stage: "signing" as const, you: "W7YFR" };
+    const lines = Array.from({ length: 60 }, (_, i) => hint(signing, ME, null, { rand: seeded((i + 1) * 104729), hour: 12 }));
+    expect(lines.filter((l) => l.includes("K4LCI DE W7YFR")).length).toBeGreaterThan(lines.length / 2);
   });
 });

@@ -105,6 +105,10 @@ describe("Exchange", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(rows()[0]!.querySelectorAll(".bookmore li.them").length).toBeGreaterThan(0);
     expect(rows()[0]!.querySelector(".bookmore")!.hasAttribute("inert")).toBe(false);
+    // Its report, both ways: the station's items, then yours.
+    const sides = [...rows()[0]!.querySelectorAll('[data-testid="qso-report"] tbody tr:not(.side)')];
+    expect(sides.length).toBeGreaterThan(0);
+    expect(rows()[0]!.querySelectorAll('[data-testid="qso-report"] tr.side')).toHaveLength(2);
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
   });
@@ -127,7 +131,8 @@ describe("Exchange", () => {
 
   it("puts what you typed in the suggested reply, never what was sent", async () => {
     await open({ qsoTheirText: "exchange", qsoHints: "always", user: USER });
-    await send("CQ CWT W7YFR");
+    // POTA: every reply to a caller starts with its call.
+    await send("CQ POTA W7YFR");
     const { call } = kept().qso.them;
     expect(hint()).not.toContain(call);
     await fill(boxes()[0]!, "K1XYZ");

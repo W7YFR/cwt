@@ -12,7 +12,7 @@
  * everything hidden shows, and your copy is graded.
  */
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPlayer } from "@/audio/player";
 import { fadeOf, NOISE_OFF_DB, seedOf, type Fade } from "@/audio/qsb";
 import type { Band } from "@/audio/player";
@@ -32,6 +32,7 @@ import {
   saveSpeed,
 } from "@/io/storage";
 import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
+import { REPLIES_EVENT, suggestedRepliesOn } from "@/devtools";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
@@ -41,7 +42,7 @@ import { exchangeReport, itemLabels } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
-import type { Station } from "@/qso/station";
+import { regionOf, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { anyAdded, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { patternOf } from "@/morse";
@@ -50,7 +51,7 @@ import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type L
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
-import { IconEdit, IconPlay, IconStop } from "./Icons";
+import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
@@ -60,7 +61,7 @@ import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NO
 import { Graded, RightOnly, type SentAttrs } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
-import { QsoGuide } from "./QsoHelp";
+import { ExampleLines, QsoGuide } from "./QsoHelp";
 import { PageHelp, type KeyGroup } from "./Help";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
@@ -84,6 +85,14 @@ import { useLiveCopy } from "./useLiveCopy";
 import { useRecorder } from "./useRecorder";
 import { HomeButton } from "./Wordmark";
 
+
+/** The kind of QSO under way, once the station has answered your CQ: a
+ *  format, or CQ for a standard QSO. Null before that, and in a script. */
+function kindOf(q: AnyQso): GuideId | null {
+  if (isScript(q)) return null;
+  if (isRun(q)) return q.stage === "waiting" ? null : q.format;
+  return q.stage === "cq" ? null : "cq";
+}
 
 function same(a: Speed, b: Speed): boolean {
   return a.charWpm === b.charWpm && a.farnsworthWpm === b.farnsworthWpm;
@@ -300,6 +309,16 @@ const HINTS: ReadonlyArray<Option<Hints>> = [
     note: "A suggested reply shows once you copy the station's line right.",
   },
 ];
+const KINDS: ReadonlyArray<Option<GuideId>> = [
+  { value: "cq", label: "CQ", note: "A plain CQ: a casual QSO with one station." },
+  { value: "pota", label: "POTA", note: "You at a park: a report and your state." },
+  { value: "sst", label: "SST", note: "A slow contest: your name and state." },
+  { value: "mst", label: "MST", note: "A medium-speed contest: your name and a serial number." },
+  { value: "cwt", label: "CWT", note: "A fast contest: your name and CWops number, or your state." },
+];
+const KIND_HELP =
+  "The kind of QSO the suggested reply calls CQ for, and the one the guide's Examples show. " +
+  "A CQ that starts another kind changes it.";
 const HINTS_HELP =
   "A suggested reply under the log: one way to answer the station, with your details from User. " +
   "Once copied waits until your copy of the station's line is all right. " +
@@ -330,6 +349,9 @@ interface Line {
   /** The tone the station sent it at, for the station's overs. Absent in a
    *  log kept before it was. */
   readonly toneHz?: number;
+  /** Your lines: the suggested reply when you began it, shown or not, for
+   *  the debug save. Absent when there was none. */
+  readonly hint?: string;
 }
 
 /** What a reload brings back of the session: the log and the QSO under
@@ -354,6 +376,12 @@ interface Kept {
   /** Your copy of each QSO's items, typed with the station's lines as
    *  Exchange, by QSO and label. Absent in a log kept before there was. */
   readonly items?: Readonly<Record<number, Readonly<Record<string, string>>>>;
+}
+
+/** The console's switch for the suggested replies in the log, followed. */
+function onReplies(changed: () => void): () => void {
+  window.addEventListener(REPLIES_EVENT, changed);
+  return () => window.removeEventListener(REPLIES_EVENT, changed);
 }
 
 /** A reply the station is about to send, before it goes in the log. */
@@ -583,9 +611,14 @@ export function QsoScreen({
       l.map((line) => (!line.you && line.mode === "copy" && !line.locked ? { ...line, input: next } : line)),
     );
   };
-  /** The kind of QSO the guide's examples show. A first suggested CQ is for
-   *  it. */
-  const [guideKind, setGuideKind] = useState<GuideId>(() => loadPrefs().qsoGuide ?? "cq");
+  /** The preferred mode: the kind of QSO a suggested CQ is for, and the one
+   *  the guide's examples show. The QSO page's switch and the Examples set
+   *  it, and so does a CQ that starts another kind. */
+  const [guideKind, setGuideKindRaw] = useState<GuideId>(() => loadPrefs().qsoGuide ?? "cq");
+  const setGuideKind = (next: GuideId) => {
+    setGuideKindRaw(next);
+    savePrefs({ ...loadPrefs(), qsoGuide: next });
+  };
   const [hints, setHintsRaw] = useState<Hints>(() => loadPrefs().qsoHints ?? "off");
   const setHints = (next: Hints) => {
     setHintsRaw(next);
@@ -609,6 +642,8 @@ export function QsoScreen({
   };
   const [lockCopy, setLockCopy] = useOnOff("qsoLockCopy", true);
   const [gradeTyping, setGradeTyping] = useOnOff("qsoGradeTyping", false);
+  // Set from the console: __cwt.suggestedReplies().
+  const pastHints = useSyncExternalStore(onReplies, suggestedRepliesOn);
   const [allowEdits, setAllowEdits] = useOnOff("qsoAllowEdits", false);
   const [lockedShows, setLockedShowsRaw] = useState<LockedShows>(
     () => loadPrefs().qsoLockedShows ?? "nothing",
@@ -626,6 +661,8 @@ export function QsoScreen({
   const qso = useRef<AnyQso>(kept?.qso ?? newQso(Math.random, "", speed));
   /** Which QSO of the session is running, counted from 0. */
   const qsoNo = useRef(kept?.qsoNo ?? 0);
+  /** The suggested reply on your turn, shown or not, as of the last render. */
+  const replyRef = useRef<string | null>(null);
   /** The QSOs that are over. Their overs all show. */
   const [closed, setClosed] = useState<readonly number[]>(() => kept?.closed ?? []);
   /** Each QSO that is over, as it ended, for its report. */
@@ -1280,7 +1317,8 @@ export function QsoScreen({
     const them = turn.qso.them;
     const n = qsoNo.current;
     const sent: Line = {
-      who: turn.qso.you || "You",
+      // Your own call: what the station copied of it shows in the report.
+      who: user.callsign.trim().toUpperCase() || turn.qso.you || "You",
       text: heard,
       you: true,
       qso: n,
@@ -1288,9 +1326,13 @@ export function QsoScreen({
       mode: "before",
       locked: false,
       sentWpm: copy.sentWpm,
+      ...(replyRef.current ? { hint: replyRef.current } : {}),
     };
 
     qso.current = turn.ended ? following(turn.qso, Math.random, speed) : turn.qso;
+    // A CQ that started another kind of QSO makes it the preferred mode.
+    const started = kindOf(turn.qso);
+    if (started && started !== guideKind) setGuideKind(started);
     if (turn.ended) {
       const done = turn.qso;
       setEnds((e) => ({ ...e, [n]: done }));
@@ -1852,8 +1894,9 @@ export function QsoScreen({
       itemsIn(n) ? (items[n] ?? {}) : undefined,
     );
   };
-  /** The report of QSO `n`: both sides, or one. */
-  const qsoReport = (n: number, only?: "you"): React.ReactElement | null => {
+  /** The report of QSO `n`: what the station sent and you copied, and what
+   *  you sent and it copied. */
+  const qsoReport = (n: number): React.ReactElement | null => {
     const done = ends[n];
     if (!closed.includes(n) || !done) return null;
     if (isScript(done)) return scriptReportOf(done);
@@ -1882,7 +1925,7 @@ export function QsoScreen({
       <div className="qsoreport" data-testid="qso-report">
         <table>
           <tbody>
-            {only !== "you" && group("them", `${call} sent`, "You copied")}
+            {group("them", `${call} sent`, "You copied")}
             {group("you", "You sent", `${call} copied`)}
           </tbody>
         </table>
@@ -2225,22 +2268,36 @@ export function QsoScreen({
      what it sent: the reply must not tell you if your copy is right. */
   const typedItem = (label: string, or: string) =>
     (items[qsoNo.current]?.[label] ?? "").toUpperCase().replace(/\s+/g, " ").trim() || or;
+  const theirRegion = regionOf(them);
   const theirsIn = headless(qsoNo.current)
-    ? { call: typedItem("Call", THEIR_CALL), name: typedItem("Name", THEIR_NAME) }
-    : { call: callShown ? them.call : THEIR_CALL, name: nameShown ? them.name : THEIR_NAME };
-  const suggestion =
-    // A script always shows what is to be sent next: that is the exercise.
-    // It stays while a line plays again, so the page does not jump.
-    recorder &&
-    (phase === "listening" || phase === "replaying") &&
-    (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
+    ? { call: typedItem("Call", THEIR_CALL), name: typedItem("Name", THEIR_NAME), region: typedItem("State", "") }
+    : {
+        call: callShown ? them.call : THEIR_CALL,
+        name: nameShown ? them.name : THEIR_NAME,
+        region: theirsShown || heard(qsoNo.current, theirRegion) ? theirRegion : "",
+      };
+  /** The suggested reply for your turn, shown or not: the debug save keeps
+   *  it with your line. */
+  const reply =
+    recorder && (phase === "listening" || phase === "replaying")
       ? hint(
           qso.current,
           meOf(loadUser()),
           guideKind === "cq" ? null : guideKind,
-          seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+          {
+            ...seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+            // A station that goes piece by piece: your exchange goes so too.
+            pieces: length === "pieces" || (length === "mixed" && piecesStation.current),
+          },
           theirsIn,
         )
+      : null;
+  replyRef.current = reply;
+  const suggestion =
+    // A script always shows what is to be sent next: that is the exercise.
+    // It stays while a line plays again, so the page does not jump.
+    reply !== null && (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
+      ? reply
       : null;
 
   /* A new line, or more of one, keeps the end of the log in view: unless you
@@ -2299,20 +2356,30 @@ export function QsoScreen({
   const lineItem = (i: number): React.ReactElement => {
     const line = lines[i]!;
     return (
-      <li key={i} className={line.you ? "you" : "them"} data-line={i}>
-        {labelOf(line)}
-        {textOf(line, i)}
-        <span className="lend">
-          {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
-            <span className="lwpm" data-testid="qso-line-wpm">
-              {wpmOf(line.sentWpm)}
-            </span>
-          )}
-          {lineEdit(line, i)}
-          {linePlay(i)}
-          {lineMore(i)}
-        </span>
-      </li>
+      <Fragment key={i}>
+        {/* The reply suggested before this one of yours, above it. */}
+        {pastHints && line.you && line.hint && (
+          <li className="pasthint" data-testid="qso-past-hint">
+            <p className="qsohint">
+              Suggested reply:<code>{line.hint}</code>
+            </p>
+          </li>
+        )}
+        <li className={line.you ? "you" : "them"} data-line={i}>
+          {labelOf(line)}
+          {textOf(line, i)}
+          <span className="lend">
+            {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
+              <span className="lwpm" data-testid="qso-line-wpm">
+                {wpmOf(line.sentWpm)}
+              </span>
+            )}
+            {lineEdit(line, i)}
+            {linePlay(i)}
+            {lineMore(i)}
+          </span>
+        </li>
+      </Fragment>
     );
   };
 
@@ -2422,7 +2489,10 @@ export function QsoScreen({
                 aria-label={isOpen ? `Close QSO ${g + 1}` : `Open QSO ${g + 1} · ${call}`}
                 onClick={toggle}
               >
-                ▸
+                {/* A chevron, not ▸: that reads as Play beside the play button. */}
+                <i className="ico">
+                  <IconChevron />
+                </i>
               </button>
             </span>
           </span>
@@ -2432,7 +2502,7 @@ export function QsoScreen({
             <div className="bookinner">
               <div className="bookbody">
                 <ol className="qsolines">{group.at.map(lineItem)}</ol>
-                {qsoReport(n, "you")}
+                {qsoReport(n)}
               </div>
             </div>
           </div>
@@ -2466,6 +2536,16 @@ export function QsoScreen({
       value={theirText}
       options={THEIR_TEXTS}
       onChange={(v) => setTheirText(v as TheirText)}
+    />
+  );
+  const kindChoice = (
+    <ChoiceGroup
+      id="qso-kind"
+      label="Preferred mode"
+      help={KIND_HELP}
+      value={guideKind}
+      options={KINDS}
+      onChange={(v) => setGuideKind(v as GuideId)}
     />
   );
   const hintsChoice = (
@@ -2522,13 +2602,7 @@ export function QsoScreen({
           <PageHelp
             title="QSO"
             guide={
-              <QsoGuide
-                /* A run under way shows its own kind first. */
-                initial={isRun(qso.current) ? qso.current.format : undefined}
-                onSettings={showSettings}
-                settingsOpen={settingsOpen}
-                onShown={setGuideKind}
-              />
+              <QsoGuide onSettings={showSettings} settingsOpen={settingsOpen} shown={guideKind} onShown={setGuideKind} />
             }
             keys={QSO_KEYS}
           />
@@ -2602,6 +2676,12 @@ export function QsoScreen({
             <>
               <QuickChip id="speed" label="Speed" value={fmtSpeed(speed)} widest={WIDEST_SPEED} tab="speed" locked={recorder !== null}>
                 {speedSection}
+              </QuickChip>
+              <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} widest="POTA" tab="page">
+                <Section name="you" title="You">
+                  <div className="panelgroups">{kindChoice}</div>
+                  <ExampleLines shown={guideKind} testId="qso-kind-example" />
+                </Section>
               </QuickChip>
               <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} widest={longest(LENGTHS.map((l) => l.label))} tab="page">
                 <Section name="station" title="The other station">
@@ -2677,6 +2757,7 @@ export function QsoScreen({
                       onChange={(v) => setYourText(v as YourText)}
                     />
                     {hintsChoice}
+                    {kindChoice}
                     <Check
                       id="qso-show-speed"
                       label="Show my speed on each line"
@@ -2812,6 +2893,23 @@ export function QsoScreen({
 
           <div className="qsocontrols">
             <DebugDownload
+              session={() => {
+                // Every line, the QSOs as the station had them, your copy in
+                // Exchange's boxes, your settings, and the session's clean audio.
+                const parts = lines.map((_, i) => tapeLineOf(i)).filter((p): p is TapeLine => p !== null);
+                return {
+                  data: {
+                    prefs: loadPrefs(),
+                    user: loadUser(),
+                    lines,
+                    ends,
+                    current: qso.current,
+                    items,
+                    closed,
+                  },
+                  audio: parts.length ? tape(parts, tapeRate()) : null,
+                };
+              }}
               current={() =>
                 recorder
                   ? {
@@ -2827,7 +2925,10 @@ export function QsoScreen({
                 alone. */}
             {/* Only once QRS or QRQ has moved it: a station starts at your speed,
                 and the guide says so. */}
-            {playback === "always" && lines.some((l) => !l.you && l.input === "slots") && (
+            {/* Only with slots on the page: Exchange and the other modes show
+                none, so there is nothing to select. */}
+            {playback === "always" &&
+              lines.some((l) => !l.you && l.input === "slots" && theirModeOf(l) === "copy") && (
               <div className="modeswitch" role="group" aria-label="Play the selected slot">
                 {slotPlay("Letter", `Play the selected letter (${ALT}+L)`, playLetter, "qso-play-letter")}
                 {slotPlay("Word", `Play the selected word (${ALT}+W)`, playWord, "qso-play-word")}
@@ -2843,7 +2944,7 @@ export function QsoScreen({
 
         {guideShown && (
           <div className="qsoguide prose" data-testid="qso-guide">
-            <QsoGuide onSettings={showSettings} settingsOpen={settingsOpen} onShown={setGuideKind} />
+            <QsoGuide onSettings={showSettings} settingsOpen={settingsOpen} shown={guideKind} onShown={setGuideKind} />
           </div>
         )}
 

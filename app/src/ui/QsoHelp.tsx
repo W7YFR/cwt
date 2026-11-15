@@ -16,10 +16,9 @@
  * does, and closes on Escape, on Close, or on a click outside it.
  */
 
-import { useState } from "react";
 import { EXAMPLE_STATION, GUIDE_IDS, example, exampleYou, type GuideId } from "@/qso/examples";
 import { FORMATS } from "@/qso/formats";
-import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
+import { loadUser } from "@/io/storage";
 
 /** Each kind's name on its button. */
 const LABEL: Readonly<Record<GuideId, string>> = { cq: "CQ", cwt: "CWT", sst: "SST", mst: "MST", pota: "POTA" };
@@ -75,53 +74,67 @@ function About({ id }: { id: GuideId }): React.ReactElement {
   }
 }
 
-/** The kind the guide shows first: the one asked for, else the last one
- *  shown. */
-function firstShown(initial: GuideId | undefined): GuideId {
-  return initial ?? loadPrefs().qsoGuide ?? "cq";
+/** The kinds of QSO, as buttons: one pressed. The Examples choose with it,
+ *  and so does **Preferred mode** on the page. Both show the same kind. */
+export function KindSwitch({
+  shown,
+  onShown,
+  labelledBy,
+  testId,
+}: {
+  shown: GuideId;
+  onShown(shown: GuideId): void;
+  /** The id of the label that names the group. */
+  labelledBy: string;
+  testId: string;
+}): React.ReactElement {
+  return (
+    <div className="modeswitch" role="group" aria-labelledby={labelledBy} data-testid={testId}>
+      {GUIDE_IDS.map((id) => (
+        <button key={id} type="button" aria-pressed={shown === id} data-kind={id} onClick={() => onShown(id)}>
+          {LABEL[id]}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-/** An example QSO of each kind, one at a time, with buttons to choose. In
- *  the guide, and beside the log once a session runs. */
+/** An example QSO of each kind, one at a time, with buttons to choose. The
+ *  kind shown is the page's preferred mode. */
 export function QsoExamples({
-  initial,
+  shown,
   onShown,
 }: {
-  initial?: GuideId | undefined;
+  shown: GuideId;
   /** Another kind was chosen. */
-  onShown?: ((shown: GuideId) => void) | undefined;
+  onShown(shown: GuideId): void;
 }): React.ReactElement {
-  const [shown, setShownRaw] = useState<GuideId>(() => firstShown(initial));
-  const setShown = (next: GuideId) => {
-    setShownRaw(next);
-    savePrefs({ ...loadPrefs(), qsoGuide: next });
-    onShown?.(next);
-  };
-  // Read each time: User may have changed in the settings.
-  const you = exampleYou(loadUser());
-  const lines = example(shown, you);
   return (
     <section className="qsoexamples" data-testid="qso-examples" data-shown={shown}>
       <h3 id="qso-examples-label">Examples</h3>
-      <div className="modeswitch" role="group" aria-labelledby="qso-examples-label" data-testid="qso-guide-kinds">
-        {GUIDE_IDS.map((id) => (
-          <button key={id} type="button" aria-pressed={shown === id} data-kind={id} onClick={() => setShown(id)}>
-            {LABEL[id]}
-          </button>
-        ))}
-      </div>
+      <KindSwitch shown={shown} onShown={onShown} labelledBy="qso-examples-label" testId="qso-guide-kinds" />
       <About id={shown} />
-      <ol className="qsoexample" data-testid="qso-example">
-        {lines.map((line, i) => (
-          <li key={i} className={line.you ? "you" : "them"}>
-            <span className="who">{line.you ? "You" : EXAMPLE_STATION.call}</span>
-            <span className="text">
-              <code>{line.text}</code>
-            </span>
-          </li>
-        ))}
-      </ol>
+      <ExampleLines shown={shown} />
     </section>
+  );
+}
+
+/** The example QSO of one kind, line by line, with no words about it. In the
+ *  Examples, and under Preferred mode as a reminder. */
+export function ExampleLines({ shown, testId = "qso-example" }: { shown: GuideId; testId?: string }): React.ReactElement {
+  // Read each time: User may have changed in the settings.
+  const lines = example(shown, exampleYou(loadUser()));
+  return (
+    <ol className="qsoexample" data-testid={testId} data-shown={shown}>
+      {lines.map((line, i) => (
+        <li key={i} className={line.you ? "you" : "them"}>
+          <span className="who">{line.you ? "You" : EXAMPLE_STATION.call}</span>
+          <span className="text">
+            <code>{line.text}</code>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -130,16 +143,16 @@ export function QsoExamples({
 export function QsoGuide({
   onSettings,
   settingsOpen,
-  initial,
+  shown,
   onShown,
 }: {
   onSettings(): void;
   /** The settings are open already: the guide points at them, not to them. */
   settingsOpen: boolean;
-  /** The kind to show first: the format of the run under way. */
-  initial?: GuideId | undefined;
+  /** The kind the Examples show: the page's preferred mode. */
+  shown: GuideId;
   /** Another kind was chosen. */
-  onShown?: ((shown: GuideId) => void) | undefined;
+  onShown(shown: GuideId): void;
 }): React.ReactElement {
   return (
     <div className="qsoguidecols">
@@ -183,7 +196,7 @@ export function QsoGuide({
         )}
       </div>
 
-      <QsoExamples initial={initial} onShown={onShown} />
+      <QsoExamples shown={shown} onShown={onShown} />
     </div>
   );
 }

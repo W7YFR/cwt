@@ -113,7 +113,7 @@ export function makeScript(options: MakeOptions): Script {
   const mySpeed = wpmIn(rand, start ? FORMATS[start].wpm : STANDARD_QSO_WPM);
   const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand), speed: mySpeed }];
   const lines: ScriptLine[] = [];
-  const voice = { rand, hour };
+  const voice = { rand, hour, pieces: length === "pieces" };
   const context = { rand, hour, length, region: me.region, speed: mySpeed };
 
   /** The place of the station in `qso`, added when first heard. */

@@ -18,8 +18,8 @@ import { FORMATS, type FormatId } from "./formats";
 import { isRun, type AnyQso, type RunQso } from "./run";
 import { isScript, yourLine } from "./script";
 import { REGIONS } from "./formats";
-import { pick, type Rand } from "./station";
-import { greeting, type Piece } from "./wording";
+import { pick, regionOf, type Rand } from "./station";
+import { greeting, LABEL, PIECES, type Piece } from "./wording";
 
 /** You, as the hints send you. */
 export interface Me {
@@ -39,6 +39,9 @@ export interface Voice {
   readonly rand: Rand;
   /** Your local hour, 0 to 23, for GM, GA or GE. */
   readonly hour: number;
+  /** In a standard QSO, the station goes piece by piece, so you do too:
+   *  your exchange one item a turn. Absent: all at once. */
+  readonly pieces?: boolean;
 }
 
 /** The first wording of every over. */
@@ -81,12 +84,12 @@ function pieceOf(p: Piece, me: Me, v: Voice): string {
   const rst = me.rst ?? "599";
   if (p === "report") {
     const r = rst === "599" && v.rand() < 0.2 ? "5NN" : rst;
-    return pick(v.rand, [`UR ${r} ${r}`, `UR RST ${r} ${r}`, `RST ${r} ${r}`, `UR RST IS ${r} ${r}`]);
+    return pick(v.rand, [`UR ${r} ${r}`, `UR RST ${r} ${r}`, `RST ${r} ${r}`, `UR RST IS ${r} ${r}`, `UR SIG ${r} ${r}`, `UR RST ${r} ${r} FB SIG`]);
   }
   const n = me.name;
-  if (p === "name") return pick(v.rand, [`NAME ${n} ${n}`, `NAME HR ${n} ${n}`, `OP ${n} ${n}`, `NAME IS ${n} ${n}`]);
+  if (p === "name") return pick(v.rand, [`NAME ${n} ${n}`, `NAME HR ${n} ${n}`, `OP ${n} ${n}`, `NAME IS ${n} ${n}`, `OP HR ${n} ${n}`]);
   const q = me.qth;
-  return pick(v.rand, [`QTH ${q}`, `QTH HR ${q}`, `QTH IS ${q}`]);
+  return pick(v.rand, [`QTH ${q}`, `QTH HR ${q}`, `QTH IS ${q}`, `QTH HR IS ${q}`]);
 }
 
 /** The words joined, with the empty ones left out. */
@@ -108,6 +111,17 @@ function cqFor(format: FormatId, call: string, v: Voice): string {
   return pick(v.rand, [`CQ ${w} ${call}`, `CQ ${w} ${call} ${call}`, `CQ ${w} DE ${call}`, `${w} ${call}`]);
 }
 
+/** A plain CQ, for a standard QSO. */
+function plainCq(call: string, v: Voice): string {
+  return pick(v.rand, [
+    `CQ CQ DE ${call} ${call} K`,
+    `CQ CQ CQ DE ${call} ${call} ${call} K`,
+    `CQ CQ DE ${call} ${call} ${call} K`,
+    `CQ CQ CQ DE ${call} ${call} K`,
+    `CQ DE ${call} ${call} K`,
+  ]);
+}
+
 /** Your next over in a standard QSO. Before a station answers, the CQ is for
  *  `start`: a plain CQ, or a format's. */
 function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them): string {
@@ -117,21 +131,18 @@ function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them)
   switch (qso.stage) {
     case "cq":
       if (start) return cqFor(start, call, v);
-      return pick(v.rand, [
-        `CQ CQ DE ${call} ${call} K`,
-        `CQ CQ CQ DE ${call} ${call} ${call} K`,
-        `CQ CQ DE ${call} ${call} ${call} K`,
-        `CQ CQ CQ DE ${call} ${call} K`,
-        `CQ DE ${call} ${call} K`,
-      ]);
+      return plainCq(call, v);
     case "asking":
       return pick(v.rand, [`DE ${call} ${call} K`, `${call} ${call} ${call} K`, `DE ${call} ${call} ${call} K`]);
     case "called": {
-      const hello = pick(v.rand, ["", `${greeting(v.hour)} OM`, "TNX FER CALL", `${greeting(v.hour)} ES TNX FER CALL`]);
+      const g = greeting(v.hour);
+      const hello = pick(v.rand, ["", `${g} OM`, "TNX FER CALL", `${g} ES TNX FER CALL`, `R ${g} OM TNX FER CALL`, `${g} TNX FER THE CALL`]);
       const order: Piece[] = v.rand() < 0.7 ? ["report", "name", "qth"] : ["report", "qth", "name"];
       const bt = v.rand() < 0.8 ? "" : "<BT>";
       const ask = pick(v.rand, ["", "HW?", "HW CPY?"]);
       const tail = ask ? `${ask} ${them} DE ${call}` : "";
+      // Piece by piece: your report alone, and the station sends its own.
+      if (v.pieces) return words(them, "DE", call, hello, pieceOf("report", me, v), end());
       return words(them, "DE", call, hello, bt, ...order.map((p) => pieceOf(p, me, v)), tail, end());
     }
     case "pieces":
@@ -142,20 +153,39 @@ function standard(qso: Qso, me: Me, start: FormatId | null, v: Voice, who: Them)
         const head = pick(v.rand, [`${them} DE ${call}`, "R", `R R ${them} DE ${call}`, "TNX"]);
         return words(head, ...owed.map((p) => pieceOf(p, me, v)), end());
       }
+      // Its name once it has sent it, else OM.
+      const sent = sentPieces(qso);
+      const n = sent.includes("name") ? who.name : "";
       if (qso.stage === "pieces") {
-        return pick(v.rand, [`R TNX ${them} DE ${call} K`, "R R FB K", `QSL ${them} DE ${call} KN`, "R TNX OM BK"]);
+        // Your next piece, which the station answers with its own. Once
+        // yours are all sent, ask for its next one.
+        const mine = PIECES.find((p) => !qso.got.includes(p));
+        const ack = pick(v.rand, ["R TNX", "R", "FB", "R R"]);
+        if (mine) return words(ack, n, pieceOf(mine, me, v), end());
+        const theirs = PIECES.find((p) => !sent.includes(p));
+        if (theirs) return words(ack, n || "OM", pick(v.rand, [`UR ${LABEL[theirs]}?`, `PSE UR ${LABEL[theirs]}?`]), end());
       }
-      const n = who.name;
       return pick(v.rand, [
         `TNX ${n} 73 SK`,
         `R TNX FER QSO ${n} 73 <SK>`,
         `FB ${n} TNX FER QSO HPE CUAGN 73 ${them} DE ${call} <SK>`,
         `R R TU ${n} GL ES 73 <SK>`,
         `TNX FB QSO ${n} 73 ${them} DE ${call} SK`,
-      ]);
+        `TNX FER FB QSO ${n} VY 73 GL ${them} DE ${call} <SK>`,
+        `R R ${n} TNX FER THE QSO HPE CUAGN 73 <SK>`,
+        `OK ${n} TNX ES 73 CUL ${them} DE ${call} SK`,
+      ].map((t) => t.replace(/\s+/g, " ")));
     }
     case "signing":
-      return pick(v.rand, ["TU 73 E E", "73 E E", "TU E E", `73 ${them} DE ${call} <SK> E E`]);
+      // Its 73 came first. Yours carries the calls, as a formal QSO does.
+      return pick(v.rand, [
+        `${them} DE ${call} TU FER FB QSO 73 ES CUL E E`,
+        `TU ${who.name} 73 ${them} DE ${call} <SK> E E`,
+        `R R TNX ${who.name} GL 73 ${them} DE ${call} E E`,
+        `73 ${them} DE ${call} <SK> E E`,
+        `FB ${who.name} TNX FER QSO VY 73 ${them} DE ${call} <SK> E E`,
+        "TU 73 E E",
+      ]);
   }
 }
 
@@ -173,13 +203,34 @@ function answerTo(qso: RunQso, me: Me, v: Voice): string | null {
   return pick(v.rand, [`${value} ${value}`, `${value} ${value} ${value}`, `R ${value} ${value}`]);
 }
 
-/** Your next over in a run. */
-function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
+/** Your sign-off in a run after the station sent an item again because
+ *  you asked for it: the item said back, as RR TU OH 73 E E for QTH?. It
+ *  says back only what the hint can hold as you copied it: the state and
+ *  the name. A report or a number gets R R alone. Null when the station's
+ *  last line answered nothing. */
+function confirming(qso: RunQso, me: Me, v: Voice, who: Them): string | null {
+  const item = qso.answered;
+  if (!item) return null;
+  const { call } = me;
+  const said = item === "region" ? who.region || THEIR_STATE : item === "name" ? who.name : "";
+  if (qso.format === "pota") {
+    if (!said) return pick(v.rand, ["RR TU 73 E E", "R R TNX 73 E E", "BK R R TU 73 E E"]);
+    return pick(v.rand, [`RR TU ${said} 73 E E`, `R R ${said} TU 73 E E`, `R ${said} TU 72 ${call} E E`, `BK R R ${said} TNX 73 E E`]);
+  }
+  if (!said) return pick(v.rand, [`R R TU ${call}`, `RR TU ${call}`]);
+  const sst = qso.format === "sst";
+  return pick(v.rand, [`R ${said} TU ${call}`, `RR ${said} TU ${call}`, sst ? `R R ${said} TU 73 ${call}` : `R ${said} TU GL ${call}`]);
+}
+
+/** Your next over in a run. Between its QSOs, the CQ is for `start` when
+ *  given: a plain CQ for null, or another format's. */
+function run(qso: RunQso, me: Me, v: Voice, who: Them, start?: FormatId | null): string {
   const { call } = me;
   const them = who.call;
   switch (qso.stage) {
     case "waiting":
-      return cqFor(qso.format, call, v);
+      if (start === null) return plainCq(call, v);
+      return cqFor(start ?? qso.format, call, v);
     case "called": {
       const again = answerTo(qso, me, v);
       if (again) return again;
@@ -190,16 +241,31 @@ function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
       switch (qso.format) {
         case "cwt": {
           const nr = me.nr || me.region;
-          return pick(v.rand, [`${them} ${me.name} ${nr}`, `${them} TU ${me.name} ${nr}`, `${me.name} ${nr}`, `${them} ${me.name} ${nr} ${nr}`]);
+          return pick(v.rand, [
+            `${them} ${me.name} ${nr}`,
+            `${them} TU ${me.name} ${nr}`,
+            `${me.name} ${nr}`,
+            `${them} ${me.name} ${nr} ${nr}`,
+            `${them} R ${me.name} ${nr}`,
+            `${them} TNX ${me.name} ${nr}`,
+          ]);
         }
         case "sst":
-          return pick(v.rand, [`${them} ${me.name} ${me.region}`, `${them} ${byName} ${me.name} ${me.region}`, `${byName} ${me.name} ${me.region}`, `${them} TU ${me.name} ${me.region}`]);
+          return pick(v.rand, [
+            `${them} ${me.name} ${me.region}`,
+            `${them} ${byName} ${me.name} ${me.region}`,
+            `${byName} ${me.name} ${me.region}`,
+            `${them} TU ${me.name} ${me.region}`,
+            `${them} TNX ${me.name} ${me.region}`,
+            `${them} ${byName} ${me.name} ${me.region} ${me.region}`,
+          ]);
         case "mst": {
           const nr = String(qso.made + 1);
-          return pick(v.rand, [`${them} ${me.name} ${nr}`, `${them} TU ${me.name} ${nr}`, `${me.name} ${nr}`]);
+          return pick(v.rand, [`${them} ${me.name} ${nr}`, `${them} TU ${me.name} ${nr}`, `${me.name} ${nr}`, `${them} R ${me.name} ${nr}`, `${them} ${me.name} ${nr} ${nr}`]);
         }
         case "pota": {
-          const r = me.rst === undefined || me.rst === "599" ? "5NN" : me.rst;
+          // An activator sends 5NN or 599, and its state once or twice.
+          const r = me.rst === undefined || me.rst === "599" ? pick(v.rand, ["5NN", "599"]) : me.rst;
           const st = me.region;
           return pick(v.rand, [
             `${them} UR ${r} ${st} ${st} BK`,
@@ -207,15 +273,31 @@ function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
             `${them} TU UR ${r} ${st} ${st} BK`,
             `${them} ${r} ${r} ${st} ${st} BK`,
             `${them} ${g} OM UR ${r} ${r} ${st} ${st} BK`,
+            `${them} TNX UR ${r} ${st} BK`,
+            `${them} TU UR ${r} ${st} BK`,
+            `${them} ${g} TNX FER CALL UR ${r} ${st} ${st} BK`,
           ]);
         }
       }
       break;
     }
-    case "exchanged":
-      if (qso.format === "pota") return pick(v.rand, ["BK TU 73 EE", "RR TU 73 E E", "BK TU 72 E E", "TU 73 GL E E"]);
-      if (qso.format === "sst") return pick(v.rand, [`TU ${call}`, `TU ${who.name} 73 ${call}`, `R TU ${call}`, `TU GL ${call} SST`]);
-      return pick(v.rand, [`TU ${call}`, `TU ${call} ${FORMATS[qso.format].word}`, `R TU ${call}`, `TU GL ${call}`]);
+    case "exchanged": {
+      const confirm = confirming(qso, me, v, who);
+      if (confirm) return confirm;
+      if (qso.format === "pota") {
+        // The hunter's state said back, once you have it: BK TU WA ES 73.
+        const st = who.region ?? "";
+        const back = st
+          ? [`BK TU ${st} ES 73 ${call} E E`, `BK TU ${st} 73 E E`, `TU ${st} 73 GL E E`, `R TNX ${st} 72 ${call} E E`]
+          : [];
+        return pick(v.rand, ["BK TU 73 EE", "RR TU 73 E E", "BK TU 72 E E", "TU 73 GL E E", `BK TU 73 ${call} E E`, "TNX 73 E E", ...back]);
+      }
+      const n = who.name;
+      if (qso.format === "sst") {
+        return pick(v.rand, [`TU ${call}`, `TU ${n} 73 ${call}`, `R TU ${call}`, `TU GL ${call} SST`, `TNX ${n} 73 ${call}`, `FB ${n} TU 73 ${call} SST`, `TU ${n} GL ${call}`]);
+      }
+      return pick(v.rand, [`TU ${call}`, `TU ${call} ${FORMATS[qso.format].word}`, `R TU ${call}`, `TU GL ${call}`, `TU ${n} ${call}`, `TNX ${call}`, `GL ${n} ${call}`]);
+    }
   }
   return `TU ${call}`;
 }
@@ -224,22 +306,27 @@ function run(qso: RunQso, me: Me, v: Voice, who: Them): string {
 export interface Them {
   readonly call: string;
   readonly name: string;
+  /** Its state or province, once you have it, or absent. A POTA sign-off
+   *  says it back. */
+  readonly region?: string;
 }
 
 /** What shows for the station's call and name while you have not copied them. */
 export const THEIR_CALL = "(THEIR CALL)";
 export const THEIR_NAME = "(THEIR NAME)";
+export const THEIR_STATE = "(THEIR STATE)";
 
-/** What you could send next in `qso`. A first CQ is for `start`, the kind
- *  of QSO the guide shows: a plain CQ, or a format's. `voice` picks the
+/** What you could send next in `qso`. A CQ is for `start`, the preferred
+ *  mode: a plain CQ for null, or a format's. Absent: a run's CQ is for its
+ *  own format, and a first CQ is plain. `voice` picks the
  *  wording: the plainest, unless given. `them` is the station's call and name
  *  as the hint sends them: its own, unless given, as THEIR_CALL. */
 export function hint(
   qso: AnyQso,
   me: Me,
-  start: FormatId | null = null,
+  start?: FormatId | null,
   voice: Voice = PLAIN,
-  them: Them = qso.them,
+  them: Them = { call: qso.them.call, name: qso.them.name, region: regionOf(qso.them) },
 ): string {
   // A script: your next line, with the station's call and name as you have
   // them, as in every hint.
@@ -248,5 +335,5 @@ export function hint(
       word ? line.replace(new RegExp(`(?<=^|\\s)${word.replace(/[/.]/g, "\\$&")}(?=\\s|$)`, "g"), to) : line;
     return swap(swap(yourLine(qso) ?? "", qso.them.call, them.call), qso.them.name, them.name);
   }
-  return isRun(qso) ? run(qso, me, voice, them) : standard(qso, me, start, voice, them);
+  return isRun(qso) ? run(qso, me, voice, them, start) : standard(qso, me, start ?? null, voice, them);
 }

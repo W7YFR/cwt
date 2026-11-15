@@ -221,6 +221,7 @@ export function useQsoRig(): void {
     resetKey();
 
     localStorage.clear();
+    sessionStorage.clear();
     errors = [];
     host = document.createElement("div");
     document.body.append(host);
