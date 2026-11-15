@@ -11,7 +11,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- On the QSO page, **Preferred mode** in the settings row chooses CQ, POTA, SST, MST or CWT. The suggested reply calls CQ for it, and the guide's Examples show the same choice. A CQ that starts another kind changes it. Its panel shows that kind's example QSO.
+- On the QSO page, **Preferred mode** in the settings row chooses CQ, POTA, SST, MST or CWT, and its panel shows that kind's example QSO. The suggested reply and the guide's Examples follow it, and a CQ of another kind changes it.
 
 ### Changed
 
@@ -35,7 +35,7 @@ nothing to the site. The next release carries them.
 ### Development
 
 - With `?micdebug`, **Save session** on the QSO page saves every line, the suggested reply before each of yours, the settings and the clean audio in one file.
-- The browser console's `__cwt` object holds the debug helpers, and `__cwt.help()` lists them. `__cwt.suggestedReplies()` shows the reply suggested before each of your lines in the QSO log. `__cwt.micDebug()` replaces `__cwtMicDebug()`.
+- The browser console's `__cwt` holds the debug helpers that `__cwt.help()` lists, as `__cwt.suggestedReplies()`, which shows the reply suggested before each of your lines in the QSO log. `__cwt.micDebug()` replaces `__cwtMicDebug()`.
 
 ## v1.31.0 — 2026-11-14
 
