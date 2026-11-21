@@ -9,7 +9,12 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- **Noise** sounds like a receiver's CW filter: a narrow band on the pitch, with no hiss above it.
+- **Noise** and **QRN** sound as through a receiver's CW filter. The noise is a narrow band on the pitch, with no hiss above it, and static crashes ring at the pitch.
+- **QRM** plays closer to the station's pitch, inside the CW filter.
+
+### Fixed
+
+- On the QSO page, moving **Noise** or **QRM** in a session no longer starts the band over. It changes level as the slider moves.
 
 ## v1.32.0 — 2026-11-15
 

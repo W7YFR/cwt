@@ -3,13 +3,13 @@
  * QRM is another QSO near the frequency. As on the air, one side of it is
  * heard well, and the other weakly or not at all: the quiet while that side
  * sends is quiet here too. Between its QSOs the frequency is quiet a while.
- * It sits off the pitch, through the same receiver filter as the station,
- * which takes some of it away, and fades on its own as any station does.
+ * It sits near the pitch, inside the receiver's CW filter, at a pitch of its
+ * own, and fades on its own as any station does.
  *
  * Pure. The Copy page adds it to its samples; the QSO page loops it.
  */
 
-import { bandNoise, biquad, fadeOf, noiseLevel, noiseOn, qrnCrashes, seeded, seedOf } from "@/audio/qsb";
+import { bandNoise, cwFilter, fadeOf, noiseLevel, noiseOn, qrnCrashes, seeded, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
 import type { Speed } from "@/qso/speed";
 import { targetTiming } from "@/timing";
@@ -29,12 +29,9 @@ export function qrmOn(qrmDb: number): boolean {
   return qrmDb > QRM_OFF_DB;
 }
 
-/** How far the QRM station is from the band's pitch, in Hz. */
-const QRM_APART_HZ = [200, 400] as const;
-
-/** The receiver filter QRM comes through: on the station's pitch, about
- *  300 Hz wide. */
-const QRM_FILTER_Q = 2;
+/** How far the QRM station is from the band's pitch, in Hz: inside the CW
+ *  filter, or at its edge, where the filter takes some of it away. */
+const QRM_APART_HZ = [50, 250] as const;
 
 /** The silence between one QRM line and the next, in seconds. */
 const QRM_GAP_SEC = [0.8, 2.5] as const;
@@ -82,51 +79,88 @@ export function bandOn(o: { noiseDb: number; qrn: number; qrmDb: number }): bool
   return noiseOn(o.noiseDb) || o.qrn > 0 || qrmOn(o.qrmDb);
 }
 
+/** What the band's parts are made from. Their levels are not here: the
+ *  parts are mixed at them. */
+export type PartOptions = Omit<BandOptions, "noiseDb" | "qrmDb">;
+
+/** The band noise, at the station's peak: mixed at its slider's level. */
+export function noisePart(o: PartOptions): Float32Array {
+  return bandNoise(o.n, o.rate, o.toneHz, o.peak, o.seed);
+}
+
+/** QRN at its setting. Null when it is off. */
+export function qrnPart(o: PartOptions): Float32Array | null {
+  return o.qrn > 0 ? qrnCrashes(o.n, o.rate, o.toneHz, o.qrn, o.peak, o.seed + 1) : null;
+}
+
+/** The QRM station, keyed at the station's peak: mixed at its slider's
+ *  level. */
+export function qrmPart(o: PartOptions): Float32Array {
+  const { n, rate, toneHz, peak } = o;
+  const rand = seeded(o.seed + 2);
+  const [lo, hi] = QRM_APART_HZ;
+  const apart = lo + rand() * (hi - lo);
+  const qrmHz = rand() < 0.5 ? toneHz - apart : toneHz + apart;
+  const [gapLo, gapHi] = QRM_GAP_SEC;
+  const [restLo, restHi] = QRM_REST_SEC;
+  const qrm = new Float32Array(n);
+  let at = Math.round(rand() * restHi * rate);
+  while (at < n) {
+    const lines = o.qrmLines(rand);
+    if (lines.length === 0) break;
+    const near = lines[0]!.station;
+    const farGain = rand() < FAR_HEARD ? Math.pow(10, FAR_DB / 20) : 0;
+    for (const line of lines) {
+      if (at >= n) break;
+      const timing = targetTiming(line.speed.charWpm, line.speed.farnsworthWpm);
+      const sound = synthesize(line.text, timing, { rate, toneHz: qrmHz, padSec: 0, amplitude: peak }).samples;
+      // Not cut off at the end: a band that loops would chop a letter.
+      if (at + sound.length > n) {
+        at = n;
+        break;
+      }
+      const fade = fadeOf(o.qsbDb, seedOf(line.call));
+      const gain = line.station === near ? 1 : farGain;
+      if (gain > 0) for (let i = 0; i < sound.length; i++) qrm[at + i] = sound[i]! * gain * fade((at + i) / rate);
+      at += sound.length + Math.round((gapLo + rand() * (gapHi - gapLo)) * rate);
+    }
+    at += Math.round((restLo + rand() * (restHi - restLo)) * rate);
+  }
+  cwFilter(qrm, rate, toneHz);
+  return qrm;
+}
+
+/** The band's parts, each null when off. */
+export interface BandParts {
+  readonly noise: Float32Array | null;
+  readonly qrn: Float32Array | null;
+  readonly qrm: Float32Array | null;
+}
+
+/** `parts` mixed as one, `n` samples, with the noise and QRM at their
+ *  sliders' levels. */
+export function mixBand(n: number, parts: BandParts, levels: { noiseDb: number; qrmDb: number }): Float32Array {
+  const out = new Float32Array(n);
+  const add = (part: Float32Array | null, gain: number) => {
+    if (part && gain > 0) for (let i = 0; i < n; i++) out[i] = out[i]! + part[i]! * gain;
+  };
+  add(parts.noise, noiseLevel(1, levels.noiseDb));
+  add(parts.qrn, 1);
+  add(parts.qrm, qrmOn(levels.qrmDb) ? Math.pow(10, levels.qrmDb / 20) : 0);
+  return out;
+}
+
 /** The band, `n` samples of it. Silent when every part is off. */
 export function bandAudio(o: BandOptions): Float32Array {
-  const { n, rate, toneHz, peak } = o;
-  const out = noiseOn(o.noiseDb)
-    ? bandNoise(n, rate, toneHz, noiseLevel(peak, o.noiseDb), o.seed)
-    : new Float32Array(n);
-  if (o.qrn > 0) {
-    const crashes = qrnCrashes(n, rate, o.qrn, peak, o.seed + 1);
-    for (let i = 0; i < n; i++) out[i] = out[i]! + crashes[i]!;
-  }
-  if (qrmOn(o.qrmDb)) {
-    const rand = seeded(o.seed + 2);
-    const [lo, hi] = QRM_APART_HZ;
-    const apart = lo + rand() * (hi - lo);
-    const qrmHz = rand() < 0.5 ? toneHz - apart : toneHz + apart;
-    const amplitude = peak * Math.pow(10, o.qrmDb / 20);
-    const [gapLo, gapHi] = QRM_GAP_SEC;
-    const [restLo, restHi] = QRM_REST_SEC;
-    const qrm = new Float32Array(n);
-    let at = Math.round(rand() * restHi * rate);
-    while (at < n) {
-      const lines = o.qrmLines(rand);
-      if (lines.length === 0) break;
-      const near = lines[0]!.station;
-      const farGain = rand() < FAR_HEARD ? Math.pow(10, FAR_DB / 20) : 0;
-      for (const line of lines) {
-        if (at >= n) break;
-        const timing = targetTiming(line.speed.charWpm, line.speed.farnsworthWpm);
-        const sound = synthesize(line.text, timing, { rate, toneHz: qrmHz, padSec: 0, amplitude }).samples;
-        // Not cut off at the end: a band that loops would chop a letter.
-        if (at + sound.length > n) {
-          at = n;
-          break;
-        }
-        const fade = fadeOf(o.qsbDb, seedOf(line.call));
-        const gain = line.station === near ? 1 : farGain;
-        if (gain > 0) for (let i = 0; i < sound.length; i++) qrm[at + i] = sound[i]! * gain * fade((at + i) / rate);
-        at += sound.length + Math.round((gapLo + rand() * (gapHi - gapLo)) * rate);
-      }
-      at += Math.round((restLo + rand() * (restHi - restLo)) * rate);
-    }
-    biquad(qrm, rate, "band", toneHz, QRM_FILTER_Q);
-    for (let i = 0; i < n; i++) out[i] = out[i]! + qrm[i]!;
-  }
-  return out;
+  return mixBand(
+    o.n,
+    {
+      noise: noiseOn(o.noiseDb) ? noisePart(o) : null,
+      qrn: qrnPart(o),
+      qrm: qrmOn(o.qrmDb) ? qrmPart(o) : null,
+    },
+    o,
+  );
 }
 
 /** Where the limiter starts to round peaks off. */

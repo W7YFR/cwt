@@ -108,20 +108,21 @@ describe("QRN", () => {
   const n = rate * 60;
 
   it("is silent when off", () => {
-    expect(peakOf(qrnCrashes(n, rate, 0, 0.8, 1))).toBe(0);
+    expect(peakOf(qrnCrashes(n, rate, 650, 0, 0.8, 1))).toBe(0);
   });
 
   it("grows with the setting, under a crash's top", () => {
-    const levels = [1, 2, 3, 4].map((q) => qrnCrashes(n, rate, q, 0.8, 5));
+    const levels = [1, 2, 3, 4].map((q) => qrnCrashes(n, rate, 650, q, 0.8, 5));
     for (let i = 1; i < levels.length; i++) {
       expect(rms(levels[i]!), `setting ${i + 1}`).toBeGreaterThan(rms(levels[i - 1]!));
     }
     for (const l of levels) expect(peakOf(l)).toBeLessThanOrEqual(0.8 * 1.2 + 1e-6);
   });
 
-  it("is in the receiver's passband, not under it", () => {
-    const q = qrnCrashes(n, rate, 3, 0.8, 9);
-    expect(power(q, rate, 1000)).toBeGreaterThan(10 * power(q, rate, 60));
+  it("comes through the CW filter, on the pitch", () => {
+    const q = qrnCrashes(n, rate, 650, 3, 0.8, 9);
+    expect(power(q, rate, 650)).toBeGreaterThan(1000 * power(q, rate, 1500));
+    expect(power(q, rate, 650)).toBeGreaterThan(1000 * power(q, rate, 150));
   });
 });
 
@@ -146,6 +147,13 @@ describe("the band", () => {
     const share = sounding / (n / win);
     expect(share).toBeGreaterThan(0.1);
     expect(share).toBeLessThan(0.6);
+  });
+
+  it("has QRM inside the CW filter, at a pitch of its own", () => {
+    const n = rate * 120;
+    const b = bandAudio({ ...base, ...off, n, qrmDb: -6 });
+    const near = [-250, -150, -50, 50, 150, 250].map((d) => power(b, rate, base.toneHz + d));
+    expect(Math.max(...near)).toBeGreaterThan(1000 * power(b, rate, base.toneHz + 600));
   });
 
   it("has quieter QRM lower on its slider", () => {
@@ -252,6 +260,20 @@ describe("the band gate", () => {
     send({ type: "delay", sec: 0.3 });
     for (let i = 0; i < blocksIn(0.2); i++) block(false);
     expect(peakOf(block(true))).toBeGreaterThan(0.1);
+  });
+
+  it("plays on from where it is when the band is mixed again", () => {
+    const { send, block } = gate();
+    const ramp = (k: number) => Float32Array.from({ length: 12000 }, (_, i) => (k * i) / 12000);
+    send({ type: "band", samples: ramp(1), rate: 12000 });
+    let last = 0;
+    for (let i = 0; i < blocksIn(0.5); i++) last = block(false).at(-1)!;
+    expect(last).toBeGreaterThan(0.4);
+    send({ type: "band", samples: ramp(0.5), rate: 12000 });
+    expect(block(false)[0]).toBeCloseTo(last / 2, 2);
+    // Another band starts from its start.
+    send({ type: "band", samples: ramp(1).subarray(0, 6000), rate: 12000 });
+    expect(block(false)[0]).toBeLessThan(0.01);
   });
 
   it("is silent with no band, or at no level", () => {

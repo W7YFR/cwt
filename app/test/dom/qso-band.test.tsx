@@ -65,6 +65,19 @@ describe("the band in a QSO", () => {
     expect(air?.band).toBeUndefined();
   });
 
+  it("follows a level slider at once, the same band at the new level", async () => {
+    await open({ noiseDb: -26 });
+    await until("the band", () => heard.gate.band !== null);
+    const first = heard.gate.band!.samples;
+    await settingsTab("sound");
+    await slide("noise", -20);
+    const next = heard.gate.band!.samples;
+    expect(next).not.toBe(first);
+    expect(next.length).toBe(first.length);
+    const k = Math.pow(10, 6 / 20);
+    for (const i of [0, 1000, 500_000]) expect(next[i]).toBeCloseTo(first[i]! * k, 6);
+  });
+
   it("plays from the recorder all through, cut as you key for the break-in delay", async () => {
     await open({ noiseDb: -26, qsoBreakInMs: 300, gainDb: 6 });
     await until("the band", () => heard.gate.band !== null);

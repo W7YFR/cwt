@@ -72,9 +72,12 @@ class BandGateProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === 'band') {
+        // A band as long as the one before is it mixed again, at new
+        // levels: it plays on from where it is.
+        const same = this.samples && m.samples && this.samples.length === m.samples.length;
         this.samples = m.samples;
         this.step = m.samples ? m.rate / sampleRate : 1;
-        this.pos = 0;
+        if (!same) this.pos = 0;
       } else if (m.type === 'level') this.level = m.level;
       else if (m.type === 'delay') this.delay = m.sec;
       else if (m.type === 'arm') this.armed = m.armed;

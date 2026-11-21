@@ -14,9 +14,9 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPlayer } from "@/audio/player";
-import { fadeOf, NOISE_OFF_DB, seedOf, type Fade } from "@/audio/qsb";
+import { fadeOf, NOISE_OFF_DB, noiseOn, seedOf, type Fade } from "@/audio/qsb";
 import type { Band } from "@/audio/player";
-import { bandAudio, bandOn as anyBand, QRM_OFF_DB } from "@/copy/band";
+import { bandOn as anyBand, mixBand, noisePart, type PartOptions, QRM_OFF_DB, qrmOn, qrmPart, qrnPart } from "@/copy/band";
 import { qrmLines } from "@/copy/generate";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import {
@@ -836,27 +836,35 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoBreakInMs: next });
   };
   const hasBand = anyBand({ noiseDb, qrn, qrmDb });
-  /** The band as one track, made again when a setting changes. */
+  /* The band's parts, each made again only when what it is made from
+     changes. A level slider only mixes them again, which is quick, so it
+     plays as it moves. */
+  const [bandSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
+  const partOptions = (): PartOptions => ({
+    n: BAND_SEC * BAND_RATE,
+    rate: BAND_RATE,
+    toneHz: BAND_TONE_HZ,
+    peak: THEIR_PEAK,
+    qrn,
+    qsbDb,
+    seed: bandSeed,
+    qrmLines,
+  });
+  const noiseIsOn = noiseOn(noiseDb);
+  const qrmIsOn = qrmOn(qrmDb);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const noise = useMemo(() => (noiseIsOn ? noisePart(partOptions()) : null), [noiseIsOn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const crashes = useMemo(() => qrnPart(partOptions()), [qrn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const qrm = useMemo(() => (qrmIsOn ? qrmPart(partOptions()) : null), [qrmIsOn, qsbDb]);
+  /** The band as one track: its parts, mixed at the sliders' levels. */
   const band = useMemo<Band | null>(
     () =>
       hasBand
-        ? {
-            samples: bandAudio({
-              n: BAND_SEC * BAND_RATE,
-              rate: BAND_RATE,
-              toneHz: BAND_TONE_HZ,
-              peak: THEIR_PEAK,
-              noiseDb,
-              qrn,
-              qrmDb,
-              qsbDb,
-              seed: Math.floor(Math.random() * 2 ** 31),
-              qrmLines,
-            }),
-            rate: BAND_RATE,
-          }
+        ? { samples: mixBand(BAND_SEC * BAND_RATE, { noise, qrn: crashes, qrm }, { noiseDb, qrmDb }), rate: BAND_RATE }
         : null,
-    [hasBand, noiseDb, qrn, qrmDb, qsbDb],
+    [hasBand, noise, crashes, qrm, noiseDb, qrmDb],
   );
 
   /** The next station in a run, about to call. */

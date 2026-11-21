@@ -5,7 +5,8 @@
  * the ionosphere does. The fade is a function of time, so a station's next
  * over picks up its fading where the last one left it. The noise belongs to
  * the band, not to a station: it sits under every signal at one level, and a
- * deep fade drops the signal into it.
+ * deep fade drops the signal into it. All of it comes through the
+ * receiver's CW filter, as on the air.
  *
  * Pure. The Copy page bakes both into its samples; the QSO page plays them
  * through Web Audio.
@@ -44,16 +45,12 @@ export const QRN_LEVELS = ["Off", "Light", "Moderate", "Heavy", "Severe"] as con
  *  loud the loudest crash is, as a share of the signal's peak. */
 const QRN_CLICKS = [0, 8, 20, 40, 70];
 const QRN_CRASHES = [0, 0.15, 0.4, 0.8, 1.5];
-const QRN_LOUD = [0, 0.45, 0.7, 0.95, 1.2];
+const QRN_LOUD = [0, 0.27, 0.42, 0.57, 0.72];
 
 /** How loud the crackle's clicks are, as a share of the loudest crash. */
-const CLICK_SHARE = 0.25;
+const CLICK_SHARE = 0.4;
 
-/** The receiver's audio passband, which QRN fills: wide, unlike the noise. */
-const PASS_LO_HZ = 300;
-const PASS_HI_HZ = 2400;
-
-/** The receiver's CW filter, which the band noise comes through. Measured
+/** The receiver's CW filter, which the band comes through. Measured
  *  from noise recorded off a real receiver: flat this far each side of the
  *  pitch, so about 450 Hz wide where it is 6 dB down... */
 const FILTER_FLAT_HZ = 215;
@@ -120,44 +117,22 @@ export function fadeCurve(fade: Fade, fromSec: number, stepSec: number, n: numbe
   return out;
 }
 
-/** `x` through an RBJ biquad, in place: a band-pass with 0 dB at its peak,
- *  or a Butterworth high- or low-pass, which does not ring. */
-export function biquad(x: Float32Array, rate: number, kind: "band" | "high" | "low", hz: number, q: number): void {
-  const w0 = (2 * Math.PI * hz) / rate;
-  const cos = Math.cos(w0);
-  const alpha = Math.sin(w0) / (2 * q);
-  const a0 = 1 + alpha;
-  const [b0, b1, b2] =
-    kind === "band"
-      ? [alpha / a0, 0, -alpha / a0]
-      : kind === "low"
-        ? [(1 - cos) / 2 / a0, (1 - cos) / a0, (1 - cos) / 2 / a0]
-        : [(1 + cos) / 2 / a0, -(1 + cos) / a0, (1 + cos) / 2 / a0];
-  const a1 = (-2 * cos) / a0;
-  const a2 = (1 - alpha) / a0;
-  let x1 = 0;
-  let x2 = 0;
-  let y1 = 0;
-  let y2 = 0;
-  for (let i = 0; i < x.length; i++) {
-    const v = x[i]!;
-    const y = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-    x2 = x1;
-    x1 = v;
-    y2 = y1;
-    y1 = y;
-    x[i] = y;
-  }
-}
-
 /** QRN at setting `qrn` (an index into `QRN_LEVELS`): `n` samples of static
- *  under a signal of peak `peak`.
+ *  under a signal of peak `peak` on `toneHz`.
  *
  * Static is lightning, far away and near. Far away, it is a crackle: single
  * clicks at random. Nearer, it is a crash: a swell of hundreds of clicks
  * close together, ragged, that dies away in a few tenths of a second. Each
- * click is one sample; the receiver's passband makes it a click you hear. */
-export function qrnCrashes(n: number, rate: number, qrn: number, peak: number, seed: number): Float32Array {
+ * click is one sample. The CW filter rings with it, at the pitch: a click
+ * ticks, and a crash thumps. */
+export function qrnCrashes(
+  n: number,
+  rate: number,
+  toneHz: number,
+  qrn: number,
+  peak: number,
+  seed: number,
+): Float32Array {
   const out = new Float32Array(n);
   const crashes = QRN_CRASHES[qrn] ?? 0;
   if (!(crashes > 0)) return out;
@@ -199,9 +174,7 @@ export function qrnCrashes(n: number, rate: number, qrn: number, peak: number, s
     }
   }
 
-  // Through the receiver: no ringing, so a click stays a click.
-  biquad(out, rate, "high", PASS_LO_HZ, Math.SQRT1_2);
-  biquad(out, rate, "low", PASS_HI_HZ, Math.SQRT1_2);
+  cwFilter(out, rate, toneHz);
   // The loudest crash at the setting's level.
   let top = 0;
   for (let i = 0; i < n; i++) top = Math.max(top, Math.abs(out[i]!));
@@ -212,26 +185,45 @@ export function qrnCrashes(n: number, rate: number, qrn: number, peak: number, s
   return out;
 }
 
+/** The FFT's twiddles for each length: cos then sin of each step around
+ *  the circle, made once. */
+const twiddles = new Map<number, [Float64Array, Float64Array]>();
+
 /** `re` and `im` through a radix-2 FFT, in place. Their length is a power
  *  of two. */
 function fft(re: Float64Array, im: Float64Array): void {
   const n = re.length;
+  let tw = twiddles.get(n);
+  if (!tw) {
+    tw = [new Float64Array(n / 2), new Float64Array(n / 2)];
+    for (let k = 0; k < n / 2; k++) {
+      tw[0][k] = Math.cos((-2 * Math.PI * k) / n);
+      tw[1][k] = Math.sin((-2 * Math.PI * k) / n);
+    }
+    twiddles.set(n, tw);
+  }
+  const [cos, sin] = tw;
   for (let i = 1, j = 0; i < n; i++) {
     let bit = n >> 1;
     for (; j & bit; bit >>= 1) j ^= bit;
     j ^= bit;
     if (i < j) {
-      [re[i], re[j]] = [re[j]!, re[i]!];
-      [im[i], im[j]] = [im[j]!, im[i]!];
+      const r = re[i]!;
+      re[i] = re[j]!;
+      re[j] = r;
+      const m = im[i]!;
+      im[i] = im[j]!;
+      im[j] = m;
     }
   }
   for (let len = 2; len <= n; len <<= 1) {
     const half = len >> 1;
-    const step = (-2 * Math.PI) / len;
-    for (let k = 0; k < half; k++) {
-      const c = Math.cos(step * k);
-      const s = Math.sin(step * k);
-      for (let i = k; i < n; i += len) {
+    const stride = n / len;
+    for (let at = 0; at < n; at += len) {
+      for (let k = 0; k < half; k++) {
+        const c = cos[k * stride]!;
+        const s = sin[k * stride]!;
+        const i = at + k;
         const j = i + half;
         const vr = re[j]! * c - im[j]! * s;
         const vi = re[j]! * s + im[j]! * c;
@@ -251,6 +243,64 @@ function filterGain(hz: number, toneHz: number): number {
   return Math.pow(10, db / 20);
 }
 
+/** The FFT's length at `rate`: bins 5 Hz apart or closer, fine enough for
+ *  the CW filter's skirts. */
+function fftSize(rate: number): number {
+  return 2 ** Math.ceil(Math.log2(rate / 5));
+}
+
+/** `x` through the receiver's CW filter on `toneHz`, in place.
+ *
+ * Overlap-add, two blocks to one FFT: one in the real part and one in the
+ * imaginary part. The filter's response is real and even, so it keeps the
+ * two apart. The filter has no delay. */
+export function cwFilter(x: Float32Array, rate: number, toneHz: number): void {
+  const size = fftSize(rate);
+  const block = size / 2;
+  const reach = size / 4;
+  // The filter's response, its impulse cut to `reach` each side so that a
+  // block's ringing does not wrap around into the block.
+  const gains = new Float64Array(size);
+  for (let k = 0; k <= block; k++) gains[k] = gains[(size - k) % size] = filterGain((k * rate) / size, toneHz);
+  const re = Float64Array.from(gains);
+  const im = new Float64Array(size);
+  fft(re, im);
+  for (let t = 0; t < size; t++) {
+    const d = Math.min(t, size - t);
+    re[t] = d < reach ? (re[t]! * (1 + Math.cos((Math.PI * d) / reach))) / 2 : 0;
+  }
+  im.fill(0);
+  fft(re, im);
+  // A forward FFT, then one with real and imaginary swapped, which inverts
+  // it: scaled by `size` each time.
+  for (let k = 0; k < size; k++) gains[k] = re[k]! / (size * size);
+  const out = new Float32Array(x.length);
+  const add = (at: number, part: Float64Array) => {
+    for (let j = 0; j < size; j++) {
+      // The end of the result is the ringing before the block starts.
+      const i = at + (j < size - reach ? j : j - size);
+      if (i >= 0 && i < out.length) out[i] = out[i]! + part[j]!;
+    }
+  };
+  for (let at = 0; at < x.length; at += 2 * block) {
+    re.fill(0);
+    im.fill(0);
+    for (let j = 0; j < block; j++) {
+      re[j] = x[at + j] ?? 0;
+      im[j] = x[at + block + j] ?? 0;
+    }
+    fft(re, im);
+    for (let k = 0; k < size; k++) {
+      re[k] = re[k]! * gains[k]!;
+      im[k] = im[k]! * gains[k]!;
+    }
+    fft(im, re);
+    add(at, re);
+    add(at + block, im);
+  }
+  x.set(out);
+}
+
 /** Band noise at `toneHz`: `n` samples of the noise a receiver's CW filter
  *  passes, at an RMS of `level`.
  *
@@ -261,8 +311,7 @@ function filterGain(hz: number, toneHz: number): number {
 export function bandNoise(n: number, rate: number, toneHz: number, level: number, seed: number): Float32Array {
   const rand = seeded(seed);
   const out = new Float32Array(n);
-  // Bins 5 Hz apart or closer, fine enough for the filter's skirts.
-  const size = 2 ** Math.ceil(Math.log2(rate / 5));
+  const size = fftSize(rate);
   const hop = size / 2;
   const gains = new Float64Array(hop);
   for (let k = 1; k < hop; k++) gains[k] = filterGain((k * rate) / size, toneHz);
