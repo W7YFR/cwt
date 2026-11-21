@@ -295,6 +295,10 @@ export interface RecordOptions {
   readonly maxSeconds?: number | undefined;
   /** Called once when the recording reaches `maxSeconds`. */
   readonly onLimit?: () => void;
+  /** Keep only this many seconds of the latest audio. `since` still counts
+   *  from the start, and `stop` hands back only what is kept. Unset, it all
+   *  is kept. */
+  readonly keepSeconds?: number | undefined;
 }
 
 export const DEFAULT_MAX_SECONDS = 300;
@@ -395,6 +399,9 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
 
   let chunks: Float32Array[] = [];
   let total = 0;
+  /** Samples captured before the first chunk kept. */
+  let dropped = 0;
+  const keepFrames = options.keepSeconds ? Math.ceil(options.keepSeconds * ctx.sampleRate) : Infinity;
   let restarts = 0;
   let lastReport = 0;
   let stopped = false;
@@ -413,6 +420,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     opened += frame.length;
     chunks.push(frame);
     total += frame.length;
+    while (chunks.length > 1 && total - dropped - chunks[0]!.length >= keepFrames) dropped += chunks.shift()!.length;
     if (total >= maxFrames) {
       stopped = true;
       options.onLimit?.();
@@ -441,7 +449,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   }
 
   function collect(): AudioClip {
-    const samples = new Float32Array(total);
+    const samples = new Float32Array(total - dropped);
     let at = 0;
     for (const c of chunks) {
       samples.set(c, at);
@@ -480,6 +488,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     restart() {
       chunks = [];
       total = 0;
+      dropped = 0;
       lastReport = 0;
       restarts++;
     },
@@ -491,6 +500,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     async cancel() {
       chunks = [];
       total = 0;
+      dropped = 0;
       await release();
     },
   };

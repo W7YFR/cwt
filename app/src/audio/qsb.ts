@@ -191,7 +191,7 @@ const twiddles = new Map<number, [Float64Array, Float64Array]>();
 
 /** `re` and `im` through a radix-2 FFT, in place. Their length is a power
  *  of two. */
-function fft(re: Float64Array, im: Float64Array): void {
+export function fft(re: Float64Array, im: Float64Array): void {
   const n = re.length;
   let tw = twiddles.get(n);
   if (!tw) {

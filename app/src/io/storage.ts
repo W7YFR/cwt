@@ -474,8 +474,9 @@ export interface Prefs {
   customDrills?: CustomDrill[];
   /** The drill picker's open groups, by name. Absent is all closed. */
   openDrillGroups?: string[];
-  /** Which page is open: practice (Send), Copy or QSO. Absent is practice. */
-  page?: "practice" | "copy" | "qso";
+  /** Which page is open: practice (Send), Copy, QSO or Live. Absent is
+   *  practice. */
+  page?: "practice" | "copy" | "qso" | "live";
   /** How the QSO page reads your sending. Absent is lenient. */
   qsoCopy?: "strict" | "lenient";
   /** How much the QSO page's station says in each over. Absent is full. */
@@ -828,7 +829,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   friends: isFriends,
   customDrills: isCustomDrills,
   openDrillGroups: (v) => Array.isArray(v) && v.every(isStr),
-  page: oneOf("practice", "copy", "qso"),
+  page: oneOf("practice", "copy", "qso", "live"),
   qsoCopy: oneOf("strict", "lenient"),
   qsoLength: oneOf("full", "short", "pieces", "mixed"),
   qsoTheirText: oneOf("before", "sent", "hidden", "copy", "exchange", "none"),
@@ -1181,6 +1182,30 @@ export function rememberQso(log: unknown): void {
 export function recallQso(): unknown {
   try {
     const raw = localStorage.getItem(QSO_KEY);
+    return raw === null ? null : (JSON.parse(raw) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+/* The Live page's turns and your fixes to them, so a reload comes back to
+   them. */
+const LIVE_KEY = "cwt:live";
+
+/** Remember the Live page's log, or forget it with null. */
+export function rememberLive(log: unknown): void {
+  try {
+    if (log === null) localStorage.removeItem(LIVE_KEY);
+    else localStorage.setItem(LIVE_KEY, JSON.stringify(log));
+  } catch {
+    /* nothing kept; the page still works */
+  }
+}
+
+/** The Live page's log as last remembered, unchecked, or null. */
+export function recallLive(): unknown {
+  try {
+    const raw = localStorage.getItem(LIVE_KEY);
     return raw === null ? null : (JSON.parse(raw) as unknown);
   } catch {
     return null;

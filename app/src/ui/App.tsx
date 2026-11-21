@@ -35,6 +35,7 @@ import { UnsetNotesText, type UnsetNotes } from "./SlotMenu";
 import { ReviewScreen } from "./ReviewScreen";
 import { CopyScreen } from "./CopyScreen";
 import { QsoScreen } from "./QsoScreen";
+import { LiveScreen } from "./LiveScreen";
 import type { Page } from "./PageSwitch";
 import { useFileDrop } from "./useFileDrop";
 import { OPEN_FILE_CLOSED } from "./copy";
@@ -248,6 +249,8 @@ function AppBody(): React.ReactElement {
           ? "calibrate"
           : page === "qso"
             ? "qso"
+            : page === "live"
+            ? "live"
             : page === "copy"
             ? "copy"
             : take.loaded && take.review
@@ -507,6 +510,15 @@ function AppBody(): React.ReactElement {
           onPage={setPage}
           onHome={goHome}
           fileTarget={copyFile}
+        />
+      ) : page === "live" ? (
+        <LiveScreen
+          deviceId={deviceId}
+          profiles={profiles}
+          profileId={profileId}
+          onError={setError}
+          onPage={setPage}
+          onHome={goHome}
         />
       ) : page === "qso" ? (
         <QsoScreen

@@ -7,6 +7,13 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Live**, a new page after QSO, decodes any CW that comes in from your input: your own key through the microphone, or your radio's audio. It finds each station's speed by itself and follows up to 8 signals at once.
+- On **Live**, each line is one station's turn, with that station's call and speed. The lines of each QSO are grouped, with a card of what each station sent: name, QTH, report, power, CWops number, park and more. The card names the kind of QSO when it can, such as CWT, POTA or a rag chew.
+- On **Live**, click the call at the start of a line to change who sent it, and click a detail on a card to correct it. Your own lines show in blue.
+- **Live** keeps its log after a reload. From ⋯, download the log as text, as an ADIF file for a logging program, or as a spreadsheet.
+
 ## v1.39.1 — 2026-11-22
 
 ### Changed
