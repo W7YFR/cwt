@@ -6,9 +6,13 @@
  * It sits near the pitch, inside the receiver's CW filter, at a pitch of its
  * own, and fades on its own as any station does.
  *
+ * QRM is FT8 now and then too: a few stations near the pitch, strong or
+ * weak, each sending in its 15 s slots for a while, then gone.
+ *
  * Pure. The Copy page adds it to its samples; the QSO page loops it.
  */
 
+import { agcGainDb, applyGainDb, loudnessDb, type AgcMode } from "@/audio/agc";
 import { bandNoise, cwFilter, fadeOf, noiseLevel, noiseOn, qrnCrashes, seeded, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
 import type { Speed } from "@/qso/speed";
@@ -46,6 +50,42 @@ const FAR_DB = -18;
 /** How often the far side is heard at all. */
 const FAR_HEARD = 0.4;
 
+/** FT8's timing: 15 s slots; in each, 79 tones from 0.5 s in, one every
+ *  0.16 s. */
+const FT8_SLOT_SEC = 15;
+const FT8_START_SEC = 0.5;
+const FT8_SYMBOL_SEC = 0.16;
+const FT8_SYMBOLS = 79;
+
+/** FT8's 8 tones, this far apart, in Hz. */
+const FT8_SPACING_HZ = 6.25;
+
+/** The tones FT8 starts, ends and is split with, so a receiver finds it. */
+const FT8_COSTAS = [3, 1, 4, 0, 6, 5, 2];
+
+/** How long a tone takes to glide to the next, and the signal to come up
+ *  and die away, in seconds. */
+const FT8_GLIDE_SEC = 0.02;
+
+/** How long FT8 is on the band, and then off it, in seconds. */
+const FT8_ON_SEC = [30, 90] as const;
+const FT8_OFF_SEC = [30, 120] as const;
+
+/** How many FT8 stations are on at once. */
+const FT8_STATIONS = [1, 3] as const;
+
+/** How far an FT8 station is from the pitch, in Hz: across the CW filter
+ *  and out past its edges. */
+const FT8_APART_HZ = 300;
+
+/** The loudest FT8 station, in dB under the QRM slider's level: as loud, or
+ *  well under it. The others are weaker still, by up to `FT8_WEAKER_DB`. */
+const FT8_LOUDEST_DB = [-20, 0] as const;
+const FT8_WEAKER_DB = 24;
+
+/** How often an FT8 station sends in a slot of its own. */
+const FT8_SENDS = 0.8;
+
 /** One line the QRM station sends. */
 export interface QrmLine {
   readonly text: string;
@@ -72,6 +112,8 @@ export interface BandOptions {
   readonly seed: number;
   /** The QRM station's next QSO, as lines. */
   readonly qrmLines: (rand: () => number) => readonly QrmLine[];
+  /** The receiver's AGC, where the band is mixed in. Absent: off. */
+  readonly agc?: AgcMode;
 }
 
 /** Whether a band with these settings holds anything. */
@@ -93,8 +135,58 @@ export function qrnPart(o: PartOptions): Float32Array | null {
   return o.qrn > 0 ? qrnCrashes(o.n, o.rate, o.toneHz, o.qrn, o.peak, o.seed + 1) : null;
 }
 
-/** The QRM station, keyed at the station's peak: mixed at its slider's
- *  level. */
+/** FT8 now and then, into `out`, at `peak` and under it: its stations
+ *  come on the band a while, then go. */
+function addFt8(out: Float32Array, o: PartOptions): void {
+  const { rate, toneHz, peak } = o;
+  const n = out.length;
+  const rand = seeded(o.seed + 3);
+  const between = (lo: number, hi: number) => lo + rand() * (hi - lo);
+  const slot = Math.round(FT8_SLOT_SEC * rate);
+  const symbol = FT8_SYMBOL_SEC * rate;
+  const glide = FT8_GLIDE_SEC * rate;
+  let from = between(0, FT8_OFF_SEC[1]) * rate;
+  while (from < n) {
+    const to = from + between(...FT8_ON_SEC) * rate;
+    const count = Math.round(between(FT8_STATIONS[0] - 0.49, FT8_STATIONS[1] + 0.49));
+    const loudest = between(...FT8_LOUDEST_DB);
+    for (let k = 0; k < count; k++) {
+      const baseHz = toneHz + between(-FT8_APART_HZ, FT8_APART_HZ);
+      const gain = peak * Math.pow(10, (loudest - (k === 0 ? 0 : between(0, FT8_WEAKER_DB))) / 20);
+      const parity = rand() < 0.5 ? 0 : 1;
+      const fade = fadeOf(o.qsbDb, Math.floor(rand() * 2 ** 31));
+      // Its slots in this while on the band: every other one.
+      for (let s = Math.ceil(from / slot); s * slot < Math.min(to, n); s++) {
+        if (s % 2 !== parity || rand() >= FT8_SENDS) continue;
+        const tones = Array.from({ length: FT8_SYMBOLS }, () => Math.floor(rand() * 8));
+        for (const at of [0, 36, 72]) FT8_COSTAS.forEach((t, i) => (tones[at + i] = t));
+        const start = s * slot + Math.round(FT8_START_SEC * rate);
+        const len = Math.round(FT8_SYMBOLS * symbol);
+        let phase = rand() * 2 * Math.PI;
+        for (let i = 0; i < len && start + i < n; i++) {
+          // The tone, gliding to the next across each boundary.
+          const at = Math.min(FT8_SYMBOLS - 1, Math.floor(i / symbol));
+          const into = i - at * symbol;
+          let tone = tones[at]!;
+          if (at + 1 < FT8_SYMBOLS && into > symbol - glide / 2) {
+            const u = (into - (symbol - glide / 2)) / glide;
+            tone += (tones[at + 1]! - tone) * (1 - Math.cos(Math.PI * u)) / 2;
+          } else if (at > 0 && into < glide / 2) {
+            const u = (into + glide / 2) / glide;
+            tone = tones[at - 1]! + (tone - tones[at - 1]!) * (1 - Math.cos(Math.PI * u)) / 2;
+          }
+          phase += (2 * Math.PI * (baseHz + tone * FT8_SPACING_HZ)) / rate;
+          const edge = Math.min(1, i / glide, (len - i) / glide);
+          out[start + i] = out[start + i]! + Math.sin(phase) * gain * edge * fade((start + i) / rate);
+        }
+      }
+    }
+    from = to + between(...FT8_OFF_SEC) * rate;
+  }
+}
+
+/** The QRM station, keyed at the station's peak, and FT8 now and then:
+ *  mixed at the QRM slider's level. */
 export function qrmPart(o: PartOptions): Float32Array {
   const { n, rate, toneHz, peak } = o;
   const rand = seeded(o.seed + 2);
@@ -126,6 +218,7 @@ export function qrmPart(o: PartOptions): Float32Array {
     }
     at += Math.round((restLo + rand() * (restHi - restLo)) * rate);
   }
+  addFt8(qrm, o);
   cwFilter(qrm, rate, toneHz);
   return qrm;
 }
@@ -176,13 +269,26 @@ export function limited(x: number): number {
 
 /** `samples` with the band mixed in under them, in place, when it holds
  *  anything. Room is left for QRM keyed on top of a station, and a crash
- *  past that is rounded off near full scale, as a receiver's AGC does.
- *  With `level`, the band at each sample is scaled by it: 0 cuts it. */
+ *  past that is rounded off near full scale. With `level`, the band at each
+ *  sample is scaled by it: 0 cuts it, as while you send. The AGC acts on
+ *  what is received, the station and the band, and not where `level` is 0. */
 export function addBand(samples: Float32Array, o: Omit<BandOptions, "n">, level?: Float32Array): void {
   if (!bandOn(o)) return;
-  const noise = bandAudio({ ...o, n: samples.length });
+  const n = samples.length;
+  const noise = bandAudio({ ...o, n });
   const room = 1 / (1 + (qrmOn(o.qrmDb) ? Math.pow(10, o.qrmDb / 20) : 0));
-  for (let i = 0; i < samples.length; i++) {
-    samples[i] = limited((samples[i]! + noise[i]! * (level ? level[i]! : 1)) * room);
+  const heard = (i: number) => (level ? level[i]! : 1);
+  if (!o.agc || o.agc === "off") {
+    for (let i = 0; i < n; i++) samples[i] = limited((samples[i]! + noise[i]! * heard(i)) * room);
+    return;
+  }
+  const mix = new Float32Array(n);
+  for (let i = 0; i < n; i++) mix[i] = samples[i]! + noise[i]! * heard(i);
+  const gain = new Float32Array(n).fill(1);
+  applyGainDb(gain, o.rate, agcGainDb(loudnessDb(mix, o.rate, o.peak, level), o.agc));
+  for (let i = 0; i < n; i++) {
+    const g = gain[i]!;
+    const h = heard(i);
+    samples[i] = limited((samples[i]! * (1 + (g - 1) * h) + noise[i]! * h * g) * room);
   }
 }

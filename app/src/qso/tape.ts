@@ -15,6 +15,7 @@
  * Pure. The page plays it and saves it.
  */
 
+import type { AgcMode } from "@/audio/agc";
 import { fadeOf, NOISE_OFF_DB, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
 import { addBand, bandOn, QRM_OFF_DB, type QrmLine } from "@/copy/band";
@@ -138,6 +139,8 @@ export interface Added {
   readonly qrmDb: number;
   readonly seed: number;
   readonly qrmLines: (rand: () => number) => readonly QrmLine[];
+  /** The receiver's AGC. Absent: off. */
+  readonly agc?: AgcMode;
 }
 
 /** The whole QSO, one line after another, at `rate`. With `added`, as heard. */

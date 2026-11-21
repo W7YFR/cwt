@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from "vitest";
 import { bandNoise, fadeOf, NOISE_OFF_DB, noiseLevel, noiseOn, qrnCrashes } from "@/audio/qsb";
-import { bandAudio, bandOn, QRM_OFF_DB, qrmOn } from "@/copy/band";
+import { agcGainDb, bandGainDb, keyedGainDb, loudnessDb } from "@/audio/agc";
+import { bandAudio, bandOn, QRM_OFF_DB, qrmOn, qrmPart } from "@/copy/band";
 import { makeScript, qrmLines, sendScript } from "@/copy/generate";
 import { WORKLET_SOURCE } from "@/capture/mic";
 
@@ -188,6 +189,78 @@ describe("a generated QSO on the air", () => {
   });
 });
 
+describe("FT8 in the QRM", () => {
+  const rate = 4000;
+  const ft8 = qrmPart({ n: rate * 600, rate, toneHz: 600, peak: 0.5, qrn: 0, qsbDb: 0, seed: 21, qrmLines: () => [] });
+  const loudIn = (from: number, to: number) => rms(ft8.subarray(Math.round(from * rate), Math.round(to * rate)));
+
+  it("sends in its 15 s slots, from 0.5 s in for 12.6 s, and is quiet after", () => {
+    const slots = Array.from({ length: 40 }, (_, k) => k * 15);
+    const sending = slots.filter((at) => loudIn(at + 1, at + 13) > 0.01);
+    expect(sending.length).toBeGreaterThan(0);
+    for (const at of sending) expect(loudIn(at + 13.3, at + 15.3), `slot at ${at} s`).toBeLessThan(loudIn(at + 1, at + 13) / 100);
+  });
+
+  it("comes and goes", () => {
+    const quiet = Array.from({ length: 40 }, (_, k) => k * 15).filter((at) => loudIn(at, at + 15) < 1e-4);
+    expect(quiet.length).toBeGreaterThan(5);
+  });
+});
+
+describe("the AGC", () => {
+  const rate = 12000;
+  /** Noise 25 dB under a tone that is on from 1 s to 2 s, and its gain. */
+  const gain = (mode: "off" | "slow" | "fast") => {
+    const n = 4 * rate;
+    const noise = bandNoise(n, rate, 600, 0.5 * db(-25), 1);
+    const x = noise.map((v, i) => v + (i >= rate && i < 2 * rate ? 0.5 * Math.sin((2 * Math.PI * 600 * i) / rate) : 0));
+    const g = agcGainDb(loudnessDb(x, rate, 0.5), mode);
+    return (t: number) => g[Math.round(t / 0.001)]!;
+  };
+
+  it("turns the band down under a strong signal, and fast brings it back in about 80 ms", () => {
+    const g = gain("fast");
+    expect(g(0.9) - g(1.5)).toBeGreaterThan(12);
+    expect(g(1.5)).toBeLessThanOrEqual(0);
+    expect(g(2.1)).toBeGreaterThan(g(0.9) - 4);
+  });
+
+  it("brings it back slowly at Slow, and leaves it alone at Off", () => {
+    const g = gain("slow");
+    expect(g(2.1)).toBeLessThan(g(0.9) - 8);
+    expect(g(3.5)).toBeGreaterThan(g(0.9) - 4);
+    const off = gain("off");
+    expect([0.9, 1.5, 2.1].map(off)).toEqual([0, 0, 0]);
+  });
+
+  it("is down before a mark starts, under a keyed station, and up between words", () => {
+    const g = keyedGainDb([[0.5, 0.6], [1.5, 1.6]], 2, () => 1, -30, "fast");
+    const at = (t: number) => g[Math.round(t / 0.001)]!;
+    expect(at(0.495)).toBeLessThan(1);
+    expect(at(0.55)).toBeLessThan(1);
+    expect(at(1.2)).toBeCloseTo(bandGainDb(-30), 0);
+  });
+
+  it("evens out a station that fades, up to how loud the band is", () => {
+    const g = keyedGainDb([[0, 2]], 2, () => db(-12), -30, "fast");
+    expect(g[1000]).toBeGreaterThan(10);
+  });
+
+  it("puts the band of a generated QSO under the station, and up between its lines", () => {
+    const script = makeScript({ kind: "cq", rand: seeded(7), length: "short" });
+    const sent = (agc: "off" | "fast") => sendScript(script, { gapSec: 3, noiseDb: -30, agc, rate: 8000 });
+    const off = sent("off");
+    const fast = sent("fast");
+    // Quiet between the first two lines.
+    const gap = (x: Float32Array) => {
+      const t = off.rec.overs[0]!.t1 + 1;
+      return rms(x.subarray(Math.round(t * 8000), Math.round((t + 1) * 8000)));
+    };
+    expect(gap(fast.samples)).toBeGreaterThan(4 * gap(off.samples));
+    expect(peakOf(fast.samples)).toBeLessThan(1);
+  });
+});
+
 describe("the band gate", () => {
   const sampleRate = 48000;
   const BLOCK = 128;
@@ -198,10 +271,11 @@ describe("the band gate", () => {
     class AudioWorkletProcessor {
       port = { postMessage() {}, onmessage: (_ev: { data: unknown }) => {} };
     }
-    new Function("AudioWorkletProcessor", "registerProcessor", "sampleRate", "currentFrame", WORKLET_SOURCE)(
+    new Function("AudioWorkletProcessor", "registerProcessor", "sampleRate", "currentFrame", "currentTime", WORKLET_SOURCE)(
       AudioWorkletProcessor,
       (name: string, ctor: (typeof procs)[string]) => (procs[name] = ctor),
       sampleRate,
+      0,
       0,
     );
     const g = new procs["cw-band-gate"]!();
@@ -274,6 +348,17 @@ describe("the band gate", () => {
     // Another band starts from its start.
     send({ type: "band", samples: ramp(1).subarray(0, 6000), rate: 12000 });
     expect(block(false)[0]).toBeLessThan(0.01);
+  });
+
+  it("takes the AGC's gain while a station keys, and is back to full after it", () => {
+    const { send, block } = gate();
+    send({ type: "band", samples: new Float32Array(12000).fill(0.5), rate: 12000 });
+    for (let i = 0; i < blocksIn(0.1); i++) block(false);
+    // currentTime is 0 on the stand-in thread: from now, for 0.1 s.
+    send({ type: "duck", gain: new Float32Array(100).fill(0.25), step: 0.001, at: 0 });
+    expect(peakOf(block(false))).toBeCloseTo(0.125, 3);
+    send({ type: "duck", gain: null, step: 0.001, at: 0 });
+    expect(peakOf(block(false))).toBeCloseTo(0.5, 3);
   });
 
   it("is silent with no band, or at no level", () => {

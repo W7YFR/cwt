@@ -18,6 +18,7 @@ import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import type { RecordMode } from "./mode";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
+import type { AgcMode } from "@/audio/agc";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
 import { loadUser } from "@/io/storage";
 import { BREAK } from "@/morse";
@@ -40,6 +41,7 @@ import {
   GAIN_HELP,
   QSB_HELP,
   BAND_ON_HELP,
+  AGC_HELP,
   NOISE_HELP,
   QRN_HELP,
   BREAK_IN_HELP,
@@ -1117,6 +1119,36 @@ export function ListeningLevel({
  *  Copy page and the QSO page both draw this. */
 export function BandOnCheck({ on, onChange }: { on: boolean; onChange(on: boolean): void }): React.ReactElement {
   return <Check id="band-on" label="Play QSB, noise, QRN and QRM" help={BAND_ON_HELP} checked={on} onChange={onChange} />;
+}
+
+/** The AGC's settings, each with what it does. */
+const AGCS: ReadonlyArray<{ value: AgcMode; label: string; note: string }> = [
+  { value: "off", label: "Off", note: "The band stays at one level." },
+  { value: "slow", label: "Slow", note: "The band comes back up slowly after a signal." },
+  { value: "fast", label: "Fast", note: "The band comes back up between characters." },
+];
+
+/** The receiver's AGC. The Copy page and the QSO page both draw this. */
+export function AgcChoice({
+  agc,
+  barred,
+  onChange,
+}: {
+  agc: AgcMode;
+  barred: string | null;
+  onChange(agc: AgcMode): void;
+}): React.ReactElement {
+  return (
+    <ChoiceGroup
+      id="agc"
+      label="AGC"
+      help={AGC_HELP}
+      value={agc}
+      options={AGCS}
+      barred={barred}
+      onChange={(v) => onChange(v as AgcMode)}
+    />
+  );
 }
 
 /** QSB: how deep a generated station fades. The Copy page and the QSO page

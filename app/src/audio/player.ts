@@ -13,6 +13,7 @@
  */
 
 import type { Timeline } from "@/types";
+import { AGC_STEP_SEC, bandGainDb, keyedGainDb, type AgcMode } from "./agc";
 import { fadeCurve, type Fade } from "./qsb";
 import { keyingEnvelope, RAMP_SEC, type ScheduleOptions } from "./schedule";
 import { encodeWav } from "./wav";
@@ -55,6 +56,17 @@ export interface TargetAir {
    *  plays from where the page's clock is in it, so each over hears a
    *  different part. */
   band?: Band;
+  /** The receiver's AGC, which follows the target's keying and fading. */
+  agc?: {
+    mode: AgcMode;
+    /** How loud the band mostly is on its own, in dB over the target's
+     *  peak. The band is made with the AGC's gain on it alone. */
+    bandDb: number;
+    /** The band where it plays on its own: give it this gain, a share at
+     *  each step of `stepSec`, from `atMs` on the performance clock. Null
+     *  takes it off again. */
+    onDuck?(gain: Float32Array | null, stepSec: number, atMs: number): void;
+  };
 }
 
 /** The band: noise, QRN and QRM, as one track that loops. Played under a
@@ -131,6 +143,9 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
     filter: BiquadFilterNode | null;
     fade: GainNode | null;
     noise: AudioBufferSourceNode | null;
+    agc: GainNode | null;
+    /** Takes the AGC's gain off the band where it plays on its own. */
+    unduck: (() => void) | null;
   } | null = null;
 
   /* A recording is decoded before it plays, and a stop can land in between.
@@ -185,6 +200,8 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         }
         tgtNodes.noise.disconnect();
       }
+      tgtNodes.agc?.disconnect();
+      tgtNodes.unduck?.();
       tgtNodes.level.disconnect();
       tgtNodes = null;
     }
@@ -302,6 +319,33 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         fade = c.createGain();
         fade.gain.setValueCurveAtTime(fadeCurve(air.fade.fade, air.fade.atSec, FADE_STEP_SEC, n), t0, (n - 1) * FADE_STEP_SEC);
       }
+      // The AGC: its gain on the target, and on the band as the target keys,
+      // over the gain the band was made with.
+      let agc: GainNode | null = null;
+      let duck: Float32Array | null = null;
+      let unduck: (() => void) | null = null;
+      if (air?.agc && air.agc.mode !== "off") {
+        const marks: [number, number][] = [];
+        for (let i = 0; i + 3 < env.points.length; i += 4) marks.push([env.points[i]![0], env.points[i + 3]![0]]);
+        const at = air.fade;
+        const fadeAt = at ? (t: number) => at.fade(at.atSec + t) : () => 1;
+        const gainDb = keyedGainDb(marks, env.duration, fadeAt, air.agc.bandDb, air.agc.mode);
+        const own = bandGainDb(air.agc.bandDb);
+        const span = (gainDb.length - 1) * AGC_STEP_SEC;
+        agc = c.createGain();
+        agc.gain.setValueCurveAtTime(gainDb.map((db) => Math.pow(10, db / 20)), t0, span);
+        duck = gainDb.map((db) => Math.pow(10, Math.min(0, db - own) / 20));
+        const onDuck = air.agc.onDuck;
+        if (onDuck) {
+          const ts = c.getOutputTimestamp?.();
+          const atMs =
+            ts?.contextTime !== undefined && ts.performanceTime !== undefined
+              ? ts.performanceTime + (t0 - ts.contextTime) * 1000
+              : performance.now() + (t0 - c.currentTime) * 1000;
+          onDuck(duck, AGC_STEP_SEC, atMs);
+          unduck = () => onDuck(null, AGC_STEP_SEC, 0);
+        }
+      }
       if (air?.band && air.band.samples.length > 0) {
         const buf = c.createBuffer(1, air.band.samples.length, air.band.rate);
         buf.getChannelData(0).set(air.band.samples);
@@ -315,7 +359,13 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         noise = c.createBufferSource();
         noise.buffer = buf;
         noise.loop = true;
-        noise.connect(ramp).connect(level);
+        let tail: AudioNode = noise.connect(ramp);
+        if (duck) {
+          const ducked = c.createGain();
+          ducked.gain.setValueCurveAtTime(duck, t0, (duck.length - 1) * AGC_STEP_SEC);
+          tail = tail.connect(ducked);
+        }
+        tail.connect(level);
         noise.start(t0, (performance.now() / 1000) % buf.duration);
         noise.stop(t0 + env.duration);
       }
@@ -331,6 +381,7 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         head = head.connect(filter);
       }
       if (fade) head = head.connect(fade);
+      if (agc) head = head.connect(agc);
       head.connect(level).connect(c.destination);
       for (const [at, value] of env.points) {
         if (value === 0) gate.gain.setValueAtTime(0, t0 + at);
@@ -346,7 +397,7 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         if (mode === "tgt") done();
       };
 
-      tgtNodes = { osc, gate, level, filter, fade, noise };
+      tgtNodes = { osc, gate, level, filter, fade, noise, agc, unduck };
       clockStart = t0;
       clockOffset = start;
       clockEnd = endT;

@@ -71,13 +71,19 @@ function sample(t: number): number {
  *  played with, each replay as a WAV with the part of it played, and
  *  whether one plays now, for a test to read. */
 export const heard: {
-  gate: { band: { samples: Float32Array; rate: number } | null; level: number; armed: boolean; delaySec: number };
+  gate: {
+    band: { samples: Float32Array; rate: number } | null;
+    level: number;
+    armed: boolean;
+    delaySec: number;
+    duck: Float32Array | null;
+  };
   airs: (TargetAir | undefined)[];
   replays: ArrayBuffer[];
   /** From and to, in seconds, or undefined for the whole of it. */
   spans: [number | undefined, number | undefined][];
   replaying: boolean;
-} = { gate: { band: null, level: 0, armed: false, delaySec: 0 }, airs: [], replays: [], spans: [], replaying: false };
+} = { gate: { band: null, level: 0, armed: false, delaySec: 0, duck: null }, airs: [], replays: [], spans: [], replaying: false };
 
 /** The band gate, which only remembers. */
 const gate: BandGate = {
@@ -85,6 +91,7 @@ const gate: BandGate = {
   level: (gain) => void (heard.gate.level = gain),
   arm: (armed) => void (heard.gate.armed = armed),
   delay: (sec) => void (heard.gate.delaySec = sec),
+  duck: (gain) => void (heard.gate.duck = gain),
 };
 
 /** A recorder on the fake clock. It records only what the test keys: the
@@ -240,7 +247,7 @@ export class PageWorker {
 export function resetKey(): void {
   marks = [];
   keyedTo = 0;
-  heard.gate = { band: null, level: 0, armed: false, delaySec: 0 };
+  heard.gate = { band: null, level: 0, armed: false, delaySec: 0, duck: null };
   heard.airs = [];
   heard.replays = [];
   heard.spans = [];

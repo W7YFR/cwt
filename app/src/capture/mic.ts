@@ -69,6 +69,7 @@ class BandGateProcessor extends AudioWorkletProcessor {
     this.armed = false;
     this.hang = 0;
     this.floor = -1;
+    this.duck = null;
     this.port.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === 'band') {
@@ -81,6 +82,7 @@ class BandGateProcessor extends AudioWorkletProcessor {
       } else if (m.type === 'level') this.level = m.level;
       else if (m.type === 'delay') this.delay = m.sec;
       else if (m.type === 'arm') this.armed = m.armed;
+      else if (m.type === 'duck') this.duck = m.gain ? { gain: m.gain, step: m.step, at: m.at } : null;
     };
   }
   process(inputs, outputs) {
@@ -110,6 +112,13 @@ class BandGateProcessor extends AudioWorkletProcessor {
         const a = band[j];
         const b = band[j + 1 < n ? j + 1 : 0];
         out[i] = (a + (b - a) * f) * this.gain;
+      }
+      // The AGC's gain as the station keys, from when it starts.
+      const d = this.duck;
+      if (d) {
+        const k = Math.floor((currentTime + i / sampleRate - d.at) / d.step);
+        if (k >= d.gain.length) this.duck = null;
+        else if (k >= 0) out[i] *= d.gain[k];
       }
       if (n > 0) { this.pos += this.step; if (this.pos >= n) this.pos -= n; }
     }
@@ -273,6 +282,9 @@ export interface BandGate {
   /** Cut on keying only while armed: while the page listens for you, not
    *  while a station plays and the microphone may hear it. */
   arm(armed: boolean): void;
+  /** The AGC's gain as a station keys: a share at each step of `stepSec`,
+   *  from `atMs` on the performance clock. Null takes it off. */
+  duck(gain: Float32Array | null, stepSec: number, atMs: number): void;
 }
 
 export interface RecordOptions {
@@ -366,6 +378,15 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     level: (gain) => gate.port.postMessage({ type: "level", level: gain }),
     delay: (sec) => gate.port.postMessage({ type: "delay", sec }),
     arm: (armed) => gate.port.postMessage({ type: "arm", armed }),
+    duck: (gain, step, atMs) => {
+      // From the performance clock to this context's.
+      const ts = ctx.getOutputTimestamp?.();
+      const at =
+        ts?.contextTime !== undefined && ts.performanceTime !== undefined
+          ? ts.contextTime + (atMs - ts.performanceTime) / 1000
+          : ctx.currentTime + (atMs - performance.now()) / 1000;
+      gate.port.postMessage({ type: "duck", gain, step, at });
+    },
   };
 
   let chunks: Float32Array[] = [];
