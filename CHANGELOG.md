@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- Some stations send on a straight key, with every dit and dah made by hand, and now and then a proper roger. They are rare in standard QSOs and the SST, and almost never in a CWT.
+- Some stations send on a straight key, with every dit and dah made by hand, and now and then a proper roger. They are rare, most often in standard QSOs and the SST, and almost never in a CWT.
 - A station on a straight key sends no faster than 20 WPM.
 - A station's speed on its lines has an icon for a bug or a straight key. Hovering the icon names the key.
 - **Paddle** and a friend's **Keys** have a **Straight key** checkbox. Any mix of the keys can be checked.
