@@ -53,8 +53,14 @@ const CLICK_SHARE = 0.25;
 const PASS_LO_HZ = 300;
 const PASS_HI_HZ = 2400;
 
-/** The band noise's width: a CW filter about 500 Hz wide. */
-const NOISE_Q = 1.3;
+/** The receiver's CW filter, which the band noise comes through. Measured
+ *  from noise recorded off a real receiver: flat this far each side of the
+ *  pitch, so about 450 Hz wide where it is 6 dB down... */
+const FILTER_FLAT_HZ = 215;
+/** ...then down this many dB a Hz, steep as a DSP filter is... */
+const FILTER_SKIRT_DB_PER_HZ = 0.3;
+/** ...to the receiver's own hiss, this far under the passband. */
+const FILTER_FLOOR_DB = -50;
 
 /** A fixed sequence of numbers in [0, 1) from `seed`. */
 export function seeded(seed: number): () => number {
@@ -206,13 +212,84 @@ export function qrnCrashes(n: number, rate: number, qrn: number, peak: number, s
   return out;
 }
 
-/** Band noise at `toneHz`: `n` samples of white noise through a band-pass
- *  filter on the tone, at an RMS of `level`. */
+/** `re` and `im` through a radix-2 FFT, in place. Their length is a power
+ *  of two. */
+function fft(re: Float64Array, im: Float64Array): void {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j]!, re[i]!];
+      [im[i], im[j]] = [im[j]!, im[i]!];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const half = len >> 1;
+    const step = (-2 * Math.PI) / len;
+    for (let k = 0; k < half; k++) {
+      const c = Math.cos(step * k);
+      const s = Math.sin(step * k);
+      for (let i = k; i < n; i += len) {
+        const j = i + half;
+        const vr = re[j]! * c - im[j]! * s;
+        const vi = re[j]! * s + im[j]! * c;
+        re[j] = re[i]! - vr;
+        im[j] = im[i]! - vi;
+        re[i] = re[i]! + vr;
+        im[i] = im[i]! + vi;
+      }
+    }
+  }
+}
+
+/** The CW filter's gain at `hz`, for a pitch of `toneHz`. */
+function filterGain(hz: number, toneHz: number): number {
+  const off = Math.abs(hz - toneHz) - FILTER_FLAT_HZ;
+  const db = off > 0 ? Math.max(FILTER_FLOOR_DB, -FILTER_SKIRT_DB_PER_HZ * off) : 0;
+  return Math.pow(10, db / 20);
+}
+
+/** Band noise at `toneHz`: `n` samples of the noise a receiver's CW filter
+ *  passes, at an RMS of `level`.
+ *
+ * Made in the frequency domain, in blocks that overlap by half: each block
+ * is random in every bin, at the filter's gain there, and the blocks
+ * cross-fade so the noise holds one level. One FFT makes two blocks: its
+ * real part and its imaginary part are each noise with that spectrum. */
 export function bandNoise(n: number, rate: number, toneHz: number, level: number, seed: number): Float32Array {
   const rand = seeded(seed);
   const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) out[i] = rand() * 2 - 1;
-  biquad(out, rate, "band", toneHz, NOISE_Q);
+  // Bins 5 Hz apart or closer, fine enough for the filter's skirts.
+  const size = 2 ** Math.ceil(Math.log2(rate / 5));
+  const hop = size / 2;
+  const gains = new Float64Array(hop);
+  for (let k = 1; k < hop; k++) gains[k] = filterGain((k * rate) / size, toneHz);
+  // A sine window: two blocks' squares sum to one where they overlap.
+  const win = new Float64Array(size);
+  for (let i = 0; i < size; i++) win[i] = Math.sin((Math.PI * (i + 0.5)) / size);
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+  const re = new Float64Array(size);
+  const im = new Float64Array(size);
+  const add = (at: number, block: Float64Array) => {
+    const from = Math.max(0, -at);
+    const to = Math.min(size, n - at);
+    for (let i = from; i < to; i++) out[at + i] = out[at + i]! + block[i]! * win[i]!;
+  };
+  for (let at = -hop; at < n; at += 2 * hop) {
+    re.fill(0);
+    im.fill(0);
+    // Positive frequencies only, so the real and imaginary parts of the
+    // result are each real noise with this spectrum.
+    for (let k = 1; k < hop; k++) {
+      re[k] = gauss() * gains[k]!;
+      im[k] = gauss() * gains[k]!;
+    }
+    fft(re, im);
+    add(at, re);
+    add(at + hop, im);
+  }
   let sumSq = 0;
   for (let i = 0; i < n; i++) sumSq += out[i]! * out[i]!;
   const rms = Math.sqrt(sumSq / Math.max(n, 1));

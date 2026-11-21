@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- **Noise** sounds like a receiver's CW filter: a narrow band on the pitch, with no hiss above it.
+
 ## v1.32.0 — 2026-11-15
 
 ### Added

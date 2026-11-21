@@ -92,6 +92,15 @@ describe("noise", () => {
     expect(power(n, rate, 650)).toBeGreaterThan(10 * power(n, rate, 2500));
     expect(bandNoise(1000, rate, 650, 0.05, 3)).toEqual(bandNoise(1000, rate, 650, 0.05, 3));
   });
+
+  it("is flat across the CW filter, and falls away steeply outside it", () => {
+    const rate = 8000;
+    const n = bandNoise(rate * 10, rate, 650, 0.05, 4);
+    expect(power(n, rate, 500)).toBeGreaterThan(power(n, rate, 650) / 2);
+    expect(power(n, rate, 800)).toBeGreaterThan(power(n, rate, 650) / 2);
+    expect(power(n, rate, 1100)).toBeLessThan(power(n, rate, 650) / 1000);
+    expect(power(n, rate, 200)).toBeLessThan(power(n, rate, 650) / 1000);
+  });
 });
 
 describe("QRN", () => {
