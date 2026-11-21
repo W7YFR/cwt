@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.37.0 — 2026-11-21
+
 ### Added
 
 - A second trash can on Send, marked A, throws away every run and keeps the message. The trash can that drops one run is now marked 1.
