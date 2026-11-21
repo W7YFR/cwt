@@ -33,10 +33,10 @@ export interface Format {
 }
 
 export const FORMATS: Readonly<Record<FormatId, Format>> = {
-  cwt: { id: "cwt", word: "CWT", yours: ["name", "number"], wpm: [26, 32], canada: 0.08, keys: { bug: 0.03 } },
-  sst: { id: "sst", word: "SST", yours: ["name", "region"], wpm: [14, 20], canada: 0.08, keys: { bug: 0.12 } },
-  mst: { id: "mst", word: "MST", yours: ["name", "number"], wpm: [20, 25], canada: 0.08, keys: { bug: 0.06 } },
-  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 25], canada: 0.03, keys: { bug: 0.05 } },
+  cwt: { id: "cwt", word: "CWT", yours: ["name", "number"], wpm: [26, 32], canada: 0.08, keys: { bug: 0.03, straight: 0.005 } },
+  sst: { id: "sst", word: "SST", yours: ["name", "region"], wpm: [14, 20], canada: 0.08, keys: { bug: 0.12, straight: 0.06 } },
+  mst: { id: "mst", word: "MST", yours: ["name", "number"], wpm: [20, 25], canada: 0.08, keys: { bug: 0.06, straight: 0.03 } },
+  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 25], canada: 0.03, keys: { bug: 0.05, straight: 0.04 } },
 };
 
 export const FORMAT_IDS = Object.keys(FORMATS) as FormatId[];
@@ -47,6 +47,10 @@ export const ACADEMY = "CWA";
 /** The speeds a CW Academy student sends at in a CWT, slowest and fastest.
  *  They are learning. */
 export const ACADEMY_WPM: readonly [number, number] = [15, 22];
+
+/** How far below a straight key's fastest a station on one in a run may
+ *  send. */
+export const STRAIGHT_WPM_SPAN = 5;
 
 /** The format a word names, or null. */
 export function formatNamed(word: string): FormatId | null {

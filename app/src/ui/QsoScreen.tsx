@@ -53,12 +53,12 @@ import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } 
 import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
-import type { Fist } from "@/timing/fist";
+import { sentSpeed, type Fist } from "@/timing/fist";
 import { targetTiming } from "@/timing/model";
 import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { drawerOpen } from "./Drawer";
-import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
@@ -85,9 +85,11 @@ import {
   BandOnCheck,
   AgcChoice,
   KeyStyleGroup,
+  KeyMark,
+  keyName,
   paddleLabel,
+  STRAIGHT_SPEED_HELP,
   useKeyStyle,
-  WIDEST_PADDLE,
   SpeedSliders,
 } from "./Controls";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
@@ -365,8 +367,8 @@ interface Line {
   /** The tone the station sent it at, for the station's overs. Absent in a
    *  log kept before it was. */
   readonly toneHz?: number;
-  /** The station's fist on a bug, for the station's overs. Absent: a keyer,
-   *  and in a log kept before there were bugs. */
+  /** The station's fist on a key worked by hand, for the station's lines.
+   *  Absent: a keyer, and in a log kept before there were bugs. */
   readonly fist?: Fist;
   /** Your lines: the suggested reply when you began it, shown or not, for
    *  the debug save. Absent when there was none. */
@@ -749,6 +751,8 @@ export function QsoScreen({
   const charEnds = useRef<number[]>([]);
   /** How fast the station sends, after QRS or QRQ. */
   const [theirSpeed, setTheirSpeed] = useState<Speed>(() => kept?.theirSpeed ?? speed);
+  /** The key the station sent its last line on, for the line under the log. */
+  const theirFist = [...lines].reverse().find((l) => !l.you)?.fist;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const afterReply = useRef<() => void>(() => {});
   /** The last over answered. */
@@ -1253,7 +1257,7 @@ export function QsoScreen({
               input: copyInputRef.current,
               mode: theirMode.current,
               locked: false,
-              sentWpm: at,
+              sentWpm: sentSpeed(at, them.fist),
               toneHz: them.toneHz,
               ...(them.fist ? { fist: them.fist } : {}),
             },
@@ -2484,6 +2488,7 @@ export function QsoScreen({
           <span className="lend">
             {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
               <span className="lwpm" data-testid="qso-line-wpm">
+                {!line.you && <KeyMark fist={line.fist} />}
                 {wpmOf(line.sentWpm)}
               </span>
             )}
@@ -2679,6 +2684,7 @@ export function QsoScreen({
           farnsworthWpm={speed.farnsworthWpm}
           onChange={(patch) => setSpeed({ ...speed, ...patch })}
           locked={recorder !== null}
+          charHelp={STRAIGHT_SPEED_HELP}
         />
       </div>
     </Section>
@@ -2792,30 +2798,30 @@ export function QsoScreen({
               <QuickChip id="speed" label="Speed" value={fmtSpeed(speed)} widest={WIDEST_SPEED} tab="speed" locked={recorder !== null}>
                 {speedSection}
               </QuickChip>
-              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} widest={WIDEST_PADDLE} tab="page">
+              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} tab="page">
                 <Section name="station" title="The other station">
                   <div className="panelgroups">
                     <KeyStyleGroup ks={keyStyle} />
                   </div>
                 </Section>
               </QuickChip>
-              <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} widest="POTA" tab="page">
+              <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} tab="page">
                 <Section name="you" title="You">
                   <div className="panelgroups">{kindChoice}</div>
                   <ExampleLines shown={guideKind} testId="qso-kind-example" />
                 </Section>
               </QuickChip>
-              <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} widest={longest(LENGTHS.map((l) => l.label))} tab="page">
+              <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} tab="page">
                 <Section name="station" title="The other station">
                   <div className="panelgroups">{lengthChoice}</div>
                 </Section>
               </QuickChip>
-              <QuickChip id="lines" label="Lines" value={THEIR_TEXTS.find((t) => t.value === theirText)!.label} widest={longest(THEIR_TEXTS.map((t) => t.label))} tab="page">
+              <QuickChip id="lines" label="Lines" value={THEIR_TEXTS.find((t) => t.value === theirText)!.label} tab="page">
                 <Section name="lines" title="The other station">
                   <div className="panelgroups">{theirTextChoice}</div>
                 </Section>
               </QuickChip>
-              <QuickChip id="hints" label="Reply hint" value={HINTS.find((h) => h.value === hints)!.label} widest={longest(HINTS.map((h) => h.label))} tab="page">
+              <QuickChip id="hints" label="Reply hint" value={HINTS.find((h) => h.value === hints)!.label} tab="page">
                 <Section name="you" title="You">
                   <div className="panelgroups">{hintsChoice}</div>
                 </Section>
@@ -3065,9 +3071,10 @@ export function QsoScreen({
                 {slotPlay("Word", `Play the selected word (${ALT}+W)`, playWord, "qso-play-word")}
               </div>
             )}
-            {!same(theirSpeed, speed) && (
+            {!same(sentSpeed(theirSpeed, theirFist), speed) && (
               <span className="hint" data-testid="qso-their-speed">
-                The station sends at {fmtSpeed(theirSpeed)}.
+                The station sends at {fmtSpeed(sentSpeed(theirSpeed, theirFist))}
+                {theirFist ? ` on ${keyName(theirFist.key)}` : ""}.
               </span>
             )}
           </div>

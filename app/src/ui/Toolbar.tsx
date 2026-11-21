@@ -94,11 +94,6 @@ function useNameColumn(open: boolean, pop: React.RefObject<HTMLElement | null>):
   }, [open, pop]);
 }
 
-/** The longest of some values, for a chip's `widest`. */
-export function longest(values: readonly string[]): string {
-  return values.reduce((a, b) => (b.length > a.length ? b : a), "");
-}
-
 /** The widest a speed reads, as 45/45 wpm. */
 export const WIDEST_SPEED = "45/45 wpm";
 
@@ -133,8 +128,9 @@ export function QuickChip({
   tab: SettingsTab;
   /** Shown, but not to be changed: a take is recording. */
   locked?: boolean;
-  /** The longest value it can show. Its room is kept, so the chips beside it
-   *  do not move when it changes. */
+  /** The longest value it can show, for a value a slider changes as you
+   *  drag. Its room is kept, so the chips beside it do not move under your
+   *  hand. A chip changed by a click is as wide as what it shows. */
   widest?: string;
   /** A fixed width for the popover, for one whose settings change shape with
    *  its value, as Mode's do. Otherwise it keeps the width it opened at. */

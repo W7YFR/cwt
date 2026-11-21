@@ -32,7 +32,7 @@ import {
   ViewControls,
   fitSpeed,
 } from "./Controls";
-import { DownloadItem, MenuHeading, OpenFileItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { DownloadItem, MenuHeading, OpenFileItem, QuickChip, Toolbar, WIDEST_SPEED } from "./Toolbar";
 import { drawerOpen } from "./Drawer";
 import { ACCEPTED } from "@/capture/file";
 import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
@@ -859,7 +859,7 @@ export function ReviewScreen({
                   </div>
                 </Section>
               </QuickChip>
-              <QuickChip id="mode" label="Mode" value={modeName} widest={longest(RECORD_MODES.map((m) => m.label))} width={460} tab="page" locked={recording}>
+              <QuickChip id="mode" label="Mode" value={modeName} width={460} tab="page" locked={recording}>
                 <Section name="mode" title="Mode">
                   <div className="panelgroups">
                     <div className="group">

@@ -501,6 +501,14 @@ describe("the friends section", () => {
     await user.click(box("keyer"));
     await user.click(save());
     expect(loadFriends()[0]!.keys).toEqual(["keyer", "bug"]);
-    expect(line()).not.toBe(onBug);
+    const both = line();
+    expect(both).not.toBe(onBug);
+    // A straight key, with the other two.
+    await user.click(screen.getByTestId("edit-friend"));
+    expect(box("straight").checked).toBe(false);
+    await user.click(box("straight"));
+    await user.click(save());
+    expect(loadFriends()[0]!.keys).toEqual(["keyer", "bug", "straight"]);
+    expect(line()).not.toBe(both);
   });
 });

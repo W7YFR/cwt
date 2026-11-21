@@ -2549,6 +2549,9 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .lwpm { margin-left: auto; padding-left: 12px; color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
 /* Your speed in your blue, so whose speed is whose reads at a glance. */
 .qsolog .you .lwpm { color: var(--you); }
+/* The key a line was sent on, before its speed: the speed's own ink, a size
+   up so the drawing reads. */
+.qsolog .lwpm .lkey { display: inline-flex; vertical-align: -2px; margin-right: 5px; font-size: 14px; }
 /* The end of a row: the speed and the play button, centered together on the
    row's first line of text, whatever the text below it wraps to. */
 .qsolog .lend {

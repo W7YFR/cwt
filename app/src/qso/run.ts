@@ -26,8 +26,9 @@
  */
 
 import { asFriend, friendCalls, onKey, pick, randomCaller, regionOf, type FriendInfo, type Rand, type Station } from "./station";
-import { ACADEMY, ACADEMY_WPM, FORMATS, FORMAT_IDS, REGIONS, formatNamed, type FormatId, type Item } from "./formats";
+import { ACADEMY, ACADEMY_WPM, FORMATS, STRAIGHT_WPM_SPAN, FORMAT_IDS, REGIONS, formatNamed, type FormatId, type Item } from "./formats";
 import { NO_SEARCH, type Search, type Speed } from "./speed";
+import { STRAIGHT_MOST_WPM } from "@/timing/fist";
 import {
   DEFAULT_SPEED,
   Over,
@@ -116,9 +117,13 @@ export interface RunTurn {
 }
 
 /** The speeds `station` sends at in `format`, slowest and fastest: slower
- *  for a CW Academy student in a CWT. */
+ *  for a CW Academy student in a CWT, and never past a straight key's top
+ *  speed on a straight key. */
 export function wpmOf(format: FormatId, station: Station): readonly [number, number] {
-  return format === "cwt" && station.nr === ACADEMY ? ACADEMY_WPM : FORMATS[format].wpm;
+  if (format === "cwt" && station.nr === ACADEMY) return ACADEMY_WPM;
+  const [lo, hi] = FORMATS[format].wpm;
+  if (station.fist?.key !== "straight" || hi <= STRAIGHT_MOST_WPM) return [lo, hi];
+  return [Math.min(lo, STRAIGHT_MOST_WPM - STRAIGHT_WPM_SPAN), STRAIGHT_MOST_WPM];
 }
 
 /** How many stations back in a run a new station's name may not repeat. */

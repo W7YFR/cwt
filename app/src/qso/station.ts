@@ -366,8 +366,9 @@ export function asFriend(station: Station, f: FriendInfo): Station {
 export type KeyChances = Readonly<Partial<Record<HandKey, number>>>;
 
 /** How often a station in a standard QSO keys on each key. A plain CQ is a
- *  rag chew, where older operators often send on a bug. */
-export const STANDARD_KEYS: KeyChances = { bug: 0.15 };
+ *  rag chew, where older operators often send on a bug, and a few on a
+ *  straight key. */
+export const STANDARD_KEYS: KeyChances = { bug: 0.15, straight: 0.06 };
 
 /** The fist of the operator at `call` on `key`: always the same one. None
  *  on a keyer. */

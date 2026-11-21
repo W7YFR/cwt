@@ -16,12 +16,13 @@ import { createPortal } from "react-dom";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import type { RecordMode } from "./mode";
+import { IconBug, IconStraightKey } from "./Icons";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import type { AgcMode } from "@/audio/agc";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
 import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
-import type { KeyKind } from "@/timing/fist";
+import { STRAIGHT_MOST_WPM, type Fist, type KeyKind } from "@/timing/fist";
 import { BREAK } from "@/morse";
 import {
   BREAK_MAX_SEC,
@@ -120,6 +121,7 @@ export function SpeedSliders({
   onChange,
   locked = false,
   idPrefix = "",
+  charHelp,
 }: {
   charWpm: number;
   farnsworthWpm: number;
@@ -128,10 +130,12 @@ export function SpeedSliders({
   locked?: boolean;
   /** Before each id, for a pair that is not your own speed: a friend's. */
   idPrefix?: string;
+  /** More to say behind the character speed's question mark. */
+  charHelp?: string;
 }): React.ReactElement {
   // Behind a question mark in the settings panels. The control row has
   // never had a tooltip on these, so it gets none.
-  const charAbout = useHelp(CHAR_SPEED_HELP);
+  const charAbout = useHelp(charHelp ? `${CHAR_SPEED_HELP} ${charHelp}` : CHAR_SPEED_HELP);
   const farnsAbout = useHelp(FARNSWORTH_HELP);
   return (
     <>
@@ -367,15 +371,25 @@ function fixedFrame(): { left: number; right: number; top: number } {
   return { left: r.left, right: r.right, top: r.top };
 }
 
-function HelpTip({ text }: { text: string }): React.ReactElement {
+/** A themed tooltip for `text`, drawn at the top of the page and placed by
+ *  `anchor`: below it, or above where there is no room below, and inside the
+ *  window either side. Spread `on` on the element that shows it. */
+function useTip<T extends HTMLElement>(
+  text: string,
+): {
+  id: string;
+  anchor: React.RefObject<T | null>;
+  on: { onMouseEnter(): void; onMouseLeave(): void; onFocus(): void; onBlur(): void };
+  box: React.ReactNode;
+} {
   const id = useId();
-  const dot = useRef<HTMLButtonElement>(null);
+  const anchor = useRef<T>(null);
   const box = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   useLayoutEffect(() => {
-    if (!open || !dot.current || !box.current) return;
-    const d = dot.current.getBoundingClientRect();
+    if (!open || !anchor.current || !box.current) return;
+    const d = anchor.current.getBoundingClientRect();
     const b = box.current.getBoundingClientRect();
     /* The page keeps a scrollbar's width free on both sides (see `html` in
        base.css), and a fixed box is placed inside them, not from the window's
@@ -393,35 +407,42 @@ function HelpTip({ text }: { text: string }): React.ReactElement {
     setOpen(false);
     setAt(null);
   };
+  return {
+    id,
+    anchor,
+    on: { onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide },
+    box: createPortal(
+      <span
+        ref={box}
+        className="tip"
+        role="tooltip"
+        id={id}
+        hidden={!open}
+        style={at ? { top: at.top, left: at.left } : { visibility: "hidden" }}
+      >
+        {text}
+      </span>,
+      document.body,
+    ),
+  };
+}
+
+function HelpTip({ text }: { text: string }): React.ReactElement {
+  const tip = useTip<HTMLButtonElement>(text);
   return (
     <span className="helptip">
       <button
-        ref={dot}
+        ref={tip.anchor}
         type="button"
         className="helpdot"
         aria-label="More about this setting"
-        aria-describedby={id}
+        aria-describedby={tip.id}
         onClick={(e) => e.preventDefault()}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        onFocus={show}
-        onBlur={hide}
+        {...tip.on}
       >
         ?
       </button>
-      {createPortal(
-        <span
-          ref={box}
-          className="tip"
-          role="tooltip"
-          id={id}
-          hidden={!open}
-          style={at ? { top: at.top, left: at.left } : { visibility: "hidden" }}
-        >
-          {text}
-        </span>,
-        document.body,
-      )}
+      {tip.box}
     </span>
   );
 }
@@ -1156,11 +1177,15 @@ export function AgcChoice({
   );
 }
 
+/** The straight key's top speed, said where a station's speed is set. */
+export const STRAIGHT_SPEED_HELP = `A station on a straight key sends no faster than ${STRAIGHT_MOST_WPM} WPM.`;
+
 /** The keys a station may send with, each with how it sounds: the friend
  *  form and Paddle both list them. */
 export const KEY_OPTIONS: ReadonlyArray<{ key: KeyKind; label: string; help: string }> = [
   { key: "keyer", label: "Keyer", help: "Every dit and dah exact." },
   { key: "bug", label: "Bug", help: "Even dits, and long dahs made by hand that vary." },
+  { key: "straight", label: "Straight key", help: `Every dit and dah made by hand, with wide gaps between letters. ${STRAIGHT_SPEED_HELP}` },
 ];
 
 /** A checkbox for each key, all on one row, for the keys in `keys`. Each
@@ -1207,27 +1232,49 @@ export function KeyChecks({
 }
 
 /** The keys `keys` holds, by name, in the order of `KEY_OPTIONS`: Keyer
- *  or bug. */
+ *  or bug, or Keyer, bug or straight key. */
 export function keysLabel(keys: readonly KeyKind[]): string {
-  return KEY_OPTIONS.filter((k) => keys.includes(k.key))
-    .map((k, i) => (i ? k.label.toLowerCase() : k.label))
-    .join(" or ");
+  const names = KEY_OPTIONS.filter((k) => keys.includes(k.key)).map((k, i) => (i ? k.label.toLowerCase() : k.label));
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : names.join("");
 }
 
-/** What Paddle's chip shows: Default, or the keys it sets. */
+/** A key by name, in a sentence: a bug, a straight key. */
+export function keyName(key: KeyKind): string {
+  return `a ${KEY_OPTIONS.find((k) => k.key === key)!.label.toLowerCase()}`;
+}
+
+/** The key a line was sent on, beside its speed: an icon for a key worked
+ *  by hand, and nothing for a keyer. Hovering it names the key. It never
+ *  names the station, whose call may be blurred. */
+export function KeyMark({ fist }: { fist: Fist | undefined }): React.ReactElement | null {
+  return fist ? <KeyIcon kind={fist.key} /> : null;
+}
+
+/** The icon of a key worked by hand, with its themed tooltip. */
+function KeyIcon({ kind }: { kind: Exclude<KeyKind, "keyer"> }): React.ReactElement {
+  const says = `The station sent this line on ${keyName(kind)}.`;
+  const tip = useTip<HTMLSpanElement>(says);
+  return (
+    <span ref={tip.anchor} className="lkey" data-key={kind} role="img" aria-label={says} {...tip.on}>
+      {kind === "bug" ? <IconBug /> : <IconStraightKey />}
+      {tip.box}
+    </span>
+  );
+}
+
+/** What Paddle's chip shows: Default, Any with every key checked, or the
+ *  keys it sets. */
 export function paddleLabel(ks: { keys: readonly KeyKind[] | null }): string {
-  return ks.keys === null ? "Default" : keysLabel(ks.keys);
+  if (ks.keys === null) return "Default";
+  return KEY_OPTIONS.every((k) => ks.keys!.includes(k.key)) ? "Any" : keysLabel(ks.keys);
 }
-
-/** The longest Paddle's chip can show, so its room is kept. */
-export const WIDEST_PADDLE = keysLabel(KEY_OPTIONS.map((k) => k.key));
 
 const ONE_KEY = "One must stay checked. Check another first.";
 
 /** What the stations send with: Default as on the air, or only the ones
  *  you check. */
 const KEY_STYLES: ReadonlyArray<{ value: "default" | "only"; label: string; note: string }> = [
-  { value: "default", label: "Default", note: "Mostly a keyer, now and then a bug, as on the air." },
+  { value: "default", label: "Default", note: "Mostly a keyer, now and then a bug or a straight key, as on the air." },
   { value: "only", label: "Only these", note: "Each station uses one of the ones you check." },
 ];
 

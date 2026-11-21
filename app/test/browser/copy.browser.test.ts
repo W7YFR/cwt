@@ -597,6 +597,13 @@ describe("a generated QSO", () => {
     expect(new Set(lines().map((l) => l.dataset.sender))).toEqual(new Set(["0", "1"]));
   });
 
+  it("marks each line's speed with the key it was sent on", async () => {
+    const keyOf = () => lines().map((l) => l.querySelector('[data-testid="copy-line-wpm"] [data-key]')?.getAttribute("data-key") ?? null);
+    await makeUp({ copyKind: "sst", copyRunQsos: 1, copyGap: "1", copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, keyStyle: "only", styleKeys: ["straight"] });
+    await playTo(2);
+    expect(keyOf()).toEqual(["straight", "straight"]);
+  });
+
   it("is sent again at a new speed, with your copy and the attempt kept", async () => {
     await makeUp({ copyKind: "cwt", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
     await playTo(1);
