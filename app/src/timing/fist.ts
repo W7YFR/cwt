@@ -14,6 +14,8 @@
  *   little longer.
  * - The gaps around a dah are made by hand too, so they drift. After a dah,
  *   the arm must start before the first dit comes.
+ * - Some operators like a proper roger: an R on its own, as in R R, with its
+ *   dah drawn out far past the rest.
  * - Each operator has a swing: a habit of spacing out two letters when the
  *   first ends as the next begins, dah to dah or dit to dit.
  * - The whole fist drifts a little faster and slower through a line.
@@ -74,6 +76,10 @@ export interface BugFist {
   readonly wordGap: number;
   /** Added between two letters when the first ends as the next begins. */
   readonly swing: number;
+  /** How often an R on its own is a proper roger, 0 to 1. */
+  readonly roger: number;
+  /** A proper roger's dah, as so many of the operator's own dahs. */
+  readonly rogerDah: number;
 }
 
 /** The fist of an operator on `key`, from `seed`, or none on a keyer. */
@@ -103,12 +109,14 @@ export function bugFist(seed: number): BugFist {
     charGap: within(0.95, 1.35),
     wordGap: within(0.9, 1.25),
     swing: within(0, 1.2),
+    roger: within(0.2, 0.9),
+    rogerDah: within(2.2, 3.2),
   };
 }
 
 /** The numbers each kind of fist holds, to check one read back. */
 const FIST_NUMBERS: { readonly [K in HandKey]: readonly (keyof Extract<Fist, { key: K }>)[] } = {
-  bug: ["seed", "weight", "dah", "dahSpread", "drag", "afterDah", "toDah", "gapSpread", "charGap", "wordGap", "swing"],
+  bug: ["seed", "weight", "dah", "dahSpread", "drag", "afterDah", "toDah", "gapSpread", "charGap", "wordGap", "swing", "roger", "rogerDah"],
 };
 
 /** Whether `v` is a fist, as read back from a saved file. */
@@ -206,35 +214,39 @@ function onBug(words: readonly string[], timing: Timing, fist: BugFist, rand?: (
   const vary = (sd: number) => (rand ? around(rand, sd) : 1);
   let drift = 0;
   let last = "";
-  return words.map((word, wi) => ({
-    gap: wi > 0 ? Math.max(wordGap * fist.wordGap * vary(fist.gapSpread), 1.5 * charGap) : 0,
-    chars: keyableSymbols(word).map((ch, li) => {
-      const pattern = patternOf(ch)!;
-      if (rand) drift = Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, DRIFT_HOLD * drift + (around(rand, DRIFT_STEP) - 1)));
-      const hand = 1 + drift;
-      const swung = li > 0 && last.at(-1) === pattern[0] ? fist.swing * unit : 0;
-      const gap = li > 0 ? Math.max(charGap * fist.charGap * hand * vary(fist.gapSpread) + swung, 2 * unit) : 0;
-      last = pattern;
-      const marks: number[] = [];
-      const spaces: number[] = [];
-      for (let ei = 0; ei < pattern.length; ei++) {
-        const e = pattern[ei];
-        const next = pattern[ei + 1];
-        if (e === ".") marks.push(dit * vary(DIT_SPREAD));
-        else {
-          const dah = dit * fist.dah * (next === "." ? 1 + fist.drag : 1);
-          marks.push(Math.max(dah * hand * vary(fist.dahSpread), 2.5 * dit));
+  return words.map((word, wi) => {
+    // A proper roger now and then, for an R on its own.
+    const roger = rand && word === "R" && rand() < fist.roger ? fist.rogerDah : 1;
+    return {
+      gap: wi > 0 ? Math.max(wordGap * fist.wordGap * vary(fist.gapSpread), 1.5 * charGap) : 0,
+      chars: keyableSymbols(word).map((ch, li) => {
+        const pattern = patternOf(ch)!;
+        if (rand) drift = Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, DRIFT_HOLD * drift + (around(rand, DRIFT_STEP) - 1)));
+        const hand = 1 + drift;
+        const swung = li > 0 && last.at(-1) === pattern[0] ? fist.swing * unit : 0;
+        const gap = li > 0 ? Math.max(charGap * fist.charGap * hand * vary(fist.gapSpread) + swung, 2 * unit) : 0;
+        last = pattern;
+        const marks: number[] = [];
+        const spaces: number[] = [];
+        for (let ei = 0; ei < pattern.length; ei++) {
+          const e = pattern[ei];
+          const next = pattern[ei + 1];
+          if (e === ".") marks.push(dit * vary(DIT_SPREAD));
+          else {
+            const dah = dit * fist.dah * (next === "." ? 1 + fist.drag : 1) * roger;
+            marks.push(Math.max(dah * hand * vary(fist.dahSpread), 2.5 * dit));
+          }
+          if (next === undefined) continue;
+          if (e === "." && next === ".") spaces.push(armSpace * vary(DIT_SPREAD));
+          else {
+            const usual = e === "-" ? fist.afterDah * unit : fist.toDah * armSpace;
+            spaces.push(Math.max(usual * hand * vary(fist.gapSpread), SHORTEST_GAP * unit));
+          }
         }
-        if (next === undefined) continue;
-        if (e === "." && next === ".") spaces.push(armSpace * vary(DIT_SPREAD));
-        else {
-          const usual = e === "-" ? fist.afterDah * unit : fist.toDah * armSpace;
-          spaces.push(Math.max(usual * hand * vary(fist.gapSpread), SHORTEST_GAP * unit));
-        }
-      }
-      return { gap, marks, spaces };
-    }),
-  }));
+        return { gap, marks, spaces };
+      }),
+    };
+  });
 }
 
 /** Total length of `words` as keyed. */

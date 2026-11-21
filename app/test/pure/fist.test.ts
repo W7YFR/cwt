@@ -13,7 +13,7 @@ import { overOfText } from "@/copy/lines";
 import { newQso } from "@/qso/cq";
 import { ACADEMY, FORMATS } from "@/qso/formats";
 import { newRun } from "@/qso/run";
-import { asFriend, onKey, randomStation, STANDARD_KEYS, type FriendInfo, type Station } from "@/qso/station";
+import { asFriend, onKey, randomStation, STANDARD_KEYS, withKeys, type FriendInfo, type Station } from "@/qso/station";
 import { seeded } from "@/audio/qsb";
 import { bugFist, fistFor, isFist, keyed, type Fist } from "@/timing/fist";
 import { targetTiming } from "@/timing/model";
@@ -100,6 +100,23 @@ describe("a bug", () => {
   it("is made for a key worked by hand, and none for a keyer", () => {
     expect(fistFor("keyer", 3)).toBeUndefined();
     expect(fistFor("bug", 3)).toEqual(bugFist(3));
+  });
+
+  it("draws out the dah of an R on its own now and then: a proper roger", () => {
+    const fist = bugFist(7);
+    const dahOf = (f: Fist, text: string, word: number) => keyed(text.split(" "), AT_20, f)[word]!.chars[0]!.marks[1]!;
+    // R R, and the R that starts RST: only an R on its own.
+    const text = "R R RST";
+    const always = { ...fist, roger: 1 };
+    const never = { ...fist, roger: 0 };
+    expect(dahOf(always, text, 0) / dahOf(never, text, 0)).toBeGreaterThan(1.8);
+    expect(dahOf(always, text, 1) / dahOf(never, text, 1)).toBeGreaterThan(1.8);
+    expect(dahOf(always, text, 2)).toBeLessThan(dahOf(always, text, 0) / 1.8);
+    // Over ten of the operator's dits, and the page shows it as the sound has it.
+    const dit = keyed(["R"], AT_20, always)[0]!.chars[0]!.marks[0]!;
+    expect(dahOf(always, text, 0) / dit).toBeGreaterThan(10);
+    const blocks = idealTimeline(text, AT_20, {}, always).blocks;
+    keyingPlan(text, AT_20, always).forEach(([, sec], i) => expect(sec).toBeCloseTo(blocks[i]!.t1 - blocks[i]!.t0, 9));
   });
 
   it("reads back only a whole fist", () => {
@@ -203,5 +220,28 @@ describe("who keys on a bug", () => {
       expect(part(line.fist)).not.toEqual(part());
     }
     expect(found).toBe(true);
+  });
+
+  it("is what Style checks, when it sets the keys, and never a friend's", () => {
+    const all = stations(200).map((s) => onKey(s, STANDARD_KEYS));
+    expect(all.map((s) => withKeys(s, null))).toEqual(all);
+    expect(all.every((s) => !withKeys(s, ["keyer"]).fist)).toBe(true);
+    for (const s of all) expect(withKeys(s, ["bug"]).fist).toEqual(onKey(s, { bug: 1 }).fist);
+    const both = all.filter((s) => withKeys(s, ["keyer", "bug"]).fist).length / all.length;
+    expect(both).toBeGreaterThan(0.35);
+    expect(both).toBeLessThan(0.65);
+    const friend = { ...onKey(all[0]!, { bug: 1 }), friend: true };
+    expect(withKeys(friend, ["keyer"])).toEqual(friend);
+  });
+
+  it("is what Style checks in the Copy page's generated QSOs", () => {
+    for (let seed = 1; seed < 20; seed++) {
+      expect(makeScript({ kind: "cq", rand: seeded(seed), keys: ["bug"] }).stations.every((s) => s.fist)).toBe(true);
+      expect(makeScript({ kind: "cwt", rand: seeded(seed), keys: ["keyer"] }).stations.some((s) => s.fist)).toBe(false);
+      // Style draws nothing: the same QSO, keyed another way.
+      const a = makeScript({ kind: "sst", rand: seeded(seed) });
+      const b = makeScript({ kind: "sst", rand: seeded(seed), keys: ["bug"] });
+      expect(b.lines).toEqual(a.lines);
+    }
   });
 });

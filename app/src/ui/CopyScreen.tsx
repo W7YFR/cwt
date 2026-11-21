@@ -79,6 +79,10 @@ import {
   QsbSlider,
   BandOnCheck,
   AgcChoice,
+  KeyStyleGroup,
+  paddleLabel,
+  useKeyStyle,
+  WIDEST_PADDLE,
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
@@ -489,6 +493,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const [qrnSet, setQrn] = useChoice("qrn", 0);
   const [qrmSet, setQrmDb] = useChoice("qrmDb", QRM_OFF_DB);
   const [bandPlays, setBandPlaysRaw] = useOnOff("bandOn", true);
+  const keyStyle = useKeyStyle();
   const [agc, setAgcRaw] = useChoice("agc", "fast");
   /** A click changed how it is sent, the band's switch or the AGC, which
    *  has no slider to wait for. */
@@ -733,7 +738,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const makeExchange = () => {
     player.stop();
     cancelLastLock();
-    const script = makeScript({ kind, length: qsoLength, qsos: runQsos, friends: loadFriends() });
+    const script = makeScript({ kind, length: qsoLength, qsos: runQsos, friends: loadFriends(), keys: keyStyle.keys });
     const sent = sendScript(script, sending);
     const audio = encodeWavBuffer(sent.samples, sent.rate);
     const name = nameOf(script);
@@ -1680,6 +1685,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           options={QSO_LENGTHS}
           onChange={(v) => setQsoLength(v as Length)}
         />
+        <KeyStyleGroup ks={keyStyle} />
         <ChoiceGroup
           id="copy-gap"
           label="Between lines"
@@ -1811,6 +1817,13 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               </QuickChip>
               <QuickChip id="speed" label="Speed" value={speedChoice === "mine" ? fmtSpeed(mine) : "Format"} widest={WIDEST_SPEED} tab="speed">
                 {speedSection}
+              </QuickChip>
+              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} widest={WIDEST_PADDLE} tab="page">
+                <Section name="make" title="Generate QSO">
+                  <div className="panelgroups">
+                    <KeyStyleGroup ks={keyStyle} />
+                  </div>
+                </Section>
               </QuickChip>
               <QuickChip id="lines" label="Lines" value={LINES_SHOW.find((l) => l.value === linesShow)!.label} widest={longest(LINES_SHOW.map((l) => l.label))} tab="page">
                 <Section name="lines" title="Playback">

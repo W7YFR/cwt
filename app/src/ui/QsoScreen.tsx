@@ -45,7 +45,7 @@ import { exchangeReport, itemLabels } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
-import { regionOf, type Station } from "@/qso/station";
+import { regionOf, withKeys, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { anyAdded, asPlayed, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { patternOf } from "@/morse";
@@ -84,6 +84,10 @@ import {
   QsbSlider,
   BandOnCheck,
   AgcChoice,
+  KeyStyleGroup,
+  paddleLabel,
+  useKeyStyle,
+  WIDEST_PADDLE,
   SpeedSliders,
 } from "./Controls";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
@@ -862,6 +866,7 @@ export function QsoScreen({
     bandPlays,
   );
   const [bandNoise, setBandNoise] = useOnOff("qsoBandNoise", true);
+  const keyStyle = useKeyStyle();
   const [breakInMs, setBreakInMsRaw] = useState(() => loadPrefs().qsoBreakInMs ?? DEFAULT_BREAK_IN_MS);
   const setBreakInMs = (next: number) => {
     setBreakInMsRaw(next);
@@ -1217,7 +1222,9 @@ export function QsoScreen({
   /** The station's over: after a short wait, it goes in the log and plays.
    *  `again` is a line already in the log to play once more, rather than a
    *  new one. */
-  const sendReply = (reply: string, them: Station, at: Speed, n: number, again: number | null) => {
+  const sendReply = (reply: string, station: Station, at: Speed, n: number, again: number | null) => {
+    // Paddle sets the station's key, when it sets the keys.
+    const them = withKeys(station, keyStyle.keys);
     setPhase("waiting");
     if (again === null) pending.current = { reply, them, at, n };
     const [lo, hi] = REPLY_DELAY_SEC;
@@ -2785,6 +2792,13 @@ export function QsoScreen({
               <QuickChip id="speed" label="Speed" value={fmtSpeed(speed)} widest={WIDEST_SPEED} tab="speed" locked={recorder !== null}>
                 {speedSection}
               </QuickChip>
+              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} widest={WIDEST_PADDLE} tab="page">
+                <Section name="station" title="The other station">
+                  <div className="panelgroups">
+                    <KeyStyleGroup ks={keyStyle} />
+                  </div>
+                </Section>
+              </QuickChip>
               <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} widest="POTA" tab="page">
                 <Section name="you" title="You">
                   <div className="panelgroups">{kindChoice}</div>
@@ -2837,6 +2851,7 @@ export function QsoScreen({
                     options={NEXT_CALLERS}
                     onChange={(v) => setNextCaller(v as NextCaller)}
                   />
+                  <KeyStyleGroup ks={keyStyle} />
                   <Check
                     id="qso-blur-call"
                     label="Hide the station's call until I copy it"

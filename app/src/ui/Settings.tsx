@@ -41,9 +41,8 @@ import {
   type Friend,
   type UserInfo,
 } from "@/io/storage";
-import type { KeyKind } from "@/timing/fist";
 import { useUpperField } from "./useUpperField";
-import { Check, SpeedSliders } from "./Controls";
+import { KeyChecks, keysLabel, SpeedSliders } from "./Controls";
 import { fmtSpeed } from "./format";
 import {
   SLOT_NAMES,
@@ -373,19 +372,6 @@ const friendId = () => `friend/${Date.now().toString(36)}-${Math.random().toStri
 /** A friend before anything is typed. */
 const NEW_FRIEND: Omit<Friend, "id"> = { ...EMPTY_USER, wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM, keys: ["keyer"] };
 
-/** The keys a friend may send with, each with how it sounds. A friend with
- *  more than one picks one each time they call. */
-const KEYS: ReadonlyArray<{ key: KeyKind; label: string; help: string }> = [
-  { key: "keyer", label: "Keyer", help: "Every dit and dah exact." },
-  { key: "bug", label: "Bug", help: "Even dits, and long dahs made by hand that vary." },
-];
-
-/** The keys `keys` holds, by name, in the form's order: Keyer or bug. */
-function keysText(keys: readonly KeyKind[]): string {
-  const labels = KEYS.filter((k) => keys.includes(k.key)).map((k, i) => (i ? k.label.toLowerCase() : k.label));
-  return labels.join(" or ");
-}
-
 /** A friend's details after their call and name, on one line. */
 export function friendSummary(f: Omit<Friend, "id">): string {
   const qth = [f.qthCity, f.qthRegionShort].filter(Boolean).join(" ");
@@ -395,7 +381,7 @@ export function friendSummary(f: Omit<Friend, "id">): string {
   return [
     qth,
     fmtSpeed({ charWpm: f.wpm, farnsworthWpm: f.farnsworthWpm }),
-    keysText(f.keys),
+    keysLabel(f.keys),
     f.cwopsNumber && `CWops ${f.cwopsNumber}`,
     rig,
     f.antenna,
@@ -469,20 +455,9 @@ function FriendSection(): React.ReactElement {
             }}
           />
         </fieldset>
-        <fieldset className="usergroup friendkeys" data-testid="friend-keys">
+        <fieldset className="usergroup">
           <legend>Keys</legend>
-          {KEYS.map((k) => (
-            <Check
-              key={k.key}
-              id={`friend-key-${k.key}`}
-              label={k.label}
-              help={k.help}
-              checked={draft.keys.includes(k.key)}
-              onChange={(on) =>
-                change({ keys: KEYS.map((o) => o.key).filter((o) => (o === k.key ? on : draft.keys.includes(o))) })
-              }
-            />
-          ))}
+          <KeyChecks idPrefix="friend-" keys={draft.keys} allowNone onChange={(keys) => change({ keys })} />
         </fieldset>
         {problems.length > 0 && (
           <ul className="drillproblems" data-testid="friend-problems" role="alert">

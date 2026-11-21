@@ -20,7 +20,8 @@ import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import type { AgcMode } from "@/audio/agc";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
-import { loadUser } from "@/io/storage";
+import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
+import type { KeyKind } from "@/timing/fist";
 import { BREAK } from "@/morse";
 import {
   BREAK_MAX_SEC,
@@ -42,6 +43,7 @@ import {
   QSB_HELP,
   BAND_ON_HELP,
   AGC_HELP,
+  KEY_STYLE_HELP,
   NOISE_HELP,
   QRN_HELP,
   BREAK_IN_HELP,
@@ -1151,6 +1153,130 @@ export function AgcChoice({
       barred={barred}
       onChange={(v) => onChange(v as AgcMode)}
     />
+  );
+}
+
+/** The keys a station may send with, each with how it sounds: the friend
+ *  form and Paddle both list them. */
+export const KEY_OPTIONS: ReadonlyArray<{ key: KeyKind; label: string; help: string }> = [
+  { key: "keyer", label: "Keyer", help: "Every dit and dah exact." },
+  { key: "bug", label: "Bug", help: "Even dits, and long dahs made by hand that vary." },
+];
+
+/** A checkbox for each key, all on one row, for the keys in `keys`. Each
+ *  says how it sounds on hover. The last one checked cannot be cleared: a
+ *  station sends with at least one. */
+export function KeyChecks({
+  idPrefix,
+  keys,
+  barred = null,
+  allowNone = false,
+  onChange,
+}: {
+  idPrefix: string;
+  keys: readonly KeyKind[];
+  barred?: string | null;
+  /** The friend form says when none is checked, so it may clear the last. */
+  allowNone?: boolean;
+  onChange(keys: KeyKind[]): void;
+}): React.ReactElement {
+  return (
+    <div className="group" data-disabled={barred !== null}>
+      <div className="keyrow" data-testid={`${idPrefix}keys`}>
+        {KEY_OPTIONS.map((k) => {
+          const on = keys.includes(k.key);
+          const why = barred ?? (on && keys.length === 1 && !allowNone ? ONE_KEY : null);
+          return (
+            <label key={k.key} className="check" title={why ?? k.help}>
+              <input
+                type="checkbox"
+                id={`${idPrefix}key-${k.key}`}
+                checked={on}
+                disabled={why !== null}
+                onChange={(e) =>
+                  onChange(KEY_OPTIONS.map((o) => o.key).filter((o) => (o === k.key ? e.target.checked : keys.includes(o))))
+                }
+              />{" "}
+              {k.label}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The keys `keys` holds, by name, in the order of `KEY_OPTIONS`: Keyer
+ *  or bug. */
+export function keysLabel(keys: readonly KeyKind[]): string {
+  return KEY_OPTIONS.filter((k) => keys.includes(k.key))
+    .map((k, i) => (i ? k.label.toLowerCase() : k.label))
+    .join(" or ");
+}
+
+/** What Paddle's chip shows: Default, or the keys it sets. */
+export function paddleLabel(ks: { keys: readonly KeyKind[] | null }): string {
+  return ks.keys === null ? "Default" : keysLabel(ks.keys);
+}
+
+/** The longest Paddle's chip can show, so its room is kept. */
+export const WIDEST_PADDLE = keysLabel(KEY_OPTIONS.map((k) => k.key));
+
+const ONE_KEY = "One must stay checked. Check another first.";
+
+/** What the stations send with: Default as on the air, or only the ones
+ *  you check. */
+const KEY_STYLES: ReadonlyArray<{ value: "default" | "only"; label: string; note: string }> = [
+  { value: "default", label: "Default", note: "Mostly a keyer, now and then a bug, as on the air." },
+  { value: "only", label: "Only these", note: "Each station uses one of the ones you check." },
+];
+
+/** Paddle, kept as a preference the Copy and QSO pages share. `keys` is the
+ *  keys every station sends with, or null for Default. */
+export function useKeyStyle(): {
+  style: "default" | "only";
+  checked: readonly KeyKind[];
+  keys: readonly KeyKind[] | null;
+  setStyle(style: "default" | "only"): void;
+  setChecked(keys: KeyKind[]): void;
+} {
+  const [style, setStyleRaw] = useState(() => loadPrefs().keyStyle ?? "default");
+  const [checked, setCheckedRaw] = useState<readonly KeyKind[]>(() => loadPrefs().styleKeys ?? ["keyer"]);
+  return {
+    style,
+    checked,
+    keys: style === "only" ? checked : null,
+    setStyle: (next) => {
+      setStyleRaw(next);
+      savePrefs({ ...loadPrefs(), keyStyle: next });
+    },
+    setChecked: (next) => {
+      setCheckedRaw(next);
+      savePrefs({ ...loadPrefs(), styleKeys: next });
+    },
+  };
+}
+
+/** Paddle: what the stations send with. The Copy and QSO pages both
+ *  draw this. */
+export function KeyStyleGroup({ ks }: { ks: ReturnType<typeof useKeyStyle> }): React.ReactElement {
+  return (
+    <>
+      <ChoiceGroup
+        id="key-style"
+        label="Paddle"
+        help={KEY_STYLE_HELP}
+        value={ks.style}
+        options={KEY_STYLES}
+        onChange={(v) => ks.setStyle(v as "default" | "only")}
+      />
+      <KeyChecks
+        idPrefix="style-"
+        keys={ks.checked}
+        barred={ks.style === "only" ? null : "Pick Only these to choose."}
+        onChange={ks.setChecked}
+      />
+    </>
   );
 }
 

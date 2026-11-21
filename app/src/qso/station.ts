@@ -405,6 +405,15 @@ export function onKey(station: Station, chances: KeyChances): Station {
   return station;
 }
 
+/** `station` on one of `keys`, picked from its call and habit, in place of
+ *  the key it was given: the page's Paddle, when it sets the keys. Null
+ *  leaves it as it is. A friend keeps their own keys. */
+export function withKeys(station: Station, keys: readonly KeyKind[] | null): Station {
+  if (!keys || keys.length === 0 || station.friend) return station;
+  const { fist: _, ...rest } = station;
+  return { ...rest, ...fistOf(pickKey(keys, station.call, station.habit), station.call) };
+}
+
 /** How many CWT stations are CWops members, and how many CW Academy
  *  students, who send CWA. The rest send their region. */
 const MEMBERS = 0.8;

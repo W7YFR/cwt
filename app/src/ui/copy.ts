@@ -150,6 +150,9 @@ export const BAND_ON_HELP =
   "Turn QSB, noise, QRN and QRM on and off together. Off sends a clean signal, and keeps " +
   "their settings for when you turn them on again.";
 
+export const KEY_STYLE_HELP =
+  "What the stations send with. Default: mostly a keyer, now and then a bug, as on the air. " +
+  "Only these: each station uses one of the ones you check. Friends use their own.";
 export const AGC_HELP =
   "How the receiver keeps what you hear at one level, as a radio's AGC does. Under a strong " +
   "signal the band goes quiet, and it comes back up between characters and words: fast at " +

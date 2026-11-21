@@ -611,6 +611,12 @@ export interface Prefs {
   bandOn?: boolean;
   /** The receiver's AGC on the Copy and QSO pages. Absent: fast. */
   agc?: "off" | "slow" | "fast";
+  /** How the stations on the Copy and QSO pages key: by default as on the
+   *  air, or only on `styleKeys`. Absent: by default. */
+  keyStyle?: "default" | "only";
+  /** The keys the stations key on when `keyStyle` is only. Kept while it is
+   *  not. Absent: a keyer. */
+  styleKeys?: KeyKind[];
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -876,6 +882,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qrn: isNum,
   qrmDb: isNum,
   bandOn: isBool,
+  keyStyle: (v) => v === "default" || v === "only",
+  styleKeys: (v) => Array.isArray(v) && v.length > 0 && v.every((k) => KEY_KINDS.includes(k as KeyKind)),
   agc: oneOf("off", "slow", "fast"),
 };
 
