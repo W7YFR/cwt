@@ -22,7 +22,7 @@ import { newQso } from "@/qso/cq";
 import { GUIDE_IDS, type GuideId } from "@/qso/examples";
 import { FORMATS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
-import { callIn, following, isRun, respond, type AnyQso, type RunQso } from "@/qso/run";
+import { callIn, following, isRun, respond, wpmOf, type AnyQso, type RunQso } from "@/qso/run";
 import type { Speed } from "@/qso/speed";
 import { randomCaller, regionOf, type Rand, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
@@ -111,7 +111,7 @@ export function makeScript(options: MakeOptions): Script {
   const start = kind === "cq" ? null : kind;
   const caller = randomCaller(rand);
   const me = meOf(caller);
-  const mySpeed = wpmIn(rand, start ? FORMATS[start].wpm : STANDARD_QSO_WPM);
+  const mySpeed = wpmIn(rand, start ? wpmOf(start, caller) : STANDARD_QSO_WPM);
   const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand), speed: mySpeed }];
   const lines: ScriptLine[] = [];
   const voice = { rand, hour, pieces: length === "pieces" };

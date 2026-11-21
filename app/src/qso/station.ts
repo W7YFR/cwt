@@ -4,6 +4,8 @@
  * would on the air. `rand` is passed in, so a test can fix the station.
  */
 
+import { ACADEMY } from "./formats";
+
 export type Rand = () => number;
 
 export interface Station {
@@ -280,17 +282,20 @@ export function randomStation(rand: Rand, not = "", canada = CANADA, names: read
   };
 }
 
-/** How many CWT stations are CWops members. The rest send their region. */
+/** How many CWT stations are CWops members, and how many CW Academy
+ *  students, who send CWA. The rest send their region. */
 const MEMBERS = 0.8;
+const STUDENTS = 0.06;
 
 /** A station that answers a CQ in a run: a new station, with a CWops number
- *  most of the time and a serial number of its own. `canada` of the time it
- *  is in Canada. Its name is none of `names`. */
+ *  most of the time, now and then CWA, and a serial number of its own.
+ *  `canada` of the time it is in Canada. Its name is none of `names`. */
 export function randomCaller(rand: Rand, not = "", canada = CANADA, names: readonly string[] = []): Station {
   const station = randomStation(rand, not, canada, names);
+  const r = rand();
   return {
     ...station,
-    nr: rand() < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : "",
+    nr: r < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : r < MEMBERS + STUDENTS ? ACADEMY : "",
     serial: 1 + Math.floor(rand() * 150),
   };
 }

@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- In a CWT, a CW Academy student calls now and then. It sends CWA in place of a number, and sends slower than the other stations. The station also reads CWA when you send it.
+
 ### Changed
 
 - On the QSO page and in the Copy page's generated QSOs, stations send many more names, the common ones most often. In a run, a station never has the name of one of the stations just before it.

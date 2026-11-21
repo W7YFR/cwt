@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { isCall } from "@/qso/cq";
-import { REGIONS } from "@/qso/formats";
+import { makeScript } from "@/copy/generate";
+import { ACADEMY_WPM, FORMATS, REGIONS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
 import { theirItems } from "@/qso/report";
 import { answerRun, following, newRun, RECENT_NAMES, respond, type RunQso } from "@/qso/run";
@@ -105,6 +106,41 @@ describe("the names stations send", () => {
     const words = new Set(vocabulary([]));
     for (const name of NAMES) expect(words.has(name), name).toBe(true);
     expect(STATION_NAMES.filter((n) => words.has(n)).sort()).toEqual([...NAMES].sort());
+  });
+});
+
+describe("CW Academy students in a CWT", () => {
+  const rand = seeded(31);
+  const runs = Array.from({ length: 5000 }, () => newRun("cwt", rand));
+  const students = runs.filter((q) => q.them.nr === "CWA");
+
+  it("call now and then, and send CWA in place of a number", () => {
+    expect(students.length / runs.length).toBeGreaterThan(0.03);
+    expect(students.length / runs.length).toBeLessThan(0.09);
+    const qso: RunQso = { ...students[0]!, stage: "called", you: "KE7G" };
+    const turn = answerRun(qso, `${qso.them.call} BOB 1234`, { rand });
+    expect(turn.reply!.split(" ")).toContain("CWA");
+    expect(theirItems(turn.qso, [{ text: turn.reply! }])).toContainEqual({ label: "Number", value: "CWA" });
+  });
+
+  it("send slower than the rest", () => {
+    const [lo, hi] = ACADEMY_WPM;
+    for (const q of students) {
+      expect(q.speed.charWpm).toBeGreaterThanOrEqual(lo);
+      expect(q.speed.charWpm).toBeLessThanOrEqual(hi);
+    }
+    const [min] = FORMATS.cwt.wpm;
+    for (const q of runs.filter((r) => r.them.nr !== "CWA")) expect(q.speed.charWpm).toBeGreaterThanOrEqual(min);
+    expect(Math.max(...students.map((q) => q.speed.charWpm))).toBeLessThan(min);
+  });
+
+  it("call and run in the Copy page's generated CWTs", () => {
+    let heard = 0;
+    for (let seed = 1; seed <= 100; seed++) {
+      const script = makeScript({ kind: "cwt", rand: seeded(seed), qsos: 5 });
+      heard += script.lines.filter((l) => l.text.split(" ").includes("CWA")).length;
+    }
+    expect(heard).toBeGreaterThan(0);
   });
 });
 

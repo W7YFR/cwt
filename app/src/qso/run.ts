@@ -26,7 +26,7 @@
  */
 
 import { pick, randomCaller, regionOf, type Rand, type Station } from "./station";
-import { FORMATS, FORMAT_IDS, REGIONS, formatNamed, type FormatId, type Item } from "./formats";
+import { ACADEMY, ACADEMY_WPM, FORMATS, FORMAT_IDS, REGIONS, formatNamed, type FormatId, type Item } from "./formats";
 import { NO_SEARCH, type Search, type Speed } from "./speed";
 import {
   DEFAULT_SPEED,
@@ -111,18 +111,26 @@ export interface RunTurn {
   readonly ended: boolean;
 }
 
+/** The speeds `station` sends at in `format`, slowest and fastest: slower
+ *  for a CW Academy student in a CWT. */
+export function wpmOf(format: FormatId, station: Station): readonly [number, number] {
+  return format === "cwt" && station.nr === ACADEMY ? ACADEMY_WPM : FORMATS[format].wpm;
+}
+
 /** How many stations back in a run a new station's name may not repeat. */
 export const RECENT_NAMES = 10;
 
 /** A new QSO in a run of `format`, after `made` QSOs, with a station not at
  *  the call `not` and with none of the names in `recent`. */
 export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "", recent: readonly string[] = []): RunQso {
-  const [lo, hi] = FORMATS[format].wpm;
-  const wpm = lo + Math.floor(rand() * (hi - lo + 1));
+  const at = rand();
+  const them = randomCaller(rand, not, FORMATS[format].canada, recent);
+  const [lo, hi] = wpmOf(format, them);
+  const wpm = lo + Math.floor(at * (hi - lo + 1));
   return {
     format,
     stage: "waiting",
-    them: randomCaller(rand, not, FORMATS[format].canada, recent),
+    them,
     you,
     yourName: "",
     last: "",
@@ -165,8 +173,10 @@ export const AROUND = new Set([
 ]);
 
 /** A number as sent: digits, with the cut letters T for 0 and N for 9 read
- *  as digits. At least one real digit. */
+ *  as digits. At least one real digit. CWA, a CW Academy student's, counts
+ *  as a number. */
 function numberOf(word: string): string | null {
+  if (word === ACADEMY) return ACADEMY;
   if (!/^[0-9TNO]{1,5}$/.test(word) || !/\d/.test(word)) return null;
   return word.replace(/[TO]/g, "0").replace(/N/g, "9");
 }
@@ -190,7 +200,7 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   const rest = words.filter((w) => !AROUND.has(w) && !isCall(w) && !w.endsWith("?") && formatNamed(w) === null);
   const report = reportIn(words);
   const named = FORMATS[format].yours.includes("name");
-  const isName = (w: string | undefined) => w !== undefined && /^[A-Z]{2,}$/.test(w);
+  const isName = (w: string | undefined) => w !== undefined && w !== ACADEMY && /^[A-Z]{2,}$/.test(w);
   // A region alone, as WA, is a region, not a name: a name that is also a
   // region, as AL, needs a number or a region after it.
   const nameAt = (i: number) =>
@@ -311,7 +321,7 @@ function answerFor(item: Item, words: readonly string[], mine: string, lenient =
   const rest = words.filter((w) => !AROUND.has(w) && !isCall(w) && !w.endsWith("?"));
   switch (item) {
     case "name":
-      return { ...NOTHING, name: rest.find((w) => /^[A-Z]{2,}$/.test(w)) ?? "" };
+      return { ...NOTHING, name: rest.find((w) => w !== ACADEMY && /^[A-Z]{2,}$/.test(w)) ?? "" };
     case "number":
       return { ...NOTHING, number: numberIn(rest) || numberIn(words.filter((w) => !isCall(w))) };
     case "region":
