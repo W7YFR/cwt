@@ -24,9 +24,10 @@ import { FORMATS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
 import { callIn, following, isRun, respond, wpmOf, type AnyQso, type RunQso } from "@/qso/run";
 import type { Speed } from "@/qso/speed";
-import { randomCaller, regionOf, type FriendInfo, type Rand, type Station } from "@/qso/station";
+import { onKey, randomCaller, regionOf, STANDARD_KEYS, type FriendInfo, type Rand, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { targetTiming } from "@/timing";
+import { isFist, type Fist } from "@/timing/fist";
 import type { Over, Recording } from "./decode";
 import { overOfText } from "./lines";
 import { addBand, QRM_OFF_DB, type QrmLine } from "./band";
@@ -40,6 +41,8 @@ export interface ScriptStation {
   readonly toneHz: number;
   /** The speed it sends at, unless the page sets one for all. */
   readonly speed: Speed;
+  /** Its fist on a bug. Absent: a keyer. */
+  readonly fist?: Fist;
 }
 
 /** One line: an over, sent by one station. */
@@ -101,6 +104,11 @@ function pitchApart(rand: Rand, from?: number): number {
   }
 }
 
+/** A station's fist, as a script station holds it: none for a keyer. */
+function fistOf(s: Station): { fist?: Fist } {
+  return s.fist ? { fist: s.fist } : {};
+}
+
 /** The station that calls CQ, as the hints send it. */
 function meOf(s: Station): Me {
   return { call: s.call, name: s.name, qth: s.qth, region: regionOf(s), nr: s.nr ?? "", rst: s.rst };
@@ -111,10 +119,10 @@ export function makeScript(options: MakeOptions): Script {
   const { kind, rand = Math.random, length = "full", qsos = 3 } = options;
   const hour = options.hour ?? Math.floor(rand() * 24);
   const start = kind === "cq" ? null : kind;
-  const caller = randomCaller(rand);
+  const caller = onKey(randomCaller(rand), start ? FORMATS[start].keys : STANDARD_KEYS);
   const me = meOf(caller);
   const mySpeed = wpmIn(rand, start ? wpmOf(start, caller) : STANDARD_QSO_WPM);
-  const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand), speed: mySpeed }];
+  const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand), speed: mySpeed, ...fistOf(caller) }];
   const lines: ScriptLine[] = [];
   const voice = { rand, hour, pieces: length === "pieces" };
   const context = { rand, hour, length, region: me.region, speed: mySpeed };
@@ -126,7 +134,7 @@ export function makeScript(options: MakeOptions): Script {
     // Apart from the station that runs: the two take turns. Callers in a
     // run never send at the same time, so they may share a pitch.
     const toneHz = pitchApart(rand, stations[0]!.toneHz);
-    return stations.push({ call: qso.them.call, toneHz, speed: qso.speed }) - 1;
+    return stations.push({ call: qso.them.call, toneHz, speed: qso.speed, ...fistOf(qso.them) }) - 1;
   };
 
   let qso: AnyQso = newQso(rand, me.call, mySpeed, options.friends);
@@ -193,8 +201,9 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
     if (i > 0) t += same ? Math.min(options.gapSec, SAME_STATION_PAUSE_SEC) : options.gapSec;
     const station = script.stations[line.station]!;
     const { charWpm, farnsworthWpm } = options.speed ?? station.speed;
-    const over = overOfText(line.text, charWpm, farnsworthWpm);
+    const over = overOfText(line.text, charWpm, farnsworthWpm, station.fist);
     const sound = synthesize(line.text, targetTiming(charWpm, farnsworthWpm), {
+      fist: station.fist,
       toneHz: station.toneHz,
       rate,
       padSec: 0,
@@ -255,7 +264,7 @@ export function qrmLines(rand: () => number): readonly QrmLine[] {
   const script = makeScript({ kind: GUIDE_IDS[Math.floor(rand() * GUIDE_IDS.length)]!, rand, qsos: 2 });
   return script.lines.map((l) => {
     const station = script.stations[l.station]!;
-    return { text: l.text, speed: station.speed, call: station.call, station: l.station };
+    return { text: l.text, speed: station.speed, call: station.call, station: l.station, fist: station.fist };
   });
 }
 
@@ -281,7 +290,7 @@ export function isScript(v: unknown): v is Script {
   if (s.title !== undefined && typeof s.title !== "string") return false;
   if (s.source !== undefined && typeof s.source !== "string") return false;
   if (s.picks !== undefined && !(Array.isArray(s.picks) && s.picks.every((p) => p === null || p === 0 || p === 1))) return false;
-  const stations = s.stations.every((x) => typeof x?.call === "string" && typeof x.toneHz === "number" && isSpeed(x.speed));
+  const stations = s.stations.every((x) => typeof x?.call === "string" && typeof x.toneHz === "number" && isSpeed(x.speed) && (x.fist === undefined || isFist(x.fist)));
   return (
     stations &&
     s.stations.length > 0 &&

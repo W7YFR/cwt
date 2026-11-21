@@ -20,6 +20,7 @@ import { fadeOf, NOISE_OFF_DB, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
 import { addBand, bandOn, QRM_OFF_DB, type QrmLine } from "@/copy/band";
 import { targetTiming } from "@/timing";
+import type { Fist } from "@/timing/fist";
 import type { Speed } from "./speed";
 
 export interface Clip {
@@ -29,7 +30,15 @@ export interface Clip {
 
 /** One line of the QSO, as the tape needs it. */
 export type TapeLine =
-  | { readonly you: false; readonly text: string; readonly speed: Speed; readonly toneHz: number; readonly call: string }
+  | {
+      readonly you: false;
+      readonly text: string;
+      readonly speed: Speed;
+      readonly toneHz: number;
+      readonly call: string;
+      /** The station's fist on a bug. Absent: a keyer. */
+      readonly fist?: Fist | undefined;
+    }
   | { readonly you: true; readonly clip: Clip };
 
 /** The level every line is brought to. */
@@ -124,7 +133,7 @@ function leveled(samples: Float32Array): Float32Array {
 export function lineAudio(line: TapeLine, rate: number): Clip {
   if (!line.you) {
     const timing = targetTiming(line.speed.charWpm, line.speed.farnsworthWpm);
-    const made = synthesize(line.text, timing, { rate, toneHz: line.toneHz, padSec: LINE_PAD_SEC });
+    const made = synthesize(line.text, timing, { rate, toneHz: line.toneHz, padSec: LINE_PAD_SEC, fist: line.fist });
     return { samples: leveled(made.samples), rate };
   }
   return { samples: leveled(resampled(trimmed(line.clip), rate).samples), rate };

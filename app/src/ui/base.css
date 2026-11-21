@@ -2051,7 +2051,7 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
    Microphone. Sections under rules, as the calibration screens have. */
 .configpanel { display: flex; flex-direction: column; gap: 22px; }
 .configpanel .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
-.configpanel .callist li { background: var(--bg); }
+.configpanel .callist > li { background: var(--bg); }
 /* Rows sit a shade darker than the panel they are on, the way the calibration
    steps do, or they vanish into it. */
 .userfields {
@@ -2088,7 +2088,7 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
   color: var(--ink);
 }
 .callist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.callist li {
+.callist > li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2169,6 +2169,8 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 /* Friends: a row of their own, opened into the form of You when edited. */
 .callist li.friendrow[data-editing="true"] { flex-direction: column; align-items: stretch; }
 .friendform { display: flex; flex-direction: column; gap: 12px; }
+/* A friend's keys: every checkbox on one row. */
+.friendkeys { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 .friendcall { font-family: var(--mono); font-weight: 600; }
 .friendsadd { display: flex; }
 

@@ -6,6 +6,7 @@
 import { canonicalChar, keyableSymbols, patternOf } from "@/morse";
 import { gradeCopy } from "@/qso/show";
 import { idealTimeline, targetTiming } from "@/timing";
+import type { Fist } from "@/timing/fist";
 import type { Over, RecChar, Recording } from "./decode";
 
 /** How you copy: in one box per line, or in a slot per character. */
@@ -36,10 +37,11 @@ export function emptyCopy(over: Over): LineCopy {
 }
 
 /** A line sent from `text`, as an over, with each character where it falls
- *  when sent at `charWpm` and `farnsworthWpm`. The QSO page's station sends
- *  from text, so its lines have no decode. */
-export function overOfText(text: string, charWpm: number, farnsworthWpm: number): Over {
-  const timeline = idealTimeline(text, targetTiming(charWpm, farnsworthWpm));
+ *  when sent at `charWpm` and `farnsworthWpm`, on `fist` when the station
+ *  keys on a bug. The QSO page's station sends from text, so its lines have
+ *  no decode. */
+export function overOfText(text: string, charWpm: number, farnsworthWpm: number, fist?: Fist): Over {
+  const timeline = idealTimeline(text, targetTiming(charWpm, farnsworthWpm), {}, fist);
   let k = 0;
   const words = timeline.text
     .split(" ")

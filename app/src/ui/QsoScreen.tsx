@@ -53,6 +53,7 @@ import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } 
 import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
+import type { Fist } from "@/timing/fist";
 import { targetTiming } from "@/timing/model";
 import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
@@ -360,6 +361,9 @@ interface Line {
   /** The tone the station sent it at, for the station's overs. Absent in a
    *  log kept before it was. */
   readonly toneHz?: number;
+  /** The station's fist on a bug, for the station's overs. Absent: a keyer,
+   *  and in a log kept before there were bugs. */
+  readonly fist?: Fist;
   /** Your lines: the suggested reply when you began it, shown or not, for
    *  the debug save. Absent when there was none. */
   readonly hint?: string;
@@ -1222,7 +1226,7 @@ export function QsoScreen({
         timer.current = null;
         focusBefore.current = document.activeElement;
         setPhase("playing");
-        const timeline = idealTimeline(reply, targetTiming(at.charWpm, at.farnsworthWpm));
+        const timeline = idealTimeline(reply, targetTiming(at.charWpm, at.farnsworthWpm), {}, them.fist);
         charEnds.current = timeline.chars.map((c) => c.t1);
         if (again !== null) {
           setPlaying({ line: again, shown: 0 });
@@ -1244,6 +1248,7 @@ export function QsoScreen({
               locked: false,
               sentWpm: at,
               toneHz: them.toneHz,
+              ...(them.fist ? { fist: them.fist } : {}),
             },
           ]);
         }
@@ -1648,6 +1653,7 @@ export function QsoScreen({
       speed: { charWpm: at.charWpm, farnsworthWpm: at.farnsworthWpm },
       toneHz: line.toneHz ?? DEFAULT_TONE_HZ,
       call: line.who,
+      fist: line.fist,
     };
   };
   /** The rate the tape is made at: your recording's, so it is not changed. */
@@ -2123,7 +2129,7 @@ export function QsoScreen({
    *  at the speed it was sent. */
   const overOf = (line: Line): Over => {
     const at = line.sentWpm ?? theirSpeed;
-    return overOfText(line.text, at.charWpm, at.farnsworthWpm);
+    return overOfText(line.text, at.charWpm, at.farnsworthWpm, line.fist);
   };
   /** Where each character of one of the station's lines is in its audio,
    *  for a click or a selection to play. */

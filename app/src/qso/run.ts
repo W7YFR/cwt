@@ -25,7 +25,7 @@
  * standard QSO from your CQ.
  */
 
-import { asFriend, friendCalls, pick, randomCaller, regionOf, type FriendInfo, type Rand, type Station } from "./station";
+import { asFriend, friendCalls, onKey, pick, randomCaller, regionOf, type FriendInfo, type Rand, type Station } from "./station";
 import { ACADEMY, ACADEMY_WPM, FORMATS, FORMAT_IDS, REGIONS, formatNamed, type FormatId, type Item } from "./formats";
 import { NO_SEARCH, type Search, type Speed } from "./speed";
 import {
@@ -139,7 +139,7 @@ export function newRun(
   const at = rand();
   const calls = friendCalls(rand, friends, not);
   const caller = randomCaller(rand, not, FORMATS[format].canada, recent);
-  const them = calls ? asFriend(caller, calls.friend) : caller;
+  const them = calls ? asFriend(caller, calls.friend) : onKey(caller, FORMATS[format].keys);
   const [lo, hi] = wpmOf(format, them);
   const wpm = lo + Math.floor(at * (hi - lo + 1));
   return {

@@ -46,7 +46,7 @@
 import { UNKNOWN } from "@/morse";
 import { REGIONS } from "./formats";
 import { NO_SEARCH, qrq, qrs, setTo, type Search, type Speed } from "./speed";
-import { asFriend, friendCalls, randomStation, type FriendInfo, type Rand, type Station } from "./station";
+import { asFriend, friendCalls, onKey, randomStation, STANDARD_KEYS, type FriendInfo, type Rand, type Station } from "./station";
 import * as wording from "./wording";
 
 export type Stage = "cq" | "asking" | "called" | "pieces" | "exchanged" | "signing";
@@ -231,7 +231,7 @@ export const DEFAULT_SPEED: Speed = { charWpm: 25, farnsworthWpm: 25 };
 export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED, friends: readonly FriendInfo[] = []): Qso {
   const calls = friendCalls(rand, friends, not);
   const station = randomStation(rand, not);
-  const them = calls ? asFriend(station, calls.friend) : station;
+  const them = calls ? asFriend(station, calls.friend) : onKey(station, STANDARD_KEYS);
   if (them.wpm) speed = { charWpm: them.wpm, farnsworthWpm: them.farnsworthWpm ?? them.wpm };
   return {
     stage: "cq",

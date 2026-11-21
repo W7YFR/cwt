@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- Some stations send on a bug, QRM too: even dits, and long dahs made by hand that vary. Most are in standard QSOs, few in a CWT. **Keys** on a friend sets what they send with, **Keyer**, **Bug** or both.
+
 ## v1.35.0 — 2026-11-21
 
 ### Added

@@ -14,6 +14,7 @@
  */
 
 import type { ReviewSettings, Take } from "@/types";
+import { KEY_KINDS, type KeyKind } from "@/timing/fist";
 
 const DB_NAME = "cwt";
 /** The upgrade is additive and version-agnostic: it creates whichever stores
@@ -671,6 +672,9 @@ export interface Friend extends UserInfo {
   /** Their typical speeds, in words per minute: character and overall. */
   wpm: number;
   farnsworthWpm: number;
+  /** The keys they send with: one, or several they pick from each time
+   *  they call. */
+  keys: KeyKind[];
 }
 
 /** A friend's speed before one is set, and for a friend saved without one. */
@@ -681,7 +685,7 @@ export function loadFriends(): Friend[] {
     const wpm = saved.wpm ?? FRIEND_WPM;
     // Saved before friends had an overall speed: none slower than their own.
     const farnsworthWpm = Math.min(saved.farnsworthWpm ?? wpm, wpm);
-    const out: Friend = { ...EMPTY_USER, id: String(saved.id), wpm, farnsworthWpm };
+    const out: Friend = { ...EMPTY_USER, id: String(saved.id), wpm, farnsworthWpm, keys: saved.keys ?? ["keyer"] };
     for (const k of Object.keys(EMPTY_USER) as (keyof UserInfo)[]) out[k] = (saved[k] ?? "").toUpperCase();
     return out;
   });
@@ -762,7 +766,9 @@ const isFriends: Check = (v) =>
   v.every((f: unknown) => {
     const r = f as Record<string, unknown>;
     const speed = (v: unknown) => v === undefined || isNum(v);
-    return isUser(f) && isStr(r.id) && speed(r.wpm) && speed(r.farnsworthWpm);
+    const keys = (v: unknown) =>
+      v === undefined || (Array.isArray(v) && v.length > 0 && v.every((k) => KEY_KINDS.includes(k as KeyKind)));
+    return isUser(f) && isStr(r.id) && speed(r.wpm) && speed(r.farnsworthWpm) && keys(r.keys);
   });
 
 const isCustomDrills: Check = (v) =>

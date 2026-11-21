@@ -10,6 +10,7 @@
 import type { Block, BlockKind, Char, Segment, Timeline, Timing } from "@/types";
 import { median } from "@/dsp/segments";
 import { BREAK, decodePattern, keyableSymbols, patternOf } from "@/morse";
+import { keyed, type Fist } from "./fist";
 
 /** Does this character open a word?
  *
@@ -191,21 +192,25 @@ export function decodeSegments(
   return buildTimeline(segs, timing).text;
 }
 
-/** Render `text` as the timeline a machine sender would have keyed.
+/** Render `text` as the timeline a machine sender would have keyed, or the
+ *  station on `fist` when given.
  *
  * Same shape as a decoded Timeline, laid out exactly the way the synthesizer
  * builds its on/off list — so "perfect" here is precisely what you hear when
- * you play the target track, and every block's `units` equals its
- * `targetUnits` by construction. */
+ * you play the target track. With no fist, every block's `units` equals its
+ * `targetUnits` by construction. With one, `units` is what the fist keyed. */
 export function idealTimeline(
   text: string,
   timing: Timing,
   pauses: Partial<Pauses> = {},
+  fist?: Fist,
 ): Timeline {
   const { breakSec } = { ...DEFAULT_PAUSES, ...pauses };
   const u = timing.unitSec;
   const charGap = timing.charGapSec || 3 * u;
   const wordGap = timing.wordGapSec || 7 * u;
+  /** A block's units: exact for a keyer, so a keyer's are whole numbers. */
+  const unitsOf = (dur: number, exact: number) => (fist ? dur / u : exact);
 
   const chars: Char[] = [];
   const blocks: Block[] = [];
@@ -226,39 +231,37 @@ export function idealTimeline(
     }
   }
 
+  const laid = keyed(words.map((w) => w.word), timing, fist);
   words.forEach(({ word, pauseSec }, wi) => {
     let lead: Block | null = null;
+    const k = laid[wi]!;
     if (wi > 0) {
-      const [kind, dur] = pauseSec > 0 ? (["pause", pauseSec] as const) : (["word-gap", wordGap] as const);
-      lead = block(t, t + dur, kind, dur / u, dur / u);
+      const [kind, dur] = pauseSec > 0 ? (["pause", pauseSec] as const) : (["word-gap", k.gap] as const);
+      lead = block(t, t + dur, kind, dur / u, kind === "pause" ? dur / u : wordGap / u);
       blocks.push(lead);
       t += dur;
     }
     keyableSymbols(word).forEach((ch, li) => {
+      const kc = k.chars[li]!;
       if (li > 0) {
-        lead = block(t, t + charGap, "char-gap", charGap / u, charGap / u);
+        lead = block(t, t + kc.gap, "char-gap", kc.gap / u, charGap / u);
         blocks.push(lead);
-        t += charGap;
+        t += kc.gap;
       }
       const pattern = patternOf(ch)!;
       const pending: Block[] = [];
       const c0 = t;
       for (let ei = 0; ei < pattern.length; ei++) {
         if (ei > 0) {
-          const gap = block(t, t + u, "element-gap", 1, 1);
+          const space = kc.spaces[ei - 1]!;
+          const gap = block(t, t + space, "element-gap", unitsOf(space, 1), 1);
           pending.push(gap);
           blocks.push(gap);
-          t += u;
+          t += space;
         }
         const isDit = pattern[ei] === ".";
-        const dur = isDit ? u : 3 * u;
-        const mark = block(
-          t,
-          t + dur,
-          isDit ? "dit" : "dah",
-          isDit ? 1 : 3,
-          isDit ? 1 : 3,
-        );
+        const dur = kc.marks[ei]!;
+        const mark = block(t, t + dur, isDit ? "dit" : "dah", unitsOf(dur, isDit ? 1 : 3), isDit ? 1 : 3);
         pending.push(mark);
         blocks.push(mark);
         t += dur;
