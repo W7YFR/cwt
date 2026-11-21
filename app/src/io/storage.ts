@@ -498,6 +498,9 @@ export interface Prefs {
   qsoYourText?: "sent" | "hidden" | "none";
   /** When the QSO page suggests your next reply. */
   qsoHints?: "off" | "always" | "copied";
+  /** When the next station calls in a run on the QSO page. Absent is
+   *  immediate. */
+  qsoNextCall?: "immediate" | "varied" | "uncertain";
   /** The QSO page grades each slot as you type it. */
   qsoGradeTyping?: boolean;
   /** A locked copy on the QSO page can be opened again with Edit. */
@@ -824,6 +827,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
   qsoHints: oneOf("off", "always", "copied"),
+  qsoNextCall: oneOf("immediate", "varied", "uncertain"),
   qsoGradeTyping: isBool,
   qsoAllowEdits: isBool,
   qsoBandNoise: isBool,

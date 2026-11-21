@@ -177,7 +177,7 @@ export function QsoGuide({
           </li>
           <li>
             In a run, send <code>NR?</code>, <code>NAME?</code> or <code>QTH?</code> to ask for one
-            part again. After your <code>TU</code>, the next station calls in a few seconds.
+            part again. After your <code>TU</code>, the next station calls. If nobody does, call CQ again.
           </li>
           <li>Made a mistake? Send a row of dits, then send the word again.</li>
           <li>If you get stuck, send what the station asked for.</li>

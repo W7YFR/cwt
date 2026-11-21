@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **When the next station calls** on the QSO page sets the wait after your TU in a contest or POTA QSO. **Immediate** keeps it a few seconds, **Varied** changes it from one station to the next, and **Uncertain** also has nobody call now and then, so you call CQ again.
+
 ## v1.34.0 — 2026-11-21
 
 ### Added
