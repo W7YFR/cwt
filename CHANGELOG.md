@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.38.0 — 2026-11-21
+
 ### Added
 
 - Some stations send on a straight key, with every dit and dah made by hand, and now and then a proper roger. They are rare, most often in standard QSOs and the SST, and almost never in a CWT.
