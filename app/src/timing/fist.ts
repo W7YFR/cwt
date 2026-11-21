@@ -38,6 +38,7 @@
  *   letter, as in Q or T, and some drag the first dah of C.
  * - The gaps between letters are wider and less even than a keyer's.
  * - Each operator has a swing, and drifts faster and slower, as on a bug.
+ *   Some like a proper roger, as on a bug.
  * - An operator's habits shape every letter alike, the same each time. A
  *   newcomer's sending varies more.
  *
@@ -145,6 +146,10 @@ export interface StraightFist {
   readonly tempoSpread: number;
   /** How often the hand pauses before a letter, 0 to 1. */
   readonly pause: number;
+  /** How often an R on its own is a proper roger, 0 to 1. */
+  readonly roger: number;
+  /** A proper roger's dah, as so many of the operator's own dahs. */
+  readonly rogerDah: number;
 }
 
 /** The fist of an operator on `key`, from `seed`, or none on a keyer. */
@@ -207,6 +212,8 @@ export function straightFist(seed: number): StraightFist {
     shapeSpread: within(0.02, 0.05),
     tempoSpread: within(0.02, 0.05) * unsteady,
     pause: within(0.02, 0.06) * unsteady,
+    roger: within(0.1, 0.7),
+    rogerDah: within(2, 3),
   };
 }
 
@@ -218,7 +225,7 @@ const UNSTEADY_SPREAD = 2.5;
 /** The numbers each kind of fist holds, to check one read back. */
 const FIST_NUMBERS: { readonly [K in HandKey]: readonly (keyof Extract<Fist, { key: K }>)[] } = {
   bug: ["seed", "weight", "dah", "dahSpread", "drag", "afterDah", "toDah", "gapSpread", "charGap", "wordGap", "swing", "roger", "rogerDah", "shapeSpread", "tempoSpread", "pause"],
-  straight: ["seed", "weight", "dah", "markSpread", "drag", "lastDah", "gapSpread", "charGap", "wordGap", "charSpread", "swing", "shapeSpread", "tempoSpread", "pause"],
+  straight: ["seed", "weight", "dah", "markSpread", "drag", "lastDah", "gapSpread", "charGap", "wordGap", "charSpread", "swing", "shapeSpread", "tempoSpread", "pause", "roger", "rogerDah"],
 };
 
 /** Whether `v` is a fist, as read back from a saved file. */
@@ -392,37 +399,41 @@ function onStraight(words: readonly string[], timing: Timing, fist: StraightFist
   const vary = (sd: number) => (rand ? around(rand, sd) : 1);
   let drift = 0;
   let last = "";
-  return words.map((word, wi) => ({
-    gap: wi > 0 ? Math.max(wordGap * fist.wordGap * vary(fist.charSpread), 1.5 * charGap) : 0,
-    chars: keyableSymbols(word).map((ch, li) => {
-      const pattern = patternOf(ch)!;
-      if (rand) drift = Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, DRIFT_HOLD * drift + (around(rand, DRIFT_STEP) - 1)));
-      // The operator's own shape for this letter, and this letter rushed or
-      // dragged.
-      const shape = shapeOf(`straight-shape:${fist.seed}:${ch}`, fist.shapeSpread, pattern.length);
-      const hand = (1 + drift) * (rand ? around(rand, fist.tempoSpread) : 1);
-      const swung = li > 0 && last.at(-1) === pattern[0] ? fist.swing * unit : 0;
-      const [lo, hi] = PAUSE_DITS;
-      const paused = rand ? (rand() < fist.pause ? lo + (hi - lo) * rand() : 0) : fist.pause * (lo + hi) / 2;
-      const gap =
-        li > 0 ? Math.max(charGap * fist.charGap * (1 + drift) * vary(fist.charSpread) + swung + paused * unit, 2 * unit) : 0;
-      last = pattern;
-      const marks: number[] = [];
-      const spaces: number[] = [];
-      for (let ei = 0; ei < pattern.length; ei++) {
-        const next = pattern[ei + 1];
-        const usual =
-          pattern[ei] === "."
-            ? dit
-            : dit * fist.dah * (next === "." ? 1 + fist.drag : 1) * (next === undefined ? 1 + fist.lastDah : 1);
-        const mark = usual * shape.marks[ei]! * hand * vary(fist.markSpread);
-        // A dit never so long, nor a dah so short, that one reads as the other.
-        marks.push(pattern[ei] === "." ? Math.min(Math.max(mark, 0.6 * dit), LONGEST_DIT * dit) : Math.max(mark, SHORTEST_DAH * dit));
-        if (next !== undefined) spaces.push(Math.max(space * shape.spaces[ei]! * hand * vary(fist.gapSpread), SHORTEST_GAP * unit));
-      }
-      return { gap, marks, spaces };
-    }),
-  }));
+  return words.map((word, wi) => {
+    // A proper roger now and then, for an R on its own.
+    const roger = rand && word === "R" && rand() < fist.roger ? fist.rogerDah : 1;
+    return {
+      gap: wi > 0 ? Math.max(wordGap * fist.wordGap * vary(fist.charSpread), 1.5 * charGap) : 0,
+      chars: keyableSymbols(word).map((ch, li) => {
+        const pattern = patternOf(ch)!;
+        if (rand) drift = Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, DRIFT_HOLD * drift + (around(rand, DRIFT_STEP) - 1)));
+        // The operator's own shape for this letter, and this letter rushed or
+        // dragged.
+        const shape = shapeOf(`straight-shape:${fist.seed}:${ch}`, fist.shapeSpread, pattern.length);
+        const hand = (1 + drift) * (rand ? around(rand, fist.tempoSpread) : 1);
+        const swung = li > 0 && last.at(-1) === pattern[0] ? fist.swing * unit : 0;
+        const [lo, hi] = PAUSE_DITS;
+        const paused = rand ? (rand() < fist.pause ? lo + (hi - lo) * rand() : 0) : fist.pause * (lo + hi) / 2;
+        const gap =
+          li > 0 ? Math.max(charGap * fist.charGap * (1 + drift) * vary(fist.charSpread) + swung + paused * unit, 2 * unit) : 0;
+        last = pattern;
+        const marks: number[] = [];
+        const spaces: number[] = [];
+        for (let ei = 0; ei < pattern.length; ei++) {
+          const next = pattern[ei + 1];
+          const usual =
+            pattern[ei] === "."
+              ? dit
+              : dit * fist.dah * (next === "." ? 1 + fist.drag : 1) * (next === undefined ? 1 + fist.lastDah : 1) * roger;
+          const mark = usual * shape.marks[ei]! * hand * vary(fist.markSpread);
+          // A dit never so long, nor a dah so short, that one reads as the other.
+          marks.push(pattern[ei] === "." ? Math.min(Math.max(mark, 0.6 * dit), LONGEST_DIT * dit) : Math.max(mark, SHORTEST_DAH * dit));
+          if (next !== undefined) spaces.push(Math.max(space * shape.spaces[ei]! * hand * vary(fist.gapSpread), SHORTEST_GAP * unit));
+        }
+        return { gap, marks, spaces };
+      }),
+    };
+  });
 }
 
 /** An operator's own shape for a letter of `n` elements, from `key`: a

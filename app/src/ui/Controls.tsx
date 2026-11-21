@@ -21,7 +21,7 @@ import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX
 import type { AgcMode } from "@/audio/agc";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
 import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
-import type { KeyKind } from "@/timing/fist";
+import { STRAIGHT_MOST_WPM, type KeyKind } from "@/timing/fist";
 import { BREAK } from "@/morse";
 import {
   BREAK_MAX_SEC,
@@ -120,6 +120,7 @@ export function SpeedSliders({
   onChange,
   locked = false,
   idPrefix = "",
+  charHelp,
 }: {
   charWpm: number;
   farnsworthWpm: number;
@@ -128,10 +129,12 @@ export function SpeedSliders({
   locked?: boolean;
   /** Before each id, for a pair that is not your own speed: a friend's. */
   idPrefix?: string;
+  /** More to say behind the character speed's question mark. */
+  charHelp?: string;
 }): React.ReactElement {
   // Behind a question mark in the settings panels. The control row has
   // never had a tooltip on these, so it gets none.
-  const charAbout = useHelp(CHAR_SPEED_HELP);
+  const charAbout = useHelp(charHelp ? `${CHAR_SPEED_HELP} ${charHelp}` : CHAR_SPEED_HELP);
   const farnsAbout = useHelp(FARNSWORTH_HELP);
   return (
     <>
@@ -1156,12 +1159,15 @@ export function AgcChoice({
   );
 }
 
+/** The straight key's top speed, said where a station's speed is set. */
+export const STRAIGHT_SPEED_HELP = `A station on a straight key sends no faster than ${STRAIGHT_MOST_WPM} WPM.`;
+
 /** The keys a station may send with, each with how it sounds: the friend
  *  form and Paddle both list them. */
 export const KEY_OPTIONS: ReadonlyArray<{ key: KeyKind; label: string; help: string }> = [
   { key: "keyer", label: "Keyer", help: "Every dit and dah exact." },
   { key: "bug", label: "Bug", help: "Even dits, and long dahs made by hand that vary." },
-  { key: "straight", label: "Straight key", help: "Every dit and dah made by hand, with wide gaps between letters." },
+  { key: "straight", label: "Straight key", help: `Every dit and dah made by hand, with wide gaps between letters. ${STRAIGHT_SPEED_HELP}` },
 ];
 
 /** A checkbox for each key, all on one row, for the keys in `keys`. Each
@@ -1214,17 +1220,12 @@ export function keysLabel(keys: readonly KeyKind[]): string {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : names.join("");
 }
 
-/** What Paddle's chip shows: Default, Any key with every key checked, or
- *  the keys it sets. */
+/** What Paddle's chip shows: Default, Any with every key checked, or the
+ *  keys it sets. */
 export function paddleLabel(ks: { keys: readonly KeyKind[] | null }): string {
   if (ks.keys === null) return "Default";
-  return KEY_OPTIONS.every((k) => ks.keys!.includes(k.key)) ? "Any key" : keysLabel(ks.keys);
+  return KEY_OPTIONS.every((k) => ks.keys!.includes(k.key)) ? "Any" : keysLabel(ks.keys);
 }
-
-/** The longest Paddle's chip can show, so its room is kept. */
-export const WIDEST_PADDLE = KEY_OPTIONS.flatMap((a) => KEY_OPTIONS.map((b) => paddleLabel({ keys: [a.key, b.key] }))).reduce(
-  (w, l) => (l.length > w.length ? l : w),
-);
 
 const ONE_KEY = "One must stay checked. Check another first.";
 

@@ -233,6 +233,15 @@ describe("a straight key", () => {
     expect(t / t0 / (n / n0)).toBeCloseTo(1.2, 9);
   });
 
+  it("draws out the dah of an R on its own now and then: a proper roger", () => {
+    const fist = straightFist(7);
+    const dahOf = (f: Fist, word: number) => keyed(["R", "R", "RST"], AT_20, f)[word]!.chars[0]!.marks[1]!;
+    const always = { ...fist, roger: 1 };
+    const never = { ...fist, roger: 0 };
+    expect(dahOf(always, 0) / dahOf(never, 0)).toBeGreaterThan(1.8);
+    expect(dahOf(always, 2)).toBeLessThan(dahOf(always, 0) / 1.8);
+  });
+
   it("is steady for most operators, and varies more for a newcomer", () => {
     const all = Array.from({ length: 400 }, (_, i) => straightFist(i));
     const newcomers = all.filter((f) => f.markSpread > 0.06);

@@ -81,8 +81,8 @@ import {
   AgcChoice,
   KeyStyleGroup,
   paddleLabel,
+  STRAIGHT_SPEED_HELP,
   useKeyStyle,
-  WIDEST_PADDLE,
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
@@ -90,7 +90,7 @@ import { IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
 import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { PageHelp, type KeyGroup } from "./Help";
 import { NEEDS_BAND, NEEDS_BAND_ON, NEEDS_LINES_COPY, NEEDS_SLOTS } from "./copy";
-import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED } from "./Toolbar";
 import { drawerOpen } from "./Drawer";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
@@ -1708,7 +1708,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           options={SPEEDS}
           onChange={(v) => setSpeedChoice(v as SpeedChoice)}
         />
-        <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} />
+        <SpeedSliders charWpm={mine.charWpm} farnsworthWpm={mine.farnsworthWpm} onChange={setMine} charHelp={STRAIGHT_SPEED_HELP} />
         <Check
           id="copy-recording-at-mine"
           label="Play an opened recording at my speeds"
@@ -1812,20 +1812,20 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           }
           chips={
             <>
-              <QuickChip id="make" label="Generate" value={`${kindLabel} ×${runQsos}`} widest={`${longest(KINDS.map((k) => k.label))} ×10`} tab="page">
+              <QuickChip id="make" label="Generate" value={`${kindLabel} ×${runQsos}`} tab="page">
                 {makeSection}
               </QuickChip>
               <QuickChip id="speed" label="Speed" value={speedChoice === "mine" ? fmtSpeed(mine) : "Format"} widest={WIDEST_SPEED} tab="speed">
                 {speedSection}
               </QuickChip>
-              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} widest={WIDEST_PADDLE} tab="page">
+              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} tab="page">
                 <Section name="make" title="Generate QSO">
                   <div className="panelgroups">
                     <KeyStyleGroup ks={keyStyle} />
                   </div>
                 </Section>
               </QuickChip>
-              <QuickChip id="lines" label="Lines" value={LINES_SHOW.find((l) => l.value === linesShow)!.label} widest={longest(LINES_SHOW.map((l) => l.label))} tab="page">
+              <QuickChip id="lines" label="Lines" value={LINES_SHOW.find((l) => l.value === linesShow)!.label} tab="page">
                 <Section name="lines" title="Playback">
                   <div className="panelgroups">
                     <ChoiceGroup

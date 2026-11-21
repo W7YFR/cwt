@@ -58,7 +58,7 @@ import { targetTiming } from "@/timing/model";
 import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { drawerOpen } from "./Drawer";
-import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
@@ -86,8 +86,8 @@ import {
   AgcChoice,
   KeyStyleGroup,
   paddleLabel,
+  STRAIGHT_SPEED_HELP,
   useKeyStyle,
-  WIDEST_PADDLE,
   SpeedSliders,
 } from "./Controls";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
@@ -2679,6 +2679,7 @@ export function QsoScreen({
           farnsworthWpm={speed.farnsworthWpm}
           onChange={(patch) => setSpeed({ ...speed, ...patch })}
           locked={recorder !== null}
+          charHelp={STRAIGHT_SPEED_HELP}
         />
       </div>
     </Section>
@@ -2792,30 +2793,30 @@ export function QsoScreen({
               <QuickChip id="speed" label="Speed" value={fmtSpeed(speed)} widest={WIDEST_SPEED} tab="speed" locked={recorder !== null}>
                 {speedSection}
               </QuickChip>
-              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} widest={WIDEST_PADDLE} tab="page">
+              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} tab="page">
                 <Section name="station" title="The other station">
                   <div className="panelgroups">
                     <KeyStyleGroup ks={keyStyle} />
                   </div>
                 </Section>
               </QuickChip>
-              <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} widest="POTA" tab="page">
+              <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} tab="page">
                 <Section name="you" title="You">
                   <div className="panelgroups">{kindChoice}</div>
                   <ExampleLines shown={guideKind} testId="qso-kind-example" />
                 </Section>
               </QuickChip>
-              <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} widest={longest(LENGTHS.map((l) => l.label))} tab="page">
+              <QuickChip id="station" label="Station" value={LENGTHS.find((l) => l.value === length)!.label} tab="page">
                 <Section name="station" title="The other station">
                   <div className="panelgroups">{lengthChoice}</div>
                 </Section>
               </QuickChip>
-              <QuickChip id="lines" label="Lines" value={THEIR_TEXTS.find((t) => t.value === theirText)!.label} widest={longest(THEIR_TEXTS.map((t) => t.label))} tab="page">
+              <QuickChip id="lines" label="Lines" value={THEIR_TEXTS.find((t) => t.value === theirText)!.label} tab="page">
                 <Section name="lines" title="The other station">
                   <div className="panelgroups">{theirTextChoice}</div>
                 </Section>
               </QuickChip>
-              <QuickChip id="hints" label="Reply hint" value={HINTS.find((h) => h.value === hints)!.label} widest={longest(HINTS.map((h) => h.label))} tab="page">
+              <QuickChip id="hints" label="Reply hint" value={HINTS.find((h) => h.value === hints)!.label} tab="page">
                 <Section name="you" title="You">
                   <div className="panelgroups">{hintsChoice}</div>
                 </Section>
