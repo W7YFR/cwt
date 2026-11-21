@@ -53,7 +53,7 @@ import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } 
 import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
-import type { Fist } from "@/timing/fist";
+import { sentSpeed, type Fist } from "@/timing/fist";
 import { targetTiming } from "@/timing/model";
 import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
@@ -85,6 +85,8 @@ import {
   BandOnCheck,
   AgcChoice,
   KeyStyleGroup,
+  KeyMark,
+  keyName,
   paddleLabel,
   STRAIGHT_SPEED_HELP,
   useKeyStyle,
@@ -365,8 +367,8 @@ interface Line {
   /** The tone the station sent it at, for the station's overs. Absent in a
    *  log kept before it was. */
   readonly toneHz?: number;
-  /** The station's fist on a bug, for the station's overs. Absent: a keyer,
-   *  and in a log kept before there were bugs. */
+  /** The station's fist on a key worked by hand, for the station's lines.
+   *  Absent: a keyer, and in a log kept before there were bugs. */
   readonly fist?: Fist;
   /** Your lines: the suggested reply when you began it, shown or not, for
    *  the debug save. Absent when there was none. */
@@ -749,6 +751,8 @@ export function QsoScreen({
   const charEnds = useRef<number[]>([]);
   /** How fast the station sends, after QRS or QRQ. */
   const [theirSpeed, setTheirSpeed] = useState<Speed>(() => kept?.theirSpeed ?? speed);
+  /** The key the station sent its last line on, for the line under the log. */
+  const theirFist = [...lines].reverse().find((l) => !l.you)?.fist;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const afterReply = useRef<() => void>(() => {});
   /** The last over answered. */
@@ -1253,7 +1257,7 @@ export function QsoScreen({
               input: copyInputRef.current,
               mode: theirMode.current,
               locked: false,
-              sentWpm: at,
+              sentWpm: sentSpeed(at, them.fist),
               toneHz: them.toneHz,
               ...(them.fist ? { fist: them.fist } : {}),
             },
@@ -2484,6 +2488,7 @@ export function QsoScreen({
           <span className="lend">
             {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
               <span className="lwpm" data-testid="qso-line-wpm">
+                {!line.you && <KeyMark fist={line.fist} />}
                 {wpmOf(line.sentWpm)}
               </span>
             )}
@@ -3066,9 +3071,10 @@ export function QsoScreen({
                 {slotPlay("Word", `Play the selected word (${ALT}+W)`, playWord, "qso-play-word")}
               </div>
             )}
-            {!same(theirSpeed, speed) && (
+            {!same(sentSpeed(theirSpeed, theirFist), speed) && (
               <span className="hint" data-testid="qso-their-speed">
-                The station sends at {fmtSpeed(theirSpeed)}.
+                The station sends at {fmtSpeed(sentSpeed(theirSpeed, theirFist))}
+                {theirFist ? ` on ${keyName(theirFist.key)}` : ""}.
               </span>
             )}
           </div>

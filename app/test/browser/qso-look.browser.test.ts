@@ -115,3 +115,19 @@ describe("an Exchange row's open button", () => {
     expect(y, "open").toBeLessThan(1);
   });
 });
+
+describe("the key on the station's speed", () => {
+  it("sits before the speed, on its line, in the speed's own color", async () => {
+    await open({ qsoTheirText: "before", qsoShowTheirSpeed: true, keyStyle: "only", styleKeys: ["straight"] });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const speed = $('.qsolog li.them [data-testid="qso-line-wpm"]')!;
+    const mark = speed.querySelector<HTMLElement>('[data-key="straight"]')!;
+    const icon = mark.querySelector("svg")!.getBoundingClientRect();
+    const text = document.createRange();
+    text.selectNodeContents(speed.lastChild!);
+    const words = text.getBoundingClientRect();
+    expect(icon.right, "before the speed").toBeLessThanOrEqual(words.left);
+    expect(Math.abs((icon.top + icon.bottom) / 2 - (words.top + words.bottom) / 2), "on its line").toBeLessThan(3);
+    expect(getComputedStyle(mark).color).toBe(getComputedStyle(speed).color);
+  });
+});

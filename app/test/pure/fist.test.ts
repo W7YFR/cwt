@@ -16,7 +16,7 @@ import { ACADEMY, FORMATS } from "@/qso/formats";
 import { newRun, wpmOf } from "@/qso/run";
 import { asFriend, onKey, randomStation, STANDARD_KEYS, withKeys, type FriendInfo, type Station } from "@/qso/station";
 import { seeded, seedOf } from "@/audio/qsb";
-import { bugFist, fistFor, isFist, keyed, STRAIGHT_MOST_WPM, straightFist, type Fist } from "@/timing/fist";
+import { bugFist, fistFor, isFist, keyed, sentSpeed, STRAIGHT_MOST_WPM, straightFist, type Fist } from "@/timing/fist";
 import { targetTiming } from "@/timing/model";
 import { idealTimeline } from "@/timing/timeline";
 import type { Timeline } from "@/types";
@@ -187,6 +187,13 @@ describe("a straight key", () => {
         expect(idealTimeline(LINE, asked, {}, fist).duration).toBeCloseTo(idealTimeline(LINE, sent, {}, fist).duration, 9);
       }
     }
+    // The speed a page shows is the speed sent.
+    const top2 = { charWpm: top, farnsworthWpm: top };
+    expect(sentSpeed({ charWpm: 35, farnsworthWpm: 35 }, fists[0])).toEqual(top2);
+    expect(sentSpeed({ charWpm: 35, farnsworthWpm: 21 }, fists[0])).toEqual({ charWpm: top, farnsworthWpm: Math.round((21 * top) / 35) });
+    expect(sentSpeed({ charWpm: 15, farnsworthWpm: 10 }, fists[0])).toEqual({ charWpm: 15, farnsworthWpm: 10 });
+    expect(sentSpeed({ charWpm: 35, farnsworthWpm: 35 }, bugFist(1))).toEqual({ charWpm: 35, farnsworthWpm: 35 });
+    expect(sentSpeed({ charWpm: 35, farnsworthWpm: 35 })).toEqual({ charWpm: 35, farnsworthWpm: 35 });
     // A bug is not held back.
     expect(keyingPlan(LINE, targetTiming(35, 35), bugFist(1))).not.toEqual(keyingPlan(LINE, targetTiming(top, top), bugFist(1)));
   });

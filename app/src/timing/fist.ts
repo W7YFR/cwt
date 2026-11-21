@@ -276,11 +276,18 @@ const SHORTEST_DAH = 2.2;
  *  on the air send one slower than this. */
 export const STRAIGHT_MOST_WPM = 20;
 
-/** `timing`, or as near it as `fist` can send: a straight key no faster
- *  than `STRAIGHT_MOST_WPM`, its Farnsworth gaps slowed alike. */
+/** The speeds `fist` sends at when asked for `speed`: a straight key no
+ *  faster than `STRAIGHT_MOST_WPM`, its overall speed slowed alike. What a
+ *  page shows as the station's speed. */
+export function sentSpeed<S extends { readonly charWpm: number; readonly farnsworthWpm: number }>(speed: S, fist?: Fist): S {
+  if (fist?.key !== "straight" || speed.charWpm <= STRAIGHT_MOST_WPM) return speed;
+  return { ...speed, charWpm: STRAIGHT_MOST_WPM, farnsworthWpm: Math.round((speed.farnsworthWpm * STRAIGHT_MOST_WPM) / speed.charWpm) };
+}
+
+/** `timing`, or as near it as `fist` can send (`sentSpeed`). */
 function sendable(timing: Timing, fist: Fist): Timing {
-  if (fist.key !== "straight" || timing.charWpm <= STRAIGHT_MOST_WPM) return timing;
-  return targetTiming(STRAIGHT_MOST_WPM, (timing.farnsworthWpm * STRAIGHT_MOST_WPM) / timing.charWpm);
+  const sent = sentSpeed(timing, fist);
+  return sent === timing ? timing : targetTiming(sent.charWpm, sent.farnsworthWpm);
 }
 
 /** `words` as keyed at `timing` by `fist`, or exactly with none. */

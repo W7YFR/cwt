@@ -197,6 +197,32 @@ export function IconEdit(): React.ReactElement {
   );
 }
 
+/** A straight key from the side: a lever on a post, its knob at the end. */
+export function IconStraightKey(): React.ReactElement {
+  return (
+    <Icon name="straight-key" stroke>
+      <path d="M1.8 13.5h12.4" />
+      <path d="M11.5 13.5v-3.2" />
+      <path d="M3.5 7.2l9.6 2.4" />
+      <circle cx="3.6" cy="6.2" r="1.6" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+/** A bug from the side: the paddle, and the long arm with its weight at the
+ *  end. */
+export function IconBug(): React.ReactElement {
+  return (
+    <Icon name="bug" stroke>
+      <path d="M1.8 13.5h12.4" />
+      <path d="M3.2 5v5.6" />
+      <path d="M3.2 8h7.6" />
+      <path d="M6.5 8v5.5" />
+      <rect x="10.8" y="6.4" width="3.4" height="3.2" rx=".6" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
 /** A die showing five: pick one at random. */
 export function IconDice(): React.ReactElement {
   return (

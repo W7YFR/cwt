@@ -62,6 +62,7 @@ import {
   type Prefs,
 } from "@/io/storage";
 import { FORMATS } from "@/qso/formats";
+import { sentSpeed } from "@/timing/fist";
 import { anyAdded, asPlayed } from "@/qso/tape";
 import { fmtSpeed } from "./format";
 import type { LockedShows } from "@/qso/show";
@@ -80,6 +81,7 @@ import {
   BandOnCheck,
   AgcChoice,
   KeyStyleGroup,
+  KeyMark,
   paddleLabel,
   STRAIGHT_SPEED_HELP,
   useKeyStyle,
@@ -838,7 +840,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const speedNow = ((): string | null => {
     const script = sent;
     const speeds = script
-      ? script.stations.map((st) => sendingOf(script).speed ?? st.speed)
+      ? script.stations.map((st) => sentSpeed(sendingOf(script).speed ?? st.speed, st.fist))
       : (measured ?? []).filter((sp): sp is Speed => sp !== null);
     if (speeds.length === 0) return null;
     const shown = [...new Set(speeds.map(fmtSpeed))];
@@ -1514,7 +1516,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
     if (!showSpeed || !file) return null;
     const line = sent?.lines[i];
     const speed = sent
-      ? line && (sendingOf(sent).speed ?? sent.stations[line.station]!.speed)
+      ? line && sentSpeed(sendingOf(sent).speed ?? sent.stations[line.station]!.speed, sent.stations[line.station]!.fist)
       : measuredLines?.[i];
     if (!speed) return null;
     return (
@@ -1523,6 +1525,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
         data-testid="copy-line-wpm"
         title={sent ? undefined : "Measured from the recording"}
       >
+        {line && <KeyMark fist={sent!.stations[line.station]!.fist} />}
         {fmtSpeed(speed)}
       </span>
     );

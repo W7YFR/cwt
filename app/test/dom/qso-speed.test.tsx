@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { fireEvent } from "@testing-library/react";
 import { loadSpeed } from "@/io/storage";
 import {
   WPM,
@@ -69,6 +70,31 @@ describe("the station's speed on its lines", () => {
     expect($('.qsolog li.you [data-testid="qso-line-wpm"]'), "yours stays off").toBeNull();
     await send("QRS K");
     expect(speeds()).toEqual([`${WPM} wpm`, `${WPM}/24 wpm`]);
+  });
+});
+
+describe("the key on the station's lines", () => {
+  it("marks the station's speed with the key it sent on, and only a key worked by hand", async () => {
+    await open({ qsoTheirText: "before", qsoShowTheirSpeed: true, keyStyle: "only", styleKeys: ["bug"] });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const mark = $('.qsolog li.them [data-testid="qso-line-wpm"] [data-key]');
+    expect(mark?.getAttribute("data-key")).toBe("bug");
+    // Hovered, its themed tooltip shows: never the browser's own.
+    expect(mark?.getAttribute("title")).toBeNull();
+    const tip = () => $$<HTMLElement>('[role="tooltip"]').find((t) => !t.hidden);
+    expect(tip(), "hidden at first").toBeUndefined();
+    fireEvent.mouseEnter(mark!);
+    expect(tip(), "shown on hover").toBeDefined();
+    fireEvent.mouseLeave(mark!);
+    expect(tip(), "gone after").toBeUndefined();
+    expect($('.qsolog li.them [data-testid="qso-line-wpm"]')!.textContent).toBe(`${WPM} wpm`);
+  });
+
+  it("shows no mark for a keyer", async () => {
+    await open({ qsoTheirText: "before", qsoShowTheirSpeed: true, keyStyle: "only", styleKeys: ["keyer"] });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    expect($('.qsolog li.them [data-testid="qso-line-wpm"]')).not.toBeNull();
+    expect($('.qsolog [data-key]')).toBeNull();
   });
 });
 

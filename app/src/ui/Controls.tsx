@@ -16,12 +16,13 @@ import { createPortal } from "react-dom";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import type { RecordMode } from "./mode";
+import { IconBug, IconStraightKey } from "./Icons";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import type { AgcMode } from "@/audio/agc";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
 import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
-import { STRAIGHT_MOST_WPM, type KeyKind } from "@/timing/fist";
+import { STRAIGHT_MOST_WPM, type Fist, type KeyKind } from "@/timing/fist";
 import { BREAK } from "@/morse";
 import {
   BREAK_MAX_SEC,
@@ -370,15 +371,25 @@ function fixedFrame(): { left: number; right: number; top: number } {
   return { left: r.left, right: r.right, top: r.top };
 }
 
-function HelpTip({ text }: { text: string }): React.ReactElement {
+/** A themed tooltip for `text`, drawn at the top of the page and placed by
+ *  `anchor`: below it, or above where there is no room below, and inside the
+ *  window either side. Spread `on` on the element that shows it. */
+function useTip<T extends HTMLElement>(
+  text: string,
+): {
+  id: string;
+  anchor: React.RefObject<T | null>;
+  on: { onMouseEnter(): void; onMouseLeave(): void; onFocus(): void; onBlur(): void };
+  box: React.ReactNode;
+} {
   const id = useId();
-  const dot = useRef<HTMLButtonElement>(null);
+  const anchor = useRef<T>(null);
   const box = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   useLayoutEffect(() => {
-    if (!open || !dot.current || !box.current) return;
-    const d = dot.current.getBoundingClientRect();
+    if (!open || !anchor.current || !box.current) return;
+    const d = anchor.current.getBoundingClientRect();
     const b = box.current.getBoundingClientRect();
     /* The page keeps a scrollbar's width free on both sides (see `html` in
        base.css), and a fixed box is placed inside them, not from the window's
@@ -396,35 +407,42 @@ function HelpTip({ text }: { text: string }): React.ReactElement {
     setOpen(false);
     setAt(null);
   };
+  return {
+    id,
+    anchor,
+    on: { onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide },
+    box: createPortal(
+      <span
+        ref={box}
+        className="tip"
+        role="tooltip"
+        id={id}
+        hidden={!open}
+        style={at ? { top: at.top, left: at.left } : { visibility: "hidden" }}
+      >
+        {text}
+      </span>,
+      document.body,
+    ),
+  };
+}
+
+function HelpTip({ text }: { text: string }): React.ReactElement {
+  const tip = useTip<HTMLButtonElement>(text);
   return (
     <span className="helptip">
       <button
-        ref={dot}
+        ref={tip.anchor}
         type="button"
         className="helpdot"
         aria-label="More about this setting"
-        aria-describedby={id}
+        aria-describedby={tip.id}
         onClick={(e) => e.preventDefault()}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        onFocus={show}
-        onBlur={hide}
+        {...tip.on}
       >
         ?
       </button>
-      {createPortal(
-        <span
-          ref={box}
-          className="tip"
-          role="tooltip"
-          id={id}
-          hidden={!open}
-          style={at ? { top: at.top, left: at.left } : { visibility: "hidden" }}
-        >
-          {text}
-        </span>,
-        document.body,
-      )}
+      {tip.box}
     </span>
   );
 }
@@ -1218,6 +1236,30 @@ export function KeyChecks({
 export function keysLabel(keys: readonly KeyKind[]): string {
   const names = KEY_OPTIONS.filter((k) => keys.includes(k.key)).map((k, i) => (i ? k.label.toLowerCase() : k.label));
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : names.join("");
+}
+
+/** A key by name, in a sentence: a bug, a straight key. */
+export function keyName(key: KeyKind): string {
+  return `a ${KEY_OPTIONS.find((k) => k.key === key)!.label.toLowerCase()}`;
+}
+
+/** The key a line was sent on, beside its speed: an icon for a key worked
+ *  by hand, and nothing for a keyer. Hovering it names the key. It never
+ *  names the station, whose call may be blurred. */
+export function KeyMark({ fist }: { fist: Fist | undefined }): React.ReactElement | null {
+  return fist ? <KeyIcon kind={fist.key} /> : null;
+}
+
+/** The icon of a key worked by hand, with its themed tooltip. */
+function KeyIcon({ kind }: { kind: Exclude<KeyKind, "keyer"> }): React.ReactElement {
+  const says = `The station sent this line on ${keyName(kind)}.`;
+  const tip = useTip<HTMLSpanElement>(says);
+  return (
+    <span ref={tip.anchor} className="lkey" data-key={kind} role="img" aria-label={says} {...tip.on}>
+      {kind === "bug" ? <IconBug /> : <IconStraightKey />}
+      {tip.box}
+    </span>
+  );
 }
 
 /** What Paddle's chip shows: Default, Any with every key checked, or the
