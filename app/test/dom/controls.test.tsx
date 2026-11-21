@@ -816,4 +816,21 @@ describe("Paddle: what the stations send with", () => {
     await user.click(screen.getByTestId("key-style").querySelectorAll("button")[1]!);
     expect(keys()).toBe("bug");
   });
+
+  it("sets a straight key, alone or with any of the others", async () => {
+    localStorage.clear();
+    const user = userEvent.setup();
+    render(<PaddleHarness />);
+    expect(box("straight").disabled).toBe(true);
+    await user.click(screen.getByTestId("key-style").querySelectorAll("button")[1]!);
+    await user.click(box("straight"));
+    expect(keys()).toBe("keyer,straight");
+    await user.click(box("bug"));
+    expect(keys()).toBe("keyer,bug,straight");
+    await user.click(box("keyer"));
+    await user.click(box("bug"));
+    expect(keys()).toBe("straight");
+    expect(box("straight").disabled).toBe(true);
+    expect(loadPrefs()).toMatchObject({ keyStyle: "only", styleKeys: ["straight"] });
+  });
 });

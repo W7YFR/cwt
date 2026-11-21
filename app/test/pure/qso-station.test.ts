@@ -142,7 +142,9 @@ describe("CW Academy students in a CWT", () => {
       expect(q.speed.charWpm).toBeLessThanOrEqual(hi);
     }
     const [min] = FORMATS.cwt.wpm;
-    for (const q of runs.filter((r) => r.them.nr !== "CWA")) expect(q.speed.charWpm).toBeGreaterThanOrEqual(min);
+    // A straight key is slower too.
+    const rest = runs.filter((r) => r.them.nr !== "CWA" && r.them.fist?.key !== "straight");
+    for (const q of rest) expect(q.speed.charWpm).toBeGreaterThanOrEqual(min);
     expect(Math.max(...students.map((q) => q.speed.charWpm))).toBeLessThan(min);
   });
 

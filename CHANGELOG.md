@@ -7,6 +7,16 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- Some stations send on a straight key, with every dit and dah made by hand. They are rare in standard QSOs and the SST, and almost never in a CWT.
+- A station on a straight key sends no faster than 20 WPM.
+- **Paddle** and a friend's **Keys** have a **Straight key** checkbox. Any mix of the keys can be checked.
+
+### Changed
+
+- A station on a bug keeps the same habits in every letter, such as a long dah at the end of a letter.
+
 ## v1.37.0 — 2026-11-21
 
 ### Added

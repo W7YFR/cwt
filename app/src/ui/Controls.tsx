@@ -1161,6 +1161,7 @@ export function AgcChoice({
 export const KEY_OPTIONS: ReadonlyArray<{ key: KeyKind; label: string; help: string }> = [
   { key: "keyer", label: "Keyer", help: "Every dit and dah exact." },
   { key: "bug", label: "Bug", help: "Even dits, and long dahs made by hand that vary." },
+  { key: "straight", label: "Straight key", help: "Every dit and dah made by hand, with wide gaps between letters." },
 ];
 
 /** A checkbox for each key, all on one row, for the keys in `keys`. Each
@@ -1207,27 +1208,30 @@ export function KeyChecks({
 }
 
 /** The keys `keys` holds, by name, in the order of `KEY_OPTIONS`: Keyer
- *  or bug. */
+ *  or bug, or Keyer, bug or straight key. */
 export function keysLabel(keys: readonly KeyKind[]): string {
-  return KEY_OPTIONS.filter((k) => keys.includes(k.key))
-    .map((k, i) => (i ? k.label.toLowerCase() : k.label))
-    .join(" or ");
+  const names = KEY_OPTIONS.filter((k) => keys.includes(k.key)).map((k, i) => (i ? k.label.toLowerCase() : k.label));
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : names.join("");
 }
 
-/** What Paddle's chip shows: Default, or the keys it sets. */
+/** What Paddle's chip shows: Default, Any key with every key checked, or
+ *  the keys it sets. */
 export function paddleLabel(ks: { keys: readonly KeyKind[] | null }): string {
-  return ks.keys === null ? "Default" : keysLabel(ks.keys);
+  if (ks.keys === null) return "Default";
+  return KEY_OPTIONS.every((k) => ks.keys!.includes(k.key)) ? "Any key" : keysLabel(ks.keys);
 }
 
 /** The longest Paddle's chip can show, so its room is kept. */
-export const WIDEST_PADDLE = keysLabel(KEY_OPTIONS.map((k) => k.key));
+export const WIDEST_PADDLE = KEY_OPTIONS.flatMap((a) => KEY_OPTIONS.map((b) => paddleLabel({ keys: [a.key, b.key] }))).reduce(
+  (w, l) => (l.length > w.length ? l : w),
+);
 
 const ONE_KEY = "One must stay checked. Check another first.";
 
 /** What the stations send with: Default as on the air, or only the ones
  *  you check. */
 const KEY_STYLES: ReadonlyArray<{ value: "default" | "only"; label: string; note: string }> = [
-  { value: "default", label: "Default", note: "Mostly a keyer, now and then a bug, as on the air." },
+  { value: "default", label: "Default", note: "Mostly a keyer, now and then a bug or a straight key, as on the air." },
   { value: "only", label: "Only these", note: "Each station uses one of the ones you check." },
 ];
 

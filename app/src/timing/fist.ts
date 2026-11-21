@@ -27,32 +27,45 @@
  * A fist is the operator's own habits, made once from a seed. The variation
  * inside a line is seeded from the fist and the line's text, so a line
  * replayed or saved sounds as it did the first time. The line keeps the
- * station's speed: its PARIS takes as long as a keyer's.
+ * station's speed: its pangram takes as long as a keyer's. A straight key
+ * sends no faster than a good hand can.
  *
- * Another key worked by hand, such as a straight key, adds a `HandKey`, its
- * kind of `Fist`, and its hand in `byHand`. The speed, the seeding, and
- * both callers stay as they are.
+ * With a straight key's fist, every mark and gap is made by hand:
+ *
+ * - Dits vary as well as dahs. Many operators key heavy: marks long and the
+ *   spaces inside a letter short.
+ * - Dahs are near 3 dits. Most operators draw out a dah that ends a
+ *   letter, as in Q or T, and some drag the first dah of C.
+ * - The gaps between letters are wider and less even than a keyer's.
+ * - Each operator has a swing, and drifts faster and slower, as on a bug.
+ * - An operator's habits shape every letter alike, the same each time. A
+ *   newcomer's sending varies more.
+ *
+ * Another key worked by hand adds a `HandKey`, its kind of `Fist`, and its
+ * hand in `byHand`. The speed, the seeding, and both callers stay as they
+ * are.
  *
  * Pure.
  */
 
 import { seeded, seedOf } from "@/audio/qsb";
 import { keyableSymbols, patternOf } from "@/morse";
+import { targetTiming } from "@/timing/model";
 import type { Timing } from "@/types";
 
 /** The key a station sends with. */
-export type KeyKind = "keyer" | "bug";
+export type KeyKind = "keyer" | "bug" | "straight";
 
-export const KEY_KINDS: readonly KeyKind[] = ["keyer", "bug"];
+export const KEY_KINDS: readonly KeyKind[] = ["keyer", "bug", "straight"];
 
 /** A key worked by hand, in part or in whole: every key but a keyer. */
 export type HandKey = Exclude<KeyKind, "keyer">;
 
-export const HAND_KEYS: readonly HandKey[] = ["bug"];
+export const HAND_KEYS: readonly HandKey[] = ["bug", "straight"];
 
 /** An operator on a key worked by hand, and their habits. One kind for
  *  each `HandKey`; `key` tells them apart. */
-export type Fist = BugFist;
+export type Fist = BugFist | StraightFist;
 
 /** An operator on a bug, and their habits. Lengths are in keyer dits before
  *  the line is brought to the station's speed. */
@@ -84,8 +97,48 @@ export interface BugFist {
   readonly roger: number;
   /** A proper roger's dah, as so many of the operator's own dahs. */
   readonly rogerDah: number;
-  /** How far each letter's own shape is from the usual, as a share: the
-   *  same letter comes out the same way each time. */
+  /** How far each letter's own shape is from the usual, as a share: small,
+   *  as the operator's habits shape every letter alike. */
+  readonly shapeSpread: number;
+  /** How much one letter is rushed or dragged against the next, as a
+   *  share. */
+  readonly tempoSpread: number;
+  /** How often the hand pauses before a letter, 0 to 1. */
+  readonly pause: number;
+  /** A dah that ends a letter, as in Q or T, is this share longer. A fist
+   *  kept before this habit takes it from its seed. */
+  readonly lastDah?: number;
+}
+
+/** An operator on a straight key, and their habits. Lengths are in keyer
+ *  dits before the line is brought to the station's speed. */
+export interface StraightFist {
+  readonly key: "straight";
+  /** Seeds the variation inside each line. */
+  readonly seed: number;
+  /** The dit's share of a dit and the space after it: over a half is a
+   *  heavy fist. */
+  readonly weight: number;
+  /** A dah, in the operator's own dits. */
+  readonly dah: number;
+  /** How much one mark differs from the next, as a share of its length. */
+  readonly markSpread: number;
+  /** A dah before a dit is this share longer. */
+  readonly drag: number;
+  /** A dah that ends a letter, as in Q or T, is this share longer. */
+  readonly lastDah: number;
+  /** How much a space inside a letter differs from the next, as a share. */
+  readonly gapSpread: number;
+  /** The gaps between characters and between words, as shares of the
+   *  station's own. */
+  readonly charGap: number;
+  readonly wordGap: number;
+  /** How much one gap between letters differs from the next, as a share. */
+  readonly charSpread: number;
+  /** Added between two letters when the first ends as the next begins. */
+  readonly swing: number;
+  /** How far each letter's own shape is from the usual, as a share: small,
+   *  as the operator's habits shape every letter alike. */
   readonly shapeSpread: number;
   /** How much one letter is rushed or dragged against the next, as a
    *  share. */
@@ -101,6 +154,8 @@ export function fistFor(key: KeyKind, seed: number): Fist | undefined {
       return undefined;
     case "bug":
       return bugFist(seed);
+    case "straight":
+      return straightFist(seed);
   }
 }
 
@@ -123,15 +178,47 @@ export function bugFist(seed: number): BugFist {
     swing: within(0, 1.2),
     roger: within(0.2, 0.9),
     rogerDah: within(2.2, 3.2),
-    shapeSpread: within(0.1, 0.18),
+    shapeSpread: within(0.02, 0.05),
     tempoSpread: within(0.02, 0.05),
     pause: within(0.01, 0.04),
+    lastDah: within(0.05, 0.25),
   };
 }
+
+/** The habits of an operator on a straight key, from `seed`. */
+export function straightFist(seed: number): StraightFist {
+  const rand = seeded(seedOf(`straight:${seed}`));
+  const within = (lo: number, hi: number) => lo + (hi - lo) * rand();
+  // Most operators send the same way each time. A newcomer does not.
+  const unsteady = rand() < UNSTEADY ? UNSTEADY_SPREAD : 1;
+  return {
+    key: "straight",
+    seed,
+    weight: within(0.48, 0.58),
+    dah: within(2.7, 3.2),
+    markSpread: within(0.03, 0.06) * unsteady,
+    drag: within(0, 0.12),
+    lastDah: within(0.1, 0.35),
+    gapSpread: within(0.06, 0.12) * unsteady,
+    charGap: within(1, 1.45),
+    wordGap: within(0.95, 1.3),
+    charSpread: within(0.1, 0.18) * unsteady,
+    swing: within(0, 1),
+    shapeSpread: within(0.02, 0.05),
+    tempoSpread: within(0.02, 0.05) * unsteady,
+    pause: within(0.02, 0.06) * unsteady,
+  };
+}
+
+/** How many operators on a straight key are newcomers, and how much more
+ *  their sending varies. */
+const UNSTEADY = 0.15;
+const UNSTEADY_SPREAD = 2.5;
 
 /** The numbers each kind of fist holds, to check one read back. */
 const FIST_NUMBERS: { readonly [K in HandKey]: readonly (keyof Extract<Fist, { key: K }>)[] } = {
   bug: ["seed", "weight", "dah", "dahSpread", "drag", "afterDah", "toDah", "gapSpread", "charGap", "wordGap", "swing", "roger", "rogerDah", "shapeSpread", "tempoSpread", "pause"],
+  straight: ["seed", "weight", "dah", "markSpread", "drag", "lastDah", "gapSpread", "charGap", "wordGap", "charSpread", "swing", "shapeSpread", "tempoSpread", "pause"],
 };
 
 /** Whether `v` is a fist, as read back from a saved file. */
@@ -173,9 +260,26 @@ const DIT_SPREAD = 0.015;
  *  brought to speed: never so short that it runs two marks together. */
 const SHORTEST_GAP = 0.5;
 
+/** On a straight key, the longest a dit gets and the shortest a dah gets,
+ *  in the operator's own dits. */
+const LONGEST_DIT = 1.3;
+const SHORTEST_DAH = 2.2;
+
+/** The fastest a straight key sends, in words per minute. Most operators
+ *  on the air send one slower than this. */
+export const STRAIGHT_MOST_WPM = 20;
+
+/** `timing`, or as near it as `fist` can send: a straight key no faster
+ *  than `STRAIGHT_MOST_WPM`, its Farnsworth gaps slowed alike. */
+function sendable(timing: Timing, fist: Fist): Timing {
+  if (fist.key !== "straight" || timing.charWpm <= STRAIGHT_MOST_WPM) return timing;
+  return targetTiming(STRAIGHT_MOST_WPM, (timing.farnsworthWpm * STRAIGHT_MOST_WPM) / timing.charWpm);
+}
+
 /** `words` as keyed at `timing` by `fist`, or exactly with none. */
-export function keyed(words: readonly string[], timing: Timing, fist?: Fist): KeyedWord[] {
-  if (!fist) return exact(words, timing);
+export function keyed(words: readonly string[], asked: Timing, fist?: Fist): KeyedWord[] {
+  if (!fist) return exact(words, asked);
+  const timing = sendable(asked, fist);
   const scale = scaleOf(timing, fist);
   const rand = seeded(seedOf(`${fist.seed}:${words.join(" ")}`));
   return byHand(words, timing, fist, rand).map((w) => ({
@@ -220,6 +324,8 @@ function byHand(words: readonly string[], timing: Timing, fist: Fist, rand?: () 
     case "bug":
       // A fist kept before a habit was added gets that habit from its seed.
       return onBug(words, timing, { ...bugFist(fist.seed), ...fist }, rand);
+    case "straight":
+      return onStraight(words, timing, fist, rand);
   }
 }
 
@@ -244,7 +350,7 @@ function onBug(words: readonly string[], timing: Timing, fist: BugFist, rand?: (
         if (rand) drift = Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, DRIFT_HOLD * drift + (around(rand, DRIFT_STEP) - 1)));
         // The operator's own shape for this letter, and this letter rushed
         // or dragged.
-        const shape = shapeOf(fist, ch, pattern.length);
+        const shape = shapeOf(`shape:${fist.seed}:${ch}`, fist.shapeSpread, pattern.length);
         const hand = (1 + drift) * (rand ? around(rand, fist.tempoSpread) : 1);
         const swung = li > 0 && last.at(-1) === pattern[0] ? fist.swing * unit : 0;
         const [lo, hi] = PAUSE_DITS;
@@ -259,7 +365,8 @@ function onBug(words: readonly string[], timing: Timing, fist: BugFist, rand?: (
           const next = pattern[ei + 1];
           if (e === ".") marks.push(dit * vary(DIT_SPREAD));
           else {
-            const dah = dit * fist.dah * (next === "." ? 1 + fist.drag : 1) * roger * shape.marks[ei]!;
+            const ends = next === undefined ? 1 + (fist.lastDah ?? 0) : 1;
+            const dah = dit * fist.dah * (next === "." ? 1 + fist.drag : 1) * ends * roger * shape.marks[ei]!;
             marks.push(Math.max(dah * hand * vary(fist.dahSpread), 2.5 * dit));
           }
           if (next === undefined) continue;
@@ -275,14 +382,58 @@ function onBug(words: readonly string[], timing: Timing, fist: BugFist, rand?: (
   });
 }
 
-/** How `fist` shapes `ch`, its `n` elements: a share for each dah and for
- *  each space after an element, the same each time. Dits and the arm's own
- *  spaces take no share: the arm makes them. */
-function shapeOf(fist: BugFist, ch: string, n: number): { marks: number[]; spaces: number[] } {
-  const rand = seeded(seedOf(`shape:${fist.seed}:${ch}`));
+/** `words` as keyed on a straight key: every mark and gap by hand. */
+function onStraight(words: readonly string[], timing: Timing, fist: StraightFist, rand?: () => number): KeyedWord[] {
+  const unit = timing.unitSec;
+  const charGap = timing.charGapSec || 3 * unit;
+  const wordGap = timing.wordGapSec || 7 * unit;
+  const dit = 2 * fist.weight * unit;
+  const space = 2 * (1 - fist.weight) * unit;
+  const vary = (sd: number) => (rand ? around(rand, sd) : 1);
+  let drift = 0;
+  let last = "";
+  return words.map((word, wi) => ({
+    gap: wi > 0 ? Math.max(wordGap * fist.wordGap * vary(fist.charSpread), 1.5 * charGap) : 0,
+    chars: keyableSymbols(word).map((ch, li) => {
+      const pattern = patternOf(ch)!;
+      if (rand) drift = Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, DRIFT_HOLD * drift + (around(rand, DRIFT_STEP) - 1)));
+      // The operator's own shape for this letter, and this letter rushed or
+      // dragged.
+      const shape = shapeOf(`straight-shape:${fist.seed}:${ch}`, fist.shapeSpread, pattern.length);
+      const hand = (1 + drift) * (rand ? around(rand, fist.tempoSpread) : 1);
+      const swung = li > 0 && last.at(-1) === pattern[0] ? fist.swing * unit : 0;
+      const [lo, hi] = PAUSE_DITS;
+      const paused = rand ? (rand() < fist.pause ? lo + (hi - lo) * rand() : 0) : fist.pause * (lo + hi) / 2;
+      const gap =
+        li > 0 ? Math.max(charGap * fist.charGap * (1 + drift) * vary(fist.charSpread) + swung + paused * unit, 2 * unit) : 0;
+      last = pattern;
+      const marks: number[] = [];
+      const spaces: number[] = [];
+      for (let ei = 0; ei < pattern.length; ei++) {
+        const next = pattern[ei + 1];
+        const usual =
+          pattern[ei] === "."
+            ? dit
+            : dit * fist.dah * (next === "." ? 1 + fist.drag : 1) * (next === undefined ? 1 + fist.lastDah : 1);
+        const mark = usual * shape.marks[ei]! * hand * vary(fist.markSpread);
+        // A dit never so long, nor a dah so short, that one reads as the other.
+        marks.push(pattern[ei] === "." ? Math.min(Math.max(mark, 0.6 * dit), LONGEST_DIT * dit) : Math.max(mark, SHORTEST_DAH * dit));
+        if (next !== undefined) spaces.push(Math.max(space * shape.spaces[ei]! * hand * vary(fist.gapSpread), SHORTEST_GAP * unit));
+      }
+      return { gap, marks, spaces };
+    }),
+  }));
+}
+
+/** An operator's own shape for a letter of `n` elements, from `key`: a
+ *  share for each mark and for each space after one, the same each time.
+ *  On a bug, the dits and the arm's own spaces take no share: the arm makes
+ *  them. */
+function shapeOf(key: string, spread: number, n: number): { marks: number[]; spaces: number[] } {
+  const rand = seeded(seedOf(key));
   return {
-    marks: Array.from({ length: n }, () => around(rand, fist.shapeSpread)),
-    spaces: Array.from({ length: n }, () => around(rand, 1.5 * fist.shapeSpread)),
+    marks: Array.from({ length: n }, () => around(rand, spread)),
+    spaces: Array.from({ length: n }, () => around(rand, 1.5 * spread)),
   };
 }
 
@@ -300,11 +451,13 @@ function lengthOf(words: readonly KeyedWord[]): number {
   return t;
 }
 
-/** The standard word speed is measured on. */
-const PARIS = ["PARIS", "PARIS"];
+/** What a hand key's speed is measured on: every letter. In PARIS, the
+ *  usual word, each dah ends its letter, so an operator who draws out a
+ *  dah that ends a letter would come out fast on any other line. */
+const PANGRAM = "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG".split(" ");
 
-/** What brings `fist` to the station's speed: its usual PARIS takes as long
- *  as a keyer's at `timing`. */
+/** What brings `fist` to the station's speed: its usual pangram takes as
+ *  long as a keyer's at `timing`. */
 function scaleOf(timing: Timing, fist: Fist): number {
-  return lengthOf(exact(PARIS, timing)) / lengthOf(byHand(PARIS, timing, fist));
+  return lengthOf(exact(PANGRAM, timing)) / lengthOf(byHand(PANGRAM, timing, fist));
 }
