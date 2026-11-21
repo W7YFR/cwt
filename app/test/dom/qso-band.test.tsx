@@ -21,7 +21,7 @@ describe("the band's settings", () => {
   it("are in the Audio settings, off to start, and kept", async () => {
     mount({});
     await settingsTab("sound");
-    for (const id of ["qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) {
+    for (const id of ["band-on", "qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) {
       expect(input(id).closest('[data-panel="audio"]'), id).not.toBeNull();
     }
     expect(input("qsb").value).toBe("0");
@@ -55,6 +55,72 @@ describe("the band's settings", () => {
   });
 });
 
+describe("the AGC", () => {
+  it("is in the Audio settings, fast to start, kept, and barred with no band", async () => {
+    mount({});
+    await settingsTab("sound");
+    const choice = $('[data-testid="agc"]')!.closest(".choicegroup")!;
+    // Off, Slow and Fast, in that order.
+    const buttons = () => [...choice.querySelectorAll("button")];
+    expect(choice.closest('[data-panel="audio"]')).not.toBeNull();
+    expect(choice.getAttribute("data-disabled")).toBe("true");
+    await slide("noise", -26);
+    expect(choice.getAttribute("data-disabled")).toBe("false");
+    expect(buttons().findIndex((b) => b.getAttribute("aria-pressed") === "true")).toBe(2);
+    await click(buttons()[1]!);
+    expect(loadPrefs().agc).toBe("slow");
+  });
+
+  it("goes with each of the station's lines, ducking the band the recorder plays", async () => {
+    await open({ noiseDb: -26, agc: "fast" });
+    await until("the band", () => heard.gate.band !== null);
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const air = heard.airs.at(-1);
+    expect(air?.agc?.mode).toBe("fast");
+    expect(air?.agc?.band.loudDb.length).toBeGreaterThan(0);
+    expect(air?.agc?.onDuck).toBeDefined();
+    expect(air?.agc?.bandAt).toBeDefined();
+  });
+
+  it("is not on a line with the AGC off", async () => {
+    await open({ noiseDb: -26, agc: "off" });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    expect(heard.airs.at(-1)?.agc).toBeUndefined();
+  });
+});
+
+describe("the band switched off", () => {
+  it("plays nothing added, keeps the sliders' settings, and plays them again when switched on", async () => {
+    await open({ qsbDb: 12, noiseDb: -26, qrn: 2, qrmDb: -20 });
+    await until("the band", () => heard.gate.band !== null);
+    const first = heard.gate.band!.samples;
+    await settingsTab("sound");
+    await click(input("band-on"));
+    expect(loadPrefs()).toMatchObject({ bandOn: false, qsbDb: 12, noiseDb: -26, qrn: 2, qrmDb: -20 });
+    expect(heard.gate.band).toBeNull();
+    for (const id of ["qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) expect(input(id).disabled, id).toBe(true);
+    expect(input("noise").value).toBe("-26");
+
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const air = heard.airs.at(-1);
+    expect(air?.fade).toBeUndefined();
+    expect(air?.band).toBeUndefined();
+
+    // At once, the same band: its parts were kept while it was off.
+    await click(input("band-on"));
+    expect(loadPrefs().bandOn).toBe(true);
+    expect(heard.gate.band!.samples).toEqual(first);
+    for (const id of ["qsb", "noise", "qrn", "qrm"]) expect(input(id).disabled, id).toBe(false);
+  });
+
+  it("starts off when it was left off", async () => {
+    await open({ noiseDb: -26, bandOn: false });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    expect(heard.gate.band).toBeNull();
+    expect(heard.airs.at(-1)?.band).toBeUndefined();
+  });
+});
+
 describe("the band in a QSO", () => {
   it("is not there with everything off", async () => {
     await open({});
@@ -63,6 +129,20 @@ describe("the band in a QSO", () => {
     const air = heard.airs.at(-1);
     expect(air?.fade).toBeUndefined();
     expect(air?.band).toBeUndefined();
+  });
+
+  it("follows a level slider at once, the same band at the new level", async () => {
+    // With the AGC off: on, it evens the level out.
+    await open({ noiseDb: -26, agc: "off" });
+    await until("the band", () => heard.gate.band !== null);
+    const first = heard.gate.band!.samples;
+    await settingsTab("sound");
+    await slide("noise", -20);
+    const next = heard.gate.band!.samples;
+    expect(next).not.toBe(first);
+    expect(next.length).toBe(first.length);
+    const k = Math.pow(10, 6 / 20);
+    for (const i of [0, 1000, 500_000]) expect(next[i]).toBeCloseTo(first[i]! * k, 6);
   });
 
   it("plays from the recorder all through, cut as you key for the break-in delay", async () => {

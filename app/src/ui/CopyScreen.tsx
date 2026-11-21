@@ -17,9 +17,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AgcMode } from "@/audio/agc";
 import { createPlayer } from "@/audio/player";
 import { NOISE_OFF_DB } from "@/audio/qsb";
-import { QRM_OFF_DB } from "@/copy/band";
+import { bandOn, QRM_OFF_DB } from "@/copy/band";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import { ACCEPTED, isTextFile, loadAudioFile } from "@/capture/file";
 import type { Over, Recording } from "@/copy/decode";
@@ -60,7 +61,7 @@ import {
   type Prefs,
 } from "@/io/storage";
 import { FORMATS } from "@/qso/formats";
-import { anyAdded } from "@/qso/tape";
+import { anyAdded, asPlayed } from "@/qso/tape";
 import { fmtSpeed } from "./format";
 import type { LockedShows } from "@/qso/show";
 import type { Speed } from "@/qso/speed";
@@ -75,13 +76,15 @@ import {
   QrmSlider,
   QrnSlider,
   QsbSlider,
+  BandOnCheck,
+  AgcChoice,
   SpeedSliders,
 } from "./Controls";
 import { Graded, RightOnly, SentMarks, YourCopy, YourMarks, type SentAttrs } from "./Graded";
 import { IconEdit, IconPause, IconPlay, IconStop, IconUpload } from "./Icons";
 import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { PageHelp, type KeyGroup } from "./Help";
-import { NEEDS_LINES_COPY, NEEDS_SLOTS } from "./copy";
+import { NEEDS_BAND, NEEDS_BAND_ON, NEEDS_LINES_COPY, NEEDS_SLOTS } from "./copy";
 import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
@@ -340,7 +343,8 @@ type OnOffKey =
   | "copyShowSpeed"
   | "copyShowDownload"
   | "copyRecordingAtMine"
-  | "copyWait";
+  | "copyWait"
+  | "bandOn";
 
 /** An on or off setting kept as a preference, with its default. */
 function useOnOff(key: OnOffKey, or: boolean): readonly [boolean, (next: boolean) => void] {
@@ -367,7 +371,8 @@ function useChoice<
     | "qsbDb"
     | "noiseDb"
     | "qrn"
-    | "qrmDb",
+    | "qrmDb"
+    | "agc",
 >(
   key: K,
   or: NonNullable<Prefs[K]>,
@@ -475,10 +480,30 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const gap: Gap = gapPref === "wait" ? "1" : gapPref;
   const gapSec = wait ? WAIT_GAP_SEC : Number(gap);
   const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
-  const [qsbDb, setQsbDb] = useChoice("qsbDb", 0);
-  const [noiseDb, setNoiseDb] = useChoice("noiseDb", NOISE_OFF_DB);
-  const [qrn, setQrn] = useChoice("qrn", 0);
-  const [qrmDb, setQrmDb] = useChoice("qrmDb", QRM_OFF_DB);
+  // The sliders' settings, and what plays: nothing added while the band is
+  // switched off.
+  const [qsbSet, setQsbDb] = useChoice("qsbDb", 0);
+  const [noiseSet, setNoiseDb] = useChoice("noiseDb", NOISE_OFF_DB);
+  const [qrnSet, setQrn] = useChoice("qrn", 0);
+  const [qrmSet, setQrmDb] = useChoice("qrmDb", QRM_OFF_DB);
+  const [bandPlays, setBandPlaysRaw] = useOnOff("bandOn", true);
+  const [agc, setAgcRaw] = useChoice("agc", "fast");
+  /** A click changed how it is sent, the band's switch or the AGC, which
+   *  has no slider to wait for. */
+  const clicked = useRef(false);
+  const setBandPlays = (on: boolean) => {
+    clicked.current = true;
+    setBandPlaysRaw(on);
+  };
+  const setAgc = (next: AgcMode) => {
+    clicked.current = true;
+    setAgcRaw(next);
+  };
+  const { qsbDb, noiseDb, qrn, qrmDb } = asPlayed(
+    { qsbDb: qsbSet, noiseDb: noiseSet, qrn: qrnSet, qrmDb: qrmSet },
+    bandPlays,
+  );
+  const hasBand = bandOn({ noiseDb, qrn, qrmDb });
   const [mine, setMineRaw] = useState<Speed>(() => {
     const p = loadPrefs();
     const or = loadSpeed() ?? { charWpm: 20, farnsworthWpm: 20 };
@@ -494,15 +519,15 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
     if (speedChoice !== "mine") setSpeedChoice("mine");
   };
   /** How a generated QSO is sent, from the settings. */
-  const sending = { gapSec, speed: speedChoice === "mine" ? mine : undefined, qsbDb, noiseDb, qrn, qrmDb };
+  const sending = { gapSec, speed: speedChoice === "mine" ? mine : undefined, qsbDb, noiseDb, qrn, qrmDb, agc };
   /** How `script` is sent. Your own text has no format, so it is always at
    *  the sliders. */
   const sendingOf = (script: Script) => (script.kind === "text" ? { ...sending, speed: mine } : sending);
   /** How a generated QSO is sent, as a key: it is sent again when this changes. */
-  const sendKey = `${gapSec}|${speedChoice}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}`;
+  const sendKey = `${gapSec}|${speedChoice}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}|${agc}`;
   /** How an opened recording plays, as a key: as opened (null), or sent
    *  again at your speeds, as it is now. */
-  const playKey = atMine ? `${gapSec}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}` : null;
+  const playKey = atMine ? `${gapSec}|${mine.charWpm}|${mine.farnsworthWpm}|${qsbDb}|${noiseDb}|${qrn}|${qrmDb}|${agc}` : null;
   /** An opened recording's lines, sent again at your speeds. */
   const sendRecording = (name: string, read: Recording): { audio: ArrayBuffer; rec: Recording } => {
     const script = recordingScript(name, read, mine);
@@ -719,9 +744,10 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
 
   /* A generated QSO sent again when its speed, gap, QSB or band changes, with your copy
      and where you are in it kept. A slider moves in steps, so this waits
-     for it to settle. */
+     for it to settle; the band's switch does not. */
   const sentWith = useRef(sendKey);
   useEffect(() => {
+    const now = clicked.current;
     if (!file?.script || sentWith.current === sendKey) return;
     const t = setTimeout(() => {
       sentWith.current = sendKey;
@@ -734,7 +760,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
       setPos((p) => timeIn(was, sent.rec, p));
       setKept((k) => (k ? { ...k, reached: timeIn(was, sent.rec, k.reached), at: timeIn(was, sent.rec, k.at) } : k));
       void keepCopyFile({ name: file.name, audio: new Blob([audio]), recording: sent.rec, script: file.script });
-    }, 250);
+    }, now ? 0 : 250);
     return () => clearTimeout(t);
     // Sent again on a change of how it is sent, not on each new file.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -747,8 +773,10 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
 
   /* An opened recording, as opened or sent again at your speeds, as the
      setting says, with your copy and where you are in it kept. A new
-     recording changes at once; a slider waits to settle. */
+     recording or the band's switch changes it at once; a slider waits to
+     settle. */
   useEffect(() => {
+    const now = clicked.current;
     if (!file || file.script || (file.read?.with ?? null) === playKey) return;
     const t = setTimeout(
       () => {
@@ -766,11 +794,15 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
         setPos((p) => timeIn(was, next.rec, p));
         setKept((k) => (k ? { ...k, reached: timeIn(was, next.rec, k.reached), at: timeIn(was, next.rec, k.at) } : k));
       },
-      file.read && playKey !== null ? 250 : 0,
+      file.read && playKey !== null && !now ? 250 : 0,
     );
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playKey, file]);
+  /* Both effects above have seen the click. */
+  useEffect(() => {
+    clicked.current = false;
+  }, [bandPlays, agc]);
 
   useEffect(() => {
     fileTarget.current = (f) => void openFile(f);
@@ -1681,10 +1713,12 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   );
   const soundSection = (
     <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
-      <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
-      <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
-      <QrnSlider qrn={qrn} onChange={setQrn} />
-      <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+      <QsbSlider qsbDb={qsbSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQsbDb} />
+      <NoiseSlider noiseDb={noiseSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setNoiseDb} />
+      <QrnSlider qrn={qrnSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrn} />
+      <QrmSlider qrmDb={qrmSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrmDb} />
+      <AgcChoice agc={agc} barred={!bandPlays ? NEEDS_BAND_ON : hasBand ? null : NEEDS_BAND} onChange={setAgc} />
+      <BandOnCheck on={bandPlays} onChange={setBandPlays} />
     </SoundSection>
   );
   const kindLabel = KINDS.find((k) => k.value === kind)!.label;

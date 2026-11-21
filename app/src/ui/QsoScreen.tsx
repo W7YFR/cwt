@@ -14,9 +14,10 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPlayer } from "@/audio/player";
-import { fadeOf, NOISE_OFF_DB, seedOf, type Fade } from "@/audio/qsb";
+import { agcGainDb, applyGainDb, loudnessDb, type AgcMode, type BandAgc } from "@/audio/agc";
+import { fadeOf, NOISE_OFF_DB, noiseOn, seedOf, type Fade } from "@/audio/qsb";
 import type { Band } from "@/audio/player";
-import { bandAudio, bandOn as anyBand, QRM_OFF_DB } from "@/copy/band";
+import { bandOn as anyBand, mixBand, noisePart, type PartOptions, QRM_OFF_DB, qrmOn, qrmPart, qrnPart } from "@/copy/band";
 import { qrmLines } from "@/copy/generate";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import {
@@ -44,7 +45,7 @@ import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import { regionOf, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
-import { anyAdded, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
+import { anyAdded, asPlayed, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { patternOf } from "@/morse";
 import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } from "@/qso/show";
 import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type LineCopy } from "@/copy/lines";
@@ -57,7 +58,7 @@ import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDE
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
-import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NOT_WITH_EXCHANGE } from "./copy";
+import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_BAND_ON, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NOT_WITH_EXCHANGE } from "./copy";
 import { Graded, RightOnly, type SentAttrs } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
@@ -77,6 +78,8 @@ import {
   QrmSlider,
   QrnSlider,
   QsbSlider,
+  BandOnCheck,
+  AgcChoice,
   SpeedSliders,
 } from "./Controls";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
@@ -484,7 +487,8 @@ function useOnOff(
     | "qsoSideGuide"
     | "qsoGradeTyping"
     | "qsoAllowEdits"
-    | "qsoBandNoise",
+    | "qsoBandNoise"
+    | "bandOn",
   or: boolean,
 ): readonly [boolean, (next: boolean) => void] {
   const [value, setRaw] = useState<boolean>(() => loadPrefs()[key] ?? or);
@@ -799,8 +803,9 @@ export function QsoScreen({
   useEffect(() => listen.setGainDb(gainDb), [listen, gainDb]);
 
   /* QSB on the station, and the band noise under it. The same preferences
-     as the Copy page's. */
-  const [qsbDb, setQsbDbRaw] = useState(() => loadPrefs().qsbDb ?? 0);
+     as the Copy page's. The sliders' settings, and what plays: nothing
+     added while the band is switched off. */
+  const [qsbSet, setQsbDbRaw] = useState(() => loadPrefs().qsbDb ?? 0);
   const setQsbDb = (next: number) => {
     setQsbDbRaw(next);
     savePrefs({ ...loadPrefs(), qsbDb: next });
@@ -814,21 +819,31 @@ export function QsoScreen({
     if (!fade) fades.current.set(key, (fade = fadeOf(qsbDb, seedOf(call))));
     return fade;
   };
-  const [noiseDb, setNoiseDbRaw] = useState(() => loadPrefs().noiseDb ?? NOISE_OFF_DB);
+  const [noiseSet, setNoiseDbRaw] = useState(() => loadPrefs().noiseDb ?? NOISE_OFF_DB);
   const setNoiseDb = (next: number) => {
     setNoiseDbRaw(next);
     savePrefs({ ...loadPrefs(), noiseDb: next });
   };
-  const [qrn, setQrnRaw] = useState(() => loadPrefs().qrn ?? 0);
+  const [qrnSet, setQrnRaw] = useState(() => loadPrefs().qrn ?? 0);
   const setQrn = (next: number) => {
     setQrnRaw(next);
     savePrefs({ ...loadPrefs(), qrn: next });
   };
-  const [qrmDb, setQrmDbRaw] = useState(() => loadPrefs().qrmDb ?? QRM_OFF_DB);
+  const [qrmSet, setQrmDbRaw] = useState(() => loadPrefs().qrmDb ?? QRM_OFF_DB);
   const setQrmDb = (next: number) => {
     setQrmDbRaw(next);
     savePrefs({ ...loadPrefs(), qrmDb: next });
   };
+  const [bandPlays, setBandPlays] = useOnOff("bandOn", true);
+  const [agc, setAgcRaw] = useState<AgcMode>(() => loadPrefs().agc ?? "fast");
+  const setAgc = (next: AgcMode) => {
+    setAgcRaw(next);
+    savePrefs({ ...loadPrefs(), agc: next });
+  };
+  const { qsbDb, noiseDb, qrn, qrmDb } = asPlayed(
+    { qsbDb: qsbSet, noiseDb: noiseSet, qrn: qrnSet, qrmDb: qrmSet },
+    bandPlays,
+  );
   const [bandNoise, setBandNoise] = useOnOff("qsoBandNoise", true);
   const [breakInMs, setBreakInMsRaw] = useState(() => loadPrefs().qsoBreakInMs ?? DEFAULT_BREAK_IN_MS);
   const setBreakInMs = (next: number) => {
@@ -836,28 +851,41 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoBreakInMs: next });
   };
   const hasBand = anyBand({ noiseDb, qrn, qrmDb });
-  /** The band as one track, made again when a setting changes. */
-  const band = useMemo<Band | null>(
-    () =>
-      hasBand
-        ? {
-            samples: bandAudio({
-              n: BAND_SEC * BAND_RATE,
-              rate: BAND_RATE,
-              toneHz: BAND_TONE_HZ,
-              peak: THEIR_PEAK,
-              noiseDb,
-              qrn,
-              qrmDb,
-              qsbDb,
-              seed: Math.floor(Math.random() * 2 ** 31),
-              qrmLines,
-            }),
-            rate: BAND_RATE,
-          }
-        : null,
-    [hasBand, noiseDb, qrn, qrmDb, qsbDb],
-  );
+  /* The band's parts, each made again only when what it is made from
+     changes. A level slider only mixes them again, which is quick, so it
+     plays as it moves. They are made from the sliders' settings, and kept
+     while the band is switched off, so switching it on is quick too. */
+  const [bandSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
+  const partOptions = (): PartOptions => ({
+    n: BAND_SEC * BAND_RATE,
+    rate: BAND_RATE,
+    toneHz: BAND_TONE_HZ,
+    peak: THEIR_PEAK,
+    qrn: qrnSet,
+    qsbDb: qsbSet,
+    seed: bandSeed,
+    qrmLines,
+  });
+  const noiseIsOn = noiseOn(noiseSet);
+  const qrmIsOn = qrmOn(qrmSet);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const noise = useMemo(() => (noiseIsOn ? noisePart(partOptions()) : null), [noiseIsOn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const crashes = useMemo(() => qrnPart(partOptions()), [qrnSet]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const qrm = useMemo(() => (qrmIsOn ? qrmPart(partOptions()) : null), [qrmIsOn, qsbSet]);
+  /** The band as one track: its parts, mixed at the sliders' levels, and
+   *  through the AGC on its own. How the AGC hears it goes with it: a
+   *  station's line works out the AGC on the station and the band from it. */
+  const bandMix = useMemo<{ band: Band; agc: BandAgc } | null>(() => {
+    if (!hasBand) return null;
+    const samples = mixBand(BAND_SEC * BAND_RATE, { noise, qrn: crashes, qrm }, { noiseDb, qrmDb });
+    const loudDb = loudnessDb(samples, BAND_RATE, THEIR_PEAK);
+    const gainDb = agcGainDb(loudDb, agc);
+    if (agc !== "off") applyGainDb(samples, BAND_RATE, gainDb);
+    return { band: { samples, rate: BAND_RATE }, agc: { loudDb, gainDb } };
+  }, [hasBand, noise, crashes, qrm, noiseDb, qrmDb, agc]);
+  const band = bandMix?.band ?? null;
 
   /** The next station in a run, about to call. */
   const nextCall = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1205,6 +1233,15 @@ export function QsoScreen({
             ...(qsbDb > 0 ? { fade: { fade: fadeFor(them.call), atSec: performance.now() / 1000 } } : {}),
             // With the over, unless the band already plays it.
             ...(band && !bandOn ? { band } : {}),
+            ...(bandMix && agc !== "off"
+              ? {
+                  agc: {
+                    mode: agc,
+                    band: bandMix.agc,
+                    ...(bandOn && gate ? { onDuck: gate.duck, bandAt: gate.bandAt } : {}),
+                  },
+                }
+              : {}),
           },
         });
       },
@@ -1563,7 +1600,7 @@ export function QsoScreen({
   const replayAdded = (): Added | null => {
     if (!anyAdded({ qsbDb, noiseDb, qrn, qrmDb })) return null;
     const quiet = bandOn ? { noiseDb: NOISE_OFF_DB, qrn: 0, qrmDb: QRM_OFF_DB } : { noiseDb, qrn, qrmDb };
-    return { qsbDb, ...quiet, seed: Math.floor(Math.random() * 2 ** 31), qrmLines };
+    return { qsbDb, ...quiet, seed: Math.floor(Math.random() * 2 ** 31), qrmLines, agc };
   };
   /** One line to play again, as it was heard. */
   const lineHeard = (part: TapeLine): Clip => {
@@ -1800,7 +1837,7 @@ export function QsoScreen({
     const nth = lines.filter((l) => l.qso === line.qso).indexOf(line) + 1;
     /** As heard: the station's fading and the band, made again. */
     const heard = (): Clip =>
-      tape([part!], tapeRate(), { qsbDb, noiseDb, qrn, qrmDb, seed: Math.floor(Math.random() * 2 ** 31), qrmLines });
+      tape([part!], tapeRate(), { qsbDb, noiseDb, qrn, qrmDb, seed: Math.floor(Math.random() * 2 ** 31), qrmLines, agc });
     return (
       <MoreMenu label="More for this line" testId="qso-line-more" up>
         <MenuHeading>Download</MenuHeading>
@@ -1947,7 +1984,7 @@ export function QsoScreen({
     const make = () => tape(parts!, tapeRate());
     /** As heard: the station's fading and the band, made again. */
     const heard = (): Clip =>
-      tape(parts!, tapeRate(), { qsbDb, noiseDb, qrn, qrmDb, seed: Math.floor(Math.random() * 2 ** 31), qrmLines });
+      tape(parts!, tapeRate(), { qsbDb, noiseDb, qrn, qrmDb, seed: Math.floor(Math.random() * 2 ** 31), qrmLines, agc });
     const added = anyAdded({ qsbDb, noiseDb, qrn, qrmDb });
     const gone = parts ? null : "This QSO's recording was not kept";
     const why = gone ?? cannotPlay();
@@ -2572,23 +2609,25 @@ export function QsoScreen({
   );
   const soundSection = (
     <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
-    <QsbSlider qsbDb={qsbDb} onChange={setQsbDb} />
-    <NoiseSlider noiseDb={noiseDb} onChange={setNoiseDb} />
-    <QrnSlider qrn={qrn} onChange={setQrn} />
-    <QrmSlider qrmDb={qrmDb} onChange={setQrmDb} />
+    <QsbSlider qsbDb={qsbSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQsbDb} />
+    <NoiseSlider noiseDb={noiseSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setNoiseDb} />
+    <QrnSlider qrn={qrnSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrn} />
+    <QrmSlider qrmDb={qrmSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrmDb} />
+    <AgcChoice agc={agc} barred={!bandPlays ? NEEDS_BAND_ON : hasBand ? null : NEEDS_BAND} onChange={setAgc} />
     <BreakInSlider
       ms={breakInMs}
-      barred={!hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
+      barred={!bandPlays ? NEEDS_BAND_ON : !hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
       onChange={setBreakInMs}
     />
     <Check
       id="qso-band-noise"
       label="Play the band between the station's lines"
       help={BAND_NOISE_HELP}
-      barred={hasBand ? null : NEEDS_BAND}
+      barred={!bandPlays ? NEEDS_BAND_ON : hasBand ? null : NEEDS_BAND}
       checked={bandNoise}
       onChange={setBandNoise}
     />
+    <BandOnCheck on={bandPlays} onChange={setBandPlays} />
     </SoundSection>
   );
 

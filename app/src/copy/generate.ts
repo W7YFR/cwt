@@ -15,6 +15,7 @@
  * Pure.
  */
 
+import type { AgcMode } from "@/audio/agc";
 import { fadeOf, NOISE_OFF_DB, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
 import { newQso } from "@/qso/cq";
@@ -162,6 +163,8 @@ export interface SendOptions {
   readonly qrn?: number;
   /** QRM, in dB under each station's peak. Absent: none. */
   readonly qrmDb?: number;
+  /** The receiver's AGC. Absent: off. */
+  readonly agc?: AgcMode;
   readonly rate?: number;
 }
 
@@ -221,6 +224,7 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
     qsbDb,
     seed: seedOf(script.stations[0]!.call || script.lines[0]!.text),
     qrmLines,
+    agc: options.agc ?? "off",
   });
   return {
     samples,

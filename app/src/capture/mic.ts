@@ -61,23 +61,23 @@ class BandGateProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.samples = null;
-    this.step = 1;
-    this.pos = 0;
+    this.rate = 0;
     this.level = 0;
     this.gain = 0;
     this.delay = 0;
     this.armed = false;
     this.hang = 0;
     this.floor = -1;
+    this.duck = null;
     this.port.onmessage = (ev) => {
       const m = ev.data;
       if (m.type === 'band') {
         this.samples = m.samples;
-        this.step = m.samples ? m.rate / sampleRate : 1;
-        this.pos = 0;
+        this.rate = m.rate;
       } else if (m.type === 'level') this.level = m.level;
       else if (m.type === 'delay') this.delay = m.sec;
       else if (m.type === 'arm') this.armed = m.armed;
+      else if (m.type === 'duck') this.duck = m.gain ? { gain: m.gain, step: m.step, at: m.at } : null;
     };
   }
   process(inputs, outputs) {
@@ -102,13 +102,22 @@ class BandGateProcessor extends AudioWorkletProcessor {
       if (this.gain < target) this.gain = Math.min(target, this.gain + rate * Math.max(this.level, 1e-6));
       else if (this.gain > target) this.gain = Math.max(target, this.gain - rate * Math.max(this.level, 1e-6));
       if (n === 0 || this.gain === 0) { out[i] = 0; } else {
-        const j = Math.floor(this.pos);
-        const f = this.pos - j;
+        // Where the band is follows the clock, so the page can tell, and
+        // a band mixed again plays on from there.
+        const pos = ((currentTime + i / sampleRate) * this.rate) % n;
+        const j = Math.floor(pos);
+        const f = pos - j;
         const a = band[j];
         const b = band[j + 1 < n ? j + 1 : 0];
         out[i] = (a + (b - a) * f) * this.gain;
       }
-      if (n > 0) { this.pos += this.step; if (this.pos >= n) this.pos -= n; }
+      // The AGC's gain as the station keys, from when it starts.
+      const d = this.duck;
+      if (d) {
+        const k = Math.floor((currentTime + i / sampleRate - d.at) / d.step);
+        if (k >= d.gain.length) this.duck = null;
+        else if (k >= 0) out[i] *= d.gain[k];
+      }
     }
     this.hang = Math.max(0, this.hang - out.length);
     return true;
@@ -270,6 +279,12 @@ export interface BandGate {
   /** Cut on keying only while armed: while the page listens for you, not
    *  while a station plays and the microphone may hear it. */
   arm(armed: boolean): void;
+  /** The AGC's gain as a station keys: a share at each step of `stepSec`,
+   *  from `atMs` on the performance clock. Null takes it off. */
+  duck(gain: Float32Array | null, stepSec: number, atMs: number): void;
+  /** Where the band is at `atMs` on the performance clock, in seconds into
+   *  its loop. */
+  bandAt(atMs: number): number;
 }
 
 export interface RecordOptions {
@@ -358,11 +373,24 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   const gate = new AudioWorkletNode(ctx, "cw-band-gate", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
   source.connect(gate);
   gate.connect(ctx.destination);
+  /** From the performance clock to this context's. */
+  const ctxAt = (atMs: number) => {
+    const ts = ctx.getOutputTimestamp?.();
+    return ts?.contextTime !== undefined && ts.performanceTime !== undefined
+      ? ts.contextTime + (atMs - ts.performanceTime) / 1000
+      : ctx.currentTime + (atMs - performance.now()) / 1000;
+  };
+  let bandSec = 0;
   const band: BandGate = {
-    set: (b) => gate.port.postMessage({ type: "band", samples: b?.samples ?? null, rate: b?.rate ?? 0 }),
+    set: (b) => {
+      bandSec = b ? b.samples.length / b.rate : 0;
+      gate.port.postMessage({ type: "band", samples: b?.samples ?? null, rate: b?.rate ?? 0 });
+    },
     level: (gain) => gate.port.postMessage({ type: "level", level: gain }),
     delay: (sec) => gate.port.postMessage({ type: "delay", sec }),
     arm: (armed) => gate.port.postMessage({ type: "arm", armed }),
+    duck: (gain, step, atMs) => gate.port.postMessage({ type: "duck", gain, step, at: ctxAt(atMs) }),
+    bandAt: (atMs) => (bandSec > 0 ? ctxAt(atMs) % bandSec : 0),
   };
 
   let chunks: Float32Array[] = [];

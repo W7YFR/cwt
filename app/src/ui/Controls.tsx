@@ -18,6 +18,7 @@ import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import type { RecordMode } from "./mode";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
+import type { AgcMode } from "@/audio/agc";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
 import { loadUser } from "@/io/storage";
 import { BREAK } from "@/morse";
@@ -39,6 +40,8 @@ import {
   RUN_SORT_HELP,
   GAIN_HELP,
   QSB_HELP,
+  BAND_ON_HELP,
+  AGC_HELP,
   NOISE_HELP,
   QRN_HELP,
   BREAK_IN_HELP,
@@ -1112,18 +1115,56 @@ export function ListeningLevel({
   );
 }
 
+/** QSB, noise, QRN and QRM on or off together, their settings kept. The
+ *  Copy page and the QSO page both draw this. */
+export function BandOnCheck({ on, onChange }: { on: boolean; onChange(on: boolean): void }): React.ReactElement {
+  return <Check id="band-on" label="Play QSB, noise, QRN and QRM" help={BAND_ON_HELP} checked={on} onChange={onChange} />;
+}
+
+/** The AGC's settings, each with what it does. */
+const AGCS: ReadonlyArray<{ value: AgcMode; label: string; note: string }> = [
+  { value: "off", label: "Off", note: "The band stays at one level." },
+  { value: "slow", label: "Slow", note: "The band comes back up slowly after a signal." },
+  { value: "fast", label: "Fast", note: "The band comes back up between characters." },
+];
+
+/** The receiver's AGC. The Copy page and the QSO page both draw this. */
+export function AgcChoice({
+  agc,
+  barred,
+  onChange,
+}: {
+  agc: AgcMode;
+  barred: string | null;
+  onChange(agc: AgcMode): void;
+}): React.ReactElement {
+  return (
+    <ChoiceGroup
+      id="agc"
+      label="AGC"
+      help={AGC_HELP}
+      value={agc}
+      options={AGCS}
+      barred={barred}
+      onChange={(v) => onChange(v as AgcMode)}
+    />
+  );
+}
+
 /** QSB: how deep a generated station fades. The Copy page and the QSO page
  *  both draw this. */
 export function QsbSlider({
   qsbDb,
+  barred = null,
   onChange,
 }: {
   qsbDb: number;
+  barred?: string | null;
   onChange(qsbDb: number): void;
 }): React.ReactElement {
-  const about = useHelp(QSB_HELP);
+  const about = useHelp(barredTitle(barred, QSB_HELP));
   return (
-    <div className="group">
+    <div className="group" data-disabled={barred !== null}>
       <label htmlFor="qsb" title={about.title}>
         QSB <output id="qsb-out">{qsbDb > 0 ? `${qsbDb} dB` : "Off"}</output>
       </label>
@@ -1134,6 +1175,7 @@ export function QsbSlider({
         max={QSB_MAX_DB}
         step={QSB_STEP_DB}
         value={qsbDb}
+        disabled={barred !== null}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       {about.tip}
@@ -1145,14 +1187,16 @@ export function QsbSlider({
  *  the QSO page both draw this. */
 export function NoiseSlider({
   noiseDb,
+  barred = null,
   onChange,
 }: {
   noiseDb: number;
+  barred?: string | null;
   onChange(noiseDb: number): void;
 }): React.ReactElement {
-  const about = useHelp(NOISE_HELP);
+  const about = useHelp(barredTitle(barred, NOISE_HELP));
   return (
-    <div className="group">
+    <div className="group" data-disabled={barred !== null}>
       <label htmlFor="noise" title={about.title}>
         Noise <output id="noise-out">{noiseOn(noiseDb) ? `${noiseDb} dB` : "Off"}</output>
       </label>
@@ -1163,6 +1207,7 @@ export function NoiseSlider({
         max={NOISE_MAX_DB}
         step={NOISE_STEP_DB}
         value={noiseDb}
+        disabled={barred !== null}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       {about.tip}
@@ -1172,10 +1217,18 @@ export function NoiseSlider({
 
 /** QRN: static crashes on a generated station. The Copy page and the QSO
  *  page both draw this. */
-export function QrnSlider({ qrn, onChange }: { qrn: number; onChange(qrn: number): void }): React.ReactElement {
-  const about = useHelp(QRN_HELP);
+export function QrnSlider({
+  qrn,
+  barred = null,
+  onChange,
+}: {
+  qrn: number;
+  barred?: string | null;
+  onChange(qrn: number): void;
+}): React.ReactElement {
+  const about = useHelp(barredTitle(barred, QRN_HELP));
   return (
-    <div className="group">
+    <div className="group" data-disabled={barred !== null}>
       <label htmlFor="qrn" title={about.title}>
         QRN <output id="qrn-out">{QRN_LEVELS[qrn] ?? QRN_LEVELS[0]}</output>
       </label>
@@ -1186,6 +1239,7 @@ export function QrnSlider({ qrn, onChange }: { qrn: number; onChange(qrn: number
         max={QRN_LEVELS.length - 1}
         step={1}
         value={qrn}
+        disabled={barred !== null}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       {about.tip}
@@ -1195,10 +1249,18 @@ export function QrnSlider({ qrn, onChange }: { qrn: number; onChange(qrn: number
 
 /** QRM: another station near a generated one. The Copy page and the QSO
  *  page both draw this. */
-export function QrmSlider({ qrmDb, onChange }: { qrmDb: number; onChange(qrmDb: number): void }): React.ReactElement {
-  const about = useHelp(QRM_HELP);
+export function QrmSlider({
+  qrmDb,
+  barred = null,
+  onChange,
+}: {
+  qrmDb: number;
+  barred?: string | null;
+  onChange(qrmDb: number): void;
+}): React.ReactElement {
+  const about = useHelp(barredTitle(barred, QRM_HELP));
   return (
-    <div className="group">
+    <div className="group" data-disabled={barred !== null}>
       <label htmlFor="qrm" title={about.title}>
         QRM <output id="qrm-out">{qrmOn(qrmDb) ? `${qrmDb} dB` : "Off"}</output>
       </label>
@@ -1209,6 +1271,7 @@ export function QrmSlider({ qrmDb, onChange }: { qrmDb: number; onChange(qrmDb: 
         max={QRM_MAX_DB}
         step={QRM_STEP_DB}
         value={qrmDb}
+        disabled={barred !== null}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       {about.tip}

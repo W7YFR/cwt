@@ -7,6 +7,22 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.33.0 — 2026-11-21
+
+### Added
+
+- **Play QSB, noise, QRN and QRM** turns all four off and on at once, on the Copy and QSO pages. Their settings stay as they were.
+- **AGC** turns the band down under a strong signal and brings it back up after, as a radio's AGC does. **Fast** brings it back between characters, **Slow** more slowly, and **Off** leaves the band at one level.
+
+### Changed
+
+- **Noise** and **QRN** sound as through a receiver's CW filter. The noise is a narrow band on the pitch, with no hiss above it, and static crashes ring at the pitch.
+- **QRM** plays closer to the station's pitch, inside the CW filter. Now and then it is FT8, strong or weak, as well as another CW QSO.
+
+### Fixed
+
+- On the QSO page, moving **Noise** or **QRM** in a session no longer starts the band over. It changes level as the slider moves.
+
 ## v1.32.0 — 2026-11-15
 
 ### Added

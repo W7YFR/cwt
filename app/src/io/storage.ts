@@ -596,6 +596,12 @@ export interface Prefs {
   /** QRM on the Copy and QSO pages, in dB under the station's peak. Absent
    *  or at `QRM_OFF_DB`: none. */
   qrmDb?: number;
+  /** QSB, noise, QRN and QRM play on the Copy and QSO pages, at their
+   *  settings. False plays a clean signal and keeps the settings. Absent:
+   *  they play. */
+  bandOn?: boolean;
+  /** The receiver's AGC on the Copy and QSO pages. Absent: fast. */
+  agc?: "off" | "slow" | "fast";
 }
 
 /** A drill the user wrote. The text is stored as `normalizeDrill` leaves it,
@@ -816,6 +822,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   noiseDb: isNum,
   qrn: isNum,
   qrmDb: isNum,
+  bandOn: isBool,
+  agc: oneOf("off", "slow", "fast"),
 };
 
 export function loadPrefs(): Prefs {

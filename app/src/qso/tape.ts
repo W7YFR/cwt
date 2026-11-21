@@ -15,9 +15,10 @@
  * Pure. The page plays it and saves it.
  */
 
-import { fadeOf, seedOf } from "@/audio/qsb";
+import type { AgcMode } from "@/audio/agc";
+import { fadeOf, NOISE_OFF_DB, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
-import { addBand, bandOn, type QrmLine } from "@/copy/band";
+import { addBand, bandOn, QRM_OFF_DB, type QrmLine } from "@/copy/band";
 import { targetTiming } from "@/timing";
 import type { Speed } from "./speed";
 
@@ -138,6 +139,8 @@ export interface Added {
   readonly qrmDb: number;
   readonly seed: number;
   readonly qrmLines: (rand: () => number) => readonly QrmLine[];
+  /** The receiver's AGC. Absent: off. */
+  readonly agc?: AgcMode;
 }
 
 /** The whole QSO, one line after another, at `rate`. With `added`, as heard. */
@@ -198,3 +201,21 @@ export function bandLevel(n: number, spans: readonly [number, number][], rate: n
 export function anyAdded(a: Pick<Added, "qsbDb" | "noiseDb" | "qrn" | "qrmDb">): boolean {
   return a.qsbDb > 0 || bandOn(a);
 }
+
+/** What is added to a QSO, with nothing added. */
+export const CLEAN: Pick<Added, "qsbDb" | "noiseDb" | "qrn" | "qrmDb"> = {
+  qsbDb: 0,
+  noiseDb: NOISE_OFF_DB,
+  qrn: 0,
+  qrmDb: QRM_OFF_DB,
+};
+
+/** What is added to a QSO as it plays: `set` at its settings, or nothing
+ *  when **Play QSB, noise, QRN and QRM** is off. */
+export function asPlayed(
+  set: Pick<Added, "qsbDb" | "noiseDb" | "qrn" | "qrmDb">,
+  on: boolean,
+): Pick<Added, "qsbDb" | "noiseDb" | "qrn" | "qrmDb"> {
+  return on ? set : CLEAN;
+}
+
