@@ -38,6 +38,7 @@ import { REPLIES_EVENT, suggestedRepliesOn } from "@/devtools";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
+import { whenNext, type NextCall, type NextCaller } from "@/qso/caller";
 import { fromTop, isScript, newScript, openScript, scriptReport, stationFirst, type ScriptQso } from "@/qso/script";
 import { hint, meOf, seededVoice, THEIR_CALL, THEIR_NAME } from "@/qso/hint";
 import { exchangeReport, itemLabels } from "@/qso/report";
@@ -154,10 +155,6 @@ function isSending(text: string): boolean {
   const chars = text.replace(/\s+/g, "");
   return chars.length >= 2 || (chars.length === 1 && chars !== "E" && chars !== "T");
 }
-
-/** How long, in seconds, the next station in a run waits for you before it
- *  calls. */
-const NEXT_CALL_SEC = [2, 4] as const;
 
 /** How near the end of the log counts as at the end, in pixels: it keeps
  *  following new lines from there. */
@@ -321,6 +318,15 @@ const KINDS: ReadonlyArray<Option<GuideId>> = [
   { value: "mst", label: "MST", note: "A medium-speed contest: your name and a serial number." },
   { value: "cwt", label: "CWT", note: "A fast contest: your name and CWops number, or your state." },
 ];
+const NEXT_CALLERS: ReadonlyArray<Option<NextCaller>> = [
+  { value: "immediate", label: "Immediate", note: "A few seconds after your TU, every time." },
+  { value: "varied", label: "Varied", note: "At once or after a longer wait, changing from one station to the next." },
+  { value: "uncertain", label: "Uncertain", note: "As Varied, and now and then nobody calls until you call CQ again." },
+];
+const NEXT_CALLER_HELP =
+  "In a contest or POTA QSO, how soon the next station calls after your TU. Immediate waits a " +
+  "few seconds. Varied calls at once or after a longer wait, changing from one station to the " +
+  "next. Uncertain does the same, and now and then nobody calls until you call CQ again.";
 const KIND_HELP =
   "The kind of QSO the suggested reply calls CQ for, and the one the guide's Examples show. " +
   "A CQ that starts another kind changes it.";
@@ -630,6 +636,11 @@ export function QsoScreen({
     setHintsRaw(next);
     savePrefs({ ...loadPrefs(), qsoHints: next });
   };
+  const [nextCaller, setNextCallerRaw] = useState<NextCaller>(() => loadPrefs().qsoNextCall ?? "immediate");
+  const setNextCaller = (next: NextCaller) => {
+    setNextCallerRaw(next);
+    savePrefs({ ...loadPrefs(), qsoNextCall: next });
+  };
   const [yourText, setYourTextRaw] = useState<YourText>(() => loadPrefs().qsoYourText ?? "sent");
   const setYourText = (next: YourText) => {
     setYourTextRaw(next);
@@ -891,6 +902,9 @@ export function QsoScreen({
 
   /** The next station in a run, about to call. */
   const nextCall = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** How long the wait between QSOs in a run is, and whether a station
+   *  calls at its end. Drawn once for each wait. */
+  const nextWait = useRef<NextCall | null>(null);
   const quiet = useCallback(() => {
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
@@ -1086,7 +1100,7 @@ export function QsoScreen({
 
   /** QSO `n` of a run is over. Its copy is graded now, or when you start
    *  your next over if there is copy to finish. You go on sending, and the
-   *  next station calls in a few seconds unless you send first: once your
+   *  next station calls after its wait unless you send first: once your
    *  copy is locked, with copy to finish. */
   const endInRun = (n: number) => {
     if (copyIn(n)) setFinished(n);
@@ -1094,13 +1108,14 @@ export function QsoScreen({
     setNote(copyDue(n) ? "Finish your copy." : "");
     recorder?.restart();
     setPhase("listening");
+    nextWait.current = whenNext(nextCaller, Math.random);
     waitForNext();
   };
 
-  /** In a run between QSOs, the next station calls in a few seconds unless
-   *  you send first. */
+  /** In a run between QSOs, the next station calls after its wait unless
+   *  you send first, or nobody does. */
   const waitForNext = () => {
-    const [lo, hi] = NEXT_CALL_SEC;
+    const wait = (nextWait.current ??= whenNext(nextCaller, Math.random));
     if (nextCall.current !== null) clearTimeout(nextCall.current);
     nextCall.current = null;
     // Not until your copy of the station's last line is locked. Locking it
@@ -1111,7 +1126,7 @@ export function QsoScreen({
         nextCall.current = null;
         callNext.current();
       },
-      (lo + Math.random() * (hi - lo)) * 1000,
+      wait.sec * 1000,
     );
   };
 
@@ -1123,6 +1138,12 @@ export function QsoScreen({
     if (isSending(copy.text)) return;
     // Nobody calls until a station has heard your call.
     if (!now.you) return;
+    // Nobody calls this time: you call CQ again.
+    if (nextWait.current?.calls === false) {
+      setNote("No answer. Call CQ again.");
+      return;
+    }
+    nextWait.current = null;
     const turn = callIn(now);
     qso.current = turn.qso;
     // The QSO before is done with: its copy is graded, and its report shows.
@@ -1132,7 +1153,7 @@ export function QsoScreen({
   };
 
   /* Your copy of the station's last line is locked or graded, between QSOs
-     in a run: the next station calls in a few seconds. Opened again to edit,
+     in a run: the next station calls after its wait. Opened again to edit,
      it waits again. */
   const due = finished !== null && copyDue(finished);
   useEffect(() => {
@@ -1660,7 +1681,7 @@ export function QsoScreen({
     void listen.playBuffer(encodeWavBuffer(clip.samples, clip.rate), span?.[0], span?.[1]);
   };
   /* The line has played: in a session, your turn starts over, clear of it.
-     In a run between QSOs, the next station waits a few seconds more. */
+     In a run between QSOs, the wait for the next station starts over. */
   replayEnded.current = () => {
     if (!recorder || phase !== "replaying") return;
     recorder.restart();
@@ -2802,6 +2823,14 @@ export function QsoScreen({
                 <div className="panelgroups">
                   {lengthChoice}
                   {theirTextChoice}
+                  <ChoiceGroup
+                    id="qso-next-caller"
+                    label="When the next station calls"
+                    help={NEXT_CALLER_HELP}
+                    value={nextCaller}
+                    options={NEXT_CALLERS}
+                    onChange={(v) => setNextCaller(v as NextCaller)}
+                  />
                   <Check
                     id="qso-blur-call"
                     label="Hide the station's call until I copy it"

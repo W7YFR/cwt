@@ -3,12 +3,28 @@
  */
 
 import { act } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { $, $$, callIn, click, ended, fill, key, mount, open, press, send, state, theirs, unmount, until, useQsoRig, wait, yourTurn } from "../qso-rig";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { $, $$, callIn, click, ended, fill, key, mount, note, open, press, send, settingsTab, state, theirs, unmount, until, useQsoRig, wait, yourTurn } from "../qso-rig";
 import { heard } from "../qso-fakes";
+import { loadPrefs } from "@/io/storage";
+import type { NextCall, NextCaller } from "@/qso/caller";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
+
+/** The waits for the next station: each setting asked for, and a draw to
+ *  give in place of the real one, when set. */
+const nextCalls = vi.hoisted(() => ({ asked: [] as NextCaller[], give: null as NextCall | null }));
+vi.mock("@/qso/caller", async (real) => {
+  const actual = await real<typeof import("@/qso/caller")>();
+  return {
+    ...actual,
+    whenNext: (when: NextCaller, rand: () => number) => {
+      nextCalls.asked.push(when);
+      return nextCalls.give ?? actual.whenNext(when, rand);
+    },
+  };
+});
 
 useQsoRig();
 
@@ -84,6 +100,69 @@ describe("a run after a reload", () => {
     await send(`${next.them.call} BOB 1234`);
     expect(theirs().length).toBeGreaterThan(n);
     expect(JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso.stage).toBe("exchanged");
+  });
+});
+
+describe("when the next station calls", () => {
+  beforeEach(() => {
+    nextCalls.asked = [];
+    nextCalls.give = null;
+  });
+
+  /** A CWT QSO worked to your TU. */
+  async function workOne(): Promise<number> {
+    const call = callIn(await send("CQ CWT W7YFR"));
+    await send(`${call} BOB 1234`);
+    const before = theirs().length;
+    await key("TU W7YFR");
+    return before;
+  }
+
+  it("is Immediate with no setting", async () => {
+    await open({ qsoTheirText: "before" });
+    const before = await workOne();
+    await until("the next station", () => theirs().length > before);
+    expect(nextCalls.asked).toEqual(["immediate"]);
+  });
+
+  it("Varied: the next station still calls on its own", async () => {
+    await open({ qsoTheirText: "before", qsoNextCall: "varied" });
+    const before = await workOne();
+    await until("the next station", () => theirs().length > before);
+    expect(nextCalls.asked).toEqual(["varied"]);
+  });
+
+  it("Uncertain: when nobody calls, your CQ brings the next station", async () => {
+    await open({ qsoTheirText: "before", qsoNextCall: "uncertain" });
+    nextCalls.give = { sec: 10, calls: false };
+    const before = await workOne();
+    // A second at a time, so the page renders between its timers.
+    for (let s = 0; s < 20; s++) await wait(1000);
+    expect(nextCalls.asked).toEqual(["uncertain"]);
+    expect(theirs(), "nobody calls").toHaveLength(before);
+    expect(note(), "the page says to call CQ again").not.toBe("");
+    expect(ended(), "the session goes on").toBe(false);
+    expect(tally()?.dataset.made).toBe("1");
+
+    nextCalls.give = null;
+    await send("CQ CWT W7YFR");
+    expect(theirs()).toHaveLength(before + 1);
+    expect(note()).toBe("");
+    expect(JSON.parse(localStorage.getItem("cwt:qso") ?? "{}").qso.stage).toBe("called");
+  });
+
+  it("is chosen in Settings, saved, and still chosen after a reload", async () => {
+    mount({});
+    await settingsTab("page");
+    const buttons = () => $$<HTMLButtonElement>('[data-testid="qso-next-caller"] button');
+    expect(buttons().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+    await click(buttons()[2]!);
+    expect(loadPrefs().qsoNextCall).toBe("uncertain");
+
+    unmount();
+    act(() => mount({ ...loadPrefs() }));
+    await settingsTab("page");
+    expect(buttons().map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "false", "true"]);
   });
 });
 
