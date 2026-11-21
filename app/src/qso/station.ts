@@ -33,8 +33,10 @@ export interface Station {
   readonly rig?: string;
   readonly antenna?: string;
   readonly power?: string;
-  /** A friend's typical speed, in words per minute: the speed they call at. */
+  /** A friend's typical speeds, in words per minute, character and
+   *  overall: the speeds they call at. */
   readonly wpm?: number;
+  readonly farnsworthWpm?: number;
 }
 
 /** What a station takes from a friend: their details from Settings. */
@@ -48,8 +50,9 @@ export interface FriendInfo {
   readonly rigModel: string;
   readonly rigPower: string;
   readonly antenna: string;
-  /** Their typical speed, in words per minute. */
+  /** Their typical speeds, in words per minute: character and overall. */
   readonly wpm: number;
+  readonly farnsworthWpm: number;
 }
 
 /** The state or province at the end of `qth`: OR, from SALEM OR. */
@@ -325,7 +328,7 @@ export function friendCalls(
 }
 
 /** `station` as your friend: their call, name and QTH, their CWops number or
- *  none, their rig, and their speed. What they left out stays `station`'s. A QTH with no
+ *  none, their rig, and their speeds. What they left out stays `station`'s. A QTH with no
  *  state or province the exchange knows stays `station`'s too. */
 export function asFriend(station: Station, f: FriendInfo): Station {
   const region = f.qthRegionShort.trim();
@@ -340,6 +343,7 @@ export function asFriend(station: Station, f: FriendInfo): Station {
     nr: f.cwopsNumber.trim(),
     friend: true,
     wpm: f.wpm,
+    farnsworthWpm: Math.min(f.farnsworthWpm, f.wpm),
     ...(rig ? { rig } : {}),
     ...(f.antenna.trim() ? { antenna: f.antenna.trim() } : {}),
     ...(f.rigPower.trim() ? { power: f.rigPower.trim() } : {}),

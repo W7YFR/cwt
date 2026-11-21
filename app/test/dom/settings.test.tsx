@@ -357,8 +357,8 @@ describe("the drills section", () => {
 
 describe("the friends section", () => {
   const settle = () => act(async () => {});
-  const BOB = { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", qthCity: "BEND", qthRegionShort: "OR", wpm: 28 };
-  const ANN = { ...EMPTY_USER, id: "friend/b", name: "ANN", callsign: "VE7XYZ", wpm: 18 };
+  const BOB = { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", qthCity: "BEND", qthRegionShort: "OR", wpm: 28, farnsworthWpm: 28 };
+  const ANN = { ...EMPTY_USER, id: "friend/b", name: "ANN", callsign: "VE7XYZ", wpm: 18, farnsworthWpm: 12 };
   const rows = () => screen.queryAllByTestId("friendrow").map((r) => r.getAttribute("data-id"));
   const save = () => screen.getByTestId("save-friend") as HTMLButtonElement;
 
@@ -378,15 +378,21 @@ describe("the friends section", () => {
     await user.type(screen.getByLabelText("Callsign"), "n4qq");
     expect(save().disabled).toBe(true);
     await user.type(screen.getByLabelText("Name"), "jim");
-    // Their speed starts at the default, and the slider sets it.
+    // Their speeds start at the default, and the sliders set them. Overall
+    // follows character speed down, never above it.
     const wpm = document.getElementById("friend-wpm") as HTMLInputElement;
-    expect(Number(wpm.value)).toBe(FRIEND_WPM);
+    const farns = document.getElementById("friend-farns") as HTMLInputElement;
+    expect([Number(wpm.value), Number(farns.value)]).toEqual([FRIEND_WPM, FRIEND_WPM]);
+    fireEvent.change(farns, { target: { value: "20" } });
+    fireEvent.change(wpm, { target: { value: "18" } });
+    expect(Number(farns.value)).toBe(18);
     fireEvent.change(wpm, { target: { value: "32" } });
+    fireEvent.change(farns, { target: { value: "24" } });
     // Enter in a field saves, as the button does.
     await user.type(screen.getByLabelText("CWops number"), "12x3{Enter}");
     const friends = loadFriends();
     expect(friends.map((f) => f.callsign)).toEqual(["K7ABC", "N4QQ"]);
-    expect(friends[1]).toMatchObject({ name: "JIM", cwopsNumber: "123", wpm: 32 });
+    expect(friends[1]).toMatchObject({ name: "JIM", cwopsNumber: "123", wpm: 32, farnsworthWpm: 24 });
     expect(screen.queryByTestId("friend-form")).toBeNull();
     expect(rows()).toEqual(["friend/a", friends[1]!.id]);
   });
@@ -452,7 +458,12 @@ describe("the friends section", () => {
   it("reads saved friends back in upper case, and drops ones that are not the right shape", () => {
     localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "bob", callsign: "k7abc" }] }));
     // Saved before friends had a speed: the default.
-    expect(loadFriends()).toEqual([{ ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: FRIEND_WPM }]);
+    expect(loadFriends()).toEqual([
+      { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM },
+    ]);
+    // Saved before friends had an overall speed: their own speed.
+    localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: 30 }] }));
+    expect(loadFriends()[0]).toMatchObject({ wpm: 30, farnsworthWpm: 30 });
     localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ name: "BOB" }] }));
     expect(loadFriends()).toEqual([]);
   });

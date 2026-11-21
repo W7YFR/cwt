@@ -229,8 +229,8 @@ describe("a caller in a run", () => {
 
 describe("friends", () => {
   const NONE = { cwopsNumber: "", qthCity: "", qthRegionShort: "", rigManufacturer: "", rigModel: "", rigPower: "", antenna: "" };
-  const BOB: FriendInfo = { ...NONE, callsign: "K7ABC", name: "BOB", qthCity: "BEND", qthRegionShort: "OR", rigModel: "IC 7300", antenna: "DIPOLE", wpm: 18 };
-  const ANN: FriendInfo = { ...NONE, callsign: "VE7XYZ", name: "ANN", cwopsNumber: "3121", wpm: 34 };
+  const BOB: FriendInfo = { ...NONE, callsign: "K7ABC", name: "BOB", qthCity: "BEND", qthRegionShort: "OR", rigModel: "IC 7300", antenna: "DIPOLE", wpm: 18, farnsworthWpm: 18 };
+  const ANN: FriendInfo = { ...NONE, callsign: "VE7XYZ", name: "ANN", cwopsNumber: "3121", wpm: 34, farnsworthWpm: 30 };
   const base = randomCaller(seeded(5));
 
   it("send their own details, and keep the station's where they left one out", () => {
@@ -279,8 +279,10 @@ describe("friends", () => {
   it("call at their own speed, in a run and in a standard QSO", () => {
     const always = () => 0;
     expect(newRun("cwt", always, 0, "", "", [], [BOB]).speed).toEqual({ charWpm: 18, farnsworthWpm: 18 });
-    expect(newRun("sst", always, 0, "", "", [], [ANN]).speed).toEqual({ charWpm: 34, farnsworthWpm: 34 });
-    expect(newQso(always, "", { charWpm: 25, farnsworthWpm: 20 }, [ANN]).speed).toEqual({ charWpm: 34, farnsworthWpm: 34 });
+    expect(newRun("sst", always, 0, "", "", [], [ANN]).speed).toEqual({ charWpm: 34, farnsworthWpm: 30 });
+    expect(newQso(always, "", { charWpm: 25, farnsworthWpm: 20 }, [ANN]).speed).toEqual({ charWpm: 34, farnsworthWpm: 30 });
+    // Never an overall speed above their character speed.
+    expect(newQso(always, "", undefined, [{ ...ANN, farnsworthWpm: 40 }]).speed).toEqual({ charWpm: 34, farnsworthWpm: 34 });
     // Any other station answers your CQ at your speed.
     expect(newQso(always, "", { charWpm: 25, farnsworthWpm: 20 }).speed).toEqual({ charWpm: 25, farnsworthWpm: 20 });
     // On the Copy page too, the first time the friend calls.

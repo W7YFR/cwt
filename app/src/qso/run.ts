@@ -141,8 +141,7 @@ export function newRun(
   const caller = randomCaller(rand, not, FORMATS[format].canada, recent);
   const them = calls ? asFriend(caller, calls.friend) : caller;
   const [lo, hi] = wpmOf(format, them);
-  // A friend calls at their own speed.
-  const wpm = them.wpm ?? lo + Math.floor(at * (hi - lo + 1));
+  const wpm = lo + Math.floor(at * (hi - lo + 1));
   return {
     format,
     stage: "waiting",
@@ -150,7 +149,8 @@ export function newRun(
     you,
     yourName: "",
     last: "",
-    speed: { charWpm: wpm, farnsworthWpm: wpm },
+    // A friend calls at their own speeds.
+    speed: them.wpm ? { charWpm: them.wpm, farnsworthWpm: them.farnsworthWpm ?? them.wpm } : { charWpm: wpm, farnsworthWpm: wpm },
     search: NO_SEARCH,
     made,
     recent,

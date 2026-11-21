@@ -665,8 +665,9 @@ export function saveUser(user: UserInfo): void {
  *  speed they send at. */
 export interface Friend extends UserInfo {
   id: string;
-  /** Their typical speed, in words per minute. */
+  /** Their typical speeds, in words per minute: character and overall. */
   wpm: number;
+  farnsworthWpm: number;
 }
 
 /** A friend's speed before one is set, and for a friend saved without one. */
@@ -674,7 +675,10 @@ export const FRIEND_WPM = 25;
 
 export function loadFriends(): Friend[] {
   return (loadPrefs().friends ?? []).map((saved) => {
-    const out: Friend = { ...EMPTY_USER, id: String(saved.id), wpm: saved.wpm ?? FRIEND_WPM };
+    const wpm = saved.wpm ?? FRIEND_WPM;
+    // Saved before friends had an overall speed: none slower than their own.
+    const farnsworthWpm = Math.min(saved.farnsworthWpm ?? wpm, wpm);
+    const out: Friend = { ...EMPTY_USER, id: String(saved.id), wpm, farnsworthWpm };
     for (const k of Object.keys(EMPTY_USER) as (keyof UserInfo)[]) out[k] = (saved[k] ?? "").toUpperCase();
     return out;
   });
@@ -754,7 +758,8 @@ const isFriends: Check = (v) =>
   Array.isArray(v) &&
   v.every((f: unknown) => {
     const r = f as Record<string, unknown>;
-    return isUser(f) && isStr(r.id) && (r.wpm === undefined || isNum(r.wpm));
+    const speed = (v: unknown) => v === undefined || isNum(v);
+    return isUser(f) && isStr(r.id) && speed(r.wpm) && speed(r.farnsworthWpm);
   });
 
 const isCustomDrills: Check = (v) =>

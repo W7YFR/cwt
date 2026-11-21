@@ -42,8 +42,8 @@ import {
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
-import { SPEED_MAX, SPEED_MIN } from "./Controls";
-import { fmtWpm } from "./format";
+import { SpeedSliders } from "./Controls";
+import { fmtSpeed } from "./format";
 import {
   SLOT_NAMES,
   SlotMenu,
@@ -370,7 +370,7 @@ function UserFields({
 const friendId = () => `friend/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** A friend before anything is typed. */
-const NEW_FRIEND: Omit<Friend, "id"> = { ...EMPTY_USER, wpm: FRIEND_WPM };
+const NEW_FRIEND: Omit<Friend, "id"> = { ...EMPTY_USER, wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM };
 
 /** A friend's details after their call and name, on one line. */
 export function friendSummary(f: Omit<Friend, "id">): string {
@@ -380,7 +380,7 @@ export function friendSummary(f: Omit<Friend, "id">): string {
     .join(", ");
   return [
     qth,
-    fmtWpm(f.wpm),
+    fmtSpeed({ charWpm: f.wpm, farnsworthWpm: f.farnsworthWpm }),
     f.cwopsNumber && `CWops ${f.cwopsNumber}`,
     rig,
     f.antenna,
@@ -439,20 +439,19 @@ function FriendSection(): React.ReactElement {
         }}
       >
         <UserFields prefix="friend" user={draft} set={change} />
-        <div className="group">
-          <label htmlFor="friend-wpm">
-            Typical speed <output id="friend-wpm-out">{fmtWpm(draft.wpm)}</output>
-          </label>
-          <input
-            type="range"
-            id="friend-wpm"
-            min={SPEED_MIN}
-            max={SPEED_MAX}
-            step={1}
-            value={draft.wpm}
-            onChange={(e) => change({ wpm: Number(e.target.value) })}
+        <fieldset className="usergroup">
+          <legend>Typical speed</legend>
+          <SpeedSliders
+            idPrefix="friend-"
+            charWpm={draft.wpm}
+            farnsworthWpm={draft.farnsworthWpm}
+            onChange={(patch) => {
+              // Overall is never faster than character speed, as for yours.
+              const wpm = patch.charWpm ?? draft.wpm;
+              change({ wpm, farnsworthWpm: Math.min(patch.farnsworthWpm ?? draft.farnsworthWpm, wpm) });
+            }}
           />
-        </div>
+        </fieldset>
         <div className="drillsave">
           <button type="submit" data-testid="save-friend" disabled={!canSave}>
             {editing === "new" ? "Save friend" : "Save changes"}

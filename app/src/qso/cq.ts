@@ -227,12 +227,12 @@ export const DEFAULT_SPEED: Speed = { charWpm: 25, farnsworthWpm: 25 };
 
 /** A new QSO with a new station, never at the call `not`, sending at
  *  `speed`: your speed. Now and then the station is one of `friends`, who
- *  have not called yet this session, and who sends at their own speed. */
+ *  have not called yet this session, and who sends at their own speeds. */
 export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED, friends: readonly FriendInfo[] = []): Qso {
   const calls = friendCalls(rand, friends, not);
   const station = randomStation(rand, not);
   const them = calls ? asFriend(station, calls.friend) : station;
-  if (them.wpm) speed = { charWpm: them.wpm, farnsworthWpm: them.wpm };
+  if (them.wpm) speed = { charWpm: them.wpm, farnsworthWpm: them.farnsworthWpm ?? them.wpm };
   return {
     stage: "cq",
     them,

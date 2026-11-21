@@ -117,12 +117,15 @@ export function SpeedSliders({
   farnsworthWpm,
   onChange,
   locked = false,
+  idPrefix = "",
 }: {
   charWpm: number;
   farnsworthWpm: number;
   onChange(patch: { charWpm?: number; farnsworthWpm?: number }): void;
   /** Shown, but not to be changed. */
   locked?: boolean;
+  /** Before each id, for a pair that is not your own speed: a friend's. */
+  idPrefix?: string;
 }): React.ReactElement {
   // Behind a question mark in the settings panels. The control row has
   // never had a tooltip on these, so it gets none.
@@ -131,12 +134,12 @@ export function SpeedSliders({
   return (
     <>
       <div className="group" inert={locked} data-locked={locked}>
-        <label htmlFor="wpm">
-          Character speed <output id="wpm-out">{fmtWpm(charWpm)}</output>
+        <label htmlFor={`${idPrefix}wpm`}>
+          Character speed <output id={`${idPrefix}wpm-out`}>{fmtWpm(charWpm)}</output>
         </label>
         <input
           type="range"
-          id="wpm"
+          id={`${idPrefix}wpm`}
           min={SPEED_MIN}
           max={SPEED_MAX}
           step={1}
@@ -147,12 +150,12 @@ export function SpeedSliders({
       </div>
 
       <div className="group" inert={locked} data-locked={locked}>
-        <label htmlFor="farns">
-          Overall (Farnsworth) <output id="farns-out">{fmtWpm(farnsworthWpm)}</output>
+        <label htmlFor={`${idPrefix}farns`}>
+          Overall (Farnsworth) <output id={`${idPrefix}farns-out`}>{fmtWpm(farnsworthWpm)}</output>
         </label>
         <input
           type="range"
-          id="farns"
+          id={`${idPrefix}farns`}
           min={SPEED_MIN}
           /* Overall speed cannot exceed character speed, so the slider's
              ceiling follows the other one rather than letting the pair go
