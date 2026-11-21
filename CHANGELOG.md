@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.34.0 — 2026-11-21
+
 ### Added
 
 - **Friends** in Settings holds stations you know, with the details of **You** and a typical character and overall speed. Now and then a friend calls on the Copy and QSO pages at those speeds, at most once a session, greets you, and may close with shave and a haircut.
