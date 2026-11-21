@@ -21,7 +21,7 @@ describe("the band's settings", () => {
   it("are in the Audio settings, off to start, and kept", async () => {
     mount({});
     await settingsTab("sound");
-    for (const id of ["qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) {
+    for (const id of ["band-on", "qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) {
       expect(input(id).closest('[data-panel="audio"]'), id).not.toBeNull();
     }
     expect(input("qsb").value).toBe("0");
@@ -52,6 +52,38 @@ describe("the band's settings", () => {
     await slide("qrn", 2);
     await slide("qrm", -20);
     expect(loadPrefs()).toMatchObject({ qsbDb: 12, qrn: 2, qrmDb: -20 });
+  });
+});
+
+describe("the band switched off", () => {
+  it("plays nothing added, keeps the sliders' settings, and plays them again when switched on", async () => {
+    await open({ qsbDb: 12, noiseDb: -26, qrn: 2, qrmDb: -20 });
+    await until("the band", () => heard.gate.band !== null);
+    const first = heard.gate.band!.samples;
+    await settingsTab("sound");
+    await click(input("band-on"));
+    expect(loadPrefs()).toMatchObject({ bandOn: false, qsbDb: 12, noiseDb: -26, qrn: 2, qrmDb: -20 });
+    expect(heard.gate.band).toBeNull();
+    for (const id of ["qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) expect(input(id).disabled, id).toBe(true);
+    expect(input("noise").value).toBe("-26");
+
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const air = heard.airs.at(-1);
+    expect(air?.fade).toBeUndefined();
+    expect(air?.band).toBeUndefined();
+
+    // At once, the same band: its parts were kept while it was off.
+    await click(input("band-on"));
+    expect(loadPrefs().bandOn).toBe(true);
+    expect(heard.gate.band!.samples).toEqual(first);
+    for (const id of ["qsb", "noise", "qrn", "qrm"]) expect(input(id).disabled, id).toBe(false);
+  });
+
+  it("starts off when it was left off", async () => {
+    await open({ noiseDb: -26, bandOn: false });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    expect(heard.gate.band).toBeNull();
+    expect(heard.airs.at(-1)?.band).toBeUndefined();
   });
 });
 

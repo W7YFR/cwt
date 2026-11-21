@@ -146,6 +146,10 @@ export const QSB_HELP =
   "How deep the station's signal fades, as it does over the air. With noise on, a deep fade " +
   "drops the signal into the noise. Off sends a steady signal.";
 
+export const BAND_ON_HELP =
+  "Turn QSB, noise, QRN and QRM on and off together. Off sends a clean signal, and keeps " +
+  "their settings for when you turn them on again.";
+
 export const NOISE_HELP =
   "How loud the band noise is, under the station's signal. Off sends a clean signal.";
 
@@ -257,6 +261,7 @@ export const NEEDS_THEIR_LINES_COPY = "Needs The station's lines show = Copy.";
 export const NEEDS_SLOTS = "Needs Copy in = Slots.";
 export const NOT_WITH_EXCHANGE = "Not with The station's lines show = Exchange.";
 export const NEEDS_BAND_BETWEEN = "Needs Play the band.";
+export const NEEDS_BAND_ON = "Needs Play QSB, noise, QRN and QRM.";
 
 export const LOOP_HELP =
   "Replay what plays, the range or the whole track, each time it reaches " +

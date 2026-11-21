@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Play QSB, noise, QRN and QRM** turns all four off and on at once, on the Copy and QSO pages. Their settings stay as they were.
+
 ### Changed
 
 - **Noise** and **QRN** sound as through a receiver's CW filter. The noise is a narrow band on the pitch, with no hiss above it, and static crashes ring at the pitch.

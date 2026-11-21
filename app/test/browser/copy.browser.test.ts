@@ -631,6 +631,37 @@ describe("a generated QSO", () => {
     expect(aired.some((b, i) => b !== clean[i])).toBe(true);
   });
 
+  it("is sent clean with the band switched off, and through it again when switched on, its settings kept", async () => {
+    const band = { qsbDb: 12, noiseDb: -20, qrn: 2, qrmDb: -20 };
+    await makeUp({ copyKind: "cwt", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40, ...band });
+    /** The longest run of silent samples in what played last. */
+    const silence = () => {
+      const pcm = new Int16Array((globalThis as { played?: ArrayBuffer }).played!.slice(44));
+      let run = 0;
+      let most = 0;
+      for (const v of pcm) most = Math.max(most, (run = v === 0 ? run + 1 : 0));
+      return most;
+    };
+    await playTo(1);
+    expect(silence()).toBeLessThan(100);
+    await settingsTab("sound");
+    const on = $<HTMLInputElement>("#band-on")!;
+    expect(on.checked).toBe(true);
+    await click(on);
+    expect(loadPrefs()).toMatchObject({ bandOn: false, ...band });
+    for (const id of ["qsb", "noise", "qrn", "qrm"]) expect($<HTMLInputElement>(`#${id}`)!.disabled, id).toBe(true);
+    // Sent again at once: a click has no slider to wait for.
+    await wait(100);
+    await playTo(2);
+    expect(silence()).toBeGreaterThan(1000);
+    await click(on);
+    expect(loadPrefs().bandOn).toBe(true);
+    for (const id of ["qsb", "noise", "qrn", "qrm"]) expect($<HTMLInputElement>(`#${id}`)!.disabled, id).toBe(false);
+    await wait(100);
+    await playTo(3);
+    expect(silence()).toBeLessThan(100);
+  });
+
   it("shows the speed it is sent at, and follows the sliders", async () => {
     await makeUp({ copyKind: "pota", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 30, copyFarnsworthWpm: 30 });
     const shown = () => $('[data-testid="copy-sent-speed"]')?.textContent;
