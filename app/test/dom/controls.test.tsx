@@ -10,14 +10,17 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import {
   Controls,
+  KeyStyleGroup,
   MicrophoneSection,
   SendSettings,
   SendSound,
   SettingsForm,
   SpeedSliders,
   ToleranceSlider,
+  useKeyStyle,
   ViewControls,
 } from "@/ui/Controls";
+import { loadPrefs, savePrefs } from "@/io/storage";
 import { defaultSettings, TIMES_MAX, TIMES_MIN } from "@/timing";
 import { PACE_LEAD_MAX_SEC } from "@/render/geometry";
 import { BREAK_MAX_SEC } from "@/timing/timeline";
@@ -767,5 +770,50 @@ describe("the Audio group", () => {
     panel({ profiles: [PROFILE], profileId: "p1", rereading: true });
     expect(picker()).toBeDisabled();
     expect(why(picker())).toMatch(/re-reading/i);
+  });
+});
+
+describe("Paddle: what the stations send with", () => {
+  function PaddleHarness() {
+    const ks = useKeyStyle();
+    return (
+      <>
+        <KeyStyleGroup ks={ks} />
+        <output data-testid="style-out">{ks.keys === null ? "default" : ks.keys.join(",")}</output>
+      </>
+    );
+  }
+  const box = (key: string) => document.getElementById(`style-key-${key}`) as HTMLInputElement;
+  const keys = () => screen.getByTestId("style-out").textContent;
+  const pressed = () => screen.getByTestId("key-style").querySelector("[aria-pressed=true]");
+
+  it("is Default at first, with the keys barred until Only these", async () => {
+    localStorage.clear();
+    const user = userEvent.setup();
+    render(<PaddleHarness />);
+    expect(keys()).toBe("default");
+    expect(pressed()).toBe(screen.getByTestId("key-style").querySelectorAll("button")[0]);
+    expect([box("keyer").disabled, box("bug").disabled]).toEqual([true, true]);
+    await user.click(screen.getByTestId("key-style").querySelectorAll("button")[1]!);
+    expect(keys()).toBe("keyer");
+    expect(box("bug").disabled).toBe(false);
+    // The last key checked cannot be cleared.
+    expect(box("keyer").disabled).toBe(true);
+    await user.click(box("bug"));
+    expect(keys()).toBe("keyer,bug");
+    await user.click(box("keyer"));
+    expect(keys()).toBe("bug");
+    expect(loadPrefs()).toMatchObject({ keyStyle: "only", styleKeys: ["bug"] });
+  });
+
+  it("keeps the keys checked while Default, and brings them back", async () => {
+    localStorage.clear();
+    savePrefs({ ...loadPrefs(), keyStyle: "default", styleKeys: ["bug"] });
+    const user = userEvent.setup();
+    render(<PaddleHarness />);
+    expect(keys()).toBe("default");
+    expect(box("bug").checked).toBe(true);
+    await user.click(screen.getByTestId("key-style").querySelectorAll("button")[1]!);
+    expect(keys()).toBe("bug");
   });
 });

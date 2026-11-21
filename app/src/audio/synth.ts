@@ -14,7 +14,7 @@
  */
 
 import type { Timing } from "@/types";
-import { keyableSymbols, patternOf } from "@/morse";
+import { keyed, type Fist } from "@/timing/fist";
 
 export interface SynthOptions {
   readonly toneHz?: number;
@@ -26,29 +26,28 @@ export interface SynthOptions {
   readonly padSec?: number;
   /** Peak amplitude of the rendered tone. */
   readonly amplitude?: number;
+  /** The station's fist. Absent: keyed exactly, as by a keyer. */
+  readonly fist?: Fist | undefined;
 }
 
-/** The on/off plan for `text` at `timing`, as (isOn, seconds) runs. */
+/** The on/off plan for `text` at `timing`, as (isOn, seconds) runs, keyed
+ *  by `fist`, or exactly with none. */
 export function keyingPlan(
   text: string,
   timing: Timing,
+  fist?: Fist,
 ): Array<readonly [boolean, number]> {
-  const unit = timing.unitSec;
-  const charGap = timing.charGapSec || 3 * unit;
-  const wordGap = timing.wordGapSec || 7 * unit;
-
   const plan: Array<readonly [boolean, number]> = [];
   const words = text.toUpperCase().split(/\s+/).filter((w) => w.length > 0);
 
-  words.forEach((word, wi) => {
-    if (wi > 0) plan.push([false, wordGap]);
-    keyableSymbols(word).forEach((ch, li) => {
-      if (li > 0) plan.push([false, charGap]);
-      const pattern = patternOf(ch)!;
-      for (let ei = 0; ei < pattern.length; ei++) {
-        if (ei > 0) plan.push([false, unit]);
-        plan.push([true, pattern[ei] === "." ? unit : 3 * unit]);
-      }
+  keyed(words, timing, fist).forEach((word, wi) => {
+    if (wi > 0) plan.push([false, word.gap]);
+    word.chars.forEach((ch, li) => {
+      if (li > 0) plan.push([false, ch.gap]);
+      ch.marks.forEach((mark, ei) => {
+        if (ei > 0) plan.push([false, ch.spaces[ei - 1]!]);
+        plan.push([true, mark]);
+      });
     });
   });
   return plan;
@@ -68,7 +67,7 @@ export function synthesize(
 
   const plan: Array<readonly [boolean, number]> = [
     [false, pad],
-    ...keyingPlan(text, timing),
+    ...keyingPlan(text, timing, options.fist),
     [false, pad],
   ];
 

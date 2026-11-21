@@ -2051,7 +2051,7 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
    Microphone. Sections under rules, as the calibration screens have. */
 .configpanel { display: flex; flex-direction: column; gap: 22px; }
 .configpanel .lede { color: var(--ink-dim); margin: 0 0 10px; line-height: 1.6; max-width: 60ch; }
-.configpanel .callist li { background: var(--bg); }
+.configpanel .callist > li { background: var(--bg); }
 /* Rows sit a shade darker than the panel they are on, the way the calibration
    steps do, or they vanish into it. */
 .userfields {
@@ -2088,7 +2088,7 @@ button.primary { border-color: var(--you-quiet); color: var(--ink); }
   color: var(--ink);
 }
 .callist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.callist li {
+.callist > li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2169,6 +2169,8 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 /* Friends: a row of their own, opened into the form of You when edited. */
 .callist li.friendrow[data-editing="true"] { flex-direction: column; align-items: stretch; }
 .friendform { display: flex; flex-direction: column; gap: 12px; }
+/* A checkbox for each key, all on one row: a friend's keys, and Paddle's. */
+.keyrow { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 .friendcall { font-family: var(--mono); font-weight: 600; }
 .friendsadd { display: flex; }
 
@@ -2872,6 +2874,7 @@ header .modeswitch button { white-space: nowrap; }
    place in every row. */
 .viewpanel.formpanel .group > .helptip { grid-column: 3; grid-row: 1; justify-self: end; }
 .viewpanel.formpanel .group > label.check { grid-column: 2; min-height: 22px; }
+.viewpanel.formpanel .group > .keyrow { grid-column: 2; min-height: 22px; }
 /* What the choices do, under them, in view rather than in a tooltip. */
 .viewpanel.formpanel .group > .note {
   grid-column: 2;
@@ -2911,6 +2914,7 @@ header .modeswitch button { white-space: nowrap; }
   .viewpanel.formpanel .group { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
   .viewpanel.formpanel .group > .helptip { grid-column: 2; }
   .viewpanel.formpanel .group > label.check,
+  .viewpanel.formpanel .group > .keyrow,
   .viewpanel.formpanel .group > .note { grid-column: 1; }
 }
 /* Each section's settings on a panel of their own. Lines inside it only

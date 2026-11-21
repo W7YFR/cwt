@@ -4,6 +4,8 @@
  * would on the air. `rand` is passed in, so a test can fix the station.
  */
 
+import { seeded, seedOf } from "@/audio/qsb";
+import { fistFor, HAND_KEYS, type Fist, type HandKey, type KeyKind } from "@/timing/fist";
 import { ACADEMY } from "./formats";
 
 export type Rand = () => number;
@@ -37,6 +39,9 @@ export interface Station {
    *  overall: the speeds they call at. */
   readonly wpm?: number;
   readonly farnsworthWpm?: number;
+  /** How it keys on a key worked by hand, such as a bug. Absent: a keyer,
+   *  every line exact. */
+  readonly fist?: Fist;
 }
 
 /** What a station takes from a friend: their details from Settings. */
@@ -53,6 +58,9 @@ export interface FriendInfo {
   /** Their typical speeds, in words per minute: character and overall. */
   readonly wpm: number;
   readonly farnsworthWpm: number;
+  /** The keys they send with, one picked each time they call. Absent: a
+   *  keyer. */
+  readonly keys?: readonly KeyKind[];
 }
 
 /** The state or province at the end of `qth`: OR, from SALEM OR. */
@@ -335,9 +343,11 @@ export function asFriend(station: Station, f: FriendInfo): Station {
   const city = f.qthCity.trim();
   const known = region in STATES || region in PROVINCES;
   const rig = (f.rigModel.trim() || f.rigManufacturer.trim()).replace(/\s+/g, "");
+  const { fist: _, ...rest } = station;
+  const call = f.callsign.trim();
   return {
-    ...station,
-    call: f.callsign.trim(),
+    ...rest,
+    call,
     name: f.name.trim(),
     qth: known ? (city ? `${city} ${region}` : region) : station.qth,
     nr: f.cwopsNumber.trim(),
@@ -347,7 +357,61 @@ export function asFriend(station: Station, f: FriendInfo): Station {
     ...(rig ? { rig } : {}),
     ...(f.antenna.trim() ? { antenna: f.antenna.trim() } : {}),
     ...(f.rigPower.trim() ? { power: f.rigPower.trim() } : {}),
+    ...fistOf(pickKey(f.keys ?? ["keyer"], call, station.habit), call),
   };
+}
+
+/** How often a station keys on each key worked by hand, 0 to 1. The rest
+ *  key on a keyer. */
+export type KeyChances = Readonly<Partial<Record<HandKey, number>>>;
+
+/** How often a station in a standard QSO keys on each key. A plain CQ is a
+ *  rag chew, where older operators often send on a bug. */
+export const STANDARD_KEYS: KeyChances = { bug: 0.15 };
+
+/** The fist of the operator at `call` on `key`: always the same one. None
+ *  on a keyer. */
+function fistOf(key: KeyKind, call: string): { fist?: Fist } {
+  const fist = fistFor(key, seedOf(call));
+  return fist ? { fist } : {};
+}
+
+/** One of `keys` for this QSO, from the call and the habit drawn for it:
+ *  an operator may change keys from one QSO to the next. Draws nothing from
+ *  the QSO's random numbers. */
+function pickKey(keys: readonly KeyKind[], call: string, habit: number | undefined): KeyKind {
+  if (keys.length === 1) return keys[0]!;
+  return keys[Math.floor(keyDraw(call, habit) * keys.length)]!;
+}
+
+/** A number in [0, 1) for this station's key in this QSO. */
+function keyDraw(call: string, habit: number | undefined): number {
+  return seeded(seedOf(`key:${call}:${habit ?? ""}`))();
+}
+
+/** `station` on a key worked by hand as often as `chances` say. An
+ *  operator may change keys from one QSO to the next, so the key comes from
+ *  this station's call and its habit, drawn new each time it is made. Its
+ *  fist on a key comes from the call alone: the same operator on the same
+ *  key. Draws nothing from the QSO's random numbers. A CW Academy student
+ *  keys on a paddle. */
+export function onKey(station: Station, chances: KeyChances): Station {
+  if (station.nr === ACADEMY) return station;
+  let left = keyDraw(station.call, station.habit);
+  for (const key of HAND_KEYS) {
+    left -= chances[key] ?? 0;
+    if (left < 0) return { ...station, ...fistOf(key, station.call) };
+  }
+  return station;
+}
+
+/** `station` on one of `keys`, picked from its call and habit, in place of
+ *  the key it was given: the page's Paddle, when it sets the keys. Null
+ *  leaves it as it is. A friend keeps their own keys. */
+export function withKeys(station: Station, keys: readonly KeyKind[] | null): Station {
+  if (!keys || keys.length === 0 || station.friend) return station;
+  const { fist: _, ...rest } = station;
+  return { ...rest, ...fistOf(pickKey(keys, station.call, station.habit), station.call) };
 }
 
 /** How many CWT stations are CWops members, and how many CW Academy

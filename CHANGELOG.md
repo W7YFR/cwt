@@ -7,6 +7,15 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.36.0 — 2026-11-21
+
+### Added
+
+- Some stations send on a bug, QRM too: even dits, and long dahs made by hand that vary. Bugs are most common in standard QSOs, rare in a CWT.
+- **Keys** on a friend sets what they send with: **Keyer**, **Bug** or both.
+- A station on a bug now and then sends a proper roger: R R with the dah drawn far out.
+- **Paddle**, a chip beside **Speed** on the Copy and QSO pages, sets what the stations send with: **Default**, as on the air, or **Only these**, the ones you check. Friends use their own.
+
 ## v1.35.0 — 2026-11-21
 
 ### Added

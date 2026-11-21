@@ -15,6 +15,7 @@
 import { agcGainDb, applyGainDb, loudnessDb, type AgcMode } from "@/audio/agc";
 import { bandNoise, cwFilter, fadeOf, noiseLevel, noiseOn, qrnCrashes, seeded, seedOf } from "@/audio/qsb";
 import { synthesize } from "@/audio/synth";
+import type { Fist } from "@/timing/fist";
 import type { Speed } from "@/qso/speed";
 import { targetTiming } from "@/timing";
 
@@ -93,6 +94,8 @@ export interface QrmLine {
   readonly call: string;
   /** Which station of its QSO sends it. */
   readonly station: number;
+  /** Its fist on a key worked by hand, such as a bug. Absent: a keyer. */
+  readonly fist?: Fist | undefined;
 }
 
 export interface BandOptions {
@@ -205,7 +208,7 @@ export function qrmPart(o: PartOptions): Float32Array {
     for (const line of lines) {
       if (at >= n) break;
       const timing = targetTiming(line.speed.charWpm, line.speed.farnsworthWpm);
-      const sound = synthesize(line.text, timing, { rate, toneHz: qrmHz, padSec: 0, amplitude: peak }).samples;
+      const sound = synthesize(line.text, timing, { rate, toneHz: qrmHz, padSec: 0, amplitude: peak, fist: line.fist }).samples;
       // Not cut off at the end: a band that loops would chop a letter.
       if (at + sound.length > n) {
         at = n;

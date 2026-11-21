@@ -9,6 +9,8 @@
  * send, from the sponsor's rules and what is usual on the air.
  */
 
+import type { KeyChances } from "./station";
+
 export type FormatId = "cwt" | "sst" | "mst" | "pota";
 
 /** One item of an exchange. */
@@ -25,13 +27,16 @@ export interface Format {
   readonly wpm: readonly [number, number];
   /** How many of its stations are in Canada, 0 to 1. */
   readonly canada: number;
+  /** How many of its stations key on each key worked by hand, 0 to 1: few
+   *  bugs in the fast CWT, more in the slower SST. */
+  readonly keys: KeyChances;
 }
 
 export const FORMATS: Readonly<Record<FormatId, Format>> = {
-  cwt: { id: "cwt", word: "CWT", yours: ["name", "number"], wpm: [26, 32], canada: 0.08 },
-  sst: { id: "sst", word: "SST", yours: ["name", "region"], wpm: [14, 20], canada: 0.08 },
-  mst: { id: "mst", word: "MST", yours: ["name", "number"], wpm: [20, 25], canada: 0.08 },
-  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 25], canada: 0.03 },
+  cwt: { id: "cwt", word: "CWT", yours: ["name", "number"], wpm: [26, 32], canada: 0.08, keys: { bug: 0.03 } },
+  sst: { id: "sst", word: "SST", yours: ["name", "region"], wpm: [14, 20], canada: 0.08, keys: { bug: 0.12 } },
+  mst: { id: "mst", word: "MST", yours: ["name", "number"], wpm: [20, 25], canada: 0.08, keys: { bug: 0.06 } },
+  pota: { id: "pota", word: "POTA", yours: ["report", "region"], wpm: [16, 25], canada: 0.03, keys: { bug: 0.05 } },
 };
 
 export const FORMAT_IDS = Object.keys(FORMATS) as FormatId[];

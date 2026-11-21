@@ -45,7 +45,7 @@ import { exchangeReport, itemLabels } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
-import { regionOf, type Station } from "@/qso/station";
+import { regionOf, withKeys, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { anyAdded, asPlayed, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { patternOf } from "@/morse";
@@ -53,6 +53,7 @@ import { gradeCopy, revealed, type LockedShows, type TheirText, type YourText } 
 import { charsOf, copyText, overOfText, plain, slotRight, type CopyInput, type LineCopy } from "@/copy/lines";
 import type { Over } from "@/copy/decode";
 import { idealTimeline } from "@/timing/timeline";
+import type { Fist } from "@/timing/fist";
 import { targetTiming } from "@/timing/model";
 import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
@@ -83,6 +84,10 @@ import {
   QsbSlider,
   BandOnCheck,
   AgcChoice,
+  KeyStyleGroup,
+  paddleLabel,
+  useKeyStyle,
+  WIDEST_PADDLE,
   SpeedSliders,
 } from "./Controls";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
@@ -360,6 +365,9 @@ interface Line {
   /** The tone the station sent it at, for the station's overs. Absent in a
    *  log kept before it was. */
   readonly toneHz?: number;
+  /** The station's fist on a bug, for the station's overs. Absent: a keyer,
+   *  and in a log kept before there were bugs. */
+  readonly fist?: Fist;
   /** Your lines: the suggested reply when you began it, shown or not, for
    *  the debug save. Absent when there was none. */
   readonly hint?: string;
@@ -858,6 +866,7 @@ export function QsoScreen({
     bandPlays,
   );
   const [bandNoise, setBandNoise] = useOnOff("qsoBandNoise", true);
+  const keyStyle = useKeyStyle();
   const [breakInMs, setBreakInMsRaw] = useState(() => loadPrefs().qsoBreakInMs ?? DEFAULT_BREAK_IN_MS);
   const setBreakInMs = (next: number) => {
     setBreakInMsRaw(next);
@@ -1213,7 +1222,9 @@ export function QsoScreen({
   /** The station's over: after a short wait, it goes in the log and plays.
    *  `again` is a line already in the log to play once more, rather than a
    *  new one. */
-  const sendReply = (reply: string, them: Station, at: Speed, n: number, again: number | null) => {
+  const sendReply = (reply: string, station: Station, at: Speed, n: number, again: number | null) => {
+    // Paddle sets the station's key, when it sets the keys.
+    const them = withKeys(station, keyStyle.keys);
     setPhase("waiting");
     if (again === null) pending.current = { reply, them, at, n };
     const [lo, hi] = REPLY_DELAY_SEC;
@@ -1222,7 +1233,7 @@ export function QsoScreen({
         timer.current = null;
         focusBefore.current = document.activeElement;
         setPhase("playing");
-        const timeline = idealTimeline(reply, targetTiming(at.charWpm, at.farnsworthWpm));
+        const timeline = idealTimeline(reply, targetTiming(at.charWpm, at.farnsworthWpm), {}, them.fist);
         charEnds.current = timeline.chars.map((c) => c.t1);
         if (again !== null) {
           setPlaying({ line: again, shown: 0 });
@@ -1244,6 +1255,7 @@ export function QsoScreen({
               locked: false,
               sentWpm: at,
               toneHz: them.toneHz,
+              ...(them.fist ? { fist: them.fist } : {}),
             },
           ]);
         }
@@ -1648,6 +1660,7 @@ export function QsoScreen({
       speed: { charWpm: at.charWpm, farnsworthWpm: at.farnsworthWpm },
       toneHz: line.toneHz ?? DEFAULT_TONE_HZ,
       call: line.who,
+      fist: line.fist,
     };
   };
   /** The rate the tape is made at: your recording's, so it is not changed. */
@@ -2123,7 +2136,7 @@ export function QsoScreen({
    *  at the speed it was sent. */
   const overOf = (line: Line): Over => {
     const at = line.sentWpm ?? theirSpeed;
-    return overOfText(line.text, at.charWpm, at.farnsworthWpm);
+    return overOfText(line.text, at.charWpm, at.farnsworthWpm, line.fist);
   };
   /** Where each character of one of the station's lines is in its audio,
    *  for a click or a selection to play. */
@@ -2779,6 +2792,13 @@ export function QsoScreen({
               <QuickChip id="speed" label="Speed" value={fmtSpeed(speed)} widest={WIDEST_SPEED} tab="speed" locked={recorder !== null}>
                 {speedSection}
               </QuickChip>
+              <QuickChip id="paddle" label="Paddle" value={paddleLabel(keyStyle)} widest={WIDEST_PADDLE} tab="page">
+                <Section name="station" title="The other station">
+                  <div className="panelgroups">
+                    <KeyStyleGroup ks={keyStyle} />
+                  </div>
+                </Section>
+              </QuickChip>
               <QuickChip id="kind" label="Preferred mode" value={KINDS.find((k) => k.value === guideKind)!.label} widest="POTA" tab="page">
                 <Section name="you" title="You">
                   <div className="panelgroups">{kindChoice}</div>
@@ -2831,6 +2851,7 @@ export function QsoScreen({
                     options={NEXT_CALLERS}
                     onChange={(v) => setNextCaller(v as NextCaller)}
                   />
+                  <KeyStyleGroup ks={keyStyle} />
                   <Check
                     id="qso-blur-call"
                     label="Hide the station's call until I copy it"

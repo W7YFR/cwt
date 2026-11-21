@@ -42,7 +42,7 @@ import {
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
-import { SpeedSliders } from "./Controls";
+import { KeyChecks, keysLabel, SpeedSliders } from "./Controls";
 import { fmtSpeed } from "./format";
 import {
   SLOT_NAMES,
@@ -370,7 +370,7 @@ function UserFields({
 const friendId = () => `friend/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** A friend before anything is typed. */
-const NEW_FRIEND: Omit<Friend, "id"> = { ...EMPTY_USER, wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM };
+const NEW_FRIEND: Omit<Friend, "id"> = { ...EMPTY_USER, wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM, keys: ["keyer"] };
 
 /** A friend's details after their call and name, on one line. */
 export function friendSummary(f: Omit<Friend, "id">): string {
@@ -381,6 +381,7 @@ export function friendSummary(f: Omit<Friend, "id">): string {
   return [
     qth,
     fmtSpeed({ charWpm: f.wpm, farnsworthWpm: f.farnsworthWpm }),
+    keysLabel(f.keys),
     f.cwopsNumber && `CWops ${f.cwopsNumber}`,
     rig,
     f.antenna,
@@ -400,7 +401,9 @@ function FriendSection(): React.ReactElement {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Omit<Friend, "id">>(NEW_FRIEND);
   // A station needs a call and a name to call you.
-  const canSave = draft.callsign.trim() !== "" && draft.name.trim() !== "";
+  // A friend sends with at least one key.
+  const problems = draft.keys.length === 0 ? ["Pick at least one key."] : [];
+  const canSave = draft.callsign.trim() !== "" && draft.name.trim() !== "" && problems.length === 0;
   // The form opens at Name, ready to type.
   useEffect(() => {
     if (editing !== null) document.getElementById("friend-name")?.focus();
@@ -452,6 +455,17 @@ function FriendSection(): React.ReactElement {
             }}
           />
         </fieldset>
+        <fieldset className="usergroup">
+          <legend>Keys</legend>
+          <KeyChecks idPrefix="friend-" keys={draft.keys} allowNone onChange={(keys) => change({ keys })} />
+        </fieldset>
+        {problems.length > 0 && (
+          <ul className="drillproblems" data-testid="friend-problems" role="alert">
+            {problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        )}
         <div className="drillsave">
           <button type="submit" data-testid="save-friend" disabled={!canSave}>
             {editing === "new" ? "Save friend" : "Save changes"}

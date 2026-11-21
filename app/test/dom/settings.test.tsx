@@ -357,8 +357,8 @@ describe("the drills section", () => {
 
 describe("the friends section", () => {
   const settle = () => act(async () => {});
-  const BOB = { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", qthCity: "BEND", qthRegionShort: "OR", wpm: 28, farnsworthWpm: 28 };
-  const ANN = { ...EMPTY_USER, id: "friend/b", name: "ANN", callsign: "VE7XYZ", wpm: 18, farnsworthWpm: 12 };
+  const BOB = { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", qthCity: "BEND", qthRegionShort: "OR", wpm: 28, farnsworthWpm: 28, keys: ["keyer" as const] };
+  const ANN = { ...EMPTY_USER, id: "friend/b", name: "ANN", callsign: "VE7XYZ", wpm: 18, farnsworthWpm: 12, keys: ["keyer" as const] };
   const rows = () => screen.queryAllByTestId("friendrow").map((r) => r.getAttribute("data-id"));
   const save = () => screen.getByTestId("save-friend") as HTMLButtonElement;
 
@@ -457,14 +457,50 @@ describe("the friends section", () => {
 
   it("reads saved friends back in upper case, and drops ones that are not the right shape", () => {
     localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "bob", callsign: "k7abc" }] }));
-    // Saved before friends had a speed: the default.
+    // Saved before friends had a speed or a key: the default speed, on a keyer.
     expect(loadFriends()).toEqual([
-      { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM },
+      { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM, keys: ["keyer"] },
     ]);
     // Saved before friends had an overall speed: their own speed.
     localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: 30 }] }));
     expect(loadFriends()[0]).toMatchObject({ wpm: 30, farnsworthWpm: 30 });
     localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ name: "BOB" }] }));
     expect(loadFriends()).toEqual([]);
+    localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "BOB", callsign: "K7ABC", keys: ["cootie"] }] }));
+    expect(loadFriends()).toEqual([]);
+    localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "BOB", callsign: "K7ABC", keys: [] }] }));
+    expect(loadFriends()).toEqual([]);
+  });
+
+  it("saves the keys a friend sends with, at least one, and shows them in their line", async () => {
+    const user = userEvent.setup();
+    saveFriends([BOB]);
+    render(<FriendSettings />);
+    await settle();
+    const line = () => screen.getByTestId("friendrow").textContent;
+    const box = (key: string) => document.getElementById(`friend-key-${key}`) as HTMLInputElement;
+    const before = line();
+    await user.click(screen.getByTestId("edit-friend"));
+    expect([box("keyer").checked, box("bug").checked]).toEqual([true, false]);
+    expect(screen.queryByTestId("friend-problems")).toBeNull();
+    // None: Save is barred, and the form says why.
+    await user.click(box("keyer"));
+    expect(save().disabled).toBe(true);
+    expect(screen.getByTestId("friend-problems")).toBeTruthy();
+    await user.type(screen.getByLabelText("Name"), "{Enter}");
+    expect(loadFriends()[0]!.keys).toEqual(["keyer"]);
+    await user.click(box("bug"));
+    expect(screen.queryByTestId("friend-problems")).toBeNull();
+    await user.click(save());
+    expect(loadFriends()[0]).toMatchObject({ id: "friend/a", keys: ["bug"] });
+    const onBug = line();
+    expect(onBug).not.toBe(before);
+    // Both: a keyer or a bug, picked each time they call.
+    await user.click(screen.getByTestId("edit-friend"));
+    expect([box("keyer").checked, box("bug").checked]).toEqual([false, true]);
+    await user.click(box("keyer"));
+    await user.click(save());
+    expect(loadFriends()[0]!.keys).toEqual(["keyer", "bug"]);
+    expect(line()).not.toBe(onBug);
   });
 });
