@@ -15,7 +15,7 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
-- A station on a bug keeps the same habits in every letter, such as a long dah at the end of a letter.
+- A station on a bug keeps the same habits in every letter, such as a long dah at the end of a letter. Its other dahs are a little shorter.
 
 ## v1.37.0 — 2026-11-21
 

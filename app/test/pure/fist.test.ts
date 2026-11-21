@@ -79,9 +79,9 @@ describe("a bug", () => {
       const dahs = durs(tl, "dah");
       expect(spread(dits)).toBeLessThan(0.03);
       expect(spread(dahs)).toBeGreaterThan(0.04);
-      // Light, quick dits, and dahs of 4 to 5 of them, not 3.
+      // Light, quick dits, and dahs of 3 to 5 of them.
       expect(mean(dits)).toBeLessThan(AT_20.unitSec);
-      expect(mean(dahs) / mean(dits)).toBeGreaterThan(3.6);
+      expect(mean(dahs) / mean(dits)).toBeGreaterThan(3.3);
       expect(mean(dahs) / mean(dits)).toBeLessThan(5.6);
       // Every dah still reads as a dah.
       expect(Math.min(...dahs)).toBeGreaterThan(2 * Math.max(...dits));

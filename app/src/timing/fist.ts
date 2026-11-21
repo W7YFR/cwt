@@ -9,17 +9,17 @@
  *
  * - The dits come from a vibrating arm, so they are even, and light: the arm
  *   holds the contact closed for less than half its swing.
- * - The dahs are made by hand. They run long, 4 to 5 dits, and no two are the
- *   same length. A dah before a dit, as the first one in C, is dragged a
- *   little longer.
+ * - The dahs are made by hand. They run long, 3 to 5 dits, and no two are the
+ *   same length. A dah before a dit, as the first one in N, is often cut a
+ *   little short, as the hand moves to the dits.
  * - The gaps around a dah are made by hand too, so they drift. After a dah,
  *   the arm must start before the first dit comes.
  * - Some operators like a proper roger: an R on its own, as in R R, with its
  *   dah drawn out far past the rest.
  * - Each operator has a swing: a habit of spacing out two letters when the
  *   first ends as the next begins, dah to dah or dit to dit.
- * - Each operator sends each letter their own way, the same way each time:
- *   one drags the first dah of C, another clips the dah of Q.
+ * - Each operator draws out a dah that ends a letter, as in Q or T, the same
+ *   way in every letter.
  * - A letter now and then comes out rushed or dragged, and the whole fist
  *   drifts faster and slower through a line.
  * - Now and then the hand pauses before a letter.
@@ -79,7 +79,7 @@ export interface BugFist {
   readonly dah: number;
   /** How much one dah differs from the next, as a share of its length. */
   readonly dahSpread: number;
-  /** A dah before a dit is this share longer. */
+  /** A dah before a dit is this share longer, or shorter when below 0. */
   readonly drag: number;
   /** The gap after a dah. */
   readonly afterDah: number;
@@ -167,9 +167,9 @@ export function bugFist(seed: number): BugFist {
     key: "bug",
     seed,
     weight: within(0.4, 0.5),
-    dah: within(3.8, 5),
+    dah: within(3.3, 4.8),
     dahSpread: within(0.05, 0.1),
-    drag: within(0, 0.15),
+    drag: within(-0.15, 0.03),
     afterDah: within(1.05, 1.5),
     toDah: within(1, 1.3),
     gapSpread: within(0.08, 0.14),
@@ -181,7 +181,7 @@ export function bugFist(seed: number): BugFist {
     shapeSpread: within(0.02, 0.05),
     tempoSpread: within(0.02, 0.05),
     pause: within(0.01, 0.04),
-    lastDah: within(0.05, 0.25),
+    lastDah: within(0.1, 0.35),
   };
 }
 
