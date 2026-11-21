@@ -6,8 +6,9 @@ import { isCall } from "@/qso/cq";
 import { REGIONS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
 import { theirItems } from "@/qso/report";
-import { answerRun, newRun, type RunQso } from "@/qso/run";
-import { digitOf, randomCaller, randomStation, regionOf, type Station } from "@/qso/station";
+import { answerRun, following, newRun, RECENT_NAMES, respond, type RunQso } from "@/qso/run";
+import { digitOf, NAMES, randomCaller, randomStation, regionOf, STATION_NAMES, type Station } from "@/qso/station";
+import { vocabulary } from "@/qso/vocabulary";
 import { exchange, type Say } from "@/qso/wording";
 
 /** A fixed sequence, so each station is the same every run. */
@@ -62,6 +63,48 @@ describe("the stations that call", () => {
 
   it("send their state the way the exchange does: one word at the end of the QTH", () => {
     for (const s of many) expect(REGIONS.has(regionOf(s)), s.qth).toBe(true);
+  });
+});
+
+describe("the names stations send", () => {
+  const rand = seeded(23);
+  const many = Array.from({ length: 20000 }, () => randomStation(rand));
+  const count = (name: string) => many.filter((s) => s.name === name).length;
+
+  it("come from the whole pool, the common ones most often", () => {
+    expect(new Set(many.map((s) => s.name))).toEqual(new Set(STATION_NAMES));
+    expect(count("BOB")).toBeGreaterThan(count("OTTO") * 3);
+    expect(count("JIM")).toBeGreaterThan(count("ELMER") * 3);
+  });
+
+  it("never repeat within the last stations of a run", () => {
+    for (const format of ["cwt", "sst", "mst", "pota"] as const) {
+      let qso: RunQso = newRun(format, rand);
+      const names = [qso.them.name];
+      for (let i = 0; i < 300; i++) {
+        qso = following(qso, rand) as RunQso;
+        names.push(qso.them.name);
+      }
+      for (let i = 1; i < names.length; i++) {
+        expect(names.slice(Math.max(0, i - RECENT_NAMES), i), format).not.toContain(names[i]);
+      }
+      // Common names still come back later in the run.
+      expect(names.filter((n) => n === "BOB").length, format).toBeGreaterThan(1);
+    }
+  });
+
+  it("keep the names after a CQ of another format", () => {
+    let qso: RunQso = newRun("cwt", rand);
+    for (let i = 0; i < 5; i++) qso = following(qso, rand) as RunQso;
+    const next = respond(qso, "CQ SST W7YFR", { rand }).qso as RunQso;
+    expect(next.format).toBe("sst");
+    expect(next.recent).toEqual(qso.recent);
+  });
+
+  it("leave Lenient copy's words as they were", () => {
+    const words = new Set(vocabulary([]));
+    for (const name of NAMES) expect(words.has(name), name).toBe(true);
+    expect(STATION_NAMES.filter((n) => words.has(n)).sort()).toEqual([...NAMES].sort());
   });
 });
 

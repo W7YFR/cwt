@@ -74,6 +74,9 @@ export interface RunQso {
   readonly search: Search;
   /** The QSOs made in this run before this one. */
   readonly made: number;
+  /** The names of the stations before this one in the run, newest last,
+   *  `RECENT_NAMES` at most. Absent in a QSO kept before there were any. */
+  readonly recent?: readonly string[];
   /** What it has of your exchange so far, from every over. Absent in a QSO
    *  kept before there was one. */
   readonly got?: Heard;
@@ -108,21 +111,25 @@ export interface RunTurn {
   readonly ended: boolean;
 }
 
+/** How many stations back in a run a new station's name may not repeat. */
+export const RECENT_NAMES = 10;
+
 /** A new QSO in a run of `format`, after `made` QSOs, with a station not at
- *  the call `not`. */
-export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = ""): RunQso {
+ *  the call `not` and with none of the names in `recent`. */
+export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "", recent: readonly string[] = []): RunQso {
   const [lo, hi] = FORMATS[format].wpm;
   const wpm = lo + Math.floor(rand() * (hi - lo + 1));
   return {
     format,
     stage: "waiting",
-    them: randomCaller(rand, not, FORMATS[format].canada),
+    them: randomCaller(rand, not, FORMATS[format].canada, recent),
     you,
     yourName: "",
     last: "",
     speed: { charWpm: wpm, farnsworthWpm: wpm },
     search: NO_SEARCH,
     made,
+    recent,
     got: NOTHING,
   };
 }
@@ -130,8 +137,13 @@ export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "
 /** The QSO after `qso`: the next station in a run, or a new standard QSO.
  *  After a script, a standard QSO too: a script plays once. */
 export function following(qso: AnyQso, rand: Rand, speed: Speed = DEFAULT_SPEED): AnyQso {
-  if (isRun(qso)) return newRun(qso.format, rand, qso.made + 1, qso.them.call, qso.you);
+  if (isRun(qso)) return newRun(qso.format, rand, qso.made + 1, qso.them.call, qso.you, recentAfter(qso));
   return newQso(rand, qso.you, speed);
+}
+
+/** The names in a run after `qso`: its station's name added. */
+function recentAfter(qso: RunQso): string[] {
+  return [...(qso.recent ?? []), qso.them.name].slice(-RECENT_NAMES);
 }
 
 /** The station calls you: its first over. */
@@ -666,7 +678,7 @@ export function respond(qso: AnyQso, heard: string, context: RunContext = {}): R
   if (fresh) {
     const over = new Over(heard, ear);
     const named = namedIn(over);
-    if (named && (!isRun(qso) || named !== qso.format)) qso = newRun(named, rand, 0, qso.them.call, qso.you);
+    if (named && (!isRun(qso) || named !== qso.format)) qso = newRun(named, rand, 0, qso.them.call, qso.you, isRun(qso) ? qso.recent : []);
     else if (!named && isRun(qso) && over.has("CQ")) qso = newQso(rand, qso.them.call, speed);
   }
   return isRun(qso) ? answerRun(qso, heard, context) : answer(qso, heard, context);

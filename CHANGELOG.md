@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Changed
+
+- On the QSO page and in the Copy page's generated QSOs, stations send many more names, the common ones most often. In a run, a station never has the name of one of the stations just before it.
+
 ## v1.33.0 — 2026-11-21
 
 ### Added

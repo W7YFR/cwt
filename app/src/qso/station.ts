@@ -31,11 +31,48 @@ export function regionOf(station: Station): string {
   return station.qth.slice(station.qth.lastIndexOf(" ") + 1);
 }
 
+/** Names Lenient copy knows as words. A station's own name and yours come
+ *  in per QSO, so this short list stays as it was: more words could change
+ *  how Lenient copy reads gaps. */
 export const NAMES = [
   "AL", "ANN", "BILL", "BOB", "CHUCK", "DAN", "DAVE", "ED", "FRED", "GARY",
   "JIM", "JOE", "JOHN", "KEN", "LEE", "MARK", "MIKE", "PAT", "PETE", "RICK",
   "RON", "SAM", "SUE", "TOM", "WALT",
 ];
+
+/** The names stations send, as sent on CW: BOB, not ROBERT. Each line is a
+ *  weight: the common names come up most, as on the air. */
+const NAME_WEIGHTS: Readonly<Record<string, number>> = {
+  ...weigh(6, "BOB JIM JOHN MIKE DAVE BILL TOM"),
+  ...weigh(3, "DON RON JOE STEVE DAN GARY KEN RICK PAUL MARK JERRY LARRY DICK CHUCK TED ED AL FRED GEORGE PETE JACK RAY FRANK HANK ART WALT DOUG JEFF TIM GREG RANDY TERRY PHIL CHRIS"),
+  ...weigh(1, [
+    "ALAN ANDY ARNIE BARRY BEN BERT BOYD BRAD BRIAN BRUCE BUD CAL CARL CHARLIE CLAY CLIFF CLYDE CRAIG CURT",
+    "DALE DARRELL DEAN DENNIS DUANE EARL ELMER ERIC ERNIE FLOYD GENE GIL GLEN GORDON GUS HAL HARRY HERB HOWARD HUGH",
+    "IRV JAKE JAY JON KEITH KEVIN KURT LEE LEN LEO LES LLOYD LOU LYLE MAC MARTY MARV MATT MAX MEL MERLE MILT MONTY",
+    "NATE NEIL NICK NORM OSCAR OTTO PAT PERRY RALPH REX RICH ROB ROD ROGER ROSS ROY RUDY RUSS SAM SCOTT SID SKIP",
+    "STAN STU TODD TONY TROY VERN VIC WALLY WAYNE WES ANDRE CLAUDE LUC MARC PIERRE",
+    "ANN BARB BETH CAROL CINDY CONNIE DEB DIANE ELLEN GAIL JAN JILL JOAN JUDY KAREN KATHY KIM LINDA LIZ LYNN",
+    "MARY NANCY PAM PEG RUTH SALLY SHARON SUE",
+  ].join(" ")),
+};
+
+function weigh(weight: number, names: string): Record<string, number> {
+  return Object.fromEntries(names.split(" ").map((n) => [n, weight]));
+}
+
+/** Every name a station may send. */
+export const STATION_NAMES = Object.keys(NAME_WEIGHTS);
+
+/** A name, by weight, none of `not`. */
+function randomName(rand: Rand, not: readonly string[]): string {
+  const all = Object.entries(NAME_WEIGHTS).filter(([name]) => !not.includes(name));
+  let left = rand() * all.reduce((sum, [, w]) => sum + w, 0);
+  for (const [name, w] of all) {
+    left -= w;
+    if (left < 0) return name;
+  }
+  return all[all.length - 1]![0];
+}
 
 /** Where stations are, by state or province: its towns, and how many hams
  *  live there, roughly, as a weight. The busy states call most. */
@@ -227,15 +264,15 @@ export function callFrom(rand: Rand, region: string): string {
 /** How many stations in a standard QSO are in Canada. */
 export const CANADA = 0.05;
 
-/** A new station, never at the call `not`. `canada` of the time it is in
- *  Canada. */
-export function randomStation(rand: Rand, not = "", canada = CANADA): Station {
+/** A new station, never at the call `not` and never with a name in
+ *  `names`. `canada` of the time it is in Canada. */
+export function randomStation(rand: Rand, not = "", canada = CANADA, names: readonly string[] = []): Station {
   const region = randomRegion(rand, canada);
   let call = callFrom(rand, region);
   while (call === not) call = callFrom(rand, region);
   return {
     call,
-    name: pick(rand, NAMES),
+    name: randomName(rand, names),
     qth: qthIn(rand, region),
     rst: pick(rand, RSTS),
     toneHz: 550 + Math.round(rand() * 20) * 10,
@@ -248,9 +285,9 @@ const MEMBERS = 0.8;
 
 /** A station that answers a CQ in a run: a new station, with a CWops number
  *  most of the time and a serial number of its own. `canada` of the time it
- *  is in Canada. */
-export function randomCaller(rand: Rand, not = "", canada = CANADA): Station {
-  const station = randomStation(rand, not, canada);
+ *  is in Canada. Its name is none of `names`. */
+export function randomCaller(rand: Rand, not = "", canada = CANADA, names: readonly string[] = []): Station {
+  const station = randomStation(rand, not, canada, names);
   return {
     ...station,
     nr: rand() < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : "",
