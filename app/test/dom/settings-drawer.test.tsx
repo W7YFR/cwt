@@ -2,13 +2,14 @@
  * shares. A page's tabs come first, then the app's; a chip opens its own
  * setting and its tab; Help holds the page's guide and its keys. */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MicChip, PageSettings, SettingsButton, SettingsDrawer, SettingsProvider } from "@/ui/SettingsDrawer";
 import { QuickChip, Toolbar } from "@/ui/Toolbar";
 import { PageHelp } from "@/ui/Help";
+import { drawerOpen } from "@/ui/Drawer";
 import { ChoiceGroup, Section } from "@/ui/Controls";
 
 /** A page in the shell: a choice in a chip and on its own tab. */
@@ -69,6 +70,9 @@ function shell(locked = false) {
   );
 }
 
+// Settings comes back open after a reload, so each test starts from none.
+beforeEach(() => localStorage.clear());
+
 const tabs = () => [...document.querySelectorAll("[data-testid='settings-tab'] [role='tab']")].map((t) => t.getAttribute("data-tab"));
 
 describe("Settings", () => {
@@ -76,7 +80,7 @@ describe("Settings", () => {
     const user = userEvent.setup();
     shell();
     await user.click(screen.getByTestId("panel-toggle"));
-    expect(tabs()).toEqual(["page", "sound", "microphone", "you", "drills"]);
+    expect(tabs()).toEqual(["page", "sound", "microphone", "you", "friends", "drills"]);
     const sep = document.querySelector("[data-testid='settings-tab'] .tabsep")!;
     expect(sep.previousElementSibling!.getAttribute("data-tab")).toBe("sound");
     expect(sep.nextElementSibling!.getAttribute("data-tab")).toBe("microphone");
@@ -99,6 +103,29 @@ describe("Settings", () => {
     expect(document.querySelector(".drawerlock")).not.toBeNull();
     await user.click(document.querySelector("[data-tab='drills']")!);
     expect(document.querySelector(".drawerslot")).not.toHaveAttribute("inert");
+  });
+
+  it("comes back after a reload as it was: open, at the same tab", async () => {
+    const user = userEvent.setup();
+    const first = shell();
+    await user.click(screen.getByTestId("panel-toggle"));
+    await user.click(document.querySelector("[role='tab'][data-tab='friends']")!);
+    first.unmount();
+    const second = shell();
+    expect(screen.getByTestId("settings")).toBeTruthy();
+    expect(document.querySelector("[role='tab'][aria-selected='true']")!.getAttribute("data-tab")).toBe("friends");
+    await user.click(screen.getByTestId("panel-toggle"));
+    second.unmount();
+    shell();
+    expect(screen.queryByTestId("settings")).toBeNull();
+  });
+
+  it("keeps the page's keys off while open", async () => {
+    const user = userEvent.setup();
+    shell();
+    expect(drawerOpen()).toBe(false);
+    await user.click(screen.getByTestId("panel-toggle"));
+    expect(drawerOpen()).toBe(true);
   });
 
   it("closes on Esc", async () => {

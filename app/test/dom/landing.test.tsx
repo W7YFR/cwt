@@ -5,6 +5,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as mic from "@/capture/mic";
 import { Landing } from "@/ui/Landing";
+import { SettingsDrawer, SettingsProvider } from "@/ui/SettingsDrawer";
 import { WORDMARKS, wordmarkText } from "@/ui/wordmarks";
 import { resetVisitRoll } from "@/ui/wordmarks";
 
@@ -171,6 +172,26 @@ describe("the landing screen", () => {
       await user.keyboard("{Enter}");
       expect(props.onCalibrate).toHaveBeenCalledTimes(1);
       expect(props.onPractice).not.toHaveBeenCalled();
+    });
+
+    it("leaves Enter alone while Settings is open", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("cwt:prefs", JSON.stringify({ settingsOpen: true, settingsTab: "you" }));
+      const props = { onPractice: vi.fn(), onFile: vi.fn(), onError: vi.fn(), deviceId: undefined, onDeviceChange: vi.fn(), profiles: [], profileId: undefined, onCalibrate: vi.fn() };
+      try {
+        render(
+          <SettingsProvider>
+            <Landing {...props} />
+            <SettingsDrawer app={() => <input data-testid="field" />} />
+          </SettingsProvider>,
+        );
+        await settled();
+        await user.click(screen.getByTestId("field"));
+        await user.keyboard("{Enter}");
+        expect(props.onPractice).not.toHaveBeenCalled();
+      } finally {
+        localStorage.clear();
+      }
     });
 
     it("leaves Enter alone while the help is open", async () => {

@@ -7,7 +7,8 @@
  * the page. The app fills the rest.
  */
 
-import { Fragment, createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from "react";
+import { Fragment, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { loadPrefs, savePrefs } from "@/io/storage";
 import { Drawer, DrawerTabs } from "./Drawer";
 import { createPortal } from "react-dom";
 import { IconCog } from "./Icons";
@@ -16,16 +17,18 @@ import type { InputDevice } from "@/capture/mic";
 import type { Profile } from "@/io/profiles";
 
 /** Every tab, in the order the drawer shows them. */
-export type SettingsTab = "page" | "copy" | "sound" | "speed" | "microphone" | "you" | "drills";
-const ORDER: readonly SettingsTab[] = ["page", "copy", "sound", "speed", "microphone", "you", "drills"];
+export type SettingsTab = "page" | "copy" | "sound" | "speed" | "microphone" | "you" | "friends" | "drills";
+const ORDER: readonly SettingsTab[] = ["page", "copy", "sound", "speed", "microphone", "you", "friends", "drills"];
 /** The app's own tabs, on every screen. */
 const EVERY_PAGE = "The same on every page.";
 const APP_TABS: readonly PageTab[] = [
   { id: "microphone", label: "Microphone", scope: EVERY_PAGE },
   { id: "you", label: "You", scope: EVERY_PAGE },
+  { id: "friends", label: "Friends", scope: EVERY_PAGE },
   { id: "drills", label: "Drills", scope: EVERY_PAGE },
 ];
 const isApp = (id: SettingsTab) => APP_TABS.some((a) => a.id === id);
+const isTab = (v: unknown): v is SettingsTab => ORDER.includes(v as SettingsTab);
 
 interface PageTab {
   id: SettingsTab;
@@ -76,8 +79,17 @@ export function useSettings(): Host {
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }): React.ReactElement {
-  const [open, setOpen] = useState(false);
-  const [tab, setTabRaw] = useState<SettingsTab>("page");
+  // As the last page left it, so a reload comes back to it.
+  const [open, setOpen] = useState(() => loadPrefs().settingsOpen === true);
+  const [tab, setTabRaw] = useState<SettingsTab>(() => {
+    const saved = loadPrefs().settingsTab;
+    return isTab(saved) ? saved : "page";
+  });
+  useEffect(() => {
+    const prefs = loadPrefs();
+    if ((prefs.settingsOpen ?? false) === open && (prefs.settingsTab ?? "page") === tab) return;
+    savePrefs({ ...prefs, settingsOpen: open, settingsTab: tab });
+  }, [open, tab]);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [pageTabs, setPageTabsRaw] = useState<readonly PageTab[]>([]);
   const [locked, setLocked] = useState(false);

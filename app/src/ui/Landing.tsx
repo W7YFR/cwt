@@ -15,6 +15,7 @@ import { isDevBuild } from "@/build-info";
 import { ACCEPTED } from "@/capture/file";
 import type { Profile } from "@/io/profiles";
 import { DevicePicker } from "./Record";
+import { drawerOpen } from "./Drawer";
 import { SoundPathHelp } from "./SoundPath";
 import { useRecorder, type RecorderHandle } from "./useRecorder";
 import { Wordmark } from "./Wordmark";
@@ -151,7 +152,7 @@ export function Landing(props: LandingProps): React.ReactElement {
   useEffect(() => {
     if (help) return;
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== "Enter" || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key !== "Enter" || e.repeat || e.altKey || e.ctrlKey || e.metaKey || drawerOpen()) return;
       const at = document.activeElement;
       if (at && at !== document.body) return;
       e.preventDefault();

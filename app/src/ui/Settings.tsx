@@ -1,11 +1,11 @@
-/* The app's own tabs in Settings: You, Drills, and the saved calibrations
- * under Microphone. These are set once and then left alone.
+/* The app's own tabs in Settings: You, Friends, Drills, and the saved
+ * calibrations under Microphone. These are set once and then left alone.
  *
  * The calibration recordings are kept so a calibration that failed leaves
  * something to look at. Each one can be saved as a file or deleted here.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { IconDownload, IconHelp } from "./Icons";
 import {
   SLOT_LABELS,
@@ -28,15 +28,22 @@ import {
   forgetCalibrationsFor,
   getCalibrationAudio,
   listCalibrations,
+  EMPTY_USER,
+  FRIEND_WPM,
   loadCustomDrills,
+  loadFriends,
   loadUser,
   saveCustomDrills,
+  saveFriends,
   saveUser,
   type CalibrationSummary,
   type CustomDrill,
+  type Friend,
   type UserInfo,
 } from "@/io/storage";
 import { useUpperField } from "./useUpperField";
+import { SPEED_MAX, SPEED_MIN } from "./Controls";
+import { fmtWpm } from "./format";
 import {
   SLOT_NAMES,
   SlotMenu,
@@ -92,6 +99,15 @@ export function UserSettings(): React.ReactElement {
   return (
     <div className="configpanel">
       <UserSection user={user} set={changeUser} />
+    </div>
+  );
+}
+
+/** Stations you know. Each calls now and then on the Copy and QSO pages. */
+export function FriendSettings(): React.ReactElement {
+  return (
+    <div className="configpanel">
+      <FriendSection />
     </div>
   );
 }
@@ -252,85 +268,258 @@ function UserSection({
   return (
     <section className="panelsec">
       <h3>User</h3>
-      <div className="userfields" data-testid="user-fields">
-        <UserField id="user-name" label="Name" value={user.name} onChange={(name) => set({ name })} />
+      <UserFields prefix="user" user={user} set={set} />
+    </section>
+  );
+}
+
+/** The details of a station: yours under You, and each friend's. Each id
+ *  starts with `prefix`, as user-name. */
+function UserFields({
+  prefix,
+  user,
+  set,
+}: {
+  prefix: string;
+  user: UserInfo;
+  set(patch: Partial<UserInfo>): void;
+}): React.ReactElement {
+  return (
+    <div className="userfields" data-testid={`${prefix}-fields`}>
+      <UserField id={`${prefix}-name`} label="Name" value={user.name} onChange={(name) => set({ name })} />
+      <UserField
+        id={`${prefix}-callsign`}
+        label="Callsign"
+        value={user.callsign}
+        onChange={(callsign) => set({ callsign })}
+      />
+      <UserField
+        id={`${prefix}-age`}
+        label="Age"
+        value={user.age}
+        digits={3}
+        onChange={(age) => set({ age })}
+      />
+      <UserField
+        id={`${prefix}-licensed`}
+        label="Year licensed"
+        value={user.yearLicensed}
+        digits={4}
+        onChange={(yearLicensed) => set({ yearLicensed })}
+      />
+      <UserField
+        id={`${prefix}-cwops`}
+        label="CWops number"
+        value={user.cwopsNumber}
+        digits={5}
+        onChange={(cwopsNumber) => set({ cwopsNumber })}
+      />
+      <fieldset className="usergroup">
+        <legend>QTH</legend>
         <UserField
-          id="user-callsign"
-          label="Callsign"
-          value={user.callsign}
-          onChange={(callsign) => set({ callsign })}
+          id={`${prefix}-qth-city`}
+          label="City"
+          value={user.qthCity}
+          onChange={(qthCity) => set({ qthCity })}
         />
         <UserField
-          id="user-age"
-          label="Age"
-          value={user.age}
-          digits={3}
-          onChange={(age) => set({ age })}
+          id={`${prefix}-qth-short`}
+          label="Region, short"
+          value={user.qthRegionShort}
+          onChange={(qthRegionShort) => set({ qthRegionShort })}
         />
         <UserField
-          id="user-licensed"
-          label="Year licensed"
-          value={user.yearLicensed}
+          id={`${prefix}-qth-long`}
+          label="Region, long"
+          value={user.qthRegionLong}
+          onChange={(qthRegionLong) => set({ qthRegionLong })}
+        />
+      </fieldset>
+      <fieldset className="usergroup">
+        <legend>Rig</legend>
+        <UserField
+          id={`${prefix}-rig-manufacturer`}
+          label="Manufacturer"
+          value={user.rigManufacturer}
+          onChange={(rigManufacturer) => set({ rigManufacturer })}
+        />
+        <UserField
+          id={`${prefix}-rig-model`}
+          label="Model"
+          value={user.rigModel}
+          onChange={(rigModel) => set({ rigModel })}
+        />
+        <UserField
+          id={`${prefix}-rig-power`}
+          label="Power (W)"
+          value={user.rigPower}
           digits={4}
-          onChange={(yearLicensed) => set({ yearLicensed })}
+          onChange={(rigPower) => set({ rigPower })}
         />
-        <UserField
-          id="user-cwops"
-          label="CWops number"
-          value={user.cwopsNumber}
-          digits={5}
-          onChange={(cwopsNumber) => set({ cwopsNumber })}
-        />
-        <fieldset className="usergroup">
-          <legend>QTH</legend>
-          <UserField
-            id="user-qth-city"
-            label="City"
-            value={user.qthCity}
-            onChange={(qthCity) => set({ qthCity })}
+      </fieldset>
+      <UserField
+        id={`${prefix}-antenna`}
+        label="Antenna"
+        value={user.antenna}
+        onChange={(antenna) => set({ antenna })}
+      />
+    </div>
+  );
+}
+
+const friendId = () => `friend/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+/** A friend before anything is typed. */
+const NEW_FRIEND: Omit<Friend, "id"> = { ...EMPTY_USER, wpm: FRIEND_WPM };
+
+/** A friend's details after their call and name, on one line. */
+export function friendSummary(f: Omit<Friend, "id">): string {
+  const qth = [f.qthCity, f.qthRegionShort].filter(Boolean).join(" ");
+  const rig = [[f.rigManufacturer, f.rigModel].filter(Boolean).join(" "), f.rigPower && `${f.rigPower} W`]
+    .filter(Boolean)
+    .join(", ");
+  return [
+    qth,
+    fmtWpm(f.wpm),
+    f.cwopsNumber && `CWops ${f.cwopsNumber}`,
+    rig,
+    f.antenna,
+    f.yearLicensed && `Licensed ${f.yearLicensed}`,
+    f.age && `Age ${f.age}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Your friends: one line each, and the form of You to add or edit one.
+ *  Add friend sits at the top, so a new friend's form is always in the same
+ *  place. */
+function FriendSection(): React.ReactElement {
+  const [friends, setFriends] = useState<Friend[]>(loadFriends);
+  /** The friend the form holds: an id, "new", or null with no form open. */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Omit<Friend, "id">>(NEW_FRIEND);
+  // A station needs a call and a name to call you.
+  const canSave = draft.callsign.trim() !== "" && draft.name.trim() !== "";
+  // The form opens at Name, ready to type.
+  useEffect(() => {
+    if (editing !== null) document.getElementById("friend-name")?.focus();
+  }, [editing]);
+
+  const store = (next: Friend[]) => {
+    saveFriends(next);
+    setFriends(next);
+  };
+  const close = () => {
+    setEditing(null);
+    setDraft(NEW_FRIEND);
+  };
+  // An edit keeps the friend's id and their place in the list.
+  const save = () => {
+    if (!canSave) return;
+    store(
+      editing === "new"
+        ? [...friends, { ...draft, id: friendId() }]
+        : friends.map((f) => (f.id === editing ? { ...draft, id: f.id } : f)),
+    );
+    close();
+  };
+  const remove = (id: string) => store(friends.filter((f) => f.id !== id));
+  const change = (patch: Partial<Omit<Friend, "id">>) => setDraft((d) => ({ ...d, ...patch }));
+
+  const form = (
+    <li className="friendrow" data-editing="true">
+      {/* A form, so Enter in any field saves. */}
+      <form
+        className="friendform"
+        data-testid="friend-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <UserFields prefix="friend" user={draft} set={change} />
+        <div className="group">
+          <label htmlFor="friend-wpm">
+            Typical speed <output id="friend-wpm-out">{fmtWpm(draft.wpm)}</output>
+          </label>
+          <input
+            type="range"
+            id="friend-wpm"
+            min={SPEED_MIN}
+            max={SPEED_MAX}
+            step={1}
+            value={draft.wpm}
+            onChange={(e) => change({ wpm: Number(e.target.value) })}
           />
-          <UserField
-            id="user-qth-short"
-            label="Region, short"
-            value={user.qthRegionShort}
-            onChange={(qthRegionShort) => set({ qthRegionShort })}
-          />
-          <UserField
-            id="user-qth-long"
-            label="Region, long"
-            value={user.qthRegionLong}
-            onChange={(qthRegionLong) => set({ qthRegionLong })}
-          />
-        </fieldset>
-        <fieldset className="usergroup">
-          <legend>Rig</legend>
-          <UserField
-            id="user-rig-manufacturer"
-            label="Manufacturer"
-            value={user.rigManufacturer}
-            onChange={(rigManufacturer) => set({ rigManufacturer })}
-          />
-          <UserField
-            id="user-rig-model"
-            label="Model"
-            value={user.rigModel}
-            onChange={(rigModel) => set({ rigModel })}
-          />
-          <UserField
-            id="user-rig-power"
-            label="Power (W)"
-            value={user.rigPower}
-            digits={4}
-            onChange={(rigPower) => set({ rigPower })}
-          />
-        </fieldset>
-        <UserField
-          id="user-antenna"
-          label="Antenna"
-          value={user.antenna}
-          onChange={(antenna) => set({ antenna })}
-        />
+        </div>
+        <div className="drillsave">
+          <button type="submit" data-testid="save-friend" disabled={!canSave}>
+            {editing === "new" ? "Save friend" : "Save changes"}
+          </button>
+          <button type="button" data-testid="cancel-friend" onClick={close}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </li>
+  );
+
+  return (
+    <section className="panelsec">
+      <h3>Friends</h3>
+      <p className="lede">
+        Stations you know. Now and then one of them calls on the Copy and QSO pages, at most once a session.
+      </p>
+      <div className="friendsadd">
+        <button
+          data-testid="add-friend"
+          disabled={editing !== null}
+          onClick={() => {
+            setDraft(NEW_FRIEND);
+            setEditing("new");
+          }}
+        >
+          Add friend
+        </button>
       </div>
+      {editing === "new" && <ul className="callist">{form}</ul>}
+      {friends.length === 0 ? (
+        editing === null && <p className="lede">No friends yet.</p>
+      ) : (
+        <ul className="callist" data-testid="friendlist">
+          {friends.map((f) =>
+            f.id === editing ? (
+              <Fragment key={f.id}>{form}</Fragment>
+            ) : (
+              <li key={f.id} className="friendrow" data-testid="friendrow" data-id={f.id} data-editing="false">
+                <div className="calmeta">
+                  <span>
+                    <span className="friendcall">{f.callsign}</span> {f.name}
+                  </span>
+                  {friendSummary(f) && <span className="hint">{friendSummary(f)}</span>}
+                </div>
+                <div className="drillrowactions">
+                  <button
+                    data-testid="edit-friend"
+                    disabled={editing !== null}
+                    onClick={() => {
+                      const { id: _, ...details } = f;
+                      setDraft(details);
+                      setEditing(f.id);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button data-testid="delete-friend" onClick={() => remove(f.id)}>
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
     </section>
   );
 }

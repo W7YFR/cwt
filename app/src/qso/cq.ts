@@ -46,7 +46,7 @@
 import { UNKNOWN } from "@/morse";
 import { REGIONS } from "./formats";
 import { NO_SEARCH, qrq, qrs, setTo, type Search, type Speed } from "./speed";
-import { randomStation, type Rand, type Station } from "./station";
+import { asFriend, friendCalls, randomStation, type FriendInfo, type Rand, type Station } from "./station";
 import * as wording from "./wording";
 
 export type Stage = "cq" | "asking" | "called" | "pieces" | "exchanged" | "signing";
@@ -77,6 +77,9 @@ export interface Qso {
   readonly working: boolean;
   /** Piece by piece: the pieces it sent out of turn, because you asked. */
   readonly told: readonly wording.Piece[];
+  /** Your friends who have not called yet this session. Absent in a QSO
+   *  kept before there were friends. */
+  readonly friends?: readonly FriendInfo[];
 }
 
 /** How the station reads your overs. */
@@ -223,11 +226,17 @@ const FILLER = new Set(["HR", "IS", "ES", "=", "<BT>"]);
 export const DEFAULT_SPEED: Speed = { charWpm: 25, farnsworthWpm: 25 };
 
 /** A new QSO with a new station, never at the call `not`, sending at
- *  `speed`: your speed. */
-export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED): Qso {
+ *  `speed`: your speed. Now and then the station is one of `friends`, who
+ *  have not called yet this session, and who sends at their own speed. */
+export function newQso(rand: Rand, not = "", speed: Speed = DEFAULT_SPEED, friends: readonly FriendInfo[] = []): Qso {
+  const calls = friendCalls(rand, friends, not);
+  const station = randomStation(rand, not);
+  const them = calls ? asFriend(station, calls.friend) : station;
+  if (them.wpm) speed = { charWpm: them.wpm, farnsworthWpm: them.wpm };
   return {
     stage: "cq",
-    them: randomStation(rand, not),
+    them,
+    friends: calls ? calls.left : friends,
     you: "",
     yourName: "",
     last: "",

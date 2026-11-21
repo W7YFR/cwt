@@ -23,6 +23,7 @@ import { encodeWav, encodeWavBuffer } from "@/audio/wav";
 import {
   loadPrefs,
   loadSpeed,
+  loadFriends,
   loadUser,
   forgetQsoOvers,
   keepQsoOver,
@@ -54,6 +55,7 @@ import { idealTimeline } from "@/timing/timeline";
 import { targetTiming } from "@/timing/model";
 import { IconChevron, IconEdit, IconPlay, IconStop } from "./Icons";
 import { MicChip, PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
+import { drawerOpen } from "./Drawer";
 import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
@@ -662,7 +664,7 @@ export function QsoScreen({
    *  have scrolled up to read. */
   const logBox = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
-  const qso = useRef<AnyQso>(kept?.qso ?? newQso(Math.random, "", speed));
+  const qso = useRef<AnyQso>(kept?.qso ?? newQso(Math.random, "", speed, loadFriends()));
   /** Which QSO of the session is running, counted from 0. */
   const qsoNo = useRef(kept?.qsoNo ?? 0);
   /** The suggested reply on your turn, shown or not, as of the last render. */
@@ -1437,7 +1439,7 @@ export function QsoScreen({
     qsoNo.current = 0;
     closing.current = null;
     setFinished(null);
-    qso.current = scriptNext.current ?? newQso(Math.random, "", speed);
+    qso.current = scriptNext.current ?? newQso(Math.random, "", speed, loadFriends());
     scriptNext.current = null;
     setTheirSpeed(speed);
     answered.current = -1;
@@ -1650,6 +1652,7 @@ export function QsoScreen({
   const partKeys = useRef({ letter: () => {}, word: () => {}, fromWord: (_el: EventTarget | null) => {} });
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
+      if (drawerOpen()) return;
       // Option+Shift+R: R, from anywhere, a box or a slot too.
       if (ev.altKey && ev.shiftKey && !ev.metaKey && !ev.ctrlKey && ev.code === "KeyR") {
         ev.preventDefault();

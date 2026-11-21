@@ -427,6 +427,9 @@ export interface Prefs {
   /** The newest landing screen this visitor has passed through — see
    *  LANDING_VERSION in ui/Landing.tsx. */
   landingSeen?: number;
+  /** Settings was open, so a reload opens it again, at the same tab. */
+  settingsOpen?: boolean;
+  settingsTab?: string;
   /** Calibration's speed, from saves that hold no `charWpm`. Read by
    *  `loadSpeed` as a fallback and never written. */
   keyerWpm?: number;
@@ -464,6 +467,8 @@ export interface Prefs {
   runSort?: string;
   /** Who is sending, for drills that key your own details. */
   user?: Partial<UserInfo>;
+  /** Stations you know, who call now and then on the Copy and QSO pages. */
+  friends?: Friend[];
   /** Drills the user wrote, in the order they were saved. */
   customDrills?: CustomDrill[];
   /** The drill picker's open groups, by name. Absent is all closed. */
@@ -656,6 +661,29 @@ export function saveUser(user: UserInfo): void {
   savePrefs({ ...loadPrefs(), user });
 }
 
+/** A friend: the same details as yours, an id to keep its place, and the
+ *  speed they send at. */
+export interface Friend extends UserInfo {
+  id: string;
+  /** Their typical speed, in words per minute. */
+  wpm: number;
+}
+
+/** A friend's speed before one is set, and for a friend saved without one. */
+export const FRIEND_WPM = 25;
+
+export function loadFriends(): Friend[] {
+  return (loadPrefs().friends ?? []).map((saved) => {
+    const out: Friend = { ...EMPTY_USER, id: String(saved.id), wpm: saved.wpm ?? FRIEND_WPM };
+    for (const k of Object.keys(EMPTY_USER) as (keyof UserInfo)[]) out[k] = (saved[k] ?? "").toUpperCase();
+    return out;
+  });
+}
+
+export function saveFriends(friends: Friend[]): void {
+  savePrefs({ ...loadPrefs(), friends });
+}
+
 export function loadCustomDrills(): CustomDrill[] {
   return loadPrefs().customDrills ?? [];
 }
@@ -722,6 +750,13 @@ const isUser: Check = (v) => {
   );
 };
 
+const isFriends: Check = (v) =>
+  Array.isArray(v) &&
+  v.every((f: unknown) => {
+    const r = f as Record<string, unknown>;
+    return isUser(f) && isStr(r.id) && (r.wpm === undefined || isNum(r.wpm));
+  });
+
 const isCustomDrills: Check = (v) =>
   Array.isArray(v) &&
   v.every((d: unknown) => {
@@ -737,6 +772,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   session: isSession,
   practicing: isBool,
   landingSeen: isNum,
+  settingsOpen: isBool,
+  settingsTab: isStr,
   keyerWpm: isNum,
   gainDb: isNum,
   tolerance: isNum,
@@ -768,6 +805,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   zenGrading: isBool,
   runSort: isStr,
   user: isUser,
+  friends: isFriends,
   customDrills: isCustomDrills,
   openDrillGroups: (v) => Array.isArray(v) && v.every(isStr),
   page: oneOf("practice", "copy", "qso"),

@@ -33,6 +33,7 @@ import {
   fitSpeed,
 } from "./Controls";
 import { DownloadItem, MenuHeading, OpenFileItem, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { drawerOpen } from "./Drawer";
 import { ACCEPTED } from "@/capture/file";
 import { OPEN_FILE_CLOSED, OPEN_FILE_HELP } from "./copy";
 import { fmtGain, fmtSpeed, fmtTolerance } from "./format";
@@ -668,6 +669,7 @@ export function ReviewScreen({
   // the button you just tabbed to.
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
+      if (drawerOpen()) return;
       const target = ev.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;

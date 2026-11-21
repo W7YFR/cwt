@@ -26,6 +26,30 @@ export interface Station {
   readonly nr?: string;
   /** In an MST, its serial number for this QSO. */
   readonly serial?: number;
+  /** One of your friends, from Settings. Absent for any other station. */
+  readonly friend?: boolean;
+  /** A friend's rig, antenna and power, as they set them. Absent when not
+   *  set: the station names a rig of its own. */
+  readonly rig?: string;
+  readonly antenna?: string;
+  readonly power?: string;
+  /** A friend's typical speed, in words per minute: the speed they call at. */
+  readonly wpm?: number;
+}
+
+/** What a station takes from a friend: their details from Settings. */
+export interface FriendInfo {
+  readonly callsign: string;
+  readonly name: string;
+  readonly cwopsNumber: string;
+  readonly qthCity: string;
+  readonly qthRegionShort: string;
+  readonly rigManufacturer: string;
+  readonly rigModel: string;
+  readonly rigPower: string;
+  readonly antenna: string;
+  /** Their typical speed, in words per minute. */
+  readonly wpm: number;
 }
 
 /** The state or province at the end of `qth`: OR, from SALEM OR. */
@@ -279,6 +303,46 @@ export function randomStation(rand: Rand, not = "", canada = CANADA, names: read
     rst: pick(rand, RSTS),
     toneHz: 550 + Math.round(rand() * 20) * 10,
     habit: 0.05 + 0.3 * rand(),
+  };
+}
+
+/** How often a friend not yet heard this session calls in place of a new
+ *  station. Low, so a friend does not call every session. */
+export const FRIEND_CHANCE = 0.08;
+
+/** A friend who calls now and then, never at the call `not`, and the friends
+ *  still to call this session. Null when no friend calls. Draws nothing with
+ *  no friend to call, so a session without friends goes as before. */
+export function friendCalls(
+  rand: Rand,
+  friends: readonly FriendInfo[],
+  not = "",
+): { friend: FriendInfo; left: FriendInfo[] } | null {
+  const can = friends.filter((f) => f.callsign.trim() && f.name.trim() && f.callsign.trim() !== not);
+  if (can.length === 0 || rand() >= FRIEND_CHANCE) return null;
+  const friend = pick(rand, can);
+  return { friend, left: friends.filter((f) => f !== friend) };
+}
+
+/** `station` as your friend: their call, name and QTH, their CWops number or
+ *  none, their rig, and their speed. What they left out stays `station`'s. A QTH with no
+ *  state or province the exchange knows stays `station`'s too. */
+export function asFriend(station: Station, f: FriendInfo): Station {
+  const region = f.qthRegionShort.trim();
+  const city = f.qthCity.trim();
+  const known = region in STATES || region in PROVINCES;
+  const rig = (f.rigModel.trim() || f.rigManufacturer.trim()).replace(/\s+/g, "");
+  return {
+    ...station,
+    call: f.callsign.trim(),
+    name: f.name.trim(),
+    qth: known ? (city ? `${city} ${region}` : region) : station.qth,
+    nr: f.cwopsNumber.trim(),
+    friend: true,
+    wpm: f.wpm,
+    ...(rig ? { rig } : {}),
+    ...(f.antenna.trim() ? { antenna: f.antenna.trim() } : {}),
+    ...(f.rigPower.trim() ? { power: f.rigPower.trim() } : {}),
   };
 }
 

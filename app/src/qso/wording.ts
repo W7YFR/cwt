@@ -63,6 +63,20 @@ function opens(s: Say): boolean {
   return s.rand() < (s.mirror ? Math.max(habit, MIRROR) : habit);
 }
 
+/** Shave and a haircut, two bits: dah-di-di-dah-dit, then dit dit. A
+ *  friend now and then closes a QSO with it. */
+export const SHAVE_AND_A_HAIRCUT = "/ E E";
+
+/** How often a friend closes with shave and a haircut. */
+const FLOURISH = 0.6;
+
+/** `line`, a last line, as a friend now and then ends it: with shave and a
+ *  haircut in place of its E E. Draws nothing for any other station. */
+export function flourish(them: Station, rand: Rand, line: string): string {
+  if (!them.friend || rand() >= FLOURISH) return line;
+  return words(line.replace(/\s*E E$/, ""), SHAVE_AND_A_HAIRCUT);
+}
+
 /** Your name, or OM when the station did not copy it. */
 function to(s: Say): string {
   return s.name || "OM";
@@ -161,10 +175,11 @@ const WX = ["SUNNY", "CLDY", "RAIN", "SNOW", "WARM", "COLD", "WINDY"];
 
 /** A word on its station or weather, as a full exchange may end with. */
 function remark(s: Say): string {
-  const { rand } = s;
-  const rig = pick(rand, RIGS);
-  const ant = pick(rand, ANTS);
-  const pwr = pick(rand, ["5", "10", "100", "50"]);
+  const { rand, them } = s;
+  // A friend's own rig, antenna and power, where they set them.
+  const rig = them.rig ?? pick(rand, RIGS);
+  const ant = them.antenna ?? pick(rand, ANTS);
+  const pwr = them.power ?? pick(rand, ["5", "10", "100", "50"]);
   const temp = String(20 + Math.floor(rand() * 15) * 5);
   return pick(rand, [
     `RIG HR ${rig} ES ${ant}`,
@@ -196,7 +211,10 @@ export function exchange(s: Say, gotReport: boolean): string {
   const c = s.them.call;
   const open = thanks(s, gotReport);
   const g = greeting(s.hour);
-  const hello = maybe(rand, pick(rand, [`${g} ${to(s)}`, `${g} DR ${to(s)}`, `VY ${g} ${to(s)}`]));
+  // A friend always says hello, and is glad to hear you.
+  const hello = s.them.friend
+    ? pick(rand, [`${g} ${to(s)} GUD TO HEAR U`, `${g} DR ${to(s)} FB TO WRK U AGAIN`, `VY ${g} ${to(s)} NICE TO HEAR U`])
+    : maybe(rand, pick(rand, [`${g} ${to(s)}`, `${g} DR ${to(s)}`, `VY ${g} ${to(s)}`]));
   const parts = [short(s) ? report(s) : reportWhy(s), nameOf(s), qthOf(s)];
   if (rand() >= KEEP) parts.splice(1, 2, parts[2]!, parts[1]!);
   // A word on its station or weather, now and then. Never with rand 0, so
@@ -306,6 +324,10 @@ export function signFirst(s: Say): string {
 
 /** Its last over, after your 73. */
 export function signOff(s: Say): string {
+  return flourish(s.them, s.rand, plainSignOff(s));
+}
+
+function plainSignOff(s: Say): string {
   const c = s.them.call;
   const n = to(s);
   if (short(s)) return pick(s.rand, [`TU 73 E E`, `73 TU <SK> E E`, `TNX ${n} 73 <SK>`, `R R 73 GL <SK> E E`]);
@@ -321,5 +343,5 @@ export function signOff(s: Say): string {
 
 /** The two dits that close the QSO after your last 73. */
 export function lastDits(s: Say): string {
-  return pick(s.rand, ["E E", "TU E E", "73 E E", "GL E E", "CUL E E"]);
+  return flourish(s.them, s.rand, pick(s.rand, ["E E", "TU E E", "73 E E", "GL E E", "CUL E E"]));
 }

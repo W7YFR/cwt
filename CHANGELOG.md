@@ -9,11 +9,17 @@ nothing to the site. The next release carries them.
 
 ### Added
 
+- **Friends** in Settings holds stations you know, with the same details as **You** and a **Typical speed**. Now and then a friend calls on the Copy and QSO pages at that speed, at most once a session. A friend greets you, and may close with shave and a haircut.
 - In a CWT, a CW Academy student calls now and then. It sends CWA in place of a number, and sends slower than the other stations. The station also reads CWA when you send it.
 
 ### Changed
 
 - On the QSO page and in the Copy page's generated QSOs, stations send many more names, the common ones most often. In a run, a station never has the name of one of the stations just before it.
+
+### Fixed
+
+- Keys typed in Settings or Help no longer work the page below. Enter in a field no longer restarts your QSO session.
+- Settings is open again after a reload, at the tab it was on.
 
 ## v1.33.0 — 2026-11-21
 
