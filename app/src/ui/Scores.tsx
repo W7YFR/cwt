@@ -25,6 +25,8 @@ export interface ScoresProps {
    * at. Deciding to drop a run is something you do while looking at its
    * numbers, so the control belongs where the numbers are. */
   onDrop?: (() => void) | undefined;
+  /** Throw every run away and keep the session. */
+  onClearAll?: (() => void) | undefined;
   /** Set the target speeds to the ones this run was sent at. */
   onFit?: (() => void) | undefined;
   /** Which attempt these figures are, counted the way the chart counts. */
@@ -36,6 +38,7 @@ export function Scores({
   settings,
   take,
   onDrop,
+  onClearAll,
   onFit,
   runOf,
 }: ScoresProps): React.ReactElement {
@@ -78,21 +81,19 @@ export function Scores({
       aria-label={`Drop run ${runOf.at + 1}`}
       title={`Throw run ${runOf.at + 1} away and keep the others`}
     >
-      {/* Drawn rather than typed: no system font carries a trash can that can
-          be relied on to look like one, and the emoji that do are a different
-          color and weight from everything around them. Which run it will throw
-          away moves to the name, where a screen reader finds it and a pointer
-          finds it as a tooltip. */}
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-        <path
-          d="M2.5 4.5h11M6.5 4.5V3a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8v1.5M4 4.5l.7 8.3a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4.5M6.6 7v4M9.4 7v4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <TrashIcon mark="1" />
+    </button>
+  );
+
+  const clearAll = onClearAll && runOf && (
+    <button
+      className="iconbtn droprun"
+      onClick={onClearAll}
+      data-testid="clear-runs"
+      aria-label="Clear all runs"
+      title="Throw every run away and keep the message, the speeds and the settings"
+    >
+      <TrashIcon mark="A" />
     </button>
   );
 
@@ -161,10 +162,11 @@ export function Scores({
           </div>
         )}
 
-        {(fit || drop) && (
+        {(fit || drop || clearAll) && (
           <div className="runactions">
             {fit}
             {drop}
+            {clearAll}
           </div>
         )}
       </div>
@@ -214,5 +216,32 @@ export function Scores({
         )}
       </div>
     </div>
+  );
+}
+
+/** A trash can with a small mark at its top right. The mark says how much it
+ *  throws away: 1 for one run, A for all of them. */
+function TrashIcon({ mark }: { mark: string }): React.ReactElement {
+  return (
+    <>
+      {/* Drawn rather than typed: no system font carries a trash can that can
+          be relied on to look like one, and the emoji that do are a different
+          color and weight from everything around them. Which run it will throw
+          away moves to the name, where a screen reader finds it and a pointer
+          finds it as a tooltip. */}
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+        <path
+          d="M2.5 4.5h11M6.5 4.5V3a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8v1.5M4 4.5l.7 8.3a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4.5M6.6 7v4M9.4 7v4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="trashmark" aria-hidden="true">
+        {mark}
+      </span>
+    </>
   );
 }

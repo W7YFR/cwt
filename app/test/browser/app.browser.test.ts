@@ -713,7 +713,7 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
     expect(short.left).toBeCloseTo(withName, 1);
   });
 
-  it("keeps the grades and the way out of the run on one line", async () => {
+  it("keeps the grades and the run's actions in the head", async () => {
     /* The band holds two grades and five measurements. Left to reflow, which
        line a figure landed on was a fact about the window rather than about
        the figure — and on a narrow one the single button among them ended up
@@ -750,13 +750,16 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
       container.getBoundingClientRect().width,
     );
 
-    /* The grades and the button share the head's line, and the button is at
-       the end of it — an action among readings. */
+    /* The run's actions stay one group in the head: drop one run, then clear
+       all, at the end. Too narrow for one line, the group wraps as a whole. */
     const line = consistent.getBoundingClientRect();
     if (drop) {
       const box = drop.getBoundingClientRect();
-      expect(box.top).toBeLessThan(line.bottom);
-      expect(box.right).toBeCloseTo(head.getBoundingClientRect().right, 0);
+      const all = container.querySelector<HTMLElement>("[data-testid='clear-runs']")!.getBoundingClientRect();
+      expect(head.contains(drop)).toBe(true);
+      expect(all.top).toBeCloseTo(box.top, 0);
+      expect(box.right).toBeLessThan(all.left);
+      expect(all.right).toBeCloseTo(head.getBoundingClientRect().right, 0);
     }
     // And nothing from underneath crept up onto it.
     for (const el of detail.querySelectorAll<HTMLElement>(".score")) {
@@ -1476,11 +1479,14 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
 
   describe("clearing the recording", () => {
     /* The loop this is for: set the message and the speeds, hear the target,
-       send it, look at how it went, wipe it, send it again. Wiping keeps the
-       session — what you are practicing — and drops only what was recorded
-       into it. */
+       send it, look at how it went, wipe it, send it again. Clear all, by the
+       run, keeps the session — what you are practicing — and drops only what
+       was recorded into it. Clear, in the header, also clears the message and
+       sends it once. */
     const clear = () =>
       container.querySelector<HTMLElement>("[data-testid='clear-take']")!;
+    const clearRuns = () =>
+      container.querySelector<HTMLElement>("[data-testid='clear-runs']")!;
 
     it("keeps the target and drops the grading", async () => {
       await served();
@@ -1489,7 +1495,7 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
       expect(container.querySelector("[data-testid='scores']")!.getAttribute("data-blank"))
         .toBe("false");
 
-      await act(async () => clear().click());
+      await act(async () => clearRuns().click());
 
       // Still here, still set up, with nothing recorded in it.
       expect(container.querySelector("header")).not.toBeNull();
@@ -1499,13 +1505,38 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
       expect(container.querySelector("[data-testid='report-blank']")).not.toBeNull();
     });
 
+    it("clears the message and the times from the header", async () => {
+      await served();
+      await mount();
+      // An opened recording bars Times, so drop it to set one.
+      await act(async () => clearRuns().click());
+      const times = container.querySelector<HTMLInputElement>("#times")!;
+      await act(async () => {
+        times.focus();
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(times, "3");
+        times.dispatchEvent(new Event("input", { bubbles: true }));
+        times.dispatchEvent(new Event("change", { bubbles: true }));
+        times.blur();
+      });
+      expect(container.querySelector<HTMLInputElement>("#times")!.value).toBe("3");
+      expect(container.querySelector<HTMLInputElement>("#expected")!.value).not.toBe("");
+      expect(clear().hasAttribute("disabled")).toBe(false);
+
+      await act(async () => clear().click());
+
+      expect(container.querySelector("header")).not.toBeNull();
+      expect(container.querySelector<HTMLInputElement>("#expected")!.value).toBe("");
+      expect(container.querySelector<HTMLInputElement>("#times")!.value).toBe("1");
+      expect(loadPrefs().expected).toBe("");
+    });
+
     it("still draws the target, which is the point of staying", async () => {
       /* The target half needs no recording — a message and a pair of speeds
          are enough to render what you are about to send. If it went blank too
          there would be nothing to practice against. */
       await served();
       await mount();
-      await act(async () => clear().click());
+      await act(async () => clearRuns().click());
 
       const canvas = container.querySelector<HTMLCanvasElement>("canvas")!;
       const ctx = canvas.getContext("2d")!;
@@ -1673,10 +1704,11 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
   });
 
   it("never lands the keyboard on the file dialog itself", async () => {
-    /* Both ways in are a visible button that opens a hidden <input type=file>.
-       The input is clipped to a 1px box, so in the tab order it is a stop on
-       nothing: no visible focus ring, nothing to read, and Enter opens a file
-       dialog you did not ask for.
+    /* Both ways in are a visible button that opens a file dialog. The landing
+       screen keeps a hidden <input type=file> for it, clipped to a 1px box, so
+       in the tab order it is a stop on nothing: no visible focus ring, nothing
+       to read, and Enter opens a file dialog you did not ask for. The item in
+       ⋯ makes its input on each click and never puts one on the page.
 
        Both halves are the claim. Taking it out of the tab order would be easy
        to do by hiding the whole feature from the keyboard, which is worse than
@@ -1699,7 +1731,7 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
       }
 
       const inputs = [...document.querySelectorAll<HTMLInputElement>("input[type=file]")];
-      expect(inputs.length, `the ${screen} screen opens files`).toBeGreaterThan(0);
+      if (screen === "landing") expect(inputs.length, "the landing screen opens files").toBeGreaterThan(0);
       for (const input of inputs) {
         expect(input.tabIndex, `the ${screen} dialog is skipped`).toBeLessThan(0);
       }

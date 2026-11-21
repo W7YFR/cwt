@@ -98,8 +98,10 @@ export interface ReviewScreenProps {
   /** A paste into the message left notes such as "(your call)" with no
    *  value, or null when it left none. */
   onUnsetNotes?(unset: UnsetNotes | null): void;
-  /** Drop the recording and stay here — see useTake.reset. */
+  /** Drop every run, clear the message and send it once. Stay here. */
   onClear(): void;
+  /** Drop every run and keep the message — see useTake.reset. */
+  onClearRuns(): void;
   /** Open a recording from disk — the same path a dropped file takes. */
   onFile(file: File): void;
   /** Start over at a new message and a new speed. */
@@ -198,6 +200,7 @@ export function ReviewScreen({
   onDeviceChange,
   onCalibrate,
   onClear,
+  onClearRuns,
   onFile,
   onNewSession,
   onBack,
@@ -825,7 +828,7 @@ export function ReviewScreen({
                 rec={rec}
                 appliesToTake={loaded.take.source === MIC_SOURCE}
                 leadLeft={leadLeft}
-                onClear={blank ? undefined : onClear}
+                onClear={blank && !settings.expected && settings.times === 1 ? undefined : onClear}
                 onNewSession={() => setStarting(true)}
                 onDrill={(d) => {
                   if (!blank) {
@@ -981,6 +984,7 @@ export function ReviewScreen({
           settings={settings}
           take={loaded.take}
           onDrop={() => onDropRun(selected)}
+          onClearAll={onClearRuns}
           onFit={() => {
             const speed = fitSpeed(loaded.take.measured);
             if (speed) onChange(speed);

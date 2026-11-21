@@ -91,6 +91,7 @@ function mount() {
       onCalibrate: () => {},
       onFile: () => {},
       onClear: () => {},
+      onClearRuns: () => {},
       onNewSession: (next) => setSettings((prev) => ({ ...prev, ...next })),
       onBack: () => {},
     });

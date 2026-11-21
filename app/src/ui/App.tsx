@@ -555,6 +555,11 @@ function AppBody(): React.ReactElement {
           onFile={(file) => void openFile(file)}
           onClear={() => {
             setError(null);
+            chooseIntended("");
+            take.reset({ expected: "", times: 1 });
+          }}
+          onClearRuns={() => {
+            setError(null);
             take.reset();
           }}
           /* A new session is a reset that also says what the next one is

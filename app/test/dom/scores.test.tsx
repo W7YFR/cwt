@@ -18,6 +18,7 @@ function band(over: Partial<React.ComponentProps<typeof Scores>> = {}) {
   const { take, settings, review } = reviewFrom(caseNamed(SLOPPY));
   const onDrop = vi.fn();
   const onFit = vi.fn();
+  const onClearAll = vi.fn();
   render(
     <Scores
       review={review}
@@ -25,11 +26,12 @@ function band(over: Partial<React.ComponentProps<typeof Scores>> = {}) {
       take={take}
       onDrop={onDrop}
       onFit={onFit}
+      onClearAll={onClearAll}
       runOf={{ at: 0, of: 1 }}
       {...over}
     />,
   );
-  return { onDrop, onFit, take };
+  return { onDrop, onFit, onClearAll, take };
 }
 
 describe("which attempt the band is about", () => {
@@ -114,6 +116,29 @@ describe("dropping a run from the scores", () => {
       />,
     );
     expect(screen.queryByTestId("drop-run")).toBeNull();
+  });
+});
+
+describe("clearing every run from the scores", () => {
+  it("throws them all away when asked", () => {
+    const { onClearAll, onDrop } = band({ runOf: { at: 1, of: 3 } });
+    screen.getByTestId("clear-runs").click();
+    expect(onClearAll).toHaveBeenCalled();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("stays out of a band with no recording behind it", () => {
+    const take = blankTake({ expected: "CQ", charWpm: 20, farnsworthWpm: 20 });
+    render(
+      <Scores
+        review={reviewFrom(caseNamed(SLOPPY)).review}
+        settings={defaultSettings(take)}
+        take={take}
+        onClearAll={() => {}}
+        runOf={{ at: 0, of: 3 }}
+      />,
+    );
+    expect(screen.queryByTestId("clear-runs")).toBeNull();
   });
 });
 
