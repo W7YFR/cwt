@@ -142,8 +142,8 @@ export interface RecordBarProps {
   /** Seconds left of the pacing cursor's lead-in; 0 once it is running, null
    *  when there is no cursor. */
   leadLeft: number | null;
-  /** Throw the recording away and stay here. Absent when there is nothing to
-   *  throw away, and Clear is off. */
+  /** Throw every run away, clear the message and send it once. Stay here.
+   *  Absent when there is nothing to clear, and Clear is off. */
   onClear?: (() => void) | undefined;
   /** Start over at a new message and a new speed. */
   onNewSession?: (() => void) | undefined;
@@ -271,7 +271,7 @@ export function RecordBar({
           onClick={onClear}
           disabled={!onClear}
           data-testid="clear-take"
-          title="Drop this recording and keep the message, the speeds and the settings"
+          title="Clear the message and every run, and send it once. Keep the speeds and the settings"
         >
           Clear
         </button>

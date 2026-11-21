@@ -387,7 +387,16 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
   align-items: center;
   gap: 8px;
 }
-.droprun { color: var(--ink-dim); }
+.droprun { color: var(--ink-dim); position: relative; }
+/* The 1 or the A at the trash can's top right, like a superscript. */
+.droprun .trashmark {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
 /* The border is what every other button changes on hover, and it is enough.
    The glyph staying put is also what keeps this one from flashing red at you
    for passing over it. */

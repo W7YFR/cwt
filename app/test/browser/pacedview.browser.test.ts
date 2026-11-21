@@ -125,6 +125,7 @@ function mount(over: Partial<ReviewSettings> & { runs?: number; take?: Take }) {
       onCalibrate: () => {},
       onFile: () => {},
       onClear: () => {},
+      onClearRuns: () => {},
       onNewSession: () => {},
       onBack: () => {},
     });

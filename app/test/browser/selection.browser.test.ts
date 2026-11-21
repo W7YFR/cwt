@@ -87,6 +87,7 @@ function mount(over: Partial<ReviewSettings> = {}) {
       onCalibrate: () => {},
       onFile: () => {},
       onClear: () => {},
+      onClearRuns: () => {},
       onNewSession: () => {},
       onBack: () => {},
     });

@@ -7,6 +7,14 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- A second trash can on Send, marked A, throws away every run and keeps the message. The trash can that drops one run is now marked 1.
+
+### Changed
+
+- **Clear** at the top of Send also clears the message and sets **Times** back to 1.
+
 ### Fixed
 
 - A recording picked with **Open a recording…** in ⋯ no longer fails to open.
