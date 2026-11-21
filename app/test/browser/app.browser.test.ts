@@ -1673,10 +1673,11 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
   });
 
   it("never lands the keyboard on the file dialog itself", async () => {
-    /* Both ways in are a visible button that opens a hidden <input type=file>.
-       The input is clipped to a 1px box, so in the tab order it is a stop on
-       nothing: no visible focus ring, nothing to read, and Enter opens a file
-       dialog you did not ask for.
+    /* Both ways in are a visible button that opens a file dialog. The landing
+       screen keeps a hidden <input type=file> for it, clipped to a 1px box, so
+       in the tab order it is a stop on nothing: no visible focus ring, nothing
+       to read, and Enter opens a file dialog you did not ask for. The item in
+       ⋯ makes its input on each click and never puts one on the page.
 
        Both halves are the claim. Taking it out of the tab order would be easy
        to do by hiding the whole feature from the keyboard, which is worse than
@@ -1699,7 +1700,7 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
       }
 
       const inputs = [...document.querySelectorAll<HTMLInputElement>("input[type=file]")];
-      expect(inputs.length, `the ${screen} screen opens files`).toBeGreaterThan(0);
+      if (screen === "landing") expect(inputs.length, "the landing screen opens files").toBeGreaterThan(0);
       for (const input of inputs) {
         expect(input.tabIndex, `the ${screen} dialog is skipped`).toBeLessThan(0);
       }
