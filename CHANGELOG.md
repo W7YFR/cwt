@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.36.0 — 2026-11-21
+
 ### Added
 
 - Some stations send on a bug, QRM too: even dits, and long dahs made by hand that vary. Bugs are most common in standard QSOs, rare in a CWT.
