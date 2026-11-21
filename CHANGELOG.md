@@ -9,8 +9,8 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- **Friends** in Settings holds stations you know, with the same details as **You** and a typical speed, character and overall. Now and then a friend calls on the Copy and QSO pages at those speeds, at most once a session. A friend greets you, and may close with shave and a haircut.
-- In a CWT, a CW Academy student calls now and then. It sends CWA in place of a number, and sends slower than the other stations. The station also reads CWA when you send it.
+- **Friends** in Settings holds stations you know, with the details of **You** and a typical character and overall speed. Now and then a friend calls on the Copy and QSO pages at those speeds, at most once a session, greets you, and may close with shave and a haircut.
+- In a CWT, a CW Academy student now and then calls slower than the other stations and sends CWA in place of a number. The station also reads CWA when you send it.
 
 ### Changed
 
