@@ -3,12 +3,26 @@
 
 import { describe, expect, it } from "vitest";
 import { isCall } from "@/qso/cq";
-import { REGIONS } from "@/qso/formats";
+import { makeScript } from "@/copy/generate";
+import { ACADEMY_WPM, FORMATS, REGIONS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
 import { theirItems } from "@/qso/report";
-import { answerRun, newRun, type RunQso } from "@/qso/run";
-import { digitOf, randomCaller, randomStation, regionOf, type Station } from "@/qso/station";
-import { exchange, type Say } from "@/qso/wording";
+import { answerRun, following, newRun, RECENT_NAMES, respond, type RunQso } from "@/qso/run";
+import { newQso } from "@/qso/cq";
+import {
+  asFriend,
+  digitOf,
+  friendCalls,
+  NAMES,
+  randomCaller,
+  randomStation,
+  regionOf,
+  STATION_NAMES,
+  type FriendInfo,
+  type Station,
+} from "@/qso/station";
+import { vocabulary } from "@/qso/vocabulary";
+import { exchange, lastDits, signOff, SHAVE_AND_A_HAIRCUT, type Say } from "@/qso/wording";
 
 /** A fixed sequence, so each station is the same every run. */
 function seeded(seed: number): () => number {
@@ -62,6 +76,83 @@ describe("the stations that call", () => {
 
   it("send their state the way the exchange does: one word at the end of the QTH", () => {
     for (const s of many) expect(REGIONS.has(regionOf(s)), s.qth).toBe(true);
+  });
+});
+
+describe("the names stations send", () => {
+  const rand = seeded(23);
+  const many = Array.from({ length: 20000 }, () => randomStation(rand));
+  const count = (name: string) => many.filter((s) => s.name === name).length;
+
+  it("come from the whole pool, the common ones most often", () => {
+    expect(new Set(many.map((s) => s.name))).toEqual(new Set(STATION_NAMES));
+    expect(count("BOB")).toBeGreaterThan(count("OTTO") * 3);
+    expect(count("JIM")).toBeGreaterThan(count("ELMER") * 3);
+  });
+
+  it("never repeat within the last stations of a run", () => {
+    for (const format of ["cwt", "sst", "mst", "pota"] as const) {
+      let qso: RunQso = newRun(format, rand);
+      const names = [qso.them.name];
+      for (let i = 0; i < 300; i++) {
+        qso = following(qso, rand) as RunQso;
+        names.push(qso.them.name);
+      }
+      for (let i = 1; i < names.length; i++) {
+        expect(names.slice(Math.max(0, i - RECENT_NAMES), i), format).not.toContain(names[i]);
+      }
+      // Common names still come back later in the run.
+      expect(names.filter((n) => n === "BOB").length, format).toBeGreaterThan(1);
+    }
+  });
+
+  it("keep the names after a CQ of another format", () => {
+    let qso: RunQso = newRun("cwt", rand);
+    for (let i = 0; i < 5; i++) qso = following(qso, rand) as RunQso;
+    const next = respond(qso, "CQ SST W7YFR", { rand }).qso as RunQso;
+    expect(next.format).toBe("sst");
+    expect(next.recent).toEqual(qso.recent);
+  });
+
+  it("leave Lenient copy's words as they were", () => {
+    const words = new Set(vocabulary([]));
+    for (const name of NAMES) expect(words.has(name), name).toBe(true);
+    expect(STATION_NAMES.filter((n) => words.has(n)).sort()).toEqual([...NAMES].sort());
+  });
+});
+
+describe("CW Academy students in a CWT", () => {
+  const rand = seeded(31);
+  const runs = Array.from({ length: 5000 }, () => newRun("cwt", rand));
+  const students = runs.filter((q) => q.them.nr === "CWA");
+
+  it("call now and then, and send CWA in place of a number", () => {
+    expect(students.length / runs.length).toBeGreaterThan(0.03);
+    expect(students.length / runs.length).toBeLessThan(0.09);
+    const qso: RunQso = { ...students[0]!, stage: "called", you: "KE7G" };
+    const turn = answerRun(qso, `${qso.them.call} BOB 1234`, { rand });
+    expect(turn.reply!.split(" ")).toContain("CWA");
+    expect(theirItems(turn.qso, [{ text: turn.reply! }])).toContainEqual({ label: "Number", value: "CWA" });
+  });
+
+  it("send slower than the rest", () => {
+    const [lo, hi] = ACADEMY_WPM;
+    for (const q of students) {
+      expect(q.speed.charWpm).toBeGreaterThanOrEqual(lo);
+      expect(q.speed.charWpm).toBeLessThanOrEqual(hi);
+    }
+    const [min] = FORMATS.cwt.wpm;
+    for (const q of runs.filter((r) => r.them.nr !== "CWA")) expect(q.speed.charWpm).toBeGreaterThanOrEqual(min);
+    expect(Math.max(...students.map((q) => q.speed.charWpm))).toBeLessThan(min);
+  });
+
+  it("call and run in the Copy page's generated CWTs", () => {
+    let heard = 0;
+    for (let seed = 1; seed <= 100; seed++) {
+      const script = makeScript({ kind: "cwt", rand: seeded(seed), qsos: 5 });
+      heard += script.lines.filter((l) => l.text.split(" ").includes("CWA")).length;
+    }
+    expect(heard).toBeGreaterThan(0);
   });
 });
 
@@ -133,5 +224,123 @@ describe("a caller in a run", () => {
       Array.from({ length: 5000 }, () => newRun(format, rand).them).filter(canadian).length / 5000;
     expect(share("pota")).toBeLessThan(share("cwt"));
     expect(randomCaller(seeded(3)).nr).toBeDefined();
+  });
+});
+
+describe("friends", () => {
+  const NONE = { cwopsNumber: "", qthCity: "", qthRegionShort: "", rigManufacturer: "", rigModel: "", rigPower: "", antenna: "" };
+  const BOB: FriendInfo = { ...NONE, callsign: "K7ABC", name: "BOB", qthCity: "BEND", qthRegionShort: "OR", rigModel: "IC 7300", antenna: "DIPOLE", wpm: 18, farnsworthWpm: 18 };
+  const ANN: FriendInfo = { ...NONE, callsign: "VE7XYZ", name: "ANN", cwopsNumber: "3121", wpm: 34, farnsworthWpm: 30 };
+  const base = randomCaller(seeded(5));
+
+  it("send their own details, and keep the station's where they left one out", () => {
+    const bob = asFriend(base, BOB);
+    expect(bob).toMatchObject({ call: "K7ABC", name: "BOB", qth: "BEND OR", nr: "", friend: true, rig: "IC7300", antenna: "DIPOLE" });
+    expect(bob.power).toBeUndefined();
+    const ann = asFriend(base, ANN);
+    expect(ann).toMatchObject({ call: "VE7XYZ", nr: "3121", qth: base.qth });
+    expect(asFriend(base, { ...BOB, qthRegionShort: "DL" }).qth).toBe(base.qth);
+    expect(asFriend(base, { ...BOB, qthCity: "" }).qth).toBe("OR");
+  });
+
+  it("call at most once a session, and not every session", () => {
+    const rand = seeded(41);
+    let quiet = 0;
+    for (let session = 0; session < 300; session++) {
+      let qso: RunQso = newRun("cwt", rand, 0, "", "", [], [BOB, ANN]);
+      const calls = [qso.them.call];
+      for (let i = 0; i < 10; i++) {
+        qso = following(qso, rand) as RunQso;
+        calls.push(qso.them.call);
+      }
+      for (const f of [BOB, ANN]) expect(calls.filter((c) => c === f.callsign).length).toBeLessThanOrEqual(1);
+      if (!calls.includes(BOB.callsign) && !calls.includes(ANN.callsign)) quiet++;
+    }
+    expect(quiet).toBeGreaterThan(30);
+    expect(quiet).toBeLessThan(270);
+  });
+
+  it("call in standard QSOs too, carried from one to the next", () => {
+    const rand = seeded(43);
+    let heard = 0;
+    for (let session = 0; session < 100; session++) {
+      let qso = newQso(rand, "", undefined, [BOB]);
+      let times = qso.them.call === BOB.callsign ? 1 : 0;
+      for (let i = 0; i < 10; i++) {
+        qso = following(qso, rand) as typeof qso;
+        if (qso.them.call === BOB.callsign) times++;
+      }
+      expect(times).toBeLessThanOrEqual(1);
+      heard += times;
+    }
+    expect(heard).toBeGreaterThan(0);
+  });
+
+  it("call at their own speed, in a run and in a standard QSO", () => {
+    const always = () => 0;
+    expect(newRun("cwt", always, 0, "", "", [], [BOB]).speed).toEqual({ charWpm: 18, farnsworthWpm: 18 });
+    expect(newRun("sst", always, 0, "", "", [], [ANN]).speed).toEqual({ charWpm: 34, farnsworthWpm: 30 });
+    expect(newQso(always, "", { charWpm: 25, farnsworthWpm: 20 }, [ANN]).speed).toEqual({ charWpm: 34, farnsworthWpm: 30 });
+    // Never an overall speed above their character speed.
+    expect(newQso(always, "", undefined, [{ ...ANN, farnsworthWpm: 40 }]).speed).toEqual({ charWpm: 34, farnsworthWpm: 34 });
+    // Any other station answers your CQ at your speed.
+    expect(newQso(always, "", { charWpm: 25, farnsworthWpm: 20 }).speed).toEqual({ charWpm: 25, farnsworthWpm: 20 });
+    // On the Copy page too, the first time the friend calls.
+    const scripts = Array.from({ length: 100 }, (_, i) => makeScript({ kind: "cq", rand: seeded(i + 1), friends: [BOB] }));
+    const heard = scripts.flatMap((s) => s.stations).filter((s) => s.call === "K7ABC");
+    expect(heard.length).toBeGreaterThan(0);
+    for (const s of heard) expect(s.speed).toEqual({ charWpm: 18, farnsworthWpm: 18 });
+  });
+
+  it("never call at your own call, and draw nothing with no friend to call", () => {
+    let draws = 0;
+    const rand = () => (draws++, 0);
+    expect(friendCalls(rand, [], "W7YFR")).toBeNull();
+    expect(friendCalls(rand, [{ ...BOB, callsign: "W7YFR" }], "W7YFR")).toBeNull();
+    expect(friendCalls(rand, [{ ...BOB, name: "" }])).toBeNull();
+    expect(draws).toBe(0);
+    expect(friendCalls(() => 0, [BOB])?.friend).toBe(BOB);
+  });
+
+  it("greet you in a contest exchange, and now and then close with shave and a haircut", () => {
+    const shaves: string[] = [];
+    for (let seed = 1; seed <= 60; seed++) {
+      const rand = seeded(seed * 7919);
+      const qso: RunQso = { ...newRun("cwt", rand), them: asFriend(base, ANN), stage: "called", you: "KE7G" };
+      const turn = answerRun(qso, "VE7XYZ ROB 1234", { rand, hour: 20 });
+      expect(turn.reply!.split(" "), turn.reply!).toEqual(expect.arrayContaining([expect.stringMatching(/^(ROB|GE)$/)]));
+      expect(theirItems(turn.qso, [{ text: turn.reply! }])).toContainEqual({ label: "Number", value: "3121" });
+      const end = answerRun(turn.qso as RunQso, "TU KE7G", { rand, hour: 20 });
+      expect(end.ended).toBe(true);
+      if (end.reply?.endsWith(SHAVE_AND_A_HAIRCUT)) shaves.push(end.reply);
+    }
+    expect(shaves.length).toBeGreaterThan(10);
+    expect(shaves.length).toBeLessThan(60);
+  });
+
+  it("close a standard QSO with shave and a haircut now and then; other stations never do", () => {
+    const say = (them: Station, seed: number): Say => ({ them, you: "KE7G", name: "ROB", rand: seeded(seed), hour: 12, length: "full", mirror: false });
+    const friend = asFriend(base, BOB);
+    const lines = Array.from({ length: 100 }, (_, i) => [signOff(say(friend, i + 1)), lastDits(say(friend, i + 1))]).flat();
+    const shaved = lines.filter((l) => l.endsWith(SHAVE_AND_A_HAIRCUT));
+    expect(shaved.length).toBeGreaterThan(50);
+    expect(shaved.length).toBeLessThan(200);
+    for (const l of shaved) expect(l.split(" ").filter((w) => w === "E").length, l).toBe(2);
+    for (let i = 1; i <= 100; i++) {
+      expect(signOff(say(base, i))).not.toContain("/");
+      expect(lastDits(say(base, i))).not.toContain("/");
+    }
+  });
+
+  it("call in the Copy page's generated QSOs, at most once each", () => {
+    let heard = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const script = makeScript({ kind: "cwt", rand: seeded(seed), qsos: 5, friends: [BOB] });
+      const times = script.stations.filter((s) => s.call === BOB.callsign).length;
+      expect(times).toBeLessThanOrEqual(1);
+      heard += times;
+    }
+    expect(heard).toBeGreaterThan(5);
+    expect(heard).toBeLessThan(150);
   });
 });

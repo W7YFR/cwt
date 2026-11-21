@@ -27,7 +27,7 @@ import type { AudioClip } from "@/types";
 import { APP_VERSION } from "@/build-info";
 import { Calibrate } from "./Calibrate";
 import { LANDING_VERSION, Landing } from "./Landing";
-import { CalibrationSettings, DrillSettings, UserSettings } from "./Settings";
+import { CalibrationSettings, DrillSettings, FriendSettings, UserSettings } from "./Settings";
 import { SettingsDrawer, SettingsProvider, useSettings } from "./SettingsDrawer";
 import { MicrophoneSection, SettingsForm } from "./Controls";
 import { useInputs } from "./useInputs";
@@ -591,6 +591,8 @@ function AppBody(): React.ReactElement {
         app={(tab) =>
           tab === "you" ? (
             <UserSettings />
+          ) : tab === "friends" ? (
+            <FriendSettings />
           ) : tab === "drills" ? (
             <DrillSettings />
           ) : tab === "microphone" ? (

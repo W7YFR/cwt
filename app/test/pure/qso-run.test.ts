@@ -100,6 +100,14 @@ describe("a QSO in each format", () => {
     expect(replies).toEqual(["TU JIM GA"]);
   });
 
+  it("CWT: a CW Academy student sends CWA, and the station reads yours", () => {
+    const { replies, qso, ended } = work(called("cwt", { ...JIM, nr: "CWA" }), ["K4ABC TOM CWA", "TU KD9XYZ"]);
+    expect(replies).toEqual(["TU JIM CWA", null]);
+    expect(ended).toBe(true);
+    expect(qso.got).toMatchObject({ name: "TOM", number: "CWA" });
+    expect(work(called("cwt"), ["K4ABC TOM", "CWA CWA"]).qso.got).toMatchObject({ name: "TOM", number: "CWA" });
+  });
+
   it("SST: name and region, with a greeting and your name", () => {
     const { replies } = work(called("sst"), ["K4ABC TOM NE", "TU KD9XYZ"]);
     expect(replies).toEqual(["GE TOM JIM GA", "73"]);

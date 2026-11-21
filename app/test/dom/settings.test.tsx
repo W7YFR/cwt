@@ -1,4 +1,4 @@
-/* The app's tabs in Settings: You, Drills, and the saved calibrations under
+/* The app's tabs in Settings: You, Friends, Drills, and the saved calibrations under
  * Microphone. Deleting calibrations, and getting the audio back.
  *
  * `deleteProfile` has existed and been tested since profiles did, and nothing
@@ -9,15 +9,19 @@
  */
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { CalibrationSettings, DrillSettings, UserSettings } from "@/ui/Settings";
+import { CalibrationSettings, DrillSettings, FriendSettings, UserSettings } from "@/ui/Settings";
 import { loadProfiles, saveProfile, selectProfile, activeProfile } from "@/io/profiles";
 import {
+  EMPTY_USER,
+  FRIEND_WPM,
   loadCustomDrills,
+  loadFriends,
   loadPrefs,
   loadUser,
   saveCustomDrills,
+  saveFriends,
   savePrefs,
   saveUser,
 } from "@/io/storage";
@@ -348,5 +352,119 @@ describe("the drills section", () => {
   it("drops stored drills that are not the right shape", () => {
     localStorage.setItem("cwt:prefs", JSON.stringify({ customDrills: [{ id: 1, text: "A" }] }));
     expect(loadCustomDrills()).toEqual([]);
+  });
+});
+
+describe("the friends section", () => {
+  const settle = () => act(async () => {});
+  const BOB = { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", qthCity: "BEND", qthRegionShort: "OR", wpm: 28, farnsworthWpm: 28 };
+  const ANN = { ...EMPTY_USER, id: "friend/b", name: "ANN", callsign: "VE7XYZ", wpm: 18, farnsworthWpm: 12 };
+  const rows = () => screen.queryAllByTestId("friendrow").map((r) => r.getAttribute("data-id"));
+  const save = () => screen.getByTestId("save-friend") as HTMLButtonElement;
+
+  it("adds a friend from the form of You, opened at the top", async () => {
+    const user = userEvent.setup();
+    saveFriends([BOB]);
+    render(<FriendSettings />);
+    await settle();
+    expect(screen.queryByTestId("friend-form")).toBeNull();
+    await user.click(screen.getByTestId("add-friend"));
+    expect(document.activeElement).toBe(screen.getByLabelText("Name"));
+    const form = screen.getByTestId("friend-form");
+    // Above the saved friends, so it is always in the same place.
+    expect(form.compareDocumentPosition(screen.getByTestId("friendlist")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect((screen.getByTestId("add-friend") as HTMLButtonElement).disabled).toBe(true);
+    // It needs a call and a name.
+    await user.type(screen.getByLabelText("Callsign"), "n4qq");
+    expect(save().disabled).toBe(true);
+    await user.type(screen.getByLabelText("Name"), "jim");
+    // Their speeds start at the default, and the sliders set them. Overall
+    // follows character speed down, never above it.
+    const wpm = document.getElementById("friend-wpm") as HTMLInputElement;
+    const farns = document.getElementById("friend-farns") as HTMLInputElement;
+    expect([Number(wpm.value), Number(farns.value)]).toEqual([FRIEND_WPM, FRIEND_WPM]);
+    fireEvent.change(farns, { target: { value: "20" } });
+    fireEvent.change(wpm, { target: { value: "18" } });
+    expect(Number(farns.value)).toBe(18);
+    fireEvent.change(wpm, { target: { value: "32" } });
+    fireEvent.change(farns, { target: { value: "24" } });
+    // Enter in a field saves, as the button does.
+    await user.type(screen.getByLabelText("CWops number"), "12x3{Enter}");
+    const friends = loadFriends();
+    expect(friends.map((f) => f.callsign)).toEqual(["K7ABC", "N4QQ"]);
+    expect(friends[1]).toMatchObject({ name: "JIM", cwopsNumber: "123", wpm: 32, farnsworthWpm: 24 });
+    expect(screen.queryByTestId("friend-form")).toBeNull();
+    expect(rows()).toEqual(["friend/a", friends[1]!.id]);
+  });
+
+  it("shows each saved friend read-only, with no fields", async () => {
+    saveFriends([BOB, ANN]);
+    render(<FriendSettings />);
+    await settle();
+    expect(rows()).toEqual(["friend/a", "friend/b"]);
+    for (const row of screen.getAllByTestId("friendrow")) {
+      expect(row.getAttribute("data-editing")).toBe("false");
+      expect(row.querySelector("input")).toBeNull();
+    }
+    expect(screen.getAllByTestId("friendrow")[0]!.textContent).toContain("K7ABC");
+  });
+
+  it("edits a friend in their own row, keeping their id and place", async () => {
+    const user = userEvent.setup();
+    saveFriends([BOB, ANN]);
+    render(<FriendSettings />);
+    await settle();
+    await user.click(screen.getAllByTestId("edit-friend")[0]!);
+    expect(document.activeElement).toBe(screen.getByLabelText("Name"));
+    const form = screen.getByTestId("friend-form");
+    expect(screen.getByTestId("friendlist").firstElementChild!.contains(form)).toBe(true);
+    expect((screen.getByLabelText("Callsign") as HTMLInputElement).value).toBe("K7ABC");
+    expect(Number((document.getElementById("friend-wpm") as HTMLInputElement).value)).toBe(28);
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "bobby");
+    await user.click(save());
+    expect(loadFriends().map((f) => [f.id, f.name])).toEqual([
+      ["friend/a", "BOBBY"],
+      ["friend/b", "ANN"],
+    ]);
+    expect(rows()).toEqual(["friend/a", "friend/b"]);
+  });
+
+  it("cancels an edit without changing the friend", async () => {
+    const user = userEvent.setup();
+    saveFriends([BOB]);
+    render(<FriendSettings />);
+    await settle();
+    await user.click(screen.getByTestId("edit-friend"));
+    await user.type(screen.getByLabelText("Name"), "X");
+    await user.click(screen.getByTestId("cancel-friend"));
+    expect(loadFriends()).toEqual([BOB]);
+    expect(screen.queryByTestId("friend-form")).toBeNull();
+  });
+
+  it("deletes a friend, leaving another's open form as it is", async () => {
+    const user = userEvent.setup();
+    saveFriends([BOB, ANN]);
+    render(<FriendSettings />);
+    await settle();
+    await user.click(screen.getAllByTestId("edit-friend")[1]!);
+    await user.click(screen.getByTestId("delete-friend"));
+    expect(loadFriends()).toEqual([ANN]);
+    expect((screen.getByLabelText("Callsign") as HTMLInputElement).value).toBe("VE7XYZ");
+    await user.click(screen.getByTestId("cancel-friend"));
+    expect(rows()).toEqual(["friend/b"]);
+  });
+
+  it("reads saved friends back in upper case, and drops ones that are not the right shape", () => {
+    localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "bob", callsign: "k7abc" }] }));
+    // Saved before friends had a speed: the default.
+    expect(loadFriends()).toEqual([
+      { ...EMPTY_USER, id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: FRIEND_WPM, farnsworthWpm: FRIEND_WPM },
+    ]);
+    // Saved before friends had an overall speed: their own speed.
+    localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ id: "friend/a", name: "BOB", callsign: "K7ABC", wpm: 30 }] }));
+    expect(loadFriends()[0]).toMatchObject({ wpm: 30, farnsworthWpm: 30 });
+    localStorage.setItem("cwt:prefs", JSON.stringify({ friends: [{ name: "BOB" }] }));
+    expect(loadFriends()).toEqual([]);
   });
 });

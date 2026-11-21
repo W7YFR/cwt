@@ -36,6 +36,13 @@ export const FORMATS: Readonly<Record<FormatId, Format>> = {
 
 export const FORMAT_IDS = Object.keys(FORMATS) as FormatId[];
 
+/** What a CW Academy student sends in a CWT in place of a number. */
+export const ACADEMY = "CWA";
+
+/** The speeds a CW Academy student sends at in a CWT, slowest and fastest.
+ *  They are learning. */
+export const ACADEMY_WPM: readonly [number, number] = [15, 22];
+
 /** The format a word names, or null. */
 export function formatNamed(word: string): FormatId | null {
   return FORMAT_IDS.find((id) => FORMATS[id].word === word) ?? null;

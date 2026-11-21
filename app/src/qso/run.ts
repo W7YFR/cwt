@@ -25,8 +25,8 @@
  * standard QSO from your CQ.
  */
 
-import { pick, randomCaller, regionOf, type Rand, type Station } from "./station";
-import { FORMATS, FORMAT_IDS, REGIONS, formatNamed, type FormatId, type Item } from "./formats";
+import { asFriend, friendCalls, pick, randomCaller, regionOf, type FriendInfo, type Rand, type Station } from "./station";
+import { ACADEMY, ACADEMY_WPM, FORMATS, FORMAT_IDS, REGIONS, formatNamed, type FormatId, type Item } from "./formats";
 import { NO_SEARCH, type Search, type Speed } from "./speed";
 import {
   DEFAULT_SPEED,
@@ -45,6 +45,7 @@ import {
   type Qso,
 } from "./cq";
 import { answerScript, isScript, type ScriptQso } from "./script";
+import { flourish } from "./wording";
 
 /** Your exchange, item by item: what the station has copied of it. */
 export interface Heard {
@@ -74,6 +75,12 @@ export interface RunQso {
   readonly search: Search;
   /** The QSOs made in this run before this one. */
   readonly made: number;
+  /** The names of the stations before this one in the run, newest last,
+   *  `RECENT_NAMES` at most. Absent in a QSO kept before there were any. */
+  readonly recent?: readonly string[];
+  /** Your friends who have not called yet this session. Absent in a QSO
+   *  kept before there were friends. */
+  readonly friends?: readonly FriendInfo[];
   /** What it has of your exchange so far, from every over. Absent in a QSO
    *  kept before there was one. */
   readonly got?: Heard;
@@ -108,21 +115,46 @@ export interface RunTurn {
   readonly ended: boolean;
 }
 
+/** The speeds `station` sends at in `format`, slowest and fastest: slower
+ *  for a CW Academy student in a CWT. */
+export function wpmOf(format: FormatId, station: Station): readonly [number, number] {
+  return format === "cwt" && station.nr === ACADEMY ? ACADEMY_WPM : FORMATS[format].wpm;
+}
+
+/** How many stations back in a run a new station's name may not repeat. */
+export const RECENT_NAMES = 10;
+
 /** A new QSO in a run of `format`, after `made` QSOs, with a station not at
- *  the call `not`. */
-export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = ""): RunQso {
-  const [lo, hi] = FORMATS[format].wpm;
-  const wpm = lo + Math.floor(rand() * (hi - lo + 1));
+ *  the call `not` and with none of the names in `recent`. Now and then the
+ *  station is one of `friends`, who have not called yet this session. */
+export function newRun(
+  format: FormatId,
+  rand: Rand,
+  made = 0,
+  not = "",
+  you = "",
+  recent: readonly string[] = [],
+  friends: readonly FriendInfo[] = [],
+): RunQso {
+  const at = rand();
+  const calls = friendCalls(rand, friends, not);
+  const caller = randomCaller(rand, not, FORMATS[format].canada, recent);
+  const them = calls ? asFriend(caller, calls.friend) : caller;
+  const [lo, hi] = wpmOf(format, them);
+  const wpm = lo + Math.floor(at * (hi - lo + 1));
   return {
     format,
     stage: "waiting",
-    them: randomCaller(rand, not, FORMATS[format].canada),
+    them,
     you,
     yourName: "",
     last: "",
-    speed: { charWpm: wpm, farnsworthWpm: wpm },
+    // A friend calls at their own speeds.
+    speed: them.wpm ? { charWpm: them.wpm, farnsworthWpm: them.farnsworthWpm ?? them.wpm } : { charWpm: wpm, farnsworthWpm: wpm },
     search: NO_SEARCH,
     made,
+    recent,
+    friends: calls ? calls.left : friends,
     got: NOTHING,
   };
 }
@@ -130,8 +162,14 @@ export function newRun(format: FormatId, rand: Rand, made = 0, not = "", you = "
 /** The QSO after `qso`: the next station in a run, or a new standard QSO.
  *  After a script, a standard QSO too: a script plays once. */
 export function following(qso: AnyQso, rand: Rand, speed: Speed = DEFAULT_SPEED): AnyQso {
-  if (isRun(qso)) return newRun(qso.format, rand, qso.made + 1, qso.them.call, qso.you);
-  return newQso(rand, qso.you, speed);
+  const friends = ("friends" in qso && qso.friends) || [];
+  if (isRun(qso)) return newRun(qso.format, rand, qso.made + 1, qso.them.call, qso.you, recentAfter(qso), friends);
+  return newQso(rand, qso.you, speed, friends);
+}
+
+/** The names in a run after `qso`: its station's name added. */
+function recentAfter(qso: RunQso): string[] {
+  return [...(qso.recent ?? []), qso.them.name].slice(-RECENT_NAMES);
 }
 
 /** The station calls you: its first over. */
@@ -153,8 +191,10 @@ export const AROUND = new Set([
 ]);
 
 /** A number as sent: digits, with the cut letters T for 0 and N for 9 read
- *  as digits. At least one real digit. */
+ *  as digits. At least one real digit. CWA, a CW Academy student's, counts
+ *  as a number. */
 function numberOf(word: string): string | null {
+  if (word === ACADEMY) return ACADEMY;
   if (!/^[0-9TNO]{1,5}$/.test(word) || !/\d/.test(word)) return null;
   return word.replace(/[TO]/g, "0").replace(/N/g, "9");
 }
@@ -178,7 +218,7 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   const rest = words.filter((w) => !AROUND.has(w) && !isCall(w) && !w.endsWith("?") && formatNamed(w) === null);
   const report = reportIn(words);
   const named = FORMATS[format].yours.includes("name");
-  const isName = (w: string | undefined) => w !== undefined && /^[A-Z]{2,}$/.test(w);
+  const isName = (w: string | undefined) => w !== undefined && w !== ACADEMY && /^[A-Z]{2,}$/.test(w);
   // A region alone, as WA, is a region, not a name: a name that is also a
   // region, as AL, needs a number or a region after it.
   const nameAt = (i: number) =>
@@ -299,7 +339,7 @@ function answerFor(item: Item, words: readonly string[], mine: string, lenient =
   const rest = words.filter((w) => !AROUND.has(w) && !isCall(w) && !w.endsWith("?"));
   switch (item) {
     case "name":
-      return { ...NOTHING, name: rest.find((w) => /^[A-Z]{2,}$/.test(w)) ?? "" };
+      return { ...NOTHING, name: rest.find((w) => w !== ACADEMY && /^[A-Z]{2,}$/.test(w)) ?? "" };
     case "number":
       return { ...NOTHING, number: numberIn(rest) || numberIn(words.filter((w) => !isCall(w))) };
     case "region":
@@ -358,17 +398,24 @@ export function potaReportIn(them: Station, lines: readonly { readonly text: str
   return !said(short) && said(them.rst) ? them.rst : short;
 }
 
-/** The station's own exchange, worded a little differently each time. */
+/** The station's own exchange, worded a little differently each time. A
+ *  friend picks a wording that greets you. */
 function exchange(qso: RunQso, rand: Rand, hour: number): string {
   const { them, yourName } = qso;
   const name = them.name;
   const st = regionOf(them);
   const g = hour < 12 ? "GM" : hour < 18 ? "GA" : "GE";
   const join = (...parts: string[]) => parts.filter(Boolean).join(" ");
+  // A friend is a little friendlier: a wording with a greeting or your name.
+  const warm = (w: string) => w.split(" ").some((x) => x === g || (yourName !== "" && x === yourName));
+  const choose = (wordings: string[]) => {
+    const friendly = them.friend ? wordings.filter(warm) : [];
+    return pick(rand, friendly.length > 0 ? friendly : wordings);
+  };
   switch (qso.format) {
     case "cwt": {
       const nr = them.nr || st;
-      return pick(rand, [
+      return choose([
         `TU ${name} ${nr}`,
         `R ${name} ${nr}`,
         `${name} ${nr}`,
@@ -382,7 +429,7 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
       ]);
     }
     case "sst":
-      return pick(rand, [
+      return choose([
         join(g, yourName, name, st),
         join("TU", yourName, name, st),
         `R ${name} ${st}`,
@@ -394,7 +441,7 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
       ]);
     case "mst": {
       const nr = String(them.serial ?? 1);
-      return pick(rand, [
+      return choose([
         `TU ${name} ${nr}`,
         `R ${name} ${nr}`,
         `${name} ${nr}`,
@@ -408,7 +455,7 @@ function exchange(qso: RunQso, rand: Rand, hour: number): string {
     case "pota": {
       // A hunter says its state once or twice, and 599 or 5NN.
       const r = potaReport(them, rand);
-      return pick(rand, [
+      return choose([
         `BK TU UR ${r} ${st} BK`,
         `BK TU UR ${r} ${r} ${st} ${st} BK`,
         `R R ${r} ${st} ${st} BK`,
@@ -461,8 +508,13 @@ function itemOf(qso: RunQso, item: Item, rand: Rand): string | null {
 
 /** What the station sends after your TU, or null for nothing. A hunter
  *  closes with E E. In an SST, many send 73. In a CWT or an MST, a caller
- *  sends nothing. */
+ *  sends nothing. A friend now and then closes with shave and a haircut. */
 function lastWord(qso: RunQso, rand: Rand): string | null {
+  const plain = plainLastWord(qso, rand);
+  return flourish(qso.them, rand, plain ?? "") || plain;
+}
+
+function plainLastWord(qso: RunQso, rand: Rand): string | null {
   if (qso.format === "pota") {
     return pick(rand, ["73 E E", "E E", "TU 73 E E", "GL 73 E E", "TU 72 E E", "R 73 E E", "TNX 73 E E", "72 E E", "TU GL E E"]);
   }
@@ -666,8 +718,8 @@ export function respond(qso: AnyQso, heard: string, context: RunContext = {}): R
   if (fresh) {
     const over = new Over(heard, ear);
     const named = namedIn(over);
-    if (named && (!isRun(qso) || named !== qso.format)) qso = newRun(named, rand, 0, qso.them.call, qso.you);
-    else if (!named && isRun(qso) && over.has("CQ")) qso = newQso(rand, qso.them.call, speed);
+    if (named && (!isRun(qso) || named !== qso.format)) qso = newRun(named, rand, 0, qso.them.call, qso.you, isRun(qso) ? qso.recent : [], qso.friends);
+    else if (!named && isRun(qso) && over.has("CQ")) qso = newQso(rand, qso.them.call, speed, qso.friends);
   }
   return isRun(qso) ? answerRun(qso, heard, context) : answer(qso, heard, context);
 }

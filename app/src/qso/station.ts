@@ -4,6 +4,8 @@
  * would on the air. `rand` is passed in, so a test can fix the station.
  */
 
+import { ACADEMY } from "./formats";
+
 export type Rand = () => number;
 
 export interface Station {
@@ -24,6 +26,33 @@ export interface Station {
   readonly nr?: string;
   /** In an MST, its serial number for this QSO. */
   readonly serial?: number;
+  /** One of your friends, from Settings. Absent for any other station. */
+  readonly friend?: boolean;
+  /** A friend's rig, antenna and power, as they set them. Absent when not
+   *  set: the station names a rig of its own. */
+  readonly rig?: string;
+  readonly antenna?: string;
+  readonly power?: string;
+  /** A friend's typical speeds, in words per minute, character and
+   *  overall: the speeds they call at. */
+  readonly wpm?: number;
+  readonly farnsworthWpm?: number;
+}
+
+/** What a station takes from a friend: their details from Settings. */
+export interface FriendInfo {
+  readonly callsign: string;
+  readonly name: string;
+  readonly cwopsNumber: string;
+  readonly qthCity: string;
+  readonly qthRegionShort: string;
+  readonly rigManufacturer: string;
+  readonly rigModel: string;
+  readonly rigPower: string;
+  readonly antenna: string;
+  /** Their typical speeds, in words per minute: character and overall. */
+  readonly wpm: number;
+  readonly farnsworthWpm: number;
 }
 
 /** The state or province at the end of `qth`: OR, from SALEM OR. */
@@ -31,11 +60,48 @@ export function regionOf(station: Station): string {
   return station.qth.slice(station.qth.lastIndexOf(" ") + 1);
 }
 
+/** Names Lenient copy knows as words. A station's own name and yours come
+ *  in per QSO, so this short list stays as it was: more words could change
+ *  how Lenient copy reads gaps. */
 export const NAMES = [
   "AL", "ANN", "BILL", "BOB", "CHUCK", "DAN", "DAVE", "ED", "FRED", "GARY",
   "JIM", "JOE", "JOHN", "KEN", "LEE", "MARK", "MIKE", "PAT", "PETE", "RICK",
   "RON", "SAM", "SUE", "TOM", "WALT",
 ];
+
+/** The names stations send, as sent on CW: BOB, not ROBERT. Each line is a
+ *  weight: the common names come up most, as on the air. */
+const NAME_WEIGHTS: Readonly<Record<string, number>> = {
+  ...weigh(6, "BOB JIM JOHN MIKE DAVE BILL TOM"),
+  ...weigh(3, "DON RON JOE STEVE DAN GARY KEN RICK PAUL MARK JERRY LARRY DICK CHUCK TED ED AL FRED GEORGE PETE JACK RAY FRANK HANK ART WALT DOUG JEFF TIM GREG RANDY TERRY PHIL CHRIS"),
+  ...weigh(1, [
+    "ALAN ANDY ARNIE BARRY BEN BERT BOYD BRAD BRIAN BRUCE BUD CAL CARL CHARLIE CLAY CLIFF CLYDE CRAIG CURT",
+    "DALE DARRELL DEAN DENNIS DUANE EARL ELMER ERIC ERNIE FLOYD GENE GIL GLEN GORDON GUS HAL HARRY HERB HOWARD HUGH",
+    "IRV JAKE JAY JON KEITH KEVIN KURT LEE LEN LEO LES LLOYD LOU LYLE MAC MARTY MARV MATT MAX MEL MERLE MILT MONTY",
+    "NATE NEIL NICK NORM OSCAR OTTO PAT PERRY RALPH REX RICH ROB ROD ROGER ROSS ROY RUDY RUSS SAM SCOTT SID SKIP",
+    "STAN STU TODD TONY TROY VERN VIC WALLY WAYNE WES ANDRE CLAUDE LUC MARC PIERRE",
+    "ANN BARB BETH CAROL CINDY CONNIE DEB DIANE ELLEN GAIL JAN JILL JOAN JUDY KAREN KATHY KIM LINDA LIZ LYNN",
+    "MARY NANCY PAM PEG RUTH SALLY SHARON SUE",
+  ].join(" ")),
+};
+
+function weigh(weight: number, names: string): Record<string, number> {
+  return Object.fromEntries(names.split(" ").map((n) => [n, weight]));
+}
+
+/** Every name a station may send. */
+export const STATION_NAMES = Object.keys(NAME_WEIGHTS);
+
+/** A name, by weight, none of `not`. */
+function randomName(rand: Rand, not: readonly string[]): string {
+  const all = Object.entries(NAME_WEIGHTS).filter(([name]) => !not.includes(name));
+  let left = rand() * all.reduce((sum, [, w]) => sum + w, 0);
+  for (const [name, w] of all) {
+    left -= w;
+    if (left < 0) return name;
+  }
+  return all[all.length - 1]![0];
+}
 
 /** Where stations are, by state or province: its towns, and how many hams
  *  live there, roughly, as a weight. The busy states call most. */
@@ -227,15 +293,15 @@ export function callFrom(rand: Rand, region: string): string {
 /** How many stations in a standard QSO are in Canada. */
 export const CANADA = 0.05;
 
-/** A new station, never at the call `not`. `canada` of the time it is in
- *  Canada. */
-export function randomStation(rand: Rand, not = "", canada = CANADA): Station {
+/** A new station, never at the call `not` and never with a name in
+ *  `names`. `canada` of the time it is in Canada. */
+export function randomStation(rand: Rand, not = "", canada = CANADA, names: readonly string[] = []): Station {
   const region = randomRegion(rand, canada);
   let call = callFrom(rand, region);
   while (call === not) call = callFrom(rand, region);
   return {
     call,
-    name: pick(rand, NAMES),
+    name: randomName(rand, names),
     qth: qthIn(rand, region),
     rst: pick(rand, RSTS),
     toneHz: 550 + Math.round(rand() * 20) * 10,
@@ -243,17 +309,61 @@ export function randomStation(rand: Rand, not = "", canada = CANADA): Station {
   };
 }
 
-/** How many CWT stations are CWops members. The rest send their region. */
-const MEMBERS = 0.8;
+/** How often a friend not yet heard this session calls in place of a new
+ *  station. Low, so a friend does not call every session. */
+export const FRIEND_CHANCE = 0.08;
 
-/** A station that answers a CQ in a run: a new station, with a CWops number
- *  most of the time and a serial number of its own. `canada` of the time it
- *  is in Canada. */
-export function randomCaller(rand: Rand, not = "", canada = CANADA): Station {
-  const station = randomStation(rand, not, canada);
+/** A friend who calls now and then, never at the call `not`, and the friends
+ *  still to call this session. Null when no friend calls. Draws nothing with
+ *  no friend to call, so a session without friends goes as before. */
+export function friendCalls(
+  rand: Rand,
+  friends: readonly FriendInfo[],
+  not = "",
+): { friend: FriendInfo; left: FriendInfo[] } | null {
+  const can = friends.filter((f) => f.callsign.trim() && f.name.trim() && f.callsign.trim() !== not);
+  if (can.length === 0 || rand() >= FRIEND_CHANCE) return null;
+  const friend = pick(rand, can);
+  return { friend, left: friends.filter((f) => f !== friend) };
+}
+
+/** `station` as your friend: their call, name and QTH, their CWops number or
+ *  none, their rig, and their speeds. What they left out stays `station`'s. A QTH with no
+ *  state or province the exchange knows stays `station`'s too. */
+export function asFriend(station: Station, f: FriendInfo): Station {
+  const region = f.qthRegionShort.trim();
+  const city = f.qthCity.trim();
+  const known = region in STATES || region in PROVINCES;
+  const rig = (f.rigModel.trim() || f.rigManufacturer.trim()).replace(/\s+/g, "");
   return {
     ...station,
-    nr: rand() < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : "",
+    call: f.callsign.trim(),
+    name: f.name.trim(),
+    qth: known ? (city ? `${city} ${region}` : region) : station.qth,
+    nr: f.cwopsNumber.trim(),
+    friend: true,
+    wpm: f.wpm,
+    farnsworthWpm: Math.min(f.farnsworthWpm, f.wpm),
+    ...(rig ? { rig } : {}),
+    ...(f.antenna.trim() ? { antenna: f.antenna.trim() } : {}),
+    ...(f.rigPower.trim() ? { power: f.rigPower.trim() } : {}),
+  };
+}
+
+/** How many CWT stations are CWops members, and how many CW Academy
+ *  students, who send CWA. The rest send their region. */
+const MEMBERS = 0.8;
+const STUDENTS = 0.06;
+
+/** A station that answers a CQ in a run: a new station, with a CWops number
+ *  most of the time, now and then CWA, and a serial number of its own.
+ *  `canada` of the time it is in Canada. Its name is none of `names`. */
+export function randomCaller(rand: Rand, not = "", canada = CANADA, names: readonly string[] = []): Station {
+  const station = randomStation(rand, not, canada, names);
+  const r = rand();
+  return {
+    ...station,
+    nr: r < MEMBERS ? String(1 + Math.floor(rand() * 4200)) : r < MEMBERS + STUDENTS ? ACADEMY : "",
     serial: 1 + Math.floor(rand() * 150),
   };
 }

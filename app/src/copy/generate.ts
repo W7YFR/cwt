@@ -22,9 +22,9 @@ import { newQso } from "@/qso/cq";
 import { GUIDE_IDS, type GuideId } from "@/qso/examples";
 import { FORMATS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
-import { callIn, following, isRun, respond, type AnyQso, type RunQso } from "@/qso/run";
+import { callIn, following, isRun, respond, wpmOf, type AnyQso, type RunQso } from "@/qso/run";
 import type { Speed } from "@/qso/speed";
-import { randomCaller, regionOf, type Rand, type Station } from "@/qso/station";
+import { randomCaller, regionOf, type FriendInfo, type Rand, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { targetTiming } from "@/timing";
 import type { Over, Recording } from "./decode";
@@ -73,6 +73,8 @@ export interface MakeOptions {
   readonly length?: Length;
   /** A run: how many QSOs. */
   readonly qsos?: number;
+  /** Your friends, from Settings. Now and then one calls, at most once. */
+  readonly friends?: readonly FriendInfo[];
 }
 
 /** The speeds a standard QSO is sent at, slowest and fastest. The station that
@@ -111,7 +113,7 @@ export function makeScript(options: MakeOptions): Script {
   const start = kind === "cq" ? null : kind;
   const caller = randomCaller(rand);
   const me = meOf(caller);
-  const mySpeed = wpmIn(rand, start ? FORMATS[start].wpm : STANDARD_QSO_WPM);
+  const mySpeed = wpmIn(rand, start ? wpmOf(start, caller) : STANDARD_QSO_WPM);
   const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand), speed: mySpeed }];
   const lines: ScriptLine[] = [];
   const voice = { rand, hour, pieces: length === "pieces" };
@@ -127,7 +129,7 @@ export function makeScript(options: MakeOptions): Script {
     return stations.push({ call: qso.them.call, toneHz, speed: qso.speed }) - 1;
   };
 
-  let qso: AnyQso = newQso(rand, me.call, mySpeed);
+  let qso: AnyQso = newQso(rand, me.call, mySpeed, options.friends);
   let done = 0;
   for (let n = 0; n < MOST_OVERS; n++) {
     const mine = hint(qso, me, start, voice);

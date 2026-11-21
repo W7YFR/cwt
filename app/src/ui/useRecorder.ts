@@ -23,6 +23,7 @@ import {
 import { micLog } from "@/micdebug";
 import type { AudioClip } from "@/types";
 import { noteMicOpened, noteMicRefused, useMicAccess } from "./useMicAccess";
+import { drawerOpen } from "./Drawer";
 
 export interface UseRecorderOptions {
   deviceId: string | undefined;
@@ -384,6 +385,8 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
     if (!recorder && !startKey) return;
     // Mid-composition Enter is committing an IME candidate, not a command.
     if (ev.isComposing) return;
+    // Keys typed in Settings or Help belong there.
+    if (drawerOpen()) return;
     if (!recorder) {
       // Busy is a recording being analyzed — the same state that disables
       // the button this key stands in for.

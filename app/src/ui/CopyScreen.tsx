@@ -53,6 +53,7 @@ import {
   keepCopyFile,
   loadPrefs,
   loadSpeed,
+  loadFriends,
   loadUser,
   recallCopy,
   recallCopyFile,
@@ -86,6 +87,7 @@ import { PageSettings, SettingsButton, useSettings } from "./SettingsDrawer";
 import { PageHelp, type KeyGroup } from "./Help";
 import { NEEDS_BAND, NEEDS_BAND_ON, NEEDS_LINES_COPY, NEEDS_SLOTS } from "./copy";
 import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED, longest } from "./Toolbar";
+import { drawerOpen } from "./Drawer";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
@@ -731,7 +733,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const makeExchange = () => {
     player.stop();
     cancelLastLock();
-    const script = makeScript({ kind, length: qsoLength, qsos: runQsos });
+    const script = makeScript({ kind, length: qsoLength, qsos: runQsos, friends: loadFriends() });
     const sent = sendScript(script, sending);
     const audio = encodeWavBuffer(sent.samples, sent.rate);
     const name = nameOf(script);
@@ -1271,7 +1273,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
      and pauses, and Esc leaves it; the rest is typing. */
   const keyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
   keyRef.current = (ev) => {
-    if (!rec || textDraft) return;
+    if (!rec || textDraft || drawerOpen()) return;
     const el = ev.target as HTMLElement | null;
     if (modKey(ev)) return;
     if (altKey(ev)) {

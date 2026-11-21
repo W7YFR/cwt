@@ -96,6 +96,12 @@ export function Drawer({
   );
 }
 
+/** Whether a drawer is open. A page's own keys do nothing then: Enter in
+ *  a Settings field never restarts the page's session below it. */
+export function drawerOpen(): boolean {
+  return document.querySelector('.drawerwrap[data-state="open"]') !== null;
+}
+
 /** A row of tabs for a drawer. */
 export function DrawerTabs({
   label,
