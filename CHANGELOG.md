@@ -14,6 +14,7 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
+- On the QSO page with **Lines** set to **Copy**, your copy box lets go of the cursor once you start sending, so **R** redoes your sending. The cursor comes back when the station sends again.
 - On the QSO page and in the Copy page's generated QSOs, stations send many more names, the common ones most often. In a run, a station never has the name of one of the stations just before it.
 
 ### Fixed

@@ -1280,6 +1280,27 @@ export function QsoScreen({
     isSending(copy.text);
 
 
+  /* You have begun sending with the cursor in your copy: the box lets go,
+     so R redoes your sending. When the station next sends, the box has the
+     cursor back, unless a new line has taken it. */
+  const letGo = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!sending) return;
+    const el = document.activeElement;
+    if (!(el instanceof HTMLInputElement) || !el.closest(".qsolog")) return;
+    letGo.current = el;
+    el.blur();
+  }, [sending]);
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const el = letGo.current;
+    letGo.current = null;
+    if (!(el instanceof HTMLInputElement) || !el.isConnected || el.disabled || el.readOnly) return;
+    const now = document.activeElement;
+    if (now && now !== document.body) return;
+    el.focus();
+  }, [phase]);
+
   /* Your next over has begun: the copy of the QSO before is done. */
   useEffect(() => {
     if (finished === null || !sending) return;

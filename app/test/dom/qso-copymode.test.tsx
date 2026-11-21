@@ -126,6 +126,20 @@ describe("copy mode options", () => {
     expect($(".qsolog .copied"), "no count").toBeNull();
   });
 
+  it("lets go of your copy once you are sending, so R redoes it, and the station's next line has the cursor", async () => {
+    const box = await copyAnswer({ qsoLockCopy: false });
+    box.focus();
+    const before = theirs().length;
+    await key("QRS K");
+    await until("the box to let go", () => document.activeElement !== box);
+    expect(document.activeElement).toBe(document.body);
+    await until("the answer", () => theirs().length > before);
+    const now = document.activeElement as HTMLElement;
+    expect(now.closest(".qsolog"), "a box in the log has the cursor").not.toBeNull();
+    expect(now.tagName).toBe("INPUT");
+    await until("the turn to come back", () => yourTurn());
+  });
+
   it("leaves your copy open while you send, with Lock off", async () => {
     await copyAnswer({ qsoLockCopy: false });
     const before = theirs().length;
