@@ -13,7 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { DRILLS } from "@/drills";
 import { saveOpenDrillGroups } from "@/io/storage";
 import { ModeSwitch, RecordBar } from "@/ui/Record";
-import { OpenFileItem } from "@/ui/Toolbar";
+import { MoreMenu, OpenFileItem } from "@/ui/Toolbar";
 import { OPEN_FILE_CLOSED } from "@/ui/copy";
 import { modeOf, modePatch } from "@/ui/mode";
 import type { RecorderHandle } from "@/ui/useRecorder";
@@ -187,12 +187,42 @@ describe("opening a recording from ⋯", () => {
     expect(open.getAttribute("title")).toBe(OPEN_FILE_CLOSED);
   });
 
+  /** Click the item, pick `file` in the dialog it opens. */
+  async function pick(file: File) {
+    let dialog: HTMLInputElement | null = null;
+    const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (this: HTMLInputElement) {
+      dialog = this;
+    });
+    await userEvent.setup().click(screen.getByTestId("open-file"));
+    click.mockRestore();
+    expect(dialog).not.toBeNull();
+    const input = dialog as unknown as HTMLInputElement;
+    expect(input.type).toBe("file");
+    Object.defineProperty(input, "files", { value: [file] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
   it("hands the file on", async () => {
     const onFile = vi.fn();
     item({ onFile });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(["x"], "take.wav", { type: "audio/wav" });
-    await userEvent.setup().upload(input, file);
+    await pick(file);
+    expect(onFile).toHaveBeenCalledWith(file);
+  });
+
+  it("hands the file on after ⋯ closes", async () => {
+    /* A click on an item closes ⋯ and unmounts the item. The file arrives
+       after that, from the dialog. */
+    const onFile = vi.fn();
+    render(
+      <MoreMenu>
+        <OpenFileItem label="Open a recording…" accept=".wav" testId="open-file" onFile={onFile} />
+      </MoreMenu>,
+    );
+    await userEvent.setup().click(screen.getByTestId("more"));
+    const file = new File(["x"], "take.wav", { type: "audio/wav" });
+    await pick(file);
+    expect(screen.queryByTestId("open-file")).toBeNull();
     expect(onFile).toHaveBeenCalledWith(file);
   });
 });

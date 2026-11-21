@@ -273,8 +273,11 @@ export function MenuHeading({ children }: { children: React.ReactNode }): React.
   return <div className="menuhead">{children}</div>;
 }
 
-/** An item in ⋯ that opens a file. The file dialog is the only part of the
- *  hidden input anyone sees, so it is kept out of the tab order. */
+/** An item in ⋯ that opens a file.
+ *
+ *  The click closes ⋯ and unmounts this item before the person picks a file.
+ *  So the file input is made on each click, outside React: an input rendered
+ *  here would be gone when the file arrives, and the file with it. */
 export function OpenFileItem({
   label,
   accept,
@@ -290,32 +293,20 @@ export function OpenFileItem({
   testId?: string;
   onFile(file: File): void;
 }): React.ReactElement {
-  const input = useRef<HTMLInputElement>(null);
+  const pick = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (file) onFile(file);
+    });
+    input.click();
+  };
   return (
-    <>
-      <button
-        type="button"
-        role="menuitem"
-        data-testid={testId}
-        disabled={disabled}
-        title={title}
-        onClick={() => input.current?.click()}
-      >
-        <IconUpload /> {label}
-      </button>
-      <input
-        ref={input}
-        className="visually-hidden"
-        tabIndex={-1}
-        type="file"
-        accept={accept}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onFile(file);
-          e.target.value = "";
-        }}
-      />
-    </>
+    <button type="button" role="menuitem" data-testid={testId} disabled={disabled} title={title} onClick={pick}>
+      <IconUpload /> {label}
+    </button>
   );
 }
 

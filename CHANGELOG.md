@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Fixed
+
+- A recording picked with **Open a recording…** in ⋯ no longer fails to open.
+
 ## v1.36.0 — 2026-11-21
 
 ### Added
