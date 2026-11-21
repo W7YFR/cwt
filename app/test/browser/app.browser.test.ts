@@ -1020,17 +1020,23 @@ const openChip = (id: string) => act(async () => $<HTMLElement>(`[data-testid='c
     }
   });
 
-  it("opens on the page, with Settings closed, after a reload", async () => {
-    /* Settings is a drawer over the page: a reload is a fresh look at the
-       page, not a return to the drawer. */
+  it("comes back to Settings after a reload, at the tab it was on, and not when it was closed", async () => {
+    /* A reload comes back to where you were, Settings included. */
+    const reload = async () => {
+      act(() => root!.unmount());
+      root = null;
+      container.innerHTML = "";
+      await mount();
+    };
     await served();
     await mount();
-    await settingsTab("page");
+    await settingsTab("you");
     expect($("[data-testid='settings']")).not.toBeNull();
-    act(() => root!.unmount());
-    root = null;
-    container.innerHTML = "";
-    await mount();
+    await reload();
+    expect($("[data-testid='settings']")).not.toBeNull();
+    expect($("[data-testid='settings-tab'] [aria-selected='true']")!.getAttribute("data-tab")).toBe("you");
+    await act(async () => $<HTMLElement>("[data-testid='panel-toggle']")!.click());
+    await reload();
     expect($("[data-testid='settings']")).toBeNull();
   });
 
