@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.33.0 — 2026-11-21
+
 ### Added
 
 - **Play QSB, noise, QRN and QRM** turns all four off and on at once, on the Copy and QSO pages. Their settings stay as they were.
