@@ -77,8 +77,9 @@ describe("the AGC", () => {
     await send("CQ CQ DE W7YFR W7YFR K");
     const air = heard.airs.at(-1);
     expect(air?.agc?.mode).toBe("fast");
-    expect(air?.agc?.bandDb).toBeLessThan(-10);
+    expect(air?.agc?.band.loudDb.length).toBeGreaterThan(0);
     expect(air?.agc?.onDuck).toBeDefined();
+    expect(air?.agc?.bandAt).toBeDefined();
   });
 
   it("is not on a line with the AGC off", async () => {

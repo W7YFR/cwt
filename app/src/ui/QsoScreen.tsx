@@ -14,7 +14,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPlayer } from "@/audio/player";
-import { agcGainDb, applyGainDb, loudnessDb, typicalDb, type AgcMode } from "@/audio/agc";
+import { agcGainDb, applyGainDb, loudnessDb, type AgcMode, type BandAgc } from "@/audio/agc";
 import { fadeOf, NOISE_OFF_DB, noiseOn, seedOf, type Fade } from "@/audio/qsb";
 import type { Band } from "@/audio/player";
 import { bandOn as anyBand, mixBand, noisePart, type PartOptions, QRM_OFF_DB, qrmOn, qrmPart, qrnPart } from "@/copy/band";
@@ -875,14 +875,15 @@ export function QsoScreen({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const qrm = useMemo(() => (qrmIsOn ? qrmPart(partOptions()) : null), [qrmIsOn, qsbSet]);
   /** The band as one track: its parts, mixed at the sliders' levels, and
-   *  through the AGC on its own. How loud it mostly is, before the AGC,
-   *  goes with it: a station's line works out the AGC's gain from it. */
-  const bandMix = useMemo<{ band: Band; db: number } | null>(() => {
+   *  through the AGC on its own. How the AGC hears it goes with it: a
+   *  station's line works out the AGC on the station and the band from it. */
+  const bandMix = useMemo<{ band: Band; agc: BandAgc } | null>(() => {
     if (!hasBand) return null;
     const samples = mixBand(BAND_SEC * BAND_RATE, { noise, qrn: crashes, qrm }, { noiseDb, qrmDb });
-    const loud = loudnessDb(samples, BAND_RATE, THEIR_PEAK);
-    if (agc !== "off") applyGainDb(samples, BAND_RATE, agcGainDb(loud, agc));
-    return { band: { samples, rate: BAND_RATE }, db: typicalDb(loud) };
+    const loudDb = loudnessDb(samples, BAND_RATE, THEIR_PEAK);
+    const gainDb = agcGainDb(loudDb, agc);
+    if (agc !== "off") applyGainDb(samples, BAND_RATE, gainDb);
+    return { band: { samples, rate: BAND_RATE }, agc: { loudDb, gainDb } };
   }, [hasBand, noise, crashes, qrm, noiseDb, qrmDb, agc]);
   const band = bandMix?.band ?? null;
 
@@ -1236,8 +1237,8 @@ export function QsoScreen({
               ? {
                   agc: {
                     mode: agc,
-                    bandDb: bandMix.db,
-                    ...(bandOn && gate ? { onDuck: gate.duck } : {}),
+                    band: bandMix.agc,
+                    ...(bandOn && gate ? { onDuck: gate.duck, bandAt: gate.bandAt } : {}),
                   },
                 }
               : {}),

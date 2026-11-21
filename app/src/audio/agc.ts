@@ -86,26 +86,23 @@ export function agc(x: Float32Array, rate: number, ref: number, mode: AgcMode): 
   if (mode !== "off") applyGainDb(x, rate, agcGainDb(loudnessDb(x, rate, ref), mode));
 }
 
-/** How loud `loudDb` mostly is: its middle value, over the steps that hold
- *  any sound. -Infinity when none does. */
-export function typicalDb(loudDb: Float32Array): number {
-  const heard = Array.from(loudDb).filter(Number.isFinite).sort((a, b) => a - b);
-  return heard.length > 0 ? heard[heard.length >> 1]! : -Infinity;
-}
-
-/** The AGC's gain on the band on its own, in dB, when it is `bandDb` loud. */
-export function bandGainDb(bandDb: number): number {
-  return Math.min(AGC_RISE_DB, -bandDb);
+/** The band as the AGC hears it, a step at a time over its loop: how loud
+ *  it is (as `loudnessDb` gives it), and the AGC's gain on it alone, which
+ *  it is made with. */
+export interface BandAgc {
+  readonly loudDb: Float32Array;
+  readonly gainDb: Float32Array;
 }
 
 /** The AGC's gain at each step of `durSec`, in dB, for a station keyed over
  *  `marks` (start and end, in seconds) at `fade` (a share, by seconds from
- *  the start), over a band `bandDb` loud on its own. */
+ *  the start), over `band` from step `from` of its loop. */
 export function keyedGainDb(
   marks: readonly (readonly [number, number])[],
   durSec: number,
   fade: (tSec: number) => number,
-  bandDb: number,
+  band: BandAgc,
+  from: number,
   mode: AgcMode,
 ): Float32Array {
   const steps = Math.max(2, Math.ceil(durSec / AGC_STEP_SEC));
@@ -114,12 +111,13 @@ export function keyedGainDb(
     for (let j = Math.floor(a / AGC_STEP_SEC); j < Math.min(steps, Math.ceil(z / AGC_STEP_SEC)); j++) keyed[j] = 1;
   }
   const look = Math.round(LOOK_SEC / AGC_STEP_SEC);
-  const band = Math.pow(10, bandDb / 20);
+  const loop = band.loudDb.length;
   const loudDb = new Float32Array(steps);
   for (let j = 0; j < steps; j++) {
     let on = 0;
     for (let k = j; k < Math.min(j + look, steps); k++) on = Math.max(on, keyed[k]!);
-    loudDb[j] = 20 * Math.log10(on * fade(j * AGC_STEP_SEC) + band);
+    const bandLin = loop > 0 ? Math.pow(10, band.loudDb[(from + j) % loop]! / 20) : 0;
+    loudDb[j] = 20 * Math.log10(on * fade(j * AGC_STEP_SEC) + bandLin);
   }
   return agcGainDb(loudDb, mode);
 }

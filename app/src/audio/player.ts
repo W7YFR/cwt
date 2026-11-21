@@ -13,7 +13,7 @@
  */
 
 import type { Timeline } from "@/types";
-import { AGC_STEP_SEC, bandGainDb, keyedGainDb, type AgcMode } from "./agc";
+import { AGC_STEP_SEC, keyedGainDb, type AgcMode, type BandAgc } from "./agc";
 import { fadeCurve, type Fade } from "./qsb";
 import { keyingEnvelope, RAMP_SEC, type ScheduleOptions } from "./schedule";
 import { encodeWav } from "./wav";
@@ -56,12 +56,15 @@ export interface TargetAir {
    *  plays from where the page's clock is in it, so each over hears a
    *  different part. */
   band?: Band;
-  /** The receiver's AGC, which follows the target's keying and fading. */
+  /** The receiver's AGC, on the target and the band together. */
   agc?: {
     mode: AgcMode;
-    /** How loud the band mostly is on its own, in dB over the target's
-     *  peak. The band is made with the AGC's gain on it alone. */
-    bandDb: number;
+    /** The band as the AGC hears it, over its loop, in dB over the
+     *  target's peak. The band is made with the AGC's gain on it alone. */
+    band: BandAgc;
+    /** Where the band is, in seconds into its loop, at `atMs` on the
+     *  performance clock, where it plays on its own. */
+    bandAt?(atMs: number): number;
     /** The band where it plays on its own: give it this gain, a share at
      *  each step of `stepSec`, from `atMs` on the performance clock. Null
      *  takes it off again. */
@@ -319,8 +322,20 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         fade = c.createGain();
         fade.gain.setValueCurveAtTime(fadeCurve(air.fade.fade, air.fade.atSec, FADE_STEP_SEC, n), t0, (n - 1) * FADE_STEP_SEC);
       }
-      // The AGC: its gain on the target, and on the band as the target keys,
-      // over the gain the band was made with.
+      // When the target starts, on the performance clock, and where the band
+      // is then: here, from the page's clock; where it plays on its own, as
+      // its player says.
+      const ts = c.getOutputTimestamp?.();
+      const atMs =
+        ts?.contextTime !== undefined && ts.performanceTime !== undefined
+          ? ts.performanceTime + (t0 - ts.contextTime) * 1000
+          : performance.now() + (t0 - c.currentTime) * 1000;
+      const bandSec = air?.band ? air.band.samples.length / air.band.rate : 0;
+      const bandFrom = air?.band ? (performance.now() / 1000) % bandSec : (air?.agc?.bandAt?.(atMs) ?? 0);
+
+      // The AGC, from the target's keying and fading and the band's sound
+      // under it: its gain on the target, and on the band over the gain the
+      // band was made with.
       let agc: GainNode | null = null;
       let duck: Float32Array | null = null;
       let unduck: (() => void) | null = null;
@@ -329,19 +344,16 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
         for (let i = 0; i + 3 < env.points.length; i += 4) marks.push([env.points[i]![0], env.points[i + 3]![0]]);
         const at = air.fade;
         const fadeAt = at ? (t: number) => at.fade(at.atSec + t) : () => 1;
-        const gainDb = keyedGainDb(marks, env.duration, fadeAt, air.agc.bandDb, air.agc.mode);
-        const own = bandGainDb(air.agc.bandDb);
+        const band = air.agc.band;
+        const from = Math.round(bandFrom / AGC_STEP_SEC);
+        const gainDb = keyedGainDb(marks, env.duration, fadeAt, band, from, air.agc.mode);
+        const loop = band.gainDb.length;
         const span = (gainDb.length - 1) * AGC_STEP_SEC;
         agc = c.createGain();
         agc.gain.setValueCurveAtTime(gainDb.map((db) => Math.pow(10, db / 20)), t0, span);
-        duck = gainDb.map((db) => Math.pow(10, Math.min(0, db - own) / 20));
+        duck = gainDb.map((db, j) => Math.pow(10, Math.min(0, db - (loop > 0 ? band.gainDb[(from + j) % loop]! : 0)) / 20));
         const onDuck = air.agc.onDuck;
         if (onDuck) {
-          const ts = c.getOutputTimestamp?.();
-          const atMs =
-            ts?.contextTime !== undefined && ts.performanceTime !== undefined
-              ? ts.performanceTime + (t0 - ts.contextTime) * 1000
-              : performance.now() + (t0 - c.currentTime) * 1000;
           onDuck(duck, AGC_STEP_SEC, atMs);
           unduck = () => onDuck(null, AGC_STEP_SEC, 0);
         }
@@ -366,7 +378,7 @@ export function createPlayer(callbacks: PlayerCallbacks = {}): Player {
           tail = tail.connect(ducked);
         }
         tail.connect(level);
-        noise.start(t0, (performance.now() / 1000) % buf.duration);
+        noise.start(t0, bandFrom);
         noise.stop(t0 + env.duration);
       }
 

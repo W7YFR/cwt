@@ -92,6 +92,7 @@ const gate: BandGate = {
   arm: (armed) => void (heard.gate.armed = armed),
   delay: (sec) => void (heard.gate.delaySec = sec),
   duck: (gain) => void (heard.gate.duck = gain),
+  bandAt: () => 0,
 };
 
 /** A recorder on the fake clock. It records only what the test keys: the

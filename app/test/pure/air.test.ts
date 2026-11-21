@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { bandNoise, fadeOf, NOISE_OFF_DB, noiseLevel, noiseOn, qrnCrashes } from "@/audio/qsb";
-import { agcGainDb, bandGainDb, keyedGainDb, loudnessDb } from "@/audio/agc";
+import { AGC_RISE_DB, agcGainDb, keyedGainDb, loudnessDb } from "@/audio/agc";
 import { bandAudio, bandOn, QRM_OFF_DB, qrmOn, qrmPart } from "@/copy/band";
 import { makeScript, qrmLines, sendScript } from "@/copy/generate";
 import { WORKLET_SOURCE } from "@/capture/mic";
@@ -233,17 +233,31 @@ describe("the AGC", () => {
     expect([0.9, 1.5, 2.1].map(off)).toEqual([0, 0, 0]);
   });
 
+  /** A band 30 dB under the station all through its loop, with `loud`
+   *  from `from` to `to` seconds. */
+  const bandOf = (loud = -30, from = 0, to = 0) => {
+    const loudDb = new Float32Array(3000).map((_, j) => (j >= from * 1000 && j < to * 1000 ? loud : -30));
+    return { loudDb, gainDb: agcGainDb(loudDb, "fast") };
+  };
+
   it("is down before a mark starts, under a keyed station, and up between words", () => {
-    const g = keyedGainDb([[0.5, 0.6], [1.5, 1.6]], 2, () => 1, -30, "fast");
+    const g = keyedGainDb([[0.5, 0.6], [1.5, 1.6]], 2, () => 1, bandOf(), 0, "fast");
     const at = (t: number) => g[Math.round(t / 0.001)]!;
     expect(at(0.495)).toBeLessThan(1);
     expect(at(0.55)).toBeLessThan(1);
-    expect(at(1.2)).toBeCloseTo(bandGainDb(-30), 0);
+    expect(at(1.2)).toBeCloseTo(AGC_RISE_DB, 0);
   });
 
   it("evens out a station that fades, up to how loud the band is", () => {
-    const g = keyedGainDb([[0, 2]], 2, () => db(-12), -30, "fast");
+    const g = keyedGainDb([[0, 2]], 2, () => db(-12), bandOf(), 0, "fast");
     expect(g[1000]).toBeGreaterThan(10);
+  });
+
+  it("turns the station down under a burst on the band as loud as it, where the band is in its loop", () => {
+    // The burst is 1.5 s to 1.7 s into the loop; the line starts 1 s in.
+    const g = keyedGainDb([[0, 2]], 2, () => 1, bandOf(0, 1.5, 1.7), 1000, "fast");
+    expect(g[600]).toBeLessThan(-4);
+    expect(g[200]).toBeGreaterThan(-1);
   });
 
   it("puts the band of a generated QSO under the station, and up between its lines", () => {
@@ -271,12 +285,15 @@ describe("the band gate", () => {
     class AudioWorkletProcessor {
       port = { postMessage() {}, onmessage: (_ev: { data: unknown }) => {} };
     }
-    new Function("AudioWorkletProcessor", "registerProcessor", "sampleRate", "currentFrame", "currentTime", WORKLET_SOURCE)(
+    // The audio thread's clock, on as each block plays.
+    let frames = 0;
+    const clock = { get currentTime() { return frames / sampleRate; } };
+    new Function("AudioWorkletProcessor", "registerProcessor", "sampleRate", "currentFrame", "clock", `with (clock) {${WORKLET_SOURCE}}`)(
       AudioWorkletProcessor,
       (name: string, ctor: (typeof procs)[string]) => (procs[name] = ctor),
       sampleRate,
       0,
-      0,
+      clock,
     );
     const g = new procs["cw-band-gate"]!();
     const send = (data: unknown) => g.port.onmessage({ data });
@@ -292,6 +309,7 @@ describe("the band gate", () => {
       k++;
       const out = new Float32Array(BLOCK);
       g.process([[mic]], [[out]]);
+      frames += BLOCK;
       return out;
     };
     return { send, block };
@@ -336,7 +354,7 @@ describe("the band gate", () => {
     expect(peakOf(block(true))).toBeGreaterThan(0.1);
   });
 
-  it("plays on from where it is when the band is mixed again", () => {
+  it("plays from where its clock is, so a band mixed again plays on", () => {
     const { send, block } = gate();
     const ramp = (k: number) => Float32Array.from({ length: 12000 }, (_, i) => (k * i) / 12000);
     send({ type: "band", samples: ramp(1), rate: 12000 });
@@ -345,17 +363,14 @@ describe("the band gate", () => {
     expect(last).toBeGreaterThan(0.4);
     send({ type: "band", samples: ramp(0.5), rate: 12000 });
     expect(block(false)[0]).toBeCloseTo(last / 2, 2);
-    // Another band starts from its start.
-    send({ type: "band", samples: ramp(1).subarray(0, 6000), rate: 12000 });
-    expect(block(false)[0]).toBeLessThan(0.01);
   });
 
   it("takes the AGC's gain while a station keys, and is back to full after it", () => {
     const { send, block } = gate();
     send({ type: "band", samples: new Float32Array(12000).fill(0.5), rate: 12000 });
     for (let i = 0; i < blocksIn(0.1); i++) block(false);
-    // currentTime is 0 on the stand-in thread: from now, for 0.1 s.
-    send({ type: "duck", gain: new Float32Array(100).fill(0.25), step: 0.001, at: 0 });
+    // From now, for 0.1 s.
+    send({ type: "duck", gain: new Float32Array(100).fill(0.25), step: 0.001, at: blocksIn(0.1) * BLOCK / sampleRate });
     expect(peakOf(block(false))).toBeCloseTo(0.125, 3);
     send({ type: "duck", gain: null, step: 0.001, at: 0 });
     expect(peakOf(block(false))).toBeCloseTo(0.5, 3);
