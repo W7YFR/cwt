@@ -2438,6 +2438,8 @@ button.cal { font-size: 11px; padding: 3px 8px; }
   font-size: 15px;
 }
 .qsolog li { display: flex; gap: 12px; min-width: 0; }
+/* Where your copy lets the cursor go while you send: out of the row, unseen. */
+.qsolog .focusstop { position: absolute; width: 0; height: 0; overflow: hidden; outline: none; }
 .qsolog .who { flex: 0 0 8ch; color: var(--ink-dim); }
 .qsolog .text { min-width: 0; overflow-wrap: anywhere; }
 .qsolog .you .text { color: var(--you); }

@@ -1199,6 +1199,7 @@ export function QsoScreen({
     timer.current = setTimeout(
       () => {
         timer.current = null;
+        focusBefore.current = document.activeElement;
         setPhase("playing");
         const timeline = idealTimeline(reply, targetTiming(at.charWpm, at.farnsworthWpm));
         charEnds.current = timeline.chars.map((c) => c.t1);
@@ -1281,24 +1282,38 @@ export function QsoScreen({
 
 
   /* You have begun sending with the cursor in your copy: the box lets go,
-     so R redoes your sending. When the station next sends, the box has the
-     cursor back, unless a new line has taken it. */
-  const letGo = useRef<HTMLElement | null>(null);
+     so R redoes your sending. The cursor waits just before the box, so Tab
+     goes back into it. When the station next sends, a box you are in keeps
+     the cursor, even from a new line's box. Otherwise the box you left has
+     it back, unless a new line's box has taken it. */
+  const letGo = useRef<{ box: HTMLInputElement; stop: HTMLElement | null } | null>(null);
+  /** What had the cursor just before the station's line began. */
+  const focusBefore = useRef<Element | null>(null);
   useEffect(() => {
     if (!sending) return;
-    const el = document.activeElement;
-    if (!(el instanceof HTMLInputElement) || !el.closest(".qsolog")) return;
-    letGo.current = el;
-    el.blur();
+    const box = document.activeElement;
+    if (!(box instanceof HTMLInputElement) || !box.closest(".qsolog")) return;
+    const stop = box.closest("li")?.querySelector<HTMLElement>(".focusstop") ?? null;
+    letGo.current = { box, stop };
+    if (stop) stop.focus({ preventScroll: true });
+    else box.blur();
   }, [sending]);
   useEffect(() => {
     if (phase !== "playing") return;
-    const el = letGo.current;
+    const before = focusBefore.current;
+    const left = letGo.current;
+    focusBefore.current = null;
     letGo.current = null;
-    if (!(el instanceof HTMLInputElement) || !el.isConnected || el.disabled || el.readOnly) return;
+    const open = (el: unknown): el is HTMLInputElement =>
+      el instanceof HTMLInputElement && el.isConnected && !el.disabled && !el.readOnly;
+    if (open(before)) {
+      if (document.activeElement !== before) before.focus();
+      return;
+    }
+    if (!left || !open(left.box)) return;
     const now = document.activeElement;
-    if (now && now !== document.body) return;
-    el.focus();
+    if (now && now !== document.body && now !== left.stop) return;
+    left.box.focus();
   }, [phase]);
 
   /* Your next over has begun: the copy of the QSO before is done. */
@@ -2428,6 +2443,9 @@ export function QsoScreen({
         )}
         <li className={line.you ? "you" : "them"} data-line={i}>
           {labelOf(line)}
+          {/* Where your copy lets the cursor go once you are sending: Tab
+              from here goes back into the box. Never a stop of Tab's own. */}
+          {!line.you && <span className="focusstop" tabIndex={-1} data-testid="qso-focus-stop" />}
           {textOf(line, i)}
           <span className="lend">
             {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (

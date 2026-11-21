@@ -132,11 +132,31 @@ describe("copy mode options", () => {
     const before = theirs().length;
     await key("QRS K");
     await until("the box to let go", () => document.activeElement !== box);
-    expect(document.activeElement).toBe(document.body);
+    // The cursor waits just before the box, on its own line, so Tab goes
+    // back into it.
+    const stop = document.activeElement as HTMLElement;
+    expect(stop.dataset.testid).toBe("qso-focus-stop");
+    expect(stop.closest("li")).toBe(box.closest("li"));
+    expect(stop.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(stop.tabIndex).toBe(-1);
     await until("the answer", () => theirs().length > before);
     const now = document.activeElement as HTMLElement;
     expect(now.closest(".qsolog"), "a box in the log has the cursor").not.toBeNull();
     expect(now.tagName).toBe("INPUT");
+    await until("the turn to come back", () => yourTurn());
+  });
+
+  it("keeps the cursor in a box you went back to yourself, when the station sends", async () => {
+    const box = await copyAnswer({ qsoLockCopy: false });
+    box.focus();
+    const before = theirs().length;
+    await key("QRS K");
+    await until("the box to let go", () => document.activeElement !== box);
+    // Back in, as Tab from where the cursor waits would put you.
+    box.focus();
+    await until("the answer", () => theirs().length > before);
+    await wait(50);
+    expect(document.activeElement).toBe(box);
     await until("the turn to come back", () => yourTurn());
   });
 
