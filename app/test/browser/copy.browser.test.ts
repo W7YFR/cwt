@@ -670,7 +670,16 @@ describe("a generated QSO", () => {
   });
 
   it("shows the speed it is sent at, and follows the sliders", async () => {
-    await makeUp({ copyKind: "pota", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 30, copyFarnsworthWpm: 30 });
+    // On a keyer: a straight key would send no faster than 20 WPM.
+    await makeUp({
+      copyKind: "pota",
+      copyRunQsos: 1,
+      copySpeed: "mine",
+      copyCharWpm: 30,
+      copyFarnsworthWpm: 30,
+      keyStyle: "only",
+      styleKeys: ["keyer"],
+    });
     const shown = () => $('[data-testid="copy-sent-speed"]')?.textContent;
     expect(shown()).toBe("30 wpm");
     await settingsTab("speed");

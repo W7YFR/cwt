@@ -9,6 +9,8 @@ import { IconHelp } from "./Icons";
 /** One key, or keys pressed together, and what it does. */
 export interface KeyRow {
   keys: readonly (readonly string[])[];
+  /** How many presses in a row, such as 2 for a double press. */
+  times?: number;
   does: string;
 }
 
@@ -95,6 +97,7 @@ function KeyList({ groups }: { groups: readonly KeyGroup[] }): React.ReactElemen
                       ))}
                     </span>
                   ))}
+                  {r.times && <span className="times">×{r.times}</span>}
                 </dt>
                 <dd>{r.does}</dd>
               </div>

@@ -26,8 +26,8 @@ dev: node_modules ## Run the app with hot reload at localhost:5173
 # repo, and leaves anything else on the port alone. A dev server whose checkout
 # was removed, as a worktree removed while it ran, cannot be told apart by its
 # repo, so a Vite server in a folder that no longer exists is stopped too.
-.PHONY: restart
-restart: node_modules ## Stop this repo's dev server, wherever it runs, and serve this checkout at localhost:5173
+# `dev` and `dev-device` share the port, so either target stops either server.
+define stop_dev
 	@set -e; \
 	repo=$$(git rev-parse --path-format=absolute --git-common-dir); \
 	pid=$$(lsof -nP -iTCP:5173 -sTCP:LISTEN -t 2>/dev/null | head -1); \
@@ -43,7 +43,12 @@ restart: node_modules ## Stop this repo's dev server, wherever it runs, and serv
 		fi; \
 		kill "$$pid"; \
 		for i in $$(seq 50); do lsof -nP -iTCP:5173 -sTCP:LISTEN -t >/dev/null 2>&1 || break; sleep 0.1; done; \
-	fi; \
+	fi
+endef
+
+.PHONY: restart
+restart: node_modules ## Stop this repo's dev server, wherever it runs, and serve this checkout at localhost:5173
+	$(stop_dev)
 	npm run dev
 
 # The microphone is offered to secure contexts only, so a phone on the LAN —
@@ -54,6 +59,11 @@ restart: node_modules ## Stop this repo's dev server, wherever it runs, and serv
 # `mkcert -install`, then trust the same authority on the phone.
 .PHONY: dev-device
 dev-device: node_modules ## Run with https on the LAN, so a phone can use the mic
+	npm run dev:device
+
+.PHONY: restart-device
+restart-device: node_modules ## Stop this repo's dev server, wherever it runs, and serve this checkout over https on the LAN
+	$(stop_dev)
 	npm run dev:device
 
 # The authority is the machine's, not this project's: every other project that
