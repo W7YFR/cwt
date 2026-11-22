@@ -232,7 +232,16 @@ function heardIn(format: FormatId, words: readonly string[], mine: string, their
   let at = named ? rest.findIndex((_, i) => nameAt(i)) : -1;
   if (at >= 0 && rest[at] === theirs && isName(rest[at + 1]) && !isRegion(rest[at + 1]!)) at++;
   const name = at >= 0 ? rest[at]! : "";
-  const after = rest.slice(at + 1);
+  let after = rest.slice(at + 1);
+  // A name sent twice, as AL AL GA GA, is one name, not a name and a region,
+  // when a number or region comes after the repeat.
+  if (name && after[0] === name) {
+    const beyond = words.slice(words.lastIndexOf(name) + 1);
+    if (regionIn(beyond, mine, lenient) || numberIn(beyond) || greetingRegionIn(beyond)) {
+      const skip = after.findIndex((w) => w !== name);
+      after = skip < 0 ? [] : after.slice(skip);
+    }
+  }
   // A number that is also a word around an exchange, as 73, counts once
   // nothing else does: TOM 73 sends CWops number 73.
   const number = numberIn(after) || numberIn(words.slice(name ? words.indexOf(name) + 1 : 0).filter((w) => !isCall(w)));

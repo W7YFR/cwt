@@ -89,7 +89,7 @@ function pieceOf(p: Piece, me: Me, v: Voice): string {
   const n = me.name;
   if (p === "name") return pick(v.rand, [`NAME ${n} ${n}`, `NAME HR ${n} ${n}`, `OP ${n} ${n}`, `NAME IS ${n} ${n}`, `OP HR ${n} ${n}`]);
   const q = me.qth;
-  return pick(v.rand, [`QTH ${q}`, `QTH HR ${q}`, `QTH IS ${q}`, `QTH HR IS ${q}`]);
+  return pick(v.rand, [`QTH ${q}`, `QTH HR ${q}`, `QTH IS ${q}`, `QTH HR IS ${q}`, `QTH ${q} ${q}`]);
 }
 
 /** The words joined, with the empty ones left out. */
@@ -248,6 +248,7 @@ function run(qso: RunQso, me: Me, v: Voice, who: Them, start?: FormatId | null):
             `${them} ${me.name} ${nr} ${nr}`,
             `${them} R ${me.name} ${nr}`,
             `${them} TNX ${me.name} ${nr}`,
+            `${them} ${me.name} ${me.name} ${nr} ${nr}`,
           ]);
         }
         case "sst":
@@ -258,10 +259,11 @@ function run(qso: RunQso, me: Me, v: Voice, who: Them, start?: FormatId | null):
             `${them} TU ${me.name} ${me.region}`,
             `${them} TNX ${me.name} ${me.region}`,
             `${them} ${byName} ${me.name} ${me.region} ${me.region}`,
+            `${them} ${me.name} ${me.name} ${me.region} ${me.region}`,
           ]);
         case "mst": {
           const nr = String(qso.made + 1);
-          return pick(v.rand, [`${them} ${me.name} ${nr}`, `${them} TU ${me.name} ${nr}`, `${me.name} ${nr}`, `${them} R ${me.name} ${nr}`, `${them} ${me.name} ${nr} ${nr}`]);
+          return pick(v.rand, [`${them} ${me.name} ${nr}`, `${them} TU ${me.name} ${nr}`, `${me.name} ${nr}`, `${them} R ${me.name} ${nr}`, `${them} ${me.name} ${nr} ${nr}`, `${them} ${me.name} ${me.name} ${nr} ${nr}`]);
         }
         case "pota": {
           // An activator sends 5NN or 599, and its state once or twice.
