@@ -13,6 +13,7 @@ nothing to the site. The next release carries them.
 - On **Live**, each line is one station's turn, with that station's call and speed. The lines of each QSO are grouped, with a card of its time, pitch and stations. The card names the kind of QSO when it can, such as CWT, POTA or a rag chew.
 - On **Live**, a call misread now and then is taken as the call read most often, and a station calling CQ keeps its pitch. Click the call at the start of a line to change who sent it, or to confirm the call. Your own lines show in blue.
 - On **Live**, drag across the band under the heading to decode only those pitches. **Decode all** goes back to the whole band.
+- On **Live**, **Pass thru** plays your input through your speakers or headphones while Live listens, at the Volume.
 - On **Live**, ⋯ on a QSO's card notes the radio's frequency. Later QSOs take the same frequency until you note a new one.
 - **Live** keeps its log after a reload. From ⋯, download the log as **Text**, or the latest 30 minutes of **Audio**. ⋯ on a QSO's card downloads just that QSO's audio or text.
 

@@ -260,6 +260,9 @@ export interface Recorder {
   cancel(): Promise<void>;
   /** The band, played beside the recording. */
   readonly band?: BandGate;
+  /** Play the input through the speakers at `gain` (0 to 1 and over), as it
+   *  is recorded, or not at all with 0. Off at the start. */
+  monitor?(gain: number): void;
 }
 
 /** The band played from the recorder's own audio context, as a receiver
@@ -374,6 +377,12 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   mute.gain.value = 0;
   node.connect(mute).connect(ctx.destination);
 
+  // The input to the speakers, at no gain until it is asked for: to hear a
+  // radio's audio while it is decoded.
+  const monitor = ctx.createGain();
+  monitor.gain.value = 0;
+  source.connect(monitor).connect(ctx.destination);
+
   const gate = new AudioWorkletNode(ctx, "cw-band-gate", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
   source.connect(gate);
   gate.connect(ctx.destination);
@@ -444,6 +453,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     gate.disconnect();
     source.disconnect();
     mute.disconnect();
+    monitor.disconnect();
     stream.getTracks().forEach((t) => t.stop());
     await ctx.close();
   }
@@ -484,6 +494,9 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
       return out;
     },
     band,
+    monitor(gain) {
+      monitor.gain.setTargetAtTime(Math.max(0, gain), ctx.currentTime, 0.02);
+    },
     restarts: () => restarts,
     restart() {
       chunks = [];

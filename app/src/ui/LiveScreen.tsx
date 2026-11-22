@@ -13,7 +13,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APP_VERSION } from "@/build-info";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
-import { loadUser, recallLive, rememberLive } from "@/io/storage";
+import { loadPrefs, loadUser, recallLive, rememberLive, savePrefs } from "@/io/storage";
 import type { Band, Signal } from "@/live/decoder";
 import { transcriptText } from "@/live/export";
 import { buildLog, NO_FIXES, type Fixes, type Line, type LiveTurn, type Qso } from "@/live/log";
@@ -26,8 +26,10 @@ import { PageHelp, type KeyGroup } from "./Help";
 import { IconCheck } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
-import { MicChip, SettingsButton } from "./SettingsDrawer";
-import { DownloadItem, MenuHeading, MoreMenu, Toolbar } from "./Toolbar";
+import { Check, SoundSection } from "./Controls";
+import { fmtGain } from "./format";
+import { MicChip, PageSettings, SettingsButton } from "./SettingsDrawer";
+import { DownloadItem, MenuHeading, MoreMenu, QuickChip, Toolbar } from "./Toolbar";
 import { useListen, type OpenTurn } from "./useListen";
 import { useRecorder } from "./useRecorder";
 import { HomeButton } from "./Wordmark";
@@ -38,6 +40,10 @@ const KEEP_SECONDS = 30;
 /** One QSO's recording starts this long before its first line and ends
  *  this long after its last, ms. */
 const QSO_PAD_MS = 1000;
+/** What Pass thru does, and the one way it goes wrong. */
+const HEAR_HELP =
+  "Plays your input through your speakers or headphones while Live listens, at the Volume. " +
+  "With a microphone as the input, use headphones: the microphone would hear the speakers.";
 /** A signal quiet this long is no longer counted in the status, seconds. */
 const QUIET_SHOWN_SEC = 20;
 /** The narrowest range of pitches a drag on the band chooses, Hz. */
@@ -63,6 +69,7 @@ const LIVE_GUIDE = (
       <li>To make a call stick, click it at the start of a line and choose Confirm. Live then reads calls close to it as that call, and lines at that pitch as sent by that station. A check mark shows beside a confirmed call on its cards.</li>
       <li>Your own lines show in blue when Live reads your call from Settings › You.</li>
       <li>The log stays after a reload. Download it as text from ⋯.</li>
+      <li>To hear your input as Live decodes it, open Pass thru and tick Pass thru. With a microphone as the input, use headphones.</li>
       <li>From ⋯, Audio saves the latest 30 minutes Live heard, as a WAV file. The audio does not stay after a reload.</li>
       <li>⋯ on a QSO&apos;s card downloads just that QSO, as audio or text. Its audio is there only while the QSO is within the latest 30 minutes.</li>
     </ul>
@@ -84,6 +91,8 @@ interface Kept {
   fixes: Fixes;
   /** The pitches to decode, Hz, or absent for the whole band. */
   range?: readonly [number, number];
+  /** The input plays through the speakers while Live listens. */
+  hear?: boolean;
 }
 
 /** The log as last remembered, checked loosely: a turn needs its text and
@@ -99,7 +108,8 @@ function recalled(): Kept {
   const fixes = raw?.fixes && typeof raw.fixes === "object" ? { ...NO_FIXES, ...raw.fixes } : NO_FIXES;
   const r = raw?.range;
   const range = Array.isArray(r) && r.length === 2 && r.every((v) => typeof v === "number") && r[0]! < r[1]! ? ([r[0]!, r[1]!] as const) : undefined;
-  return range ? { turns, fixes, range } : { turns, fixes };
+  const hear = raw?.hear === true;
+  return { turns, fixes, ...(range ? { range } : {}), ...(hear ? { hear } : {}) };
 }
 
 /** Save `data` as a file called `name`. */
@@ -156,7 +166,7 @@ export function LiveScreen({
   const keptRef = useRef(kept);
   keptRef.current = kept;
   useEffect(() => {
-    rememberLive(kept.turns.length || Object.keys(kept.fixes.sender).length || kept.range ? kept : null);
+    rememberLive(kept.turns.length || Object.keys(kept.fixes.sender).length || kept.range || kept.hear ? kept : null);
   }, [kept]);
 
   const rec = useRecorder({
@@ -193,6 +203,27 @@ export function LiveScreen({
   );
   const [tape] = useState(() => new Tape(TAPE_MINUTES * 60));
   const listening = useListen(recorder, calibration, words, addTurns, tape, KEEP_SECONDS, kept.range ?? null);
+  /* Pass thru, the input to the speakers: on or off here, at the Volume
+     every page shares. */
+  const [gainDb, setGainDbRaw] = useState(() => loadPrefs().gainDb ?? 0);
+  const setGainDb = (next: number) => {
+    setGainDbRaw(next);
+    savePrefs({ ...loadPrefs(), gainDb: next });
+  };
+  const hear = kept.hear === true;
+  const setHear = (on: boolean) =>
+    setKept((k) => {
+      const { hear: _old, ...rest } = k;
+      return on ? { ...rest, hear: true } : rest;
+    });
+  useEffect(() => {
+    recorder?.monitor?.(hear ? 10 ** (gainDb / 20) : 0);
+  }, [recorder, hear, gainDb]);
+  const soundSection = (
+    <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
+      <Check id="live-passthru" label="Pass thru" help={HEAR_HELP} checked={hear} onChange={setHear} />
+    </SoundSection>
+  );
   const setRange = (range: readonly [number, number] | null) =>
     setKept((k) => {
       const { range: _old, ...rest } = k;
@@ -232,8 +263,9 @@ export function LiveScreen({
     });
   const clear = () => {
     tape.clear();
-    // The range is where you listen, not part of the log: it stays.
-    setKept((k) => (k.range ? { turns: [], fixes: NO_FIXES, range: k.range } : { turns: [], fixes: NO_FIXES }));
+    // The range and hearing the input are how you listen, not part of the
+    // log: they stay.
+    setKept((k) => ({ turns: [], fixes: NO_FIXES, ...(k.range ? { range: k.range } : {}), ...(k.hear ? { hear: k.hear } : {}) }));
   };
   const saveQsoAudio = (qso: Qso) => {
     const { samples, rate } = tape.audio(qso.at - QSO_PAD_MS, qso.end + QSO_PAD_MS);
@@ -310,6 +342,11 @@ export function LiveScreen({
               </button>
             </>
           }
+          chips={
+            <QuickChip id="passthru" label="Pass thru" value={hear ? fmtGain(gainDb).trim() : "Off"} widest="+42 dB" tab="sound">
+              {soundSection}
+            </QuickChip>
+          }
           more={
             <>
               <MenuHeading>Download</MenuHeading>
@@ -345,6 +382,17 @@ export function LiveScreen({
           }
         />
       </header>
+
+      <PageSettings
+        tabs={[
+          {
+            id: "sound",
+            label: "Sound",
+            scope: "Pass thru is only on the Live page. Volume is the same on every page.",
+            content: soundSection,
+          },
+        ]}
+      />
 
       <main className="panel qso live" data-testid="live">
         <div className="qsotop">
