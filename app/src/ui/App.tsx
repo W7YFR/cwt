@@ -1,6 +1,7 @@
 /* Three screens and the state between them. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { livePageOn, onLivePage } from "@/devtools";
 import { loadAudioFile } from "@/capture/file";
 import { NoKeyingError, isBlankTake } from "@/io/take";
 import {
@@ -115,8 +116,11 @@ function AppBody(): React.ReactElement {
       setCalibrating(true);
     });
   }, []);
-  /* Practice or QSO, kept across a reload. */
-  const [page, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
+  /* Practice or QSO, kept across a reload. Live, chosen while its switch was
+     on, is Send while it is off. */
+  const [chosen, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
+  const liveOn = useSyncExternalStore(onLivePage, livePageOn);
+  const page: Page = chosen === "live" && !liveOn ? "practice" : chosen;
   const setPage = useCallback(
     (next: Page) => {
       setPageRaw(next);

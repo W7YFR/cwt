@@ -1,7 +1,11 @@
 /* Send, Copy, QSO or Live: the four pages, one switch, in the header of each.
  *
  * Send is "practice" in the code and in what is stored, as it was before it
- * had a name of its own. */
+ * had a name of its own. Live shows only once `__cwt.enableLive()` turns it
+ * on, while it is being tried out. */
+
+import { useSyncExternalStore } from "react";
+import { livePageOn, onLivePage } from "@/devtools";
 
 export type Page = "practice" | "copy" | "qso" | "live";
 
@@ -21,9 +25,10 @@ export function PageSwitch({
   onPage(page: Page): void;
   disabled?: boolean;
 }): React.ReactElement {
+  const live = useSyncExternalStore(onLivePage, livePageOn);
   return (
     <div className="modeswitch pageswitch" role="group" aria-label="Page" data-testid="page">
-      {PAGES.map((p) => (
+      {PAGES.filter((p) => p.value !== "live" || live).map((p) => (
         <button
           key={p.value}
           data-page={p.value}

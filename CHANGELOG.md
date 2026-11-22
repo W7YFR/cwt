@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- **Live**, a new page after QSO, decodes any CW that comes in from your input: your own key through the microphone, or your radio's audio. It finds each station's speed by itself, up to 45 WPM, follows up to 8 signals at once, and reads where words break by what makes words, as **Lenient** does.
+- **Live**, a new page after QSO, decodes any CW that comes in from your input: your own key through the microphone, or your radio's audio. It finds each station's speed by itself, up to 45 WPM, follows up to 8 signals at once, and reads where words break by what makes words, as **Lenient** does. While it is tried out, it shows in the page switch only after `__cwt.enableLive()` is typed in the browser's console.
 - On **Live**, each line is one station's turn, with that station's call and speed. The lines of each QSO are grouped, with a card of its time, pitch and stations. The card names the kind of QSO when it can, such as CWT, POTA or a rag chew.
 - On **Live**, a call misread now and then is taken as the call read most often, and a station calling CQ keeps its pitch. Click the call at the start of a line to change who sent it, or to confirm the call. Your own lines show in blue.
 - On **Live**, drag across the band under the heading to decode only those pitches. **Decode all** goes back to the whole band.
