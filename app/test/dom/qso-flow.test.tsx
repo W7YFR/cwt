@@ -60,7 +60,8 @@ describe("a QSO from your CQ", () => {
   });
 
   it("sends its last over again, slower, on QRS", async () => {
-    await open({ qsoTheirText: "before" });
+    // On a keyer: a straight key would send no faster than 20 WPM.
+    await open({ qsoTheirText: "before", keyStyle: "only", styleKeys: ["keyer"] });
     const first = await send("CQ CQ DE W7YFR W7YFR K");
     const again = await send("QRS K");
     expect(again.querySelector(".text")!.textContent).toBe(first.querySelector(".text")!.textContent);
