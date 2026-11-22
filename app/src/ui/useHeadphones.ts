@@ -1,8 +1,9 @@
 /* The headphone buttons and the lock screen, through the Media Session API.
  *
- * A phone sends play, pause and next track from the headphones and the lock
- * screen to the page that plays its Now Playing sound. The page must play
- * through an <audio> element for that: see createMediaPlayer.
+ * A phone or a computer sends play, pause and next track from the headphones,
+ * the media keys and the lock screen to the page that is Now Playing. The page
+ * must play through an <audio> element for that, or hold a paused one: see
+ * createMediaPlayer and createSessionPlayer.
  */
 
 import { useEffect, useRef } from "react";
@@ -14,8 +15,6 @@ export function onPhone(): boolean {
 }
 
 export interface HeadphoneOptions {
-  /** Off: the page takes no buttons. */
-  on: boolean;
   /** What the lock screen shows as playing. Null when nothing is open. */
   title: string | null;
   playing: boolean;
@@ -41,7 +40,7 @@ const artwork = (): MediaImage[] => [
 ];
 
 export function useHeadphones(options: HeadphoneOptions): void {
-  const { on, title, playing } = options;
+  const { title, playing } = options;
   // Read through a ref, so the handlers are set once and always call the
   // page's latest functions.
   const latest = useRef(options);
@@ -54,7 +53,7 @@ export function useHeadphones(options: HeadphoneOptions): void {
   const session = typeof navigator !== "undefined" && "mediaSession" in navigator ? navigator.mediaSession : null;
 
   useEffect(() => {
-    if (!on || !session) return;
+    if (!session) return;
     const actions: [MediaSessionAction, () => void][] = [
       ["play", () => latest.current.onPlay()],
       ["pause", () => latest.current.onPause()],
@@ -94,15 +93,15 @@ export function useHeadphones(options: HeadphoneOptions): void {
       }
       session.metadata = null;
     };
-  }, [on, session]);
+  }, [session]);
 
   useEffect(() => {
-    if (!on || !session || typeof MediaMetadata === "undefined") return;
+    if (!session || typeof MediaMetadata === "undefined") return;
     session.metadata = title === null ? null : new MediaMetadata({ title, artist: ARTIST, artwork: artwork() });
-  }, [on, session, title]);
+  }, [session, title]);
 
   useEffect(() => {
-    if (!on || !session) return;
+    if (!session) return;
     session.playbackState = playing ? "playing" : "paused";
-  }, [on, session, playing]);
+  }, [session, playing]);
 }

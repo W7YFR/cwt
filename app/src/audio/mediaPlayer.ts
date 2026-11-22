@@ -69,6 +69,34 @@ if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => noteHeadphones(`page ${document.visibilityState}`));
 }
 
+let silent: string | null = null;
+/** A URL to `SILENCE_SEC` of silence, made once for the page. */
+function silence(): string {
+  silent ??= URL.createObjectURL(
+    new Blob([encodeWavBuffer(new Float32Array(SILENCE_SEC * 8000), 8000)], { type: "audio/wav" }),
+  );
+  return silent;
+}
+
+/** Run `start` from the first tap or key on the page while the page names
+ *  what it plays, the Media Session's title. `start` says whether it is done:
+ *  false, or a promise of false, tries again on the next tap. Hands back a
+ *  function that stops listening. */
+function onFirstTap(start: () => boolean | Promise<boolean>): () => void {
+  let done = false;
+  const tap = () => {
+    if (done || !navigator.mediaSession?.metadata) return;
+    done = true;
+    void Promise.resolve(start()).then((ok) => {
+      if (!ok) done = false;
+    });
+  };
+  for (const type of GESTURES) document.addEventListener(type, tap, true);
+  return () => {
+    for (const type of GESTURES) document.removeEventListener(type, tap, true);
+  };
+}
+
 export function createMediaPlayer(callbacks: PlayerCallbacks = {}): Player {
   const inner = createPlayer(callbacks);
   const el = new Audio();
@@ -160,29 +188,21 @@ export function createMediaPlayer(callbacks: PlayerCallbacks = {}): Player {
 
   /* Silence on the first tap, to make the page Now Playing. A tap that plays
      the QSO itself takes the element over, and the silence stops. */
-  let primed = false;
-  let silence: string | null = null;
-  function prime(): void {
-    if (primed || mode !== null || !navigator.mediaSession?.metadata) return;
-    primed = true;
+  const unprime = onFirstTap(() => {
+    if (mode !== null) return true;
     const mine = ticket;
-    silence ??= URL.createObjectURL(
-      new Blob([encodeWavBuffer(new Float32Array(SILENCE_SEC * 8000), 8000)], { type: "audio/wav" }),
-    );
-    el.src = silence;
+    el.src = silence();
     source = null;
     if (!el.isConnected) document.body.append(el);
     noteHeadphones("silence to take Now Playing");
-    el.play().then(
+    return el.play().then(
       () => {
         if (mine === ticket && mode === null) el.pause();
+        return true;
       },
-      () => {
-        if (mine === ticket) primed = false;
-      },
+      () => mine !== ticket,
     );
-  }
-  for (const type of GESTURES) document.addEventListener(type, prime, true);
+  });
 
   return {
     async playBuffer(data, from, to) {
@@ -263,15 +283,98 @@ export function createMediaPlayer(callbacks: PlayerCallbacks = {}): Player {
 
     destroy() {
       teardown();
-      for (const type of GESTURES) document.removeEventListener(type, prime, true);
+      unprime();
       el.removeAttribute("src");
       el.load();
       el.remove();
       if (url) URL.revokeObjectURL(url);
-      if (silence) URL.revokeObjectURL(silence);
       url = null;
-      silence = null;
       source = null;
+      inner.destroy();
+    },
+  };
+}
+
+/** The Web Audio player, with a silent <audio> element beside it, for a
+ *  computer.
+ *
+ * The browser sends the headphone buttons and the media keys to the page
+ * that is Now Playing. Web Audio makes the page Now Playing only while it
+ * sounds: paused, the page drops out, and play goes to the last app that
+ * played. A paused element keeps the page there. So the element plays a
+ * loop of silence while the QSO plays, and pauses with it. The sound itself
+ * stays in Web Audio, which can play louder than 0 dB.
+ */
+export function createSessionPlayer(callbacks: PlayerCallbacks = {}): Player {
+  const el = new Audio();
+  el.loop = true;
+  el.hidden = true;
+  const quiet = () => {
+    if (!el.paused) el.pause();
+  };
+  const inner = createPlayer({
+    ...callbacks,
+    onEnded: (reason) => {
+      quiet();
+      callbacks.onEnded?.(reason);
+    },
+    onError: (message) => {
+      quiet();
+      callbacks.onError?.(message);
+    },
+  });
+  /** Start the silence, from the click or button that plays. */
+  const hold = () => {
+    if (!el.src) el.src = silence();
+    if (!el.isConnected) document.body.append(el);
+    el.play().catch(() => {
+      /* no gesture behind it: the buttons wait for the next play */
+    });
+  };
+  // Paused from outside the page, such as by another tab's sound.
+  el.addEventListener("pause", () => {
+    if (inner.playing()) inner.stop();
+  });
+  for (const event of ["play", "pause"]) {
+    el.addEventListener(event, () => noteHeadphones(`silence ${event}`));
+  }
+  // Paused before anything plays, so the first press of play reaches the page.
+  const unprime = onFirstTap(() => {
+    if (inner.playing()) return true;
+    hold();
+    return el.play().then(
+      () => {
+        if (!inner.playing()) quiet();
+        return true;
+      },
+      () => false,
+    );
+  });
+
+  return {
+    playBuffer(data, from, to) {
+      hold();
+      return inner.playBuffer(data, from, to);
+    },
+    playTarget(timeline, options) {
+      hold();
+      inner.playTarget(timeline, options);
+    },
+    stop() {
+      inner.stop();
+      quiet();
+    },
+    wake: () => inner.wake(),
+    setGainDb: (db) => inner.setGainDb(db),
+    gainDb: () => inner.gainDb(),
+    playing: () => inner.playing(),
+    renderTarget: (timeline, options) => inner.renderTarget(timeline, options),
+    destroy() {
+      unprime();
+      quiet();
+      el.removeAttribute("src");
+      el.load();
+      el.remove();
       inner.destroy();
     },
   };

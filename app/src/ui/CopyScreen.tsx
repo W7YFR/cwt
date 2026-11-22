@@ -18,8 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgcMode } from "@/audio/agc";
-import { createMediaPlayer } from "@/audio/mediaPlayer";
-import { createPlayer } from "@/audio/player";
+import { createMediaPlayer, createSessionPlayer } from "@/audio/mediaPlayer";
 import { NOISE_OFF_DB } from "@/audio/qsb";
 import { bandOn, QRM_OFF_DB } from "@/copy/band";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
@@ -460,7 +459,7 @@ const COPY_KEYS: readonly KeyGroup[] = [
     ],
   },
   {
-    heading: "Headphones and lock screen",
+    heading: "Headphones/Media",
     rows: [
       { keys: [["Play"], ["Pause"]], does: "Play or pause" },
       { keys: [["Next track"]], does: "Start the QSO over" },
@@ -612,11 +611,12 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   useEffect(() => cancelLastLock, []);
 
   /** On a phone, the QSO plays through an <audio> element, so it plays on
-   *  with the screen locked and the headphone buttons reach it. */
+   *  with the screen locked. A computer plays it through Web Audio, beside a
+   *  silent element. Either way, the headphone buttons reach the page. */
   const phone = useMemo(onPhone, []);
   const player = useMemo(
     () =>
-      (phone ? createMediaPlayer : createPlayer)({
+      (phone ? createMediaPlayer : createSessionPlayer)({
         onProgress: (t) => {
           if (mode.current === "main") setPos(t);
           else setPartAt(t);
@@ -1183,7 +1183,6 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
     play(0);
   });
   useHeadphones({
-    on: phone,
     title: file?.name ?? null,
     playing: playing === "main",
     onPlay: () => {

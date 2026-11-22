@@ -10,7 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - On a phone, a QSO on the Copy page keeps playing with the screen locked.
-- On a phone, the headphone and lock screen buttons play and pause the QSO on the Copy page. Next track starts the QSO over, and next track twice within 2 seconds plays a new QSO.
+- The headphone buttons and media keys play and pause the QSO on the Copy page. Next track starts the QSO over, and next track twice within 2 seconds plays a new QSO.
 
 ### Development
 

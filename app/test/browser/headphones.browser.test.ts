@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { act, createElement, type MutableRefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { createMediaPlayer } from "@/audio/mediaPlayer";
+import { createMediaPlayer, createSessionPlayer } from "@/audio/mediaPlayer";
 import { encodeWavBuffer } from "@/audio/wav";
 import { forgetCopyFile, savePrefs, type Prefs } from "@/io/storage";
 import { CopyScreen } from "@/ui/CopyScreen";
@@ -88,6 +88,44 @@ async function fromClick(fn: () => void): Promise<void> {
   await userEvent.click(go);
   go.remove();
 }
+
+describe("the computer's player", () => {
+  /** The silent element beside the Web Audio player. */
+  const silentEl = () => [...document.querySelectorAll("audio")].at(-1);
+
+  it("plays silence while the QSO plays, and pauses it when the QSO stops or ends", async () => {
+    const ended = vi.fn();
+    const player = createSessionPlayer({ onEnded: ended });
+    try {
+      await fromClick(() => void player.playBuffer(silence(3)));
+      await vi.waitFor(() => expect(player.playing()).toBe("you"));
+      expect(silentEl()?.paused).toBe(false);
+      player.stop();
+      expect(silentEl()?.paused).toBe(true);
+      await fromClick(() => void player.playBuffer(silence(0.5)));
+      await vi.waitFor(() => expect(ended).toHaveBeenLastCalledWith("done"), { timeout: 3000 });
+      expect(silentEl()?.paused).toBe(true);
+    } finally {
+      player.destroy();
+    }
+  });
+
+  it("plays silence and pauses on the first tap once the page names what it plays", async () => {
+    const pauses = vi.spyOn(HTMLMediaElement.prototype, "pause");
+    navigator.mediaSession.metadata = new MediaMetadata({ title: "a QSO" });
+    const player = createSessionPlayer();
+    try {
+      await fromClick(() => {});
+      await vi.waitFor(() => expect(pauses).toHaveBeenCalled());
+      expect(silentEl()?.paused).toBe(true);
+      expect(player.playing()).toBeNull();
+    } finally {
+      player.destroy();
+      navigator.mediaSession.metadata = null;
+      vi.restoreAllMocks();
+    }
+  });
+});
 
 describe("the phone's player", () => {
   it("plays from a point and stops at its end, saying where it is on the way", async () => {
@@ -292,10 +330,16 @@ describe("the headphone buttons on the Copy page", () => {
     expect(navigator.mediaSession.metadata?.title).toBeTruthy();
   });
 
-  it("are not taken on a computer", async () => {
+  it("are taken on a computer too, and play and pause the QSO there", async () => {
     phone = false;
     await generate();
-    expect(buttons.size).toBe(0);
+    expect(buttons.get("nexttrack")).toBeTruthy();
+    await press("play");
+    expect(state()).toBe("playing");
+    await wait(500);
+    await press("pause");
+    expect(state()).toBe("paused");
+    expect(phonePlays, "the phone's player").toEqual([]);
   });
 
   it("play and pause the QSO", async () => {
