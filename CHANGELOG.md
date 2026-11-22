@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.39.0 — 2026-11-22
+
 ### Added
 
 - On a phone, a QSO on the Copy page keeps playing with the screen locked.
