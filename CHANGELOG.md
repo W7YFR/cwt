@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.39.1 — 2026-11-22
+
 ### Changed
 
 - The suggested reply sometimes sends your name or QTH twice.
