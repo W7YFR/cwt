@@ -60,3 +60,41 @@ addHelper(
     return on ? "Suggested replies show in the QSO log." : "Suggested replies hidden.";
   },
 );
+
+/* ---- the Live page, while it is being tried out ------------------------- */
+
+/** The switch, kept across reloads and tabs until it is turned off. */
+const LIVE_KEY = "cwt:live-page";
+
+/** Fired on `window` when the switch changes. */
+export const LIVE_EVENT = "cwt-live-page";
+
+/** Whether the page switch offers the Live page. */
+export function livePageOn(): boolean {
+  try {
+    return localStorage.getItem(LIVE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Call `changed` when the switch changes, for `useSyncExternalStore`. */
+export function onLivePage(changed: () => void): () => void {
+  window.addEventListener(LIVE_EVENT, changed);
+  return () => window.removeEventListener(LIVE_EVENT, changed);
+}
+
+addHelper(
+  "enableLive",
+  "enableLive() adds the Live page to the page switch, kept across reloads. enableLive(false) takes it away.",
+  (on = true) => {
+    try {
+      if (on) localStorage.setItem(LIVE_KEY, "1");
+      else localStorage.removeItem(LIVE_KEY);
+    } catch {
+      /* no local storage: nothing changes */
+    }
+    window.dispatchEvent(new Event(LIVE_EVENT));
+    return on ? "The Live page is in the page switch." : "The Live page is gone from the page switch.";
+  },
+);

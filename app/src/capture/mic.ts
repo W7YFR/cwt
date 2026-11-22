@@ -260,6 +260,9 @@ export interface Recorder {
   cancel(): Promise<void>;
   /** The band, played beside the recording. */
   readonly band?: BandGate;
+  /** Play the input through the speakers at `gain` (0 to 1 and over), as it
+   *  is recorded, or not at all with 0. Off at the start. */
+  monitor?(gain: number): void;
 }
 
 /** The band played from the recorder's own audio context, as a receiver
@@ -295,6 +298,10 @@ export interface RecordOptions {
   readonly maxSeconds?: number | undefined;
   /** Called once when the recording reaches `maxSeconds`. */
   readonly onLimit?: () => void;
+  /** Keep only this many seconds of the latest audio. `since` still counts
+   *  from the start, and `stop` hands back only what is kept. Unset, it all
+   *  is kept. */
+  readonly keepSeconds?: number | undefined;
 }
 
 export const DEFAULT_MAX_SECONDS = 300;
@@ -370,6 +377,12 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
   mute.gain.value = 0;
   node.connect(mute).connect(ctx.destination);
 
+  // The input to the speakers, at no gain until it is asked for: to hear a
+  // radio's audio while it is decoded.
+  const monitor = ctx.createGain();
+  monitor.gain.value = 0;
+  source.connect(monitor).connect(ctx.destination);
+
   const gate = new AudioWorkletNode(ctx, "cw-band-gate", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
   source.connect(gate);
   gate.connect(ctx.destination);
@@ -395,6 +408,9 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
 
   let chunks: Float32Array[] = [];
   let total = 0;
+  /** Samples captured before the first chunk kept. */
+  let dropped = 0;
+  const keepFrames = options.keepSeconds ? Math.ceil(options.keepSeconds * ctx.sampleRate) : Infinity;
   let restarts = 0;
   let lastReport = 0;
   let stopped = false;
@@ -413,6 +429,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     opened += frame.length;
     chunks.push(frame);
     total += frame.length;
+    while (chunks.length > 1 && total - dropped - chunks[0]!.length >= keepFrames) dropped += chunks.shift()!.length;
     if (total >= maxFrames) {
       stopped = true;
       options.onLimit?.();
@@ -436,12 +453,13 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     gate.disconnect();
     source.disconnect();
     mute.disconnect();
+    monitor.disconnect();
     stream.getTracks().forEach((t) => t.stop());
     await ctx.close();
   }
 
   function collect(): AudioClip {
-    const samples = new Float32Array(total);
+    const samples = new Float32Array(total - dropped);
     let at = 0;
     for (const c of chunks) {
       samples.set(c, at);
@@ -476,10 +494,14 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
       return out;
     },
     band,
+    monitor(gain) {
+      monitor.gain.setTargetAtTime(Math.max(0, gain), ctx.currentTime, 0.02);
+    },
     restarts: () => restarts,
     restart() {
       chunks = [];
       total = 0;
+      dropped = 0;
       lastReport = 0;
       restarts++;
     },
@@ -491,6 +513,7 @@ export async function startRecording(options: RecordOptions = {}): Promise<Recor
     async cancel() {
       chunks = [];
       total = 0;
+      dropped = 0;
       await release();
     },
   };

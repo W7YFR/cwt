@@ -38,8 +38,9 @@ const GAP_WEIGHT = 3;
 /** The longest word read. */
 const MAX_WORD = 12;
 
-/** A call: an optional letter or digit, a letter, a digit, then letters. */
-const CALL_RE = /^(?:[A-Z0-9]?[A-Z])\d[A-Z]{1,4}$/;
+/** A call: an optional letter or digit, a letter, a digit, then letters,
+ *  with an optional portable before or after a slash (W1AW/5). */
+const CALL_RE = /^(?:[A-Z0-9]{1,4}\/)?(?:[A-Z0-9]?[A-Z])\d[A-Z]{1,4}(?:\/[A-Z0-9]{1,4})?$/;
 
 /** A number, with cut digits (T for 0, N for 9), or a report. */
 const NUMBER_RE = /^(?=.*\d)[0-9TN]+$/;
@@ -61,25 +62,39 @@ function worth(word: string, known: ReadonlySet<string>): number {
 
 type Gap = "join" | "break" | "either";
 
-function kindOf(gap: number | null): Gap {
+function kindOf(gap: number | null, sureBreak: number): Gap {
   if (gap === null || gap < SURE_JOIN) return "join";
-  if (gap > SURE_BREAK) return "break";
+  if (gap > sureBreak) return "break";
   return "either";
 }
 
 /** For a gap near the cut, the cost of reading it as a break, and as a join:
  *  the nearer the cut from below, the cheaper a break. */
-function costs(gap: number): { brk: number; join: number } {
-  const p = Math.min(1, Math.max(0, (gap - SURE_JOIN) / (SURE_BREAK - SURE_JOIN)));
+function costs(gap: number, sureBreak: number): { brk: number; join: number } {
+  const p = Math.min(1, Math.max(0, (gap - SURE_JOIN) / (sureBreak - SURE_JOIN)));
   return { brk: (1 - p) * GAP_WEIGHT, join: p * GAP_WEIGHT };
 }
 
 /** The over as words: each gap near the cut read as whichever makes the best
  *  words of `known`. */
 export function readWords(chars: readonly Spaced[], known: ReadonlySet<string>): string {
+  return wordSpans(chars, known)
+    .map(([from, to]) =>
+      chars
+        .slice(from, to)
+        .map((c) => c.char)
+        .join(""),
+    )
+    .join(" ");
+}
+
+/** Where the words of `chars` start and end, as `readWords` reads them: each
+ *  word's first index and the index after its last. Above `sureBreak`, a
+ *  gap breaks the word whatever the words. */
+export function wordSpans(chars: readonly Spaced[], known: ReadonlySet<string>, sureBreak = SURE_BREAK): [number, number][] {
   const n = chars.length;
-  if (n === 0) return "";
-  const kinds = chars.map((c) => kindOf(c.gap));
+  if (n === 0) return [];
+  const kinds = chars.map((c) => kindOf(c.gap, sureBreak));
   // best[i]: the best reading of the first i characters, ending with a word.
   const best = new Array<number>(n + 1).fill(-Infinity);
   const from = new Array<number>(n + 1).fill(-1);
@@ -91,7 +106,7 @@ export function readWords(chars: readonly Spaced[], known: ReadonlySet<string>):
     for (let j = i - 1; j >= 0 && i - j <= MAX_WORD; j--) {
       // Character j starts the word: the gap before it must break, or be first.
       if (j > 0 && kinds[j] !== "join" && best[j]! > -Infinity) {
-        const brk = kinds[j] === "either" ? costs(chars[j]!.gap!).brk : 0;
+        const brk = kinds[j] === "either" ? costs(chars[j]!.gap!, sureBreak).brk : 0;
         const word = chars
           .slice(j, i)
           .map((c) => c.char)
@@ -115,19 +130,12 @@ export function readWords(chars: readonly Spaced[], known: ReadonlySet<string>):
       // Going on to j - 1 puts the gap before j inside the word.
       if (j > 0) {
         if (kinds[j] === "break") break;
-        if (kinds[j] === "either") inside += costs(chars[j]!.gap!).join;
+        if (kinds[j] === "either") inside += costs(chars[j]!.gap!, sureBreak).join;
       }
     }
   }
-  if (best[n] === -Infinity) return chars.map((c) => c.char).join("");
-  const words: string[] = [];
-  for (let i = n; i > 0; i = from[i]!) {
-    words.unshift(
-      chars
-        .slice(from[i]!, i)
-        .map((c) => c.char)
-        .join(""),
-    );
-  }
-  return words.join(" ");
+  if (best[n] === -Infinity) return [[0, n]];
+  const spans: [number, number][] = [];
+  for (let i = n; i > 0; i = from[i]!) spans.unshift([from[i]!, i]);
+  return spans;
 }

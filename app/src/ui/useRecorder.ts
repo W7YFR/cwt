@@ -63,6 +63,9 @@ export interface UseRecorderOptions {
   /** The longest a recording may run. At this length it finishes itself.
    *  Unset, the recorder's own safety cap applies. */
   maxSeconds?: number | undefined;
+  /** Keep only this many seconds of the latest audio, for a recording that
+   *  runs for hours. */
+  keepSeconds?: number | undefined;
 }
 
 export interface RecorderHandle {
@@ -147,6 +150,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
   const {
     deviceId,
     maxSeconds,
+    keepSeconds,
     onClip,
     onError,
     onStart,
@@ -273,6 +277,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       const rec = await startRecording({
         deviceId,
         maxSeconds,
+        keepSeconds,
         onLevel: (peak, seconds) => {
           setLevel(peak);
           setElapsed(seconds);
@@ -297,7 +302,7 @@ export function useRecorder(options: UseRecorderOptions): RecorderHandle {
       }
       onError(micError(e));
     }
-  }, [deviceId, maxSeconds, onError, onStart, refreshDevices]);
+  }, [deviceId, maxSeconds, keepSeconds, onError, onStart, refreshDevices]);
 
   const grantAccess = useCallback(async () => {
     try {

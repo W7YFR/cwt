@@ -1,6 +1,7 @@
 /* Three screens and the state between them. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { livePageOn, onLivePage } from "@/devtools";
 import { loadAudioFile } from "@/capture/file";
 import { NoKeyingError, isBlankTake } from "@/io/take";
 import {
@@ -35,6 +36,7 @@ import { UnsetNotesText, type UnsetNotes } from "./SlotMenu";
 import { ReviewScreen } from "./ReviewScreen";
 import { CopyScreen } from "./CopyScreen";
 import { QsoScreen } from "./QsoScreen";
+import { LiveScreen } from "./LiveScreen";
 import type { Page } from "./PageSwitch";
 import { useFileDrop } from "./useFileDrop";
 import { OPEN_FILE_CLOSED } from "./copy";
@@ -114,8 +116,11 @@ function AppBody(): React.ReactElement {
       setCalibrating(true);
     });
   }, []);
-  /* Practice or QSO, kept across a reload. */
-  const [page, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
+  /* Practice or QSO, kept across a reload. Live, chosen while its switch was
+     on, is Send while it is off. */
+  const [chosen, setPageRaw] = useState<Page>(() => loadPrefs().page ?? "practice");
+  const liveOn = useSyncExternalStore(onLivePage, livePageOn);
+  const page: Page = chosen === "live" && !liveOn ? "practice" : chosen;
   const setPage = useCallback(
     (next: Page) => {
       setPageRaw(next);
@@ -248,6 +253,8 @@ function AppBody(): React.ReactElement {
           ? "calibrate"
           : page === "qso"
             ? "qso"
+            : page === "live"
+            ? "live"
             : page === "copy"
             ? "copy"
             : take.loaded && take.review
@@ -507,6 +514,15 @@ function AppBody(): React.ReactElement {
           onPage={setPage}
           onHome={goHome}
           fileTarget={copyFile}
+        />
+      ) : page === "live" ? (
+        <LiveScreen
+          deviceId={deviceId}
+          profiles={profiles}
+          profileId={profileId}
+          onError={setError}
+          onPage={setPage}
+          onHome={goHome}
         />
       ) : page === "qso" ? (
         <QsoScreen
