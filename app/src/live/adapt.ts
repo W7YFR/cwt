@@ -11,6 +11,7 @@
  */
 
 import { MORSE_TO_CHAR, UNKNOWN } from "@/morse";
+import { wordSpans } from "@/timing/segment";
 import type { Run } from "./channel";
 
 /** A sender's timing, measured. All in seconds. */
@@ -23,6 +24,8 @@ export interface Pace {
   readonly charOver: number;
   /** A gap longer than this ends the word. */
   readonly wordOver: number;
+  /** The sender's typical gap between letters. */
+  readonly letterGap: number;
   /** Character speed, WPM. */
   readonly wpm: number;
 }
@@ -42,6 +45,13 @@ const GLITCH_UNITS = 0.3;
 const WORD_RATIO = 1.6;
 /** With one kind, a word gap is at least this many times a letter gap. */
 const WORD_OVER_LETTER = 1.4;
+/** Read by meaning, the cut between a letter gap and a word gap is at least
+ *  this many letter gaps. */
+const MEANING_CUT_LETTERS = 5 / 3;
+/** Read by meaning, a gap breaks the word whatever the words above this
+ *  share of the cut. Wider than on the other pages, which know your set
+ *  speed: with none, a wide letter gap can be 9 dits (W 7 Y F R). */
+const MEANING_SURE_BREAK = 2;
 /** Marks the measure looks back over. */
 export const PACE_MARKS = 40;
 
@@ -131,12 +141,14 @@ export function paceOf(marks: readonly number[], gaps: readonly number[], prior?
   // letters come more often than words, and a word gap is well past them.
   const past = g.filter((v) => v > charOver && v < 15 * unit);
   let wordOver = 5 * unit;
+  let letterGap = 3 * unit;
   if (past.length >= 3) {
     const [short, long] = twoKinds(past);
-    wordOver =
-      long / short >= WORD_RATIO
-        ? clamp(Math.sqrt(short * long), 3.5 * unit, 9 * unit)
-        : clamp(WORD_OVER_LETTER * median(past), 5 * unit, 9 * unit);
+    const two = long / short >= WORD_RATIO;
+    letterGap = two ? short : median(past);
+    wordOver = two
+      ? clamp(Math.sqrt(short * long), 3.5 * unit, 9 * unit)
+      : clamp(WORD_OVER_LETTER * median(past), 5 * unit, 9 * unit);
   }
   // A mark and the gap after it together are not moved by where the
   // threshold sits, so the speed comes from them when it can.
@@ -144,7 +156,7 @@ export function paceOf(marks: readonly number[], gaps: readonly number[], prior?
     Number.isFinite(inside) && m.length >= 2 && dah / dit >= MIN_DAH_RATIO
       ? clamp(((dit + inside) / 2 + (dah + inside) / 4) / 2, MIN_UNIT, MAX_UNIT)
       : unit;
-  return { unit, dahOver, charOver, wordOver, wpm: 1.2 / speedUnit };
+  return { unit, dahOver, charOver, wordOver, letterGap, wpm: 1.2 / speedUnit };
 }
 
 /** The pace of `runs`: their marks and the gaps between them. */
@@ -178,43 +190,76 @@ function charOf(pattern: string): string {
   return MORSE_TO_CHAR[pattern] ?? UNKNOWN;
 }
 
+/** A character read from the runs, with the gap before it. */
+interface Char {
+  readonly char: string;
+  /** The gap before it, seconds. Null for the first. */
+  readonly gap: number | null;
+  readonly t0: number;
+  readonly t1: number;
+}
+
 /** Read `runs` as words at `pace`. A last character with less than a
- *  character gap after it is still being keyed: it is `keying`, not text. */
-export function readRuns(runs: readonly Run[], pace: Pace): Reading {
-  const words: Word[] = [];
-  let text = "";
+ *  character gap after it is still being keyed: it is `keying`, not text.
+ *
+ *  With `known`, a gap near the word cut is read as whichever makes words
+ *  of `known`, as the other pages read by meaning (see `readWords`). */
+export function readRuns(runs: readonly Run[], pace: Pace, known?: ReadonlySet<string>): Reading {
+  const chars: Char[] = [];
   let pattern = "";
-  let w0 = NaN;
-  let w1 = NaN;
+  let c0 = NaN;
+  let c1 = NaN;
+  // The gap that ended the character before, in seconds.
+  let before = 0;
   const endChar = () => {
     if (!pattern) return;
-    text += charOf(pattern);
+    chars.push({ char: charOf(pattern), gap: chars.length ? before : null, t0: c0, t1: c1 });
     pattern = "";
-  };
-  const endWord = () => {
-    endChar();
-    if (text) words.push({ text, t0: w0, t1: w1 });
-    text = "";
-    w0 = NaN;
+    before = 0;
   };
   for (let i = 0; i < runs.length; i++) {
     const r = runs[i]!;
     if (r.on && r.dur < GLITCH_UNITS * pace.unit && i < runs.length - 1) continue;
     if (r.on) {
-      if (Number.isNaN(w0)) w0 = r.t;
-      w1 = r.t + r.dur;
+      if (!pattern) c0 = r.t;
+      c1 = r.t + r.dur;
       pattern += r.dur > pace.dahOver ? "-" : ".";
       continue;
     }
-    if (!pattern && !text) continue;
-    if (r.dur > pace.wordOver) endWord();
-    else if (r.dur > pace.charOver) endChar();
+    if (!pattern && !chars.length) continue;
+    if (r.dur > pace.charOver) {
+      endChar();
+      before = Math.max(before, r.dur);
+    }
   }
   // A run in progress is the last one: a mark still keyed, or a gap too
   // short yet to end the character.
   const last = runs[runs.length - 1];
   const open = last && (last.on || last.dur <= pace.charOver) ? pattern : "";
   if (open) pattern = "";
-  endWord();
+  endChar();
+  // By meaning, a gap is judged against a cut 5/3 of the sender's letter
+  // gap, as the other pages judge it: a textbook letter gap is then a sure
+  // join, and a word gap of 7 dits a sure break.
+  const cut = Math.max(pace.wordOver, MEANING_CUT_LETTERS * pace.letterGap);
+  const spans = known
+    ? wordSpans(
+        chars.map((c) => ({ char: c.char, gap: c.gap === null ? null : c.gap / cut })),
+        known,
+        MEANING_SURE_BREAK,
+      )
+    : chars.reduce<[number, number][]>((out, c, i) => {
+        if (i === 0 || c.gap! > pace.wordOver) out.push([i, i + 1]);
+        else out[out.length - 1]![1] = i + 1;
+        return out;
+      }, []);
+  const words = spans.map(([from, to]) => ({
+    text: chars
+      .slice(from, to)
+      .map((c) => c.char)
+      .join(""),
+    t0: chars[from]!.t0,
+    t1: chars[to - 1]!.t1,
+  }));
   return { words, keying: open || null };
 }

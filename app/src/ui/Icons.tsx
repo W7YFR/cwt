@@ -137,6 +137,15 @@ export function IconDownload(): React.ReactElement {
   );
 }
 
+/** A call you confirmed, on the Live page. */
+export function IconCheck(): React.ReactElement {
+  return (
+    <Icon name="check" stroke>
+      <path d="M3.2 8.4 6.5 11.6l6.3-7" />
+    </Icon>
+  );
+}
+
 export function IconPlay(): React.ReactElement {
   return (
     <Icon name="play">

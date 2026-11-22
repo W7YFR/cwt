@@ -31,6 +31,9 @@ const ON_DB = 9;
 /** A bin's floor is the median of the bins around it, this many either
  *  side: a signal takes up two or three bins, so the median is the noise. */
 const FLOOR_SPAN = 12;
+/** Until there is sound, a frame with more than this share of its samples
+ *  exactly zero is left out: digital silence, not noise. */
+const SILENT_SHARE = 1 / 16;
 /** How fast a bin's floor follows that median, per frame. */
 const FLOOR_FOLLOW = 0.1;
 
@@ -72,6 +75,8 @@ export class Spectrum {
   /** Audio not yet framed. */
   private buf = new Float32Array(FRAME * 4);
   private fill = 0;
+  /** A frame of sound has come: digital silence is read from now on. */
+  private heard = false;
   /** Per bin: floor, power in dB this frame, and the mean power when on. */
   private readonly floor: Float64Array;
   private readonly power: Float64Array;
@@ -133,6 +138,15 @@ export class Spectrum {
   }
 
   private frame(x: Float32Array): void {
+    // The digital silence the recorder starts with is not the noise: a
+    // floor learned from it would put every bin far above it. Once there is
+    // sound, silence is read: a loopback keys into exact zeros.
+    if (!this.heard) {
+      let zeros = 0;
+      for (let i = 0; i < FRAME; i++) if (x[i] === 0) zeros++;
+      if (zeros > FRAME * SILENT_SHARE) return;
+      this.heard = true;
+    }
     const { re, im } = this;
     for (let i = 0; i < FRAME; i++) {
       re[i] = x[i]! * this.window[i]!;

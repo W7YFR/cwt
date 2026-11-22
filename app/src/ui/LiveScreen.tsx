@@ -15,14 +15,19 @@ import { APP_VERSION } from "@/build-info";
 import { calibrationOf, profileForSource, type Profile } from "@/io/profiles";
 import { loadUser, recallLive, rememberLive } from "@/io/storage";
 import type { Band, Signal } from "@/live/decoder";
-import { logAdif, logCsv, transcriptText } from "@/live/export";
+import { transcriptText } from "@/live/export";
 import { buildLog, NO_FIXES, type Fixes, type Line, type LiveTurn, type Qso } from "@/live/log";
-import { FIELD_KEYS, KIND_LABEL, type FieldKey } from "@/live/parse";
+import { KIND_LABEL } from "@/live/parse";
+import { Tape } from "@/live/tape";
+import { vocabulary } from "@/qso/vocabulary";
+import { encodeWav } from "@/audio/wav";
+import { micDebugOn, micTranscript } from "@/micdebug";
 import { PageHelp, type KeyGroup } from "./Help";
+import { IconCheck } from "./Icons";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { LevelMeter, RecDot } from "./Record";
 import { MicChip, SettingsButton } from "./SettingsDrawer";
-import { DownloadItem, MenuHeading, Toolbar } from "./Toolbar";
+import { DownloadItem, MenuHeading, MoreMenu, Toolbar } from "./Toolbar";
 import { useListen, type OpenTurn } from "./useListen";
 import { useRecorder } from "./useRecorder";
 import { HomeButton } from "./Wordmark";
@@ -30,24 +35,19 @@ import { HomeButton } from "./Wordmark";
 /** Seconds of audio the recorder keeps. The decoder reads it as it comes,
  *  so a few seconds would do; this is room to spare. */
 const KEEP_SECONDS = 30;
+/** One QSO's recording starts this long before its first line and ends
+ *  this long after its last, ms. */
+const QSO_PAD_MS = 1000;
+/** A signal quiet this long is no longer counted in the status, seconds. */
+const QUIET_SHOWN_SEC = 20;
+/** The narrowest range of pitches a drag on the band chooses, Hz. */
+const MIN_RANGE_HZ = 40;
+/** Minutes of audio kept for the Recording download. */
+const TAPE_MINUTES = 30;
 /** The most turns the log keeps. The oldest go first. */
 const MAX_TURNS = 3000;
 /** The log scrolls with new lines while it is this close to its end, px. */
 const END_SLACK_PX = 48;
-
-/** A detail's name on a card. */
-const FIELD_LABEL: Readonly<Record<FieldKey, string>> = {
-  name: "Name",
-  qth: "QTH",
-  state: "State",
-  rst: "Report sent",
-  power: "Power",
-  rig: "Rig",
-  ant: "Antenna",
-  number: "Number",
-  park: "Park",
-  skcc: "SKCC",
-};
 
 const LIVE_GUIDE = (
   <>
@@ -56,10 +56,15 @@ const LIVE_GUIDE = (
       <li>Key into your microphone to see your own sending decoded. Or connect your radio&apos;s audio to the input to copy the band.</li>
       <li>Live finds the speed of each station by itself. The speed you set on the other pages does not apply here.</li>
       <li>Live follows up to 8 signals at once. Each line is one station&apos;s turn, with that station&apos;s call and speed.</li>
-      <li>The lines of each QSO are grouped. A card beside them shows what each station sent: call, name, QTH, report and more.</li>
-      <li>Live can be wrong about who sent a line. Click the call at the start of a line to change it. Click a detail on a card to correct it.</li>
+      <li>The band under the heading shows how far each pitch stands over the noise. Each signal Live follows is a line, with its pitch. To decode only some pitches, drag across the band, from a little below a signal&apos;s line to a little above it. Live leaves signals outside them alone. Double-click the band, or click Decode all, to decode the whole band again.</li>
+      <li>The lines of each QSO are grouped. A card beside them shows the QSO&apos;s time, pitch and stations.</li>
+      <li>To note the radio&apos;s frequency, open ⋯ on a QSO&apos;s card and choose Frequency. Later QSOs take the same frequency until you type a new one.</li>
+      <li>Live can be wrong about who sent a line. Click the call at the start of a line to change it.</li>
+      <li>To make a call stick, click it at the start of a line and choose Confirm. Live then reads calls close to it as that call, and lines at that pitch as sent by that station. A check mark shows beside a confirmed call on its cards.</li>
       <li>Your own lines show in blue when Live reads your call from Settings › You.</li>
-      <li>The log stays after a reload. Download it from ⋯ as text, as a log file for a logging program, or as a spreadsheet.</li>
+      <li>The log stays after a reload. Download it as text from ⋯.</li>
+      <li>From ⋯, Audio saves the latest 30 minutes Live heard, as a WAV file. The audio does not stay after a reload.</li>
+      <li>⋯ on a QSO&apos;s card downloads just that QSO, as audio or text. Its audio is there only while the QSO is within the latest 30 minutes.</li>
     </ul>
   </>
 );
@@ -77,6 +82,8 @@ const LIVE_KEYS: readonly KeyGroup[] = [
 interface Kept {
   turns: LiveTurn[];
   fixes: Fixes;
+  /** The pitches to decode, Hz, or absent for the whole band. */
+  range?: readonly [number, number];
 }
 
 /** The log as last remembered, checked loosely: a turn needs its text and
@@ -90,23 +97,39 @@ function recalled(): Kept {
       )
     : [];
   const fixes = raw?.fixes && typeof raw.fixes === "object" ? { ...NO_FIXES, ...raw.fixes } : NO_FIXES;
-  return { turns, fixes };
+  const r = raw?.range;
+  const range = Array.isArray(r) && r.length === 2 && r.every((v) => typeof v === "number") && r[0]! < r[1]! ? ([r[0]!, r[1]!] as const) : undefined;
+  return range ? { turns, fixes, range } : { turns, fixes };
 }
 
-/** Save `text` as a file called `name`. */
-function save(text: string, name: string, type: string): void {
+/** Save `data` as a file called `name`. */
+function save(data: string | Blob, name: string, type: string): void {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.href = URL.createObjectURL(typeof data === "string" ? new Blob([data], { type }) : data);
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-/** A file name stem with the date: cwt-live-2026-11-21. */
-function stem(): string {
-  const d = new Date();
+/** A file name stem with the date, today or at `at` (ms): cwt-live-2026-11-21. */
+function stem(at = Date.now()): string {
+  const d = new Date(at);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `cwt-live-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** A file name stem for one QSO: its date, its start in UTC and its first
+ *  station, cwt-live-2026-11-21-0247Z-W1AW-5. */
+function qsoStem(qso: Qso): string {
+  const call = qso.stations[0]?.call.replace(/\//g, "-");
+  return `${stem(qso.at)}-${utcClock(qso.at)}${call ? `-${call}` : ""}`;
+}
+
+/** A time of day, UTC, as the transcript gives it: 0247Z. */
+function utcClock(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}Z`;
 }
 
 /** A time of day, local: 18:04. */
@@ -133,7 +156,7 @@ export function LiveScreen({
   const keptRef = useRef(kept);
   keptRef.current = kept;
   useEffect(() => {
-    rememberLive(kept.turns.length || Object.keys(kept.fixes.sender).length ? kept : null);
+    rememberLive(kept.turns.length || Object.keys(kept.fixes.sender).length || kept.range ? kept : null);
   }, [kept]);
 
   const rec = useRecorder({
@@ -160,11 +183,24 @@ export function LiveScreen({
       return { ...k, turns: all.length > MAX_TURNS ? all.slice(all.length - MAX_TURNS) : all };
     });
   }, []);
-  const listening = useListen(recorder, calibration, addTurns);
+  const user = loadUser();
+  const myCall = user.callsign;
+  const confirmed = kept.fixes.confirmed ?? {};
+  const confirmedKey = Object.keys(confirmed).sort().join(" ");
+  const words = useMemo(
+    () => vocabulary([user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, confirmedKey]),
+    [user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, confirmedKey],
+  );
+  const [tape] = useState(() => new Tape(TAPE_MINUTES * 60));
+  const listening = useListen(recorder, calibration, words, addTurns, tape, KEEP_SECONDS, kept.range ?? null);
+  const setRange = (range: readonly [number, number] | null) =>
+    setKept((k) => {
+      const { range: _old, ...rest } = k;
+      return range ? { ...rest, range } : rest;
+    });
 
-  const myCall = loadUser().callsign;
   const log = useMemo(
-    () => buildLog([...kept.turns, ...listening.open], kept.fixes, myCall),
+    () => buildLog([...kept.turns, ...listening.open], kept.fixes, myCall, new Set(listening.open.map((t) => t.id))),
     [kept, listening.open, myCall],
   );
   const openIds = useMemo(() => new Map(listening.open.map((t) => [t.id, t])), [listening.open]);
@@ -185,20 +221,43 @@ export function LiveScreen({
       else delete sender[turnId];
       return { ...k, fixes: { ...k.fixes, sender } };
     });
-  const fixField = (qsoId: string, call: string, key: FieldKey, value: string) =>
+  const fixFreq = (qsoId: string, value: string) =>
+    setKept((k) => ({ ...k, fixes: { ...k.fixes, freq: { ...(k.fixes.freq ?? {}), [qsoId]: value.trim() } } }));
+  const confirm = (call: string, hz: number | null) =>
     setKept((k) => {
-      const forQso = { ...(k.fixes.fields[qsoId] ?? {}) };
-      forQso[call] = { ...(forQso[call] ?? {}), [key]: value.trim().toUpperCase() };
-      return { ...k, fixes: { ...k.fixes, fields: { ...k.fixes.fields, [qsoId]: forQso } } };
+      const next = { ...(k.fixes.confirmed ?? {}) };
+      if (hz === null) delete next[call];
+      else next[call] = hz;
+      return { ...k, fixes: { ...k.fixes, confirmed: next } };
     });
-  const clear = () => setKept({ turns: [], fixes: NO_FIXES });
+  const clear = () => {
+    tape.clear();
+    // The range is where you listen, not part of the log: it stays.
+    setKept((k) => (k.range ? { turns: [], fixes: NO_FIXES, range: k.range } : { turns: [], fixes: NO_FIXES }));
+  };
+  const saveQsoAudio = (qso: Qso) => {
+    const { samples, rate } = tape.audio(qso.at - QSO_PAD_MS, qso.end + QSO_PAD_MS);
+    if (samples.length) save(encodeWav(samples, rate), `${qsoStem(qso)}.wav`, "audio/wav");
+  };
+  const saveTape = () => {
+    const at = tape.startedAt;
+    if (at === null) return;
+    const { samples, rate } = tape.audio();
+    save(encodeWav(samples, rate), `${stem()}-${utcClock(at)}.wav`, "audio/wav");
+  };
 
   const groups = useMemo(() => groupLines(log.lines), [log.lines]);
   const qsoById = useMemo(() => new Map(log.qsos.map((q) => [q.id, q])), [log.qsos]);
-  const heard = listening.signals.filter((s) => s.quietSec < 20);
+  /** Something was heard since Listen was pressed. */
+  const heardSince = useRef(false);
+  if (!recorder) heardSince.current = false;
+  else if (listening.signals.length > 0) heardSince.current = true;
+  const heard = listening.signals.filter((s) => s.quietSec < QUIET_SHOWN_SEC);
   const status = recorder
     ? heard.length === 0
-      ? "Listening. No CW heard yet."
+      ? heardSince.current
+        ? "Listening for the next station."
+        : "Listening. No CW heard yet."
       : heard.length === 1
         ? "Listening. Following 1 signal."
         : `Listening. Following ${heard.length} signals.`
@@ -243,7 +302,7 @@ export function LiveScreen({
               )}
               <button
                 data-testid="live-clear"
-                disabled={recorder !== null || kept.turns.length === 0}
+                disabled={recorder !== null || (kept.turns.length === 0 && !tape.heldSec)}
                 title="Clear the log of every line and QSO"
                 onClick={clear}
               >
@@ -255,26 +314,33 @@ export function LiveScreen({
             <>
               <MenuHeading>Download</MenuHeading>
               <DownloadItem
-                label="Transcript"
+                label="Text"
                 testId="live-download-text"
                 disabled={log.lines.length === 0}
                 title="Save every line as a text file"
-                onClick={() => save(transcriptText(log.lines), `${stem()}.txt`, "text/plain")}
+                onClick={() => save(transcriptText(log.lines, log.qsos), `${stem()}.txt`, "text/plain")}
               />
               <DownloadItem
-                label="Log for a logging program"
-                testId="live-download-adif"
-                disabled={log.qsos.length === 0}
-                title="Save the QSOs as an ADIF file"
-                onClick={() => save(logAdif(log.qsos, myCall, APP_VERSION), `${stem()}.adi`, "text/plain")}
+                label="Audio"
+                testId="live-download-audio"
+                disabled={!tape.heldSec}
+                title={`Save the latest ${TAPE_MINUTES} minutes Live heard as a WAV file`}
+                onClick={saveTape}
               />
-              <DownloadItem
-                label="Log as a spreadsheet"
-                testId="live-download-csv"
-                disabled={log.qsos.length === 0}
-                title="Save the QSOs as a CSV file"
-                onClick={() => save(logCsv(log.qsos), `${stem()}.csv`, "text/csv")}
-              />
+              {micDebugOn() && (
+                <DownloadItem
+                  label="Debug log"
+                  testId="live-download-debug"
+                  title="Save what Live and the microphone did, as a text file"
+                  onClick={() =>
+                    save(
+                      [`cwt ${APP_VERSION}`, `page ${location.href}`, `agent ${navigator.userAgent}`, "", micTranscript(), ""].join("\n"),
+                      `${stem()}-debug.txt`,
+                      "text/plain",
+                    )
+                  }
+                />
+              )}
             </>
           }
         />
@@ -288,7 +354,7 @@ export function LiveScreen({
             </span>
             <span className="copysay qsostatus">{status}</span>
           </div>
-          {recorder && <BandStrip band={listening.band} signals={heard} />}
+          {recorder && <BandStrip band={listening.band} signals={heard} range={kept.range ?? null} onRange={setRange} />}
         </div>
 
         <div className="qsobody">
@@ -319,11 +385,27 @@ export function LiveScreen({
                               open={openIds.get(line.turn.id) ?? null}
                               calls={qso?.stations.map((s) => s.call) ?? []}
                               fixed={kept.fixes.sender[line.turn.id] !== undefined}
+                              confirmed={line.sender !== null && confirmed[line.sender] !== undefined}
                               onSender={(call) => fixSender(line.turn.id, call)}
+                              onConfirm={(yes) => line.sender && confirm(line.sender, yes ? line.turn.hz : null)}
                             />
                           ))}
                         </ol>
-                        {qso && <QsoCard qso={qso} onField={(call, key, value) => fixField(qso.id, call, key, value)} />}
+                        {qso && group.last && (
+                          <QsoCard
+                            qso={qso}
+                            hasAudio={tape.holds(qso.at - QSO_PAD_MS, qso.end + QSO_PAD_MS)}
+                            onSaveAudio={() => saveQsoAudio(qso)}
+                            onSaveText={() =>
+                              save(
+                                transcriptText(log.lines.filter((l) => l.qso === qso.id), [qso]),
+                                `${qsoStem(qso)}.txt`,
+                                "text/plain",
+                              )
+                            }
+                            onFreq={(value) => fixFreq(qso.id, value)}
+                          />
+                        )}
                       </li>
                       {g < groups.length - 1 && <li className="qsodivider" role="separator" />}
                     </Fragment>
@@ -339,20 +421,21 @@ export function LiveScreen({
 }
 
 /** The lines in the order they started, in runs of one QSO each. A QSO
- *  whose lines are broken up by another's shows once, where it started,
- *  with all its lines. */
-function groupLines(lines: readonly Line[]): { qso: string | null; lines: Line[] }[] {
-  const out: { qso: string | null; lines: Line[] }[] = [];
-  const byQso = new Map<string, { qso: string | null; lines: Line[] }>();
+ *  that goes on after another QSO's lines starts a new run at the end, so
+ *  the log only ever grows at the bottom. `last` marks a QSO's latest run,
+ *  which shows its card. */
+function groupLines(lines: readonly Line[]): { qso: string | null; lines: Line[]; last: boolean }[] {
+  const out: { qso: string | null; lines: Line[]; last: boolean }[] = [];
   for (const line of lines) {
-    const found = line.qso ? byQso.get(line.qso) : undefined;
-    if (found) {
-      found.lines.push(line);
-      continue;
-    }
-    const group = { qso: line.qso, lines: [line] };
-    if (line.qso) byQso.set(line.qso, group);
-    out.push(group);
+    const prev = out[out.length - 1];
+    if (prev && prev.qso === line.qso) prev.lines.push(line);
+    else out.push({ qso: line.qso, lines: [line], last: false });
+  }
+  const seen = new Set<string | null>();
+  for (let i = out.length - 1; i >= 0; i--) {
+    const group = out[i]!;
+    group.last = !seen.has(group.qso);
+    seen.add(group.qso);
   }
   return out;
 }
@@ -364,18 +447,22 @@ function LineItem({
   open,
   calls,
   fixed,
+  confirmed,
   onSender,
+  onConfirm,
 }: {
   line: Line;
   open: OpenTurn | null;
   calls: readonly string[];
   fixed: boolean;
+  confirmed: boolean;
   onSender(call: string | null): void;
+  onConfirm(yes: boolean): void;
 }): React.ReactElement {
   const cls = [line.mine ? "you" : "them", open ? "live" : ""].filter(Boolean).join(" ");
   return (
     <li className={cls} data-testid="live-line" data-open={String(!!open)} data-sender={line.sender ?? ""}>
-      <WhoPicker who={line.sender} calls={calls} fixed={fixed} onPick={onSender} />
+      <WhoPicker who={line.sender} calls={calls} fixed={fixed} confirmed={confirmed} onPick={onSender} onConfirm={onConfirm} />
       <span className="text">
         {line.turn.text}
         {open?.keying && <span className="keying"> {open.keying}</span>}
@@ -397,12 +484,16 @@ function WhoPicker({
   who,
   calls,
   fixed,
+  confirmed,
   onPick,
+  onConfirm,
 }: {
   who: string | null;
   calls: readonly string[];
   fixed: boolean;
+  confirmed: boolean;
   onPick(call: string | null): void;
+  onConfirm(yes: boolean): void;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
@@ -461,144 +552,227 @@ function WhoPicker({
               Let Live decide
             </button>
           )}
+          {who && (
+            <button
+              type="button"
+              role="menuitem"
+              data-testid="live-confirm"
+              title={
+                confirmed
+                  ? `Live goes back to reading ${who} like any other call`
+                  : `Live reads calls close to ${who} as ${who}, and lines at this pitch as sent by ${who}`
+              }
+              onClick={() => {
+                setOpen(false);
+                onConfirm(!confirmed);
+              }}
+            >
+              {confirmed ? `Unconfirm ${who}` : `Confirm ${who}`}
+            </button>
+          )}
         </span>
       )}
     </span>
   );
 }
 
-/** What each station of a QSO sent, a column per station. A detail opens
- *  to be corrected with a click. */
+/** ⋯ on a QSO's card: its downloads, and the radio's frequency to note. */
+function QsoMenu({
+  hasAudio,
+  onFreq,
+  onSaveAudio,
+  onSaveText,
+}: {
+  /** Its audio is still on the recording. */
+  hasAudio: boolean;
+  onFreq(): void;
+  onSaveAudio(): void;
+  onSaveText(): void;
+}): React.ReactElement {
+  return (
+    <MoreMenu label="More for this QSO" testId="live-qso-more" up>
+      <MenuHeading>Download</MenuHeading>
+      <DownloadItem
+        label="Audio"
+        testId="live-qso-audio"
+        disabled={!hasAudio}
+        title={hasAudio ? undefined : `Audio is kept for the latest ${TAPE_MINUTES} minutes heard since the page loaded`}
+        onClick={onSaveAudio}
+      />
+      <DownloadItem label="Text" testId="live-qso-text" onClick={onSaveText} />
+      <MenuHeading>Note</MenuHeading>
+      <button type="button" role="menuitem" data-testid="live-note-freq" onClick={onFreq}>
+        Frequency
+      </button>
+    </MoreMenu>
+  );
+}
+
+/** A QSO's card: what is known of it and its ⋯, then its stations. */
 function QsoCard({
   qso,
-  onField,
+  hasAudio,
+  onSaveAudio,
+  onSaveText,
+  onFreq,
 }: {
   qso: Qso;
-  onField(call: string, key: FieldKey, value: string): void;
+  /** Its audio is still on the recording. */
+  hasAudio: boolean;
+  onSaveAudio(): void;
+  onSaveText(): void;
+  onFreq(value: string): void;
 }): React.ReactElement {
-  const keys = FIELD_KEYS.filter((k) => qso.stations.some((s) => s.fields[k]));
-  const [adding, setAdding] = useState<FieldKey | null>(null);
-  const shown = adding && !keys.includes(adding) ? [...keys, adding] : keys;
-  const missing = FIELD_KEYS.filter((k) => !shown.includes(k));
+  const [noting, setNoting] = useState(false);
+  const facts = [qso.kind ? KIND_LABEL[qso.kind] : null, clock(qso.at), `${qso.hz} Hz`, qso.freq].filter(Boolean).join(" · ");
   return (
-    <div className="qsoreport livecard" data-testid="live-card" data-kind={qso.kind ?? ""} data-ended={String(qso.ended)}>
-      <p className="cardhead">
-        {qso.kind && <span className="cardkind">{KIND_LABEL[qso.kind]}</span>}
-        <span>{clock(qso.at)}</span>
-        <span>{qso.hz} Hz</span>
-        <span>{qso.ended ? "Ended" : "Going on"}</span>
-      </p>
-      <table>
-        <tbody>
-          <tr className="side">
-            <th scope="col" />
-            {qso.stations.map((s) => (
-              <th key={s.call} scope="col" className={s.mine ? "mine" : undefined}>
-                {s.call}
-                {s.wpm > 0 && <span className="cardwpm"> {s.wpm} wpm</span>}
-              </th>
-            ))}
-          </tr>
-          {shown.map((k) => (
-            <tr key={k}>
-              <th scope="row">{FIELD_LABEL[k]}</th>
-              {qso.stations.map((s) => (
-                <td key={s.call}>
-                  <FieldCell value={s.fields[k] ?? ""} label={`${FIELD_LABEL[k]} of ${s.call}`} onSave={(v) => onField(s.call, k, v)} />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {missing.length > 0 && (
-        <select
-          className="cardadd"
-          aria-label="Add a detail"
-          value=""
-          onChange={(e) => setAdding(e.target.value as FieldKey)}
-        >
-          <option value="">Add a detail…</option>
-          {missing.map((k) => (
-            <option key={k} value={k}>
-              {FIELD_LABEL[k]}
-            </option>
-          ))}
-        </select>
+    <div className="qsoreport livecard" data-testid="live-card" data-kind={qso.kind ?? ""}>
+      <div className="cardhead">
+        <span className="cardname">{facts}</span>
+        <QsoMenu hasAudio={hasAudio} onFreq={() => setNoting(true)} onSaveAudio={onSaveAudio} onSaveText={onSaveText} />
+      </div>
+      {noting && (
+        <p className="cardfreq" data-testid="live-freq">
+          <FreqBox value={qso.freq ?? ""} onSave={onFreq} onClose={() => setNoting(false)} />
+        </p>
       )}
+      <p className="cardcalls">
+        {qso.stations.map((st) => (
+          <span key={st.call} className={st.mine ? "mine" : undefined} data-confirmed={String(st.confirmed)}>
+            {st.call}
+            {st.confirmed && (
+              <span className="cardsure" title={`You confirmed ${st.call}`}>
+                {" "}
+                <IconCheck />
+              </span>
+            )}
+          </span>
+        ))}
+      </p>
     </div>
   );
 }
 
-/** One detail on a card: its value, or a box to correct it. */
-function FieldCell({ value, label, onSave }: { value: string; label: string; onSave(v: string): void }): React.ReactElement {
-  const [editing, setEditing] = useState(false);
+/** The box the radio's frequency is typed in. Enter or leaving it keeps
+ *  what is typed, and Escape lets it go. */
+function FreqBox({ value, onSave, onClose }: { value: string; onSave(v: string): void; onClose(): void }): React.ReactElement {
   const [draft, setDraft] = useState(value);
-  if (!editing) {
-    return (
-      <button
-        type="button"
-        className="link cardvalue"
-        title={`Correct the ${label.toLowerCase()}`}
-        onClick={() => {
-          setDraft(value);
-          setEditing(true);
-        }}
-      >
-        {value || "—"}
-      </button>
-    );
-  }
   const done = (keep: boolean) => {
-    setEditing(false);
-    if (keep && draft.trim().toUpperCase() !== value) onSave(draft);
+    if (keep && draft.trim() !== value) onSave(draft);
+    onClose();
   };
   return (
     <input
-      className="cardinput"
-      aria-label={label}
+      type="text"
+      aria-label="The radio's frequency"
+      placeholder="Such as 14.025"
+      title="Later QSOs take the same frequency until you type a new one."
       autoFocus
       value={draft}
-      onChange={(e) => setDraft(e.target.value.toUpperCase())}
+      onChange={(e) => setDraft(e.target.value)}
       onBlur={() => done(true)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") done(true);
-        else if (e.key === "Escape") done(false);
+        // Enter and Escape are this box's, not the page's: they would stop
+        // listening.
+        if (e.key !== "Enter" && e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation();
+        done(e.key === "Enter");
       }}
     />
   );
 }
 
-/** The band from 300 to 1500 Hz as heard lately, with a mark on each signal
- *  Live follows. */
-function BandStrip({ band, signals }: { band: Band | null; signals: readonly Signal[] }): React.ReactElement {
+/** The band from 300 to 1500 Hz as heard lately: how far each pitch stands
+ *  over its noise, 0 to 36 dB, with a mark on each signal Live follows.
+ *  Dragging across it chooses the pitches to decode; outside them it is
+ *  dimmed. */
+function BandStrip({
+  band,
+  signals,
+  range,
+  onRange,
+}: {
+  band: Band | null;
+  signals: readonly Signal[];
+  range: readonly [number, number] | null;
+  onRange(range: readonly [number, number] | null): void;
+}): React.ReactElement {
   const width = 600;
   const height = 40;
   const top = 36;
+  const box = useRef<HTMLDivElement>(null);
+  /** The drag under way: where it started and where it is now, Hz. */
+  const [drag, setDrag] = useState<readonly [number, number] | null>(null);
   if (!band) return <div className="livestrip" aria-hidden="true" />;
   const span = band.toHz - band.fromHz;
   const x = (hz: number) => ((hz - band.fromHz) / span) * width;
+  const pct = (hz: number) => `${(x(hz) / width) * 100}%`;
+  const hzAt = (clientX: number) => {
+    const r = box.current!.getBoundingClientRect();
+    const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    return band.fromHz + f * span;
+  };
   const points = Array.from(band.db, (db, i) => {
     const hz = band.fromHz + (i / Math.max(1, band.db.length - 1)) * span;
     return `${x(hz).toFixed(1)},${(height - (Math.min(db, top) / top) * (height - 4)).toFixed(1)}`;
   }).join(" ");
+  const shown = drag ? ([Math.min(drag[0], drag[1]), Math.max(drag[0], drag[1])] as const) : range;
   return (
     <div className="livestrip" data-testid="live-band">
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
-        <polyline points={points} />
-      </svg>
-      {signals.map((s) => (
-        <span
-          key={s.ch}
-          className={s.keyed ? "livesig on" : "livesig"}
-          style={{ left: `${(x(s.hz) / width) * 100}%` }}
-          title={`${s.hz.toFixed(0)} Hz${s.wpm ? `, ${s.wpm} wpm` : ""}`}
-        >
-          {s.wpm > 0 ? `${s.wpm}` : ""}
-        </span>
-      ))}
+      <div
+        className="livebandarea"
+        ref={box}
+        title="Drag across the band to decode only those pitches"
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          const hz = hzAt(e.clientX);
+          setDrag([hz, hz]);
+        }}
+        onPointerMove={(e) => {
+          if (drag) setDrag([drag[0], hzAt(e.clientX)]);
+        }}
+        onPointerUp={(e) => {
+          if (!drag) return;
+          const lo = Math.round(Math.min(drag[0], hzAt(e.clientX)));
+          const hi = Math.round(Math.max(drag[0], hzAt(e.clientX)));
+          setDrag(null);
+          // A click, not a drag, leaves the range as it is.
+          if (hi - lo >= MIN_RANGE_HZ) onRange([lo, hi]);
+        }}
+        onPointerCancel={() => setDrag(null)}
+        onDoubleClick={() => onRange(null)}
+      >
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+          <polyline points={points} />
+        </svg>
+        {shown && (
+          <>
+            <span className="liveshade" style={{ left: 0, width: pct(shown[0]) }} />
+            <span className="liveshade" style={{ left: pct(shown[1]), right: 0 }} />
+          </>
+        )}
+        {signals.map((s) => (
+          <span key={s.ch} className="livesig" style={{ left: pct(s.hz) }} title={`A signal Live follows, at ${s.hz.toFixed(0)} Hz`}>
+            {s.hz.toFixed(0)} Hz
+          </span>
+        ))}
+      </div>
       <span className="livescale">
         <span>{Math.round(band.fromHz)} Hz</span>
+        {shown && (
+          <span data-testid="live-range">
+            Decoding {Math.round(shown[0])}–{Math.round(shown[1])} Hz
+            {!drag && (
+              <>
+                {" · "}
+                <button type="button" className="link" data-testid="live-range-all" onClick={() => onRange(null)}>
+                  Decode all
+                </button>
+              </>
+            )}
+          </span>
+        )}
         <span>{Math.round(band.toHz)} Hz</span>
       </span>
     </div>

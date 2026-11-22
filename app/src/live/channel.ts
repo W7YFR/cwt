@@ -31,16 +31,27 @@ export const HOP_SEC = 0.004;
 /** The low-pass cutoff on each arm of the mixer, Hz. A 40 WPM dit still
  *  rises in a few milliseconds, and a signal 150 Hz away is 25 dB down. */
 const CUTOFF_HZ = 70;
+/** Quieter than this is digital silence, not noise, dB of full scale: the
+ *  recorder zeroes its first moments while the device settles, and a
+ *  loopback keys into exact zeros. It leaves the floor and the peak where
+ *  they are. */
+const SILENCE_DB = -120;
 /** The quietest peak that can be keying, dB of full scale. */
 const MIN_PEAK_DB = -60;
 /** The least range between floor and peak that can be keying, dB. */
 const MIN_RANGE_DB = 12;
-/** How far the floor moves toward each key-up reading, dB. A fixed step
- *  makes it the median: noise spikes and deep nulls pull it equally. */
+/** How far the floor moves down toward each key-up reading under it, dB. */
 const FLOOR_STEP_DB = 0.1;
+/** The share of key-up readings the floor sits over. Fixed steps, longer
+ *  down than up, make the floor this quantile of the readings: noise spikes
+ *  and deep nulls pull it little. Keying that is not read yet, more than half
+ *  of the readings, cannot lift it into the marks, as a median would. */
+const FLOOR_QUANTILE = 0.25;
+/** How far the floor moves up toward each key-up reading over it, dB. */
+const FLOOR_RISE_DB = (FLOOR_STEP_DB * FLOOR_QUANTILE) / (1 - FLOOR_QUANTILE);
 /** Key down is at least this far over the floor, dB. Noise seldom reaches
  *  it, and not for long. */
-const MIN_UP_DB = 12;
+const MIN_UP_DB = 14;
 /** Key down is no more than this far under the loudest the station has
  *  been lately, dB. */
 const REF_SPAN_DB = 22;
@@ -207,16 +218,18 @@ export class Detector {
 
   private reading(db: number): void {
     const now = this.at / this.rate;
+    const silent = db < SILENCE_DB;
     if (Number.isNaN(this.floor)) {
+      if (silent) return;
       this.floor = db;
       this.peak = db;
     }
-    // The floor is the median level with the key up. The peak rises fast
+    // The floor is a low quantile of the level with the key up. The peak rises fast
     // and falls slowly, faster once the key has been up a while. Noise alone
     // keeps the peak a few dB over the floor, short of `MIN_RANGE_DB`.
-    if (!this.on) this.floor += db > this.floor ? FLOOR_STEP_DB : -FLOOR_STEP_DB;
+    if (!this.on && !silent) this.floor += db > this.floor ? FLOOR_RISE_DB : -FLOOR_STEP_DB;
     if (db > this.peak) this.peak += (db - this.peak) * 0.3;
-    else this.peak -= now - this.lastMarkEnd > PEAK_HOLD_SEC ? PEAK_FALL_DB : PEAK_SAG_DB;
+    else if (!silent) this.peak -= now - this.lastMarkEnd > PEAK_HOLD_SEC ? PEAK_FALL_DB : PEAK_SAG_DB;
     if (this.peak < this.floor) this.peak = this.floor;
     if (!(this.peak <= this.loudest)) this.loudest = this.peak;
 

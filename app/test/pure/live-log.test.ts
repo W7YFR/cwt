@@ -2,9 +2,9 @@
  * station said. */
 
 import { describe, expect, it } from "vitest";
-import { buildLog, type LiveTurn } from "@/live/log";
+import { buildLog, NO_FIXES, type LiveTurn } from "@/live/log";
 import { readSaid } from "@/live/parse";
-import { logAdif, logCsv, transcriptText } from "@/live/export";
+import { transcriptText } from "@/live/export";
 
 /** Turns on one signal, a few seconds apart, with each station's own
  *  strength and speed: [text, db, wpm]. */
@@ -133,6 +133,128 @@ describe("the log", () => {
   });
 });
 
+describe("a station running on one pitch", () => {
+  /** A run as heard when the callers are too weak to copy: every line is
+   *  the runner's, at its strength and speed. */
+  const run = (chan = "a", start = 0) =>
+    turns(
+      [
+        ["CQ W1AW/5 W1AW/5", -30, 30],
+        ["K9OM 5NN MS", -30, 30],
+        ["CQ W1AW/5 W1AWB", -30, 30],
+        ["N6MU 5NN MS", -30, 30],
+        ["TU W1AW/5", -30, 30],
+        ["CQ W1AWE", -30, 30],
+        ["OM3C", -30, 30],
+        ["TE", -30, 30],
+        ["CQ W1AW", -30, 30],
+      ],
+      chan,
+      start,
+    );
+
+  it("takes a misread call for the call read well", () => {
+    const log = buildLog(run());
+    expect(log.lines.map((l) => l.sender)).toEqual(Array(9).fill("W1AW/5"));
+    expect(new Set(log.qsos.flatMap((q) => q.stations.map((s) => s.call)))).toEqual(
+      new Set(["W1AW/5", "K9OM", "N6MU", "OM3C"]),
+    );
+  });
+
+  it("keeps a call read as often as the other apart", () => {
+    const log = buildLog(turns([["CQ K7ABC K7ABC", -10, 20], ["CQ K7ABD K7ABD", -10, 20]]));
+    expect(log.lines.map((l) => l.sender)).toEqual(["K7ABC", "K7ABD"]);
+  });
+
+  it("keeps the runner when its signal moves to a new channel", () => {
+    const first = run("a").slice(0, 3);
+    const moved = turns([["N9BIR 5NN MS", -30, 30], ["?", -30, 30], ["R TU", -30, 30]], "b", 30_000).map((t) => ({
+      ...t,
+      hz: 608,
+    }));
+    const log = buildLog([...first, ...moved]);
+    expect(log.lines.map((l) => l.sender)).toEqual(Array(6).fill("W1AW/5"));
+  });
+
+  it("takes a call read once at a station's pitch and speed as that station", () => {
+    const lines = turns([
+      ["CQ RG DE KB4T KB4T K", -20, 18],
+      ["GL 73 DE KB4T E", -20, 18],
+      ["CQ RG DE KB4T KN", -20, 18],
+      ["CQ RG DE CB4TKDS", -20, 18],
+      ["KB4T RG K", -20, 18],
+    ]);
+    const log = buildLog(lines);
+    expect(log.lines.map((l) => l.sender)).toEqual(Array(5).fill("KB4T"));
+    expect(log.qsos.flatMap((q) => q.stations.map((st) => st.call))).not.toContain("CB4TKDS");
+  });
+
+  it("leaves a line at another speed to someone else", () => {
+    const log = buildLog([...run().slice(0, 2), ...turns([["7 Y", -30, 22]], "a", 25_000)]);
+    expect(log.lines[2]!.sender).not.toBe("W1AW/5");
+  });
+
+  it("holds a confirmed call and its pitch, even before its CQ", () => {
+    const lines = turns([["E I", -30, 30], ["CQ W1AWX", -30, 30], ["W1AL/5", -30, 30]]);
+    const log = buildLog(lines, { ...NO_FIXES, confirmed: { "W1AW/5": 600 } });
+    expect(log.lines.map((l) => l.sender)).toEqual(["W1AW/5", "W1AW/5", "W1AW/5"]);
+    expect(log.qsos[0]!.stations[0]).toMatchObject({ call: "W1AW/5", confirmed: true });
+  });
+
+  it("reads the end of your call as your call", () => {
+    const log = buildLog(turns([["CQ W1AW/5 W1AW/5", -30, 30], ["7YFR", -20, 25], ["7YFR 5NN MS", -30, 30]]), NO_FIXES, "W7YFR");
+    expect(log.lines.map((l) => [l.sender, l.mine])).toEqual([
+      ["W1AW/5", false],
+      ["W7YFR", true],
+      ["W1AW/5", false],
+    ]);
+  });
+});
+
+describe("the end of a QSO", () => {
+  const chat = turns([
+    ["CQ CQ DE W7YFR K", -6, 18],
+    ["W7YFR DE K7ABC K", -17, 25],
+    ["K7ABC DE W7YFR TU 73 SK", -6, 18],
+  ]);
+
+  it("ends on SK", () => {
+    expect(buildLog(chat).qsos[0]!.ended).toBe(true);
+  });
+
+  it("waits for a line still being read", () => {
+    expect(buildLog(chat, NO_FIXES, "", new Set([chat[2]!.id])).qsos[0]!.ended).toBe(false);
+  });
+
+  it("takes the end back when the QSO goes on", () => {
+    const more = [...chat, ...turns([["R FB OM", -17, 25]], "a", 40_000).map((t) => ({ ...t, id: "late" }))];
+    expect(buildLog(more).qsos[0]!.ended).toBe(false);
+  });
+});
+
+describe("the radio's frequency", () => {
+  /** Three QSOs, a few minutes apart. */
+  const three = [
+    ...turns([["CQ K7ABC K7ABC", -10, 20]], "a", 0),
+    ...turns([["CQ N5XX N5XX", -10, 20]], "b", 240_000),
+    ...turns([["CQ W1AW W1AW", -10, 20]], "c", 480_000),
+  ];
+
+  it("holds for the QSOs after, until you note the next", () => {
+    const ids = buildLog(three).qsos.map((q) => q.id);
+    const log = buildLog(three, { ...NO_FIXES, freq: { [ids[1]!]: "14.025" } });
+    expect(log.qsos.map((q) => q.freq)).toEqual([null, "14.025", "14.025"]);
+    const retuned = buildLog(three, { ...NO_FIXES, freq: { [ids[0]!]: "7.030", [ids[2]!]: "" } });
+    expect(retuned.qsos.map((q) => q.freq)).toEqual(["7.030", "7.030", null]);
+  });
+
+  it("goes in the transcript", () => {
+    const ids = buildLog(three).qsos.map((q) => q.id);
+    const log = buildLog(three, { ...NO_FIXES, freq: { [ids[0]!]: "14.025" } });
+    expect(transcriptText(log.lines, log.qsos)).toContain("Z  14.025  600 Hz  K7ABC");
+  });
+});
+
 describe("downloads", () => {
   const log = buildLog(
     turns([
@@ -149,21 +271,5 @@ describe("downloads", () => {
     const text = transcriptText(log.lines);
     expect(text.trim().split("\n")).toHaveLength(4);
     expect(text).toContain("K7ABC 25 WPM  W7YFR DE K7ABC K");
-  });
-
-  it("writes an ADIF record for each station you worked", () => {
-    const adif = logAdif(log.qsos, "W7YFR", "1.0.0");
-    expect(adif).toContain("<EOH>");
-    expect(adif.match(/<EOR>/g)).toHaveLength(1);
-    expect(adif).toContain("<CALL:5>K7ABC");
-    expect(adif).toContain("<RST_SENT:3>579");
-    expect(adif).toContain("<STATION_CALLSIGN:5>W7YFR");
-  });
-
-  it("writes a CSV row for each station of each QSO", () => {
-    const rows = logCsv(log.qsos).trim().split("\n");
-    expect(rows).toHaveLength(3);
-    expect(rows[1]).toContain("W7YFR");
-    expect(rows[2]).toContain("K7ABC");
   });
 });

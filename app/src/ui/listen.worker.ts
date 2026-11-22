@@ -16,6 +16,22 @@ export interface ListenStart {
   readonly gen: number;
   readonly rate: number;
   readonly calibration: Calibration | null;
+  /** The words to read by meaning. */
+  readonly words: readonly string[];
+  /** The pitches to decode, Hz, or null for the whole band. */
+  readonly range: readonly [number, number] | null;
+}
+
+/** The pitches to decode change. */
+export interface ListenRange {
+  readonly type: "range";
+  readonly range: readonly [number, number] | null;
+}
+
+/** More words to read by meaning: calls you confirm while listening. */
+export interface ListenLearn {
+  readonly type: "learn";
+  readonly words: readonly string[];
 }
 
 /** Audio captured since the last of these. */
@@ -29,11 +45,12 @@ export interface ListenFlush {
   readonly type: "flush";
 }
 
-export type ListenIn = ListenStart | ListenAudio | ListenFlush;
+export type ListenIn = ListenStart | ListenAudio | ListenFlush | ListenLearn | ListenRange;
 
 export type ListenOut =
-  | ({ readonly type: "step"; readonly gen: number } & LiveStep)
-  | { readonly type: "flushed"; readonly gen: number; readonly final: Turn[] };
+  | ({ readonly type: "step"; readonly gen: number; readonly passMs: number } & LiveStep)
+  | { readonly type: "flushed"; readonly gen: number; readonly final: Turn[] }
+  | { readonly type: "failed"; readonly gen: number; readonly final: Turn[]; readonly error: string };
 
 /** The least time between the start of one pass and the next. */
 const PASS_EVERY_MS = 150;
@@ -55,18 +72,34 @@ function pass(): void {
   if (!decoder || !fresh) return;
   fresh = false;
   lastPass = performance.now();
-  scope.postMessage({ type: "step", gen, ...decoder.step() });
+  try {
+    const step = decoder.step();
+    scope.postMessage({ type: "step", gen, passMs: performance.now() - lastPass, ...step });
+  } catch (e) {
+    // Said, so the page's debug transcript shows it. The next pass tries
+    // again.
+    scope.postMessage({ type: "failed", gen, final: [], error: e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e) });
+  }
 }
 
 scope.onmessage = (ev) => {
   const msg = ev.data;
   if (msg.type === "start") {
     gen = msg.gen;
-    decoder = new LiveDecoder(msg.rate, msg.calibration);
+    decoder = new LiveDecoder(msg.rate, msg.calibration, msg.words);
+    decoder.setRange(msg.range);
     fresh = false;
     return;
   }
   if (!decoder) return;
+  if (msg.type === "learn") {
+    decoder.learn(msg.words);
+    return;
+  }
+  if (msg.type === "range") {
+    decoder.setRange(msg.range);
+    return;
+  }
   if (msg.type === "flush") {
     if (timer !== null) clearTimeout(timer);
     timer = null;

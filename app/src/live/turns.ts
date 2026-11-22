@@ -17,7 +17,7 @@
  */
 
 import type { Run } from "./channel";
-import { bothKinds, paceOfRuns, readRuns, twoKinds, type Pace } from "./adapt";
+import { bothKinds, paceOfRuns, readRuns, twoKinds, type Pace, type Word } from "./adapt";
 
 /** A silence this long always ends a turn: this many seconds, or this many
  *  dits, whichever is longer. */
@@ -66,6 +66,8 @@ export function isCall(word: string): boolean {
 export interface TurnRead {
   readonly runs: readonly Run[];
   readonly text: string;
+  /** Its words, each with its first mark's start and last mark's end. */
+  readonly words: readonly Word[];
   readonly keying: string | null;
   readonly pace: Pace | null;
   /** Mean mark level, dB. */
@@ -120,17 +122,39 @@ function wordGap(runs: readonly Run[], from: number, to: number, unit: number): 
   return gaps.length ? median(gaps) : 7 * unit;
 }
 
-/** Read `runs` as one turn. */
-export function readTurn(runs: readonly Run[], fallback: Pace | null): TurnRead {
+/** The words a turn is read by meaning with. */
+export interface Words {
+  readonly known: ReadonlySet<string>;
+  /** Calls read in earlier turns, not yet known. */
+  readonly heard: ReadonlySet<string>;
+}
+
+/** Read `runs` as one turn, by meaning with `words`. With `fixed`, at that
+ *  pace rather than its own: the rest of a turn whose start is read. */
+export function readTurn(runs: readonly Run[], fallback: Pace | null, words?: Words, fixed?: Pace | null): TurnRead {
+  const known = words?.known;
   const marks = runs.filter((r) => r.on);
-  const own = marks.length >= OWN_PACE_MARKS && bothKinds(marks.map((m) => m.dur)) ? paceOfRuns(runs, fallback) : null;
-  const pace = own ?? fallback ?? paceOfRuns(runs);
-  const read = pace ? readRuns(runs, pace) : { words: [], keying: null };
+  const own = !fixed && marks.length >= OWN_PACE_MARKS && bothKinds(marks.map((m) => m.dur)) ? paceOfRuns(runs, fallback) : null;
+  const pace = fixed ?? own ?? fallback ?? paceOfRuns(runs);
+  let read = pace ? readRuns(runs, pace, known) : { words: [], keying: null };
+  // A call read twice is known for the rest of the turn: CQ K7ABC K7ABC,
+  // then K7ABC once more with a wide gap, is not K7A BC. A reading in an
+  // earlier turn counts, and so does a call with more stuck on its end:
+  // K7ABCK is K7ABC K.
+  if (pace && known) {
+    const calls = read.words.map((w) => w.text).filter(isCall);
+    const heard = words.heard;
+    const more = [...new Set([...calls, ...heard])].filter(
+      (c) => !known.has(c) && calls.filter((w) => w.startsWith(c)).length + (heard.has(c) ? 1 : 0) >= 2,
+    );
+    if (more.length) read = readRuns(runs, pace, new Set([...known, ...more]));
+  }
   const first = marks[0];
   const last = marks[marks.length - 1];
   return {
     runs,
     text: read.words.map((w) => w.text).join(" "),
+    words: read.words,
     keying: read.keying,
     pace,
     db: marks.length ? marks.reduce((a, m) => a + m.db, 0) / marks.length : 0,
@@ -141,8 +165,9 @@ export function readTurn(runs: readonly Run[], fallback: Pace | null): TurnRead 
 
 /** Split `runs`, which start with a mark, into turns. `pace` is the
  *  signal's timing lately, for reading pauses before a turn has enough
- *  marks of its own. The last turn may still be going on. */
-export function splitTurns(runs: readonly Run[], pace: Pace | null): TurnRead[] {
+ *  marks of its own. The last turn may still be going on. `known` holds
+ *  the words to read by meaning. */
+export function splitTurns(runs: readonly Run[], pace: Pace | null, known?: Words): TurnRead[] {
   const unit = pace?.unit ?? 0.06;
   // The last run may still be going on: a mark half keyed says nothing yet
   // about strength or speed.
@@ -158,7 +183,7 @@ export function splitTurns(runs: readonly Run[], pace: Pace | null): TurnRead[] 
 
     const word = wordGap(runs, since, i, unit);
     if (!cut && g >= Math.max(TURN_SEC, TURN_UNITS * unit, WORD_GAP_TIMES * word)) {
-      const before = readTurn(runs.slice(since, i + 1).concat(farGap(runs[i]!)), pace);
+      const before = readTurn(runs.slice(since, i + 1).concat(farGap(runs[i]!)), pace, known);
       const words = before.text.split(" ");
       const lastWord = words[words.length - 1] ?? "";
       const lastTwo = words.slice(-2).join(" ");
@@ -203,10 +228,10 @@ export function splitTurns(runs: readonly Run[], pace: Pace | null): TurnRead[] 
   const turns: TurnRead[] = [];
   let from = 0;
   for (const b of breaks) {
-    turns.push(readTurn(runs.slice(from, b).concat(farGap(runs[b]!)), pace));
+    turns.push(readTurn(runs.slice(from, b).concat(farGap(runs[b]!)), pace, known));
     from = b + 1;
   }
-  turns.push(readTurn(runs.slice(from), pace));
+  turns.push(readTurn(runs.slice(from), pace, known));
   return turns.filter((t) => t.runs.some((r) => r.on));
 }
 

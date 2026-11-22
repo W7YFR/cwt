@@ -3353,7 +3353,10 @@ header .modeswitch button { white-space: nowrap; }
    on each signal followed and its speed. In the log, each QSO's lines and,
    beside them, a card of what its stations sent. */
 .livestrip { position: relative; height: 58px; }
+.livestrip .livebandarea { position: relative; height: 40px; cursor: crosshair; touch-action: none; user-select: none; }
 .livestrip svg { display: block; width: 100%; height: 40px; }
+/* Outside the pitches chosen to decode. */
+.livestrip .liveshade { position: absolute; top: 0; bottom: 0; background: var(--bg); opacity: .65; pointer-events: none; }
 .livestrip polyline { fill: none; stroke: var(--ink-faint); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .livesig {
   position: absolute;
@@ -3361,24 +3364,24 @@ header .modeswitch button { white-space: nowrap; }
   height: 40px;
   padding-left: 4px;
   border-left: 2px solid var(--you);
-  opacity: .45;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--you);
 }
-.livesig.on { opacity: 1; }
-.livescale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-faint); }
+.livescale { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: var(--ink-faint); }
+.livescale button.link { font-size: 11px; padding: 0; }
 /* The call at the start of a line opens a list to change it. */
 .livelog .livewho { position: relative; }
 .livelog .livewho > button.link { font: inherit; color: inherit; padding: 0; text-decoration: none; }
 .livelog .you .livewho > button.link { color: var(--you); }
 .livelog .livewho .quickpop.menu { left: 0; min-width: 160px; }
-.livecard { overflow-x: auto; }
-.livecard .cardhead { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 0 0 6px; font-size: 12px; color: var(--ink-faint); }
-.livecard .cardkind { color: var(--you); font-weight: 600; }
-.livecard tr.side th { font-family: var(--mono); color: var(--ink-dim); font-size: 13px; }
-.livecard tr.side th.mine { color: var(--you); }
-.livecard .cardwpm { color: var(--ink-faint); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11px; }
-.livecard button.cardvalue { font: inherit; color: inherit; padding: 0; text-decoration: none; }
-.livecard .cardinput { font: inherit; width: 12ch; padding: 0 2px; }
-.livecard .cardadd { margin-top: 6px; font-size: 12px; }
+/* A QSO's card: what is known of it, and its ⋯ at the end of the line, then
+   its stations. */
+.livecard .cardhead { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
+.livecard .cardname { font: 12.5px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); }
+.livecard .cardhead .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
+.livecard .cardhead .quick.more { margin-left: auto; }
+.livecard .cardcalls { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font: 13px var(--mono); color: var(--ink-dim); }
+.livecard .cardcalls .mine { color: var(--you); }
+.livecard .cardfreq { margin: 0 0 6px; }
+.livecard .cardfreq input { width: 16ch; }
