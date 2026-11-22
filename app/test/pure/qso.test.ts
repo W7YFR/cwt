@@ -148,6 +148,14 @@ describe("reading an over", () => {
     expect(qth("QTH SALEM OR HW CPY? K")).toBe("SALEM OR");
     expect(qth("QTH SALEM OR OP BOB BOB K")).toBe("SALEM OR");
   });
+
+  it("reads a QTH sent twice once (#156)", () => {
+    const qth = (heard: string) => new Over(heard, STRICT).qthSent();
+    expect(qth("QTH PORTLAND OR PORTLAND OR K")).toBe("PORTLAND OR");
+    expect(qth("QTH ATLANTA GA ATLANTA GA NAME BOB K")).toBe("ATLANTA GA");
+    expect(qth("QTH SEATTLE SEATTLE K")).toBe("SEATTLE");
+    expect(qth("QTH WALLA WALLA WA K")).toBe("WALLA WALLA WA");
+  });
 });
 
 describe("a QSO from your CQ", () => {

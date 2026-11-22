@@ -7,6 +7,17 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.39.1 — 2026-11-22
+
+### Changed
+
+- The suggested reply sometimes sends your name or QTH twice.
+
+### Fixed
+
+- In SST or CWT, a name sent twice, such as `AL AL GA GA`, gave the station your state as AL. The station now reads the name once and the state after it.
+- A QTH sent twice, such as `QTH PORTLAND OR PORTLAND OR`, read as one QTH of three words. The station now reads it once.
+
 ## v1.39.0 — 2026-11-22
 
 ### Added

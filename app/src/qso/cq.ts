@@ -593,23 +593,29 @@ export class Over {
   }
 
   /** The QTH it holds: up to three words after QTH, to the next word that
-   *  starts something else. Empty when none. */
+   *  starts something else. A QTH sent twice, as PORTLAND OR PORTLAND OR,
+   *  is read once. Empty when none. */
   qthSent(): string {
     if (this.qth() !== "sent") return "";
     const at = this.words.indexOf("QTH");
     const out: string[] = [];
-    for (let j = at + 1; j < this.words.length && out.length < 3; j++) {
+    for (let j = at + 1; j < this.words.length && out.length < 6; j++) {
       const w = this.words[j]!;
       if (FILLER.has(w) && out.length === 0) continue;
       // A region after the city, as the GA of ATLANTA GA, is no greeting.
-      if (out.length === 1 && REGIONS.has(w)) {
+      // Nor is the same region in the repeat.
+      if ((out.length === 1 || (out.length > 2 && w === out[1])) && REGIONS.has(w)) {
         out.push(w);
         continue;
       }
       if (DE_STOP.has(w) || TURN_WORDS.has(w) || ["ES", "NAME", "OP", "NM", "HW"].includes(w) || w.endsWith("?")) break;
       out.push(w);
     }
-    return out.join(" ");
+    // The words sent twice and nothing after: WALLA WALLA WA is no repeat.
+    for (let n = 3; n >= 1; n--) {
+      if (out.length === 2 * n && out.slice(0, n).join(" ") === out.slice(n).join(" ")) return out.slice(0, n).join(" ");
+    }
+    return out.slice(0, 3).join(" ");
   }
 
   private qth(): "sent" | "botched" | "none" {

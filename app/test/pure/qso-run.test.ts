@@ -140,6 +140,14 @@ describe("a QSO in each format", () => {
     expect(work(called("sst"), ["K4ABC TOM", "GA GA"]).qso.got?.region).toBe("GA");
   });
 
+  it("reads your name sent twice once, not as a region (#155)", () => {
+    expect(work(called("sst"), ["K4ABC AL AL GA GA"]).qso.got).toMatchObject({ name: "AL", region: "GA" });
+    expect(work(called("sst"), ["K4ABC AL AL OR OR"]).qso.got).toMatchObject({ name: "AL", region: "OR" });
+    expect(work(called("cwt"), ["K4ABC AL AL 1234 1234"]).qso.got).toMatchObject({ name: "AL", number: "1234", region: "" });
+    // Al in Alabama: the repeat is the region when nothing comes after it.
+    expect(work(called("sst"), ["K4ABC AL AL"]).qso.got).toMatchObject({ name: "AL", region: "AL" });
+  });
+
   it("reads a POTA region after the report, not a TNX keyed apart before it", () => {
     expect(work(called("pota"), ["K4ABC TN X UR 5NN WA BK"]).qso.got?.region).toBe("WA");
     expect(work(called("pota"), ["K4ABC TN X UR 5NN WA BK"], { ...FIRST, ear: { lenient: true, saved: "" } }).qso.got?.region).toBe("WA");
