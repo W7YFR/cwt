@@ -3332,6 +3332,7 @@ header .modeswitch button { white-space: nowrap; }
 .keylist dt { display: flex; flex-wrap: wrap; gap: 4px 6px; }
 .keylist .combo { display: inline-flex; gap: 3px; align-items: baseline; }
 .keylist .or { color: var(--ink-faint); font-size: 12px; margin-right: 3px; }
+.keylist .times { color: var(--ink-dim); font-size: 12px; }
 .keylist dd { margin: 0; font-size: 13px; color: var(--ink-dim); }
 @media (max-width: 560px) {
   .keylist .keyrow { grid-template-columns: 120px minmax(0, 1fr); }

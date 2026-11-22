@@ -23,7 +23,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,7 +72,17 @@ try {
   ];
   for (const { size, name } of tiles) render(SOURCE, size, join(PUBLIC, name));
 
-  console.log("✓ favicon.ico, apple-touch-icon.png, icon-192.png, icon-512.png");
+  /* The lock screen's art for a QSO playing on a phone: the ground square to
+     its edges. The phone rounds the corners itself, and fills the tile's
+     clear corners with white. */
+  const drawing = readFileSync(SOURCE, "utf8");
+  const square = drawing.replace(/(<rect width="48" height="48") rx="[\d.]+"/, "$1");
+  if (square === drawing) throw new Error("favicon.svg: no rounded ground to square off");
+  const squareSvg = join(work, "square.svg");
+  writeFileSync(squareSvg, square);
+  render(squareSvg, 512, join(PUBLIC, "artwork-512.png"));
+
+  console.log("✓ favicon.ico, apple-touch-icon.png, icon-192.png, icon-512.png, artwork-512.png");
   console.log("  from app/public/favicon.svg — review the diff, it is what users see.");
 } finally {
   rmSync(work, { recursive: true, force: true });

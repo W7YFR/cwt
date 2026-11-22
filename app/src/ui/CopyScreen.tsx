@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgcMode } from "@/audio/agc";
+import { createMediaPlayer } from "@/audio/mediaPlayer";
 import { createPlayer } from "@/audio/player";
 import { NOISE_OFF_DB } from "@/audio/qsb";
 import { bandOn, QRM_OFF_DB } from "@/copy/band";
@@ -98,6 +99,7 @@ import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
+import { onPhone, useHeadphones } from "./useHeadphones";
 import { HomeButton } from "./Wordmark";
 import { ALT, MOD, modOf } from "./modKey";
 
@@ -417,6 +419,11 @@ const COPY_GUIDE = (
       <li>Your copy of a line locks when the next line starts, or 5 seconds after the end.</li>
       <li>Copy again plays it all from the start. Your earlier attempts stay on the page.</li>
       <li>Click a word in a finished line, or select part of it, to hear it again.</li>
+      <li>On a phone, the QSO keeps playing with the screen locked.</li>
+      <li>
+        Your headphones can play and pause the QSO, and start it over with next track. On AirPods, squeeze the stem once
+        to play or pause, and twice for next track. Keys lists them all.
+      </li>
     </ul>
   </>
 );
@@ -450,6 +457,14 @@ const COPY_KEYS: readonly KeyGroup[] = [
       { keys: [["Space"]], does: "Go to the next word" },
       { keys: [["Backspace"]], does: "Back one, on an empty slot" },
       { keys: [[ALT, "L"], [ALT, "W"]], does: "Play the selected letter or word" },
+    ],
+  },
+  {
+    heading: "Headphones and lock screen",
+    rows: [
+      { keys: [["Play"], ["Pause"]], does: "Play or pause" },
+      { keys: [["Next track"]], does: "Start the QSO over" },
+      { keys: [["Next track"]], times: 2, does: "Press it twice within 2 seconds to play a new QSO" },
     ],
   },
 ];
@@ -596,9 +611,12 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   };
   useEffect(() => cancelLastLock, []);
 
+  /** On a phone, the QSO plays through an <audio> element, so it plays on
+   *  with the screen locked and the headphone buttons reach it. */
+  const phone = useMemo(onPhone, []);
   const player = useMemo(
     () =>
-      createPlayer({
+      (phone ? createMediaPlayer : createPlayer)({
         onProgress: (t) => {
           if (mode.current === "main") setPos(t);
           else setPartAt(t);
@@ -1152,6 +1170,34 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
     rememberCopy(null);
     void forgetCopyFile();
   };
+
+  /* ---- headphones ------------------------------------------------------- */
+
+  /** The QSO and the copy before a headphone button changed them: once
+   *  the page has the new ones, it plays from the top. */
+  const playNext = useRef<{ file: typeof file; kept: typeof kept } | null>(null);
+  useEffect(() => {
+    const was = playNext.current;
+    if (!was || !file || (file === was.file && kept === was.kept)) return;
+    playNext.current = null;
+    play(0);
+  });
+  useHeadphones({
+    on: phone,
+    title: file?.name ?? null,
+    playing: playing === "main",
+    onPlay: () => {
+      if (mode.current !== "main") play();
+    },
+    onPause: pause,
+    // Next track: while the QSO plays, it starts over. Next track twice, or
+    // next track while paused, plays a new QSO.
+    onNext: (wasPlaying, again) => {
+      playNext.current = { file, kept };
+      if (wasPlaying && !again) restart();
+      else makeExchange();
+    },
+  });
 
   /* ---- keys ---------------------------------------------------------------- */
 

@@ -7,6 +7,16 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- On a phone, a QSO on the Copy page keeps playing with the screen locked.
+- On a phone, the headphone and lock screen buttons play and pause the QSO on the Copy page. Next track starts the QSO over, and next track twice within 2 seconds plays a new QSO.
+
+### Development
+
+- `make restart-device` stops this repo's dev server, wherever it runs, and serves the current checkout over https on the LAN.
+- `make icons` also builds `artwork-512.png`, the lock screen's square art.
+
 ## v1.38.0 — 2026-11-21
 
 ### Added
