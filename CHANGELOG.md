@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.40.0 — 2026-11-22
+
 ### Added
 
 - **Live**, a new page after QSO, decodes any CW that comes in from your input: your own key through the microphone, or your radio's audio. It finds each station's speed by itself, up to 45 WPM, follows up to 8 signals at once, and shows in the page switch once `__cwt.enableLive()` is typed in the browser's console.
