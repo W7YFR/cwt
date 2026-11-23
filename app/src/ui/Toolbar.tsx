@@ -69,9 +69,24 @@ function useInView(open: boolean, pop: React.RefObject<HTMLElement | null>, pin 
        moves it: what grows wraps instead. */
     if (pin && !el.style.width) el.style.width = `${el.offsetWidth}px`;
     if (pin) el.dataset.pinned = "true";
-    el.style.left = "0px";
-    const over = el.getBoundingClientRect().right - (document.documentElement.clientWidth - EDGE_PX);
-    if (over > 0) el.style.left = `${-over}px`;
+    const place = () => {
+      el.style.left = "0px";
+      const over = el.getBoundingClientRect().right - (document.documentElement.clientWidth - EDGE_PX);
+      if (over > 0) el.style.left = `${-over}px`;
+    };
+    place();
+    /* A change made in the popover can change the chip's width and wrap the
+       chip to another line. The popover moves with the chip and can then run
+       off an edge, so it is placed again. Only the sides count: the root
+       reaches far above and below the window. */
+    const watch = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.intersectionRatio < 1)) place();
+      },
+      { rootMargin: "100000px 0px", threshold: 1 },
+    );
+    watch.observe(el);
+    return () => watch.disconnect();
   }, [open, pop]);
 }
 
