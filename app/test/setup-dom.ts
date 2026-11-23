@@ -39,6 +39,19 @@ if (!window.ResizeObserver) {
   } as unknown as typeof ResizeObserver;
 }
 
+// IntersectionObserver: a popover watches for the window's edges. The same
+// no-op that never fires.
+if (!window.IntersectionObserver) {
+  window.IntersectionObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof IntersectionObserver;
+}
+
 // rAF exists in jsdom but runs on a real timer; make it immediate so a test
 // doesn't have to wait a frame to see the effect of a state change.
 window.requestAnimationFrame = ((cb: FrameRequestCallback) =>
