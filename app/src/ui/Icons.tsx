@@ -218,6 +218,15 @@ export function IconStraightKey(): React.ReactElement {
   );
 }
 
+/** A trash can: delete. */
+export function IconTrash(): React.ReactElement {
+  return (
+    <Icon name="trash" stroke>
+      <path d="M2.5 4.5h11M6.5 4.5V3a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8v1.5M4 4.5l.7 8.3a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4.5M6.6 7v4M9.4 7v4" />
+    </Icon>
+  );
+}
+
 /** A robot's head: an antenna, a square face and two eyes. A line the rag
  *  chew model wrote. */
 export function IconRobot(): React.ReactElement {

@@ -5,6 +5,7 @@
 
 import type { AppConfig, MLCEngine } from "@mlc-ai/web-llm";
 import { addHelper } from "@/devtools";
+import { loadPrefs, savePrefs } from "@/io/storage";
 import { micLog } from "@/micdebug";
 import type { ChatTurn } from "@/qso/ragchew";
 
@@ -19,6 +20,8 @@ import type { ChatTurn } from "@/qso/ragchew";
 export const MODELS = {
   "Llama-3.1-8B-Instruct-q4f16_1-MLC": {
     label: "Llama 3.1 8B",
+    /** What it is good for, in a sentence, for the choice between models. */
+    note: "The best replies in our tests.",
     gb: 5,
     /** The computer's memory it needs, in GB: the graphics card of a laptop shares it. */
     memoryGb: 8,
@@ -32,6 +35,7 @@ export const MODELS = {
   },
   "gemma-4-E2B-it-q4f16_1-MLC": {
     label: "Gemma 4 E2B",
+    note: "Smaller and lighter, for a computer with less memory.",
     gb: 3,
     memoryGb: 6,
     hf: "633df598b7a473759367855273c63912c9e2bc9a",
@@ -76,7 +80,8 @@ export function failureOf(e: unknown): Failure {
   return "other";
 }
 
-let model: ModelId = DEFAULT_MODEL;
+/** The model chosen, kept across reloads. */
+let model: ModelId = loadPrefs().qsoRagChewModel ?? DEFAULT_MODEL;
 let state: ModelState = { kind: "checking" };
 let engine: MLCEngine | null = null;
 let loading: Promise<void> | null = null;
@@ -167,14 +172,39 @@ export async function wake(): Promise<void> {
   if (state.kind === "downloaded") await load();
 }
 
-/** Take the model off the GPU and out of the browser's storage. */
-export async function remove(): Promise<void> {
+/** Switch to `id`. The one in use leaves the GPU, and stays downloaded. */
+export async function choose(id: ModelId): Promise<void> {
+  if (id === model) return;
   await loading?.catch(() => {});
   await engine?.unload();
   engine = null;
+  model = id;
+  savePrefs({ ...loadPrefs(), qsoRagChewModel: id });
+  set({ kind: "checking" });
+  await check();
+}
+
+/** The models on this computer. */
+export async function downloaded(): Promise<ModelId[]> {
+  const { hasModelInCache } = await lib();
+  const config = await pinned();
+  const ids = Object.keys(MODELS) as ModelId[];
+  const here = await Promise.all(ids.map((id) => hasModelInCache(id, config).catch(() => false)));
+  return ids.filter((_, i) => here[i]);
+}
+
+/** Take a model out of the browser's storage, and off the GPU if it is the
+ *  one in use. */
+export async function remove(id: ModelId = model): Promise<void> {
+  if (id === model) {
+    await loading?.catch(() => {});
+    await engine?.unload();
+    engine = null;
+  }
   const { deleteModelAllInfoInCache } = await lib();
-  await deleteModelAllInfoInCache(model, await pinned()).catch(() => {});
-  set({ kind: "absent" });
+  await deleteModelAllInfoInCache(id, await pinned()).catch(() => {});
+  if (id === model) set({ kind: "absent" });
+  else set(state);
 }
 
 /** The station's reply in English, or null with no model loaded or on an
@@ -198,11 +228,8 @@ export async function chat(system: string, turns: readonly ChatTurn[]): Promise<
 addHelper("ragChewModel", "ragChewModel(id?): the rag chew model, or switch to another (Llama 3.1 8B or Gemma 4 E2B).", (id?: string) => {
   if (id === undefined) return { model, models: Object.keys(MODELS), state };
   if (!(id in MODELS)) return `Not a model: ${id}`;
-  void engine?.unload();
-  engine = null;
-  model = id as ModelId;
-  void check();
-  return `Rag chew model: ${id}. Load it from Settings.`;
+  void choose(id as ModelId);
+  return `Rag chew model: ${id}.`;
 });
 
 /** Where `__cwt.debugLLM(true)` is kept, so it lasts across reloads. */

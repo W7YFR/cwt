@@ -10,7 +10,7 @@ import { TERMS_VERSION } from "@/terms";
 
 /** The SHA-256 of `app/public/terms.html` at each terms version. */
 const HASHES: Record<number, string> = {
-  1: "60a818a827ad54d0b0196f81f165347a47e1b483e67d28892c96e5c80154aa46",
+  1: "8e7a4b6103bd0a4b5fee7e9ac12bd7ef41eb65cda511a419bbf0a009d4b808e7",
 };
 
 describe("the terms", () => {

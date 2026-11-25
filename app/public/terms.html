@@ -35,6 +35,13 @@ main h2{font-size:22px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
 main h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:26px 0 8px;font-weight:600}
 main p{margin:0 0 10px}
 main a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+/* The app's question mark and its tip, for a line the terms carry because a
+   license asks for it. */
+.helptip{position:relative;top:-1px;display:inline-block;vertical-align:middle}
+.helpdot{display:block;width:13px;height:13px;padding:0;border:1px solid var(--accent);border-radius:50%;background:none;color:var(--accent);font:600 9px/11px system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;cursor:help}
+.helpdot:hover,.helpdot:focus-visible{border-color:var(--accent);color:var(--accent)}
+.tip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);z-index:1;width:max-content;max-width:min(300px,calc(100vw - 24px));padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:0 6px 18px rgb(0 0 0 / .35);color:var(--text);font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;font-style:normal;pointer-events:none}
+.helpdot:hover+.tip,.helpdot:focus-visible+.tip{display:block}
 .colophon{padding:16px 20px 24px;text-align:center;font-size:11px;color:var(--faint)}
 .colophon a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .colophon a:hover,.colophon a:focus-visible{color:var(--accent)}
@@ -70,23 +77,23 @@ main a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
   <p>CWT reads your sending from sound. Your microphone, your room, your key and your calibration all change what it hears. Every reading is an estimate: the letters it copies, your speed, your timing and your grades. They are a guide to your practice, not a measure of your skill.</p>
 
   <h3>3. The rag chew feature</h3>
-  <p>The rag chew feature on the QSO page is optional. It is off until you enable it and explicitly accept these terms. Enabling it downloads a language model, <a href="https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct">Llama 3.1 8B Instruct</a> by Meta, in <a href="https://huggingface.co/mlc-ai/Llama-3.1-8B-Instruct-q4f16_1-MLC">a form prepared by the MLC project</a>. The model is about 5 GB, and it comes from <a href="https://huggingface.co">Hugging Face</a>. The program that runs it, about 7 MB, comes from the <a href="https://github.com/mlc-ai/binary-mlc-llm-libs">MLC project on GitHub</a>. CWT checks the program before it runs it. The browser keeps both on your computer until you remove them. The model runs on your computer's graphics card.</p>
+  <p>The rag chew feature on the QSO page is optional. It is off until you enable it and explicitly accept these terms. Enabling it downloads the language model you choose: <a href="https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct">Llama 3.1 8B Instruct</a> by Meta, about 5 GB, or <a href="https://huggingface.co/google/gemma-4-E2B-it">Gemma 4 E2B</a> by Google, about 3 GB. Each comes in a form prepared by the MLC project (<a href="https://huggingface.co/mlc-ai/Llama-3.1-8B-Instruct-q4f16_1-MLC">Llama</a>, <a href="https://huggingface.co/mlc-ai/gemma-4-E2B-it-q4f16_1-MLC">Gemma</a>), from <a href="https://huggingface.co">Hugging Face</a>. The program that runs a model, about 7 to 12 MB, comes from the <a href="https://github.com/mlc-ai/binary-mlc-llm-libs">MLC project on GitHub</a>. CWT checks the program before it runs it. The browser keeps each model you download, and its program, on your computer until you remove them. The model runs on your computer's graphics card.</p>
   <p>Once your exchange with a station is done, the model writes the station's lines. <b>A language model writes them, not the author of CWT and not a real person.</b> They can be wrong, made up, repeated, strange or offensive. The station, its operator and everything it says about itself are made up. Do not rely on anything it says, about radio, the rules or anything else.</p>
-  <p>Llama 3.1 is Meta's, under the <a href="https://www.llama.com/llama3_1/license/">Llama 3.1 Community License</a> and its <a href="https://www.llama.com/llama3_1/use-policy/">Acceptable Use Policy</a>. When you download it, you agree to them. The rag chew feature is built with Llama.</p>
-  <p>The download uses about 5 GB of your data and your storage. Running the model works your graphics card, which can warm your computer and use up a laptop's battery faster. You can remove the model at any time from the QSO page's settings.</p>
+  <p>Llama 3.1 is Meta's, under the <a href="https://www.llama.com/llama3_1/license/">Llama 3.1 Community License</a> and its <a href="https://www.llama.com/llama3_1/use-policy/">Acceptable Use Policy</a>. When you download it, you agree to them. <em>Built with Llama.</em> <span class="helptip"><button type="button" class="helpdot" aria-label="Why this is here" aria-describedby="llama-tip">?</button><span class="tip" role="tooltip" id="llama-tip">Meta's Llama 3.1 license requires a product that uses Llama to say this.</span></span> Gemma 4 is Google's, under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0 license</a>.</p>
+  <p>Each download uses your data and your storage: about 5 GB for Llama, about 3 GB for Gemma. Running the model works your graphics card, which can warm your computer and use up a laptop's battery faster. You can remove either model at any time from the QSO page's settings.</p>
 
   <h3>4. No warranty</h3>
-  <p>CWT and the rag chew model are provided as is and as available, with no warranty of any kind, express or implied, including any warranty of accuracy, fitness for a particular purpose, or that they will work without error.</p>
+  <p>CWT and the rag chew models are provided as is and as available, with no warranty of any kind, express or implied, including any warranty of accuracy, fitness for a particular purpose, or that they will work without error.</p>
 
   <h3>5. Limitation of liability</h3>
-  <p>To the fullest extent the law allows, the author of CWT is not liable for any loss or damage that comes from using it or relying on it. That includes anything the rag chew model says or writes, the model's download, and any effect on your computer, its storage, its battery or your data plan. You use CWT and the model at your own risk.</p>
+  <p>To the fullest extent the law allows, the author of CWT is not liable for any loss or damage that comes from using it or relying on it. That includes anything a rag chew model says or writes, a model's download, and any effect on your computer, its storage, its battery or your data plan. You use CWT and the models at your own risk.</p>
 
   <h3>6. Privacy</h3>
   <p>Everything runs in your browser. There is no account, no upload and no server. Your recordings, what you key and your settings never leave your machine. They stay in the browser's own storage until you clear them. There are no analytics and no cookies.</p>
   <p>CWT makes no network requests of its own, with one exception. When you enable the rag chew feature and explicitly accept these terms, it downloads the model and its program from the addresses in section 3. What you send to the model never leaves your computer. The page is blocked from sending anything anywhere else.</p>
 
   <h3>7. Source and license</h3>
-  <p>The source is on <a href="https://github.com/W7YFR/cwt">GitHub</a> under the MIT license, which carries its own no-warranty terms for the code. The license does not cover the rag chew model, which has its own license (section 3). Bugs and ideas are welcome on GitHub.</p>
+  <p>The source is on <a href="https://github.com/W7YFR/cwt">GitHub</a> under the MIT license, which carries its own no-warranty terms for the code. The license does not cover the rag chew models, which have their own licenses (section 3). Bugs and ideas are welcome on GitHub.</p>
 
   <h3>8. Changes</h3>
   <p>These terms may change. The date at the top says when they last did. Using CWT after a change means you accept the new terms. The rag chew feature asks you to accept them again before it runs.</p>

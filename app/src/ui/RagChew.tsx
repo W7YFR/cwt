@@ -1,19 +1,29 @@
 /* The rag chew setting on the QSO page.
  *
  * Until you accept the terms and the model is on this computer, the setting
- * is one button, Enable LLM ragchew. It opens a dialog that says what the
+ * is one button, Enable LLM rag chew. It opens a dialog that says what the
  * rag chew is, that it downloads the model from Hugging Face, and that a
  * model writes the station's lines. Accepting the terms there starts the
  * download and turns the rag chew on. After that the setting is a check, to
- * turn the rag chew on and off, with a trash can that deletes the model. */
+ * turn the rag chew on and off, and a choice of model. Each model downloads
+ * once and stays until you delete it: a trash can with one on this computer,
+ * ⋯ with both, to delete either or both. */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { APP_VERSION } from "@/build-info";
-import { check, load, modelId, MODELS, modelState, remove, subscribe, type Failure, type ModelState } from "@/llm/engine";
+import {
+  check, choose, downloaded, load, modelId, MODELS, modelState, remove, subscribe, type Failure, type ModelId, type ModelState,
+} from "@/llm/engine";
 import { agree, agreed } from "@/terms";
-import { ActionGroup, Check } from "./Controls";
+import { ActionGroup, Check, ChoiceGroup } from "./Controls";
 import { TrashIcon } from "./Scores";
+import { DeleteItem, MoreMenu } from "./Toolbar";
+
+const IDS = Object.keys(MODELS) as ModelId[];
+
+/** A model's size and the memory it needs, in a sentence. */
+const needs = (id: ModelId) => `About ${MODELS[id].gb} GB. Needs about ${MODELS[id].memoryGb} GB of memory.`;
 
 /** The model's state, as it changes. */
 export function useModel(): ModelState {
@@ -63,72 +73,106 @@ function failureText(why: Failure, label: string, gb: number): string {
 
 export function RagChewGroup({ on, onChange }: { on: boolean; onChange(on: boolean): void }): React.ReactElement {
   const s = useModel();
-  const { label, gb } = MODELS[modelId()];
+  const id = modelId();
+  const { label, gb } = MODELS[id];
   const [accepted, setAccepted] = useState(agreed);
-  const [asking, setAsking] = useState(false);
+  /** The model the terms dialog is open for, or null. */
+  const [asking, setAsking] = useState<ModelId | null>(null);
+  /** The models on this computer, as last looked. */
+  const [here, setHere] = useState<readonly ModelId[]>([]);
+  const look = () => void downloaded().then(setHere);
   useEffect(() => {
     void check();
   }, []);
+  // Again as the model in use changes state: a download that ends, a delete.
+  useEffect(look, [s.kind, id]);
   // On, accepted and downloaded: onto the GPU, which takes a few seconds.
   useEffect(() => {
     if (on && accepted && s.kind === "downloaded") void load();
   }, [on, accepted, s.kind]);
-  const here = s.kind === "downloaded" || s.kind === "loading" || s.kind === "ready";
+  const inUse = s.kind === "downloaded" || s.kind === "loading" || s.kind === "ready";
   const failed = s.kind === "failed" && on;
+
+  /** Delete models. Deleting the one in use moves to the other, if it is
+   *  here, or turns the rag chew off. */
+  const drop = async (ids: readonly ModelId[]) => {
+    for (const d of ids) await remove(d);
+    const left = (await downloaded()).filter((d) => !ids.includes(d));
+    setHere(left);
+    if (ids.includes(id)) {
+      if (left[0]) await choose(left[0]);
+      else onChange(false);
+    }
+  };
+  /** A choice of model: one here is switched to, one not here asks first. */
+  const pick = (next: ModelId) => {
+    if (here.includes(next)) void choose(next);
+    else setAsking(next);
+  };
+
   const dialog = asking && (
     <TermsDialog
-      label={label}
-      gb={gb}
-      download={!here}
-      onCancel={() => setAsking(false)}
-      onAccept={() => {
+      initial={asking}
+      here={here}
+      onCancel={() => setAsking(null)}
+      onAccept={(chosen) => {
         agree(APP_VERSION);
         setAccepted(true);
-        setAsking(false);
+        setAsking(null);
         onChange(true);
-        void load();
+        void choose(chosen).then(() => load());
       }}
     />
   );
 
-  if (!accepted || !(here || failed)) {
+  if (!accepted || !(inUse || failed)) {
     return (
       <>
         <ActionGroup help={s.kind === "no-gpu" ? `${ABOUT} This browser can't run the model. It needs a browser that lets a page use the graphics card (WebGPU).` : help(s, label, gb)}>
-          <button type="button" data-testid="qso-rag-chew-enable" disabled={s.kind === "no-gpu"} onClick={() => setAsking(true)}>
-            Enable LLM ragchew
+          <button type="button" data-testid="qso-rag-chew-enable" disabled={s.kind === "no-gpu"} onClick={() => setAsking(id)}>
+            Enable LLM rag chew
           </button>
         </ActionGroup>
         {dialog}
       </>
     );
   }
+  const del =
+    here.length > 1 ? (
+      <MoreMenu label="Delete a model" testId="qso-rag-chew-models">
+        {here.map((d) => (
+          <DeleteItem key={d} label={`Delete ${MODELS[d].label}`} testId={`qso-rag-chew-delete-${d}`} onClick={() => void drop([d])} />
+        ))}
+        <DeleteItem label="Delete both" testId="qso-rag-chew-delete-both" onClick={() => void drop(here)} />
+      </MoreMenu>
+    ) : (
+      here.length === 1 && (
+        <button
+          type="button"
+          className="iconbtn droprun"
+          data-testid="qso-rag-chew-remove"
+          aria-label={`Delete ${MODELS[here[0]!].label}`}
+          title={`Delete ${MODELS[here[0]!].label} from this computer. Rag chew turns off. Enabling it again downloads it again, about ${MODELS[here[0]!].gb} GB.`}
+          onClick={() => void drop(here)}
+        >
+          <TrashIcon />
+        </button>
+      )
+    );
   return (
     <>
-      <Check
-        id="qso-rag-chew-on"
-        label="Rag chew after the exchange"
-        help={help(s, label, gb)}
-        checked={on}
-        action={
-          (s.kind === "downloaded" || s.kind === "ready" || s.kind === "failed") && (
-            <button
-              type="button"
-              className="iconbtn droprun"
-              data-testid="qso-rag-chew-remove"
-              aria-label={`Delete ${label}`}
-              title={`Delete ${label} from this computer. Rag chew turns off. Enabling it again downloads ${label} again, about ${gb} GB.`}
-              onClick={() => {
-                // With no model, rag chew cannot be on.
-                onChange(false);
-                void remove();
-              }}
-            >
-              <TrashIcon />
-            </button>
-          )
-        }
-        onChange={onChange}
+      <Check id="qso-rag-chew-on" label="Rag chew after the exchange" help={help(s, label, gb)} checked={on} action={del} onChange={onChange} />
+      <ChoiceGroup
+        id="qso-rag-chew-model"
+        label="Rag chew model"
+        help="The model that writes the station's lines. Each one downloads once and stays on this computer until you delete it."
+        value={id}
+        options={IDS.map((m) => ({
+          value: m,
+          label: MODELS[m].label,
+          note: `${MODELS[m].note} ${needs(m)}${here.includes(m) ? "" : " Choosing it asks before it downloads."}`,
+        }))}
+        onChange={(v) => pick(v as ModelId)}
       />
       {(s.kind === "loading" || failed) && (
         <div className="group" data-testid="qso-rag-chew" data-model={s.kind}>
@@ -153,6 +197,7 @@ export function RagChewGroup({ on, onChange }: { on: boolean; onChange(on: boole
           </div>
         </div>
       )}
+      {dialog}
     </>
   );
 }
@@ -166,22 +211,85 @@ function Out({ href, children }: { href: string; children: React.ReactNode }): R
   );
 }
 
-/** What the rag chew is, the download, the terms, and a box to accept them.
- *  `download`: the model is not on this computer yet. */
+/** Each model's version of a part of the dialog, all in one place and only
+ *  the chosen one seen, so the dialog is as tall as the longest and does not
+ *  change height when the choice does. */
+function Stack({ chosen, part }: { chosen: ModelId; part(id: ModelId): React.ReactNode }): React.ReactElement {
+  return (
+    <div className="permodel">
+      {IDS.map((m) => (
+        <div key={m} data-on={m === chosen} aria-hidden={m !== chosen}>
+          {part(m)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** What a model is good for, what downloads, and what it needs. */
+function ModelText({ id, here }: { id: ModelId; here: boolean }): React.ReactElement {
+  const { label, gb, note, memoryGb } = MODELS[id];
+  return (
+    <>
+      <p className="note">{note}</p>
+      <p>
+        {here ? (
+          <>
+            The model is <Out href={`https://huggingface.co/mlc-ai/${id}`}>{label}</Out>, and it is already on this
+            computer.{" "}
+          </>
+        ) : (
+          <>
+            The model is <Out href={`https://huggingface.co/mlc-ai/${id}`}>{label}</Out>. Enabling the rag chew
+            downloads it, about {gb} GB, from <Out href="https://huggingface.co">Hugging Face</Out>, with a small
+            program that runs it, from the <Out href="https://github.com/mlc-ai/binary-mlc-llm-libs">MLC project on GitHub</Out>.{" "}
+          </>
+        )}
+        The browser keeps the model on this computer until you remove it. The model runs on this computer&rsquo;s
+        graphics card. What you send stays on this computer.
+      </p>
+      <p data-testid="qso-rag-chew-needs">
+        It needs a browser that lets a page use the graphics card (WebGPU), about {memoryGb} GB of memory, and about{" "}
+        {Math.ceil(gb + 1)} GB of free disk space.
+      </p>
+    </>
+  );
+}
+
+/** A model's license. */
+function License({ id }: { id: ModelId }): React.ReactElement {
+  const { label } = MODELS[id];
+  return label.startsWith("Llama") ? (
+    <p>
+      {label} is under Meta&rsquo;s{" "}
+      <Out href="https://www.llama.com/llama3_1/license/">Llama 3.1 Community License</Out> and{" "}
+      <Out href="https://www.llama.com/llama3_1/use-policy/">Acceptable Use Policy</Out>.
+    </p>
+  ) : (
+    <p>
+      {label} is Google&rsquo;s, under the <Out href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0 license</Out>.
+    </p>
+  );
+}
+
+/** What the rag chew is, a choice of model, what downloads, the terms, and a
+ *  box to accept them. Opens at `initial`. `here`: the models already on
+ *  this computer. */
 function TermsDialog({
-  label,
-  gb,
-  download,
+  initial,
+  here,
   onCancel,
   onAccept,
 }: {
-  label: string;
-  gb: number;
-  download: boolean;
+  initial: ModelId;
+  here: readonly ModelId[];
   onCancel(): void;
-  onAccept(): void;
+  onAccept(chosen: ModelId): void;
 }): React.ReactElement {
-  const [yes, setYes] = useState(false);
+  const [chosen, setChosen] = useState(initial);
+  const download = !here.includes(chosen);
+  // Accepted before, for another model: the box starts checked.
+  const [yes, setYes] = useState(agreed);
   const box = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     box.current?.focus();
@@ -207,7 +315,7 @@ function TermsDialog({
           if (e.key === "Escape") onCancel();
         }}
       >
-        <h2 id="ragchew-terms-title">LLM ragchew</h2>
+        <h2 id="ragchew-terms-title">LLM Rag Chew</h2>
         <p>
           After the exchange of a plain QSO, the station keeps chatting with you about its rig, antenna and weather,
           and answers what you send, until you send 73 or SK.
@@ -216,27 +324,16 @@ function TermsDialog({
           To do that, the rag chew uses a language model. That is a program that reads what you send, as text, and
           writes the station&rsquo;s reply. The page then sends the reply back to you as CW.
         </p>
-        <p>
-          {download ? (
-            <>
-              The model is <Out href={`https://huggingface.co/mlc-ai/${modelId()}`}>{label}</Out>. Enabling the rag
-              chew downloads it, about {gb} GB, from <Out href="https://huggingface.co">Hugging Face</Out>, with a
-              small program that runs it, from the{" "}
-              <Out href="https://github.com/mlc-ai/binary-mlc-llm-libs">MLC project on GitHub</Out>.{" "}
-            </>
-          ) : (
-            <>
-              The model is <Out href={`https://huggingface.co/mlc-ai/${modelId()}`}>{label}</Out>, and it is already
-              on this computer.{" "}
-            </>
-          )}
-          The browser keeps the model on this computer until you remove it. The model runs on this computer&rsquo;s
-          graphics card. What you send stays on this computer.
-        </p>
-        <p data-testid="qso-rag-chew-needs">
-          It needs a browser that lets a page use the graphics card (WebGPU), about {MODELS[modelId()].memoryGb} GB of
-          memory, and about {Math.ceil(gb + 1)} GB of free disk space.
-        </p>
+        <div className="pick" data-testid="qso-rag-chew-pick">
+          <div className="modeswitch" role="group" aria-label="Model">
+            {IDS.map((m) => (
+              <button key={m} type="button" aria-pressed={chosen === m} onClick={() => setChosen(m)}>
+                {MODELS[m].label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Stack chosen={chosen} part={(m) => <ModelText id={m} here={here.includes(m)} />} />
         <div className="caution">
           <p>
             <b>A language model writes the station&rsquo;s lines, not a person.</b> They can be wrong, made up or
@@ -244,24 +341,7 @@ function TermsDialog({
           </p>
           <p>The author of CWT is not liable for anything the model says.</p>
         </div>
-        {label.startsWith("Llama") ? (
-          <p>
-            {label} is under Meta&rsquo;s{" "}
-            <a href="https://www.llama.com/llama3_1/license/" target="_blank" rel="noreferrer">
-              Llama 3.1 Community License
-            </a>{" "}
-            and{" "}
-            <a href="https://www.llama.com/llama3_1/use-policy/" target="_blank" rel="noreferrer">
-              Acceptable Use Policy
-            </a>
-            .
-          </p>
-        ) : (
-          <p>
-            {label} is Google&rsquo;s, under the{" "}
-            <Out href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0 license</Out>.
-          </p>
-        )}
+        <Stack chosen={chosen} part={(m) => <License id={m} />} />
         <label className="check">
           <input
             type="checkbox"
@@ -279,7 +359,7 @@ function TermsDialog({
           <button type="button" onClick={onCancel}>
             Cancel
           </button>
-          <button type="button" className="primary" data-testid="qso-rag-chew-yes" disabled={!yes} onClick={onAccept}>
+          <button type="button" className="primary" data-testid="qso-rag-chew-yes" disabled={!yes} onClick={() => onAccept(chosen)}>
             {download ? "Accept Terms and Download Model" : "Accept Terms and Turn On"}
           </button>
         </div>

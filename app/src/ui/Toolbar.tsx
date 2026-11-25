@@ -8,7 +8,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SettingsForm } from "./Controls";
-import { IconDownload, IconPlay, IconUpload } from "./Icons";
+import { IconDownload, IconPlay, IconTrash, IconUpload } from "./Icons";
 import { useSettings, type SettingsTab } from "./SettingsDrawer";
 import { useSoundPanel } from "./soundPanel";
 
@@ -334,6 +334,11 @@ export function OpenFileItem({
 /** An item in ⋯ that saves a file. */
 export function DownloadItem(props: Omit<MenuItemProps, "icon">): React.ReactElement {
   return <MenuItem {...props} icon={<IconDownload />} />;
+}
+
+/** An item in ⋯ that deletes something. */
+export function DeleteItem(props: Omit<MenuItemProps, "icon">): React.ReactElement {
+  return <MenuItem {...props} icon={<IconTrash />} />;
 }
 
 /** An item in ⋯ that plays something. */
