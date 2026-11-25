@@ -19,6 +19,9 @@ export interface Station {
   readonly rst: string;
   /** The tone the station is heard at, in Hz. */
   readonly toneHz: number;
+  /** A pitch set by hand for this station, in Hz, played as set. Absent:
+   *  `toneHz`, moved into Station pitch's range. */
+  readonly pitchHz?: number;
   /** How often it opens a line in the middle of the QSO with both calls,
    *  0 to 1. Each operator has their own habit. Absent in a QSO kept before
    *  there was one. */
@@ -312,9 +315,40 @@ export function randomStation(rand: Rand, not = "", canada = CANADA, names: read
     name: randomName(rand, names),
     qth: qthIn(rand, region),
     rst: pick(rand, RSTS),
-    toneHz: 550 + Math.round(rand() * 20) * 10,
+    toneHz: randomPitch(rand),
     habit: 0.05 + 0.3 * rand(),
   };
+}
+
+/** The lowest and highest pitch the stations send at, in Hz. */
+export interface PitchRange {
+  readonly lowHz: number;
+  readonly highHz: number;
+}
+
+/** The pitches the stations send at with none set. */
+export const DEFAULT_PITCH: PitchRange = { lowHz: 550, highHz: 750 };
+
+/** The lowest and highest pitch the Station pitch slider sets, in Hz. */
+export const PITCH_MIN_HZ = 300;
+export const PITCH_MAX_HZ = 1000;
+
+/** The step between two pitches, in Hz. */
+export const PITCH_STEP_HZ = 10;
+
+/** A pitch in `range` at random, on a step. One draw. */
+export function randomPitch(rand: Rand, range: PitchRange = DEFAULT_PITCH): number {
+  const steps = Math.round((range.highHz - range.lowHz) / PITCH_STEP_HZ);
+  return range.lowHz + Math.round(rand() * steps) * PITCH_STEP_HZ;
+}
+
+/** A station's pitch moved into `range`: as low or high in `range` as
+ *  `toneHz` is in `DEFAULT_PITCH`. Each station keeps its own pitch, and no
+ *  QSO has to know the range. The default range keeps every pitch. */
+export function pitchIn(toneHz: number, range: PitchRange): number {
+  const { lowHz, highHz } = DEFAULT_PITCH;
+  const at = Math.min(1, Math.max(0, (toneHz - lowHz) / (highHz - lowHz)));
+  return randomPitch(() => at, range);
 }
 
 /** How often a friend not yet heard this session calls in place of a new

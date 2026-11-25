@@ -117,6 +117,10 @@ export interface BandOptions {
   readonly qrmLines: (rand: () => number) => readonly QrmLine[];
   /** The receiver's AGC, where the band is mixed in. Absent: off. */
   readonly agc?: AgcMode;
+  /** When the QRM station first sends, in seconds. Absent: after a quiet
+   *  of up to `QRM_REST_SEC`, as on the air. Preview sets it, since its
+   *  clip is shorter than that quiet. */
+  readonly qrmFirstSec?: number;
 }
 
 /** Whether a band with these settings holds anything. */
@@ -199,7 +203,9 @@ export function qrmPart(o: PartOptions): Float32Array {
   const [gapLo, gapHi] = QRM_GAP_SEC;
   const [restLo, restHi] = QRM_REST_SEC;
   const qrm = new Float32Array(n);
-  let at = Math.round(rand() * restHi * rate);
+  // Drawn even when set, so the rest of the band is the same either way.
+  const quiet = rand() * restHi;
+  let at = Math.round((o.qrmFirstSec ?? quiet) * rate);
   while (at < n) {
     const lines = o.qrmLines(rand);
     if (lines.length === 0) break;

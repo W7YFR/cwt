@@ -79,11 +79,13 @@ export const heard: {
     duck: Float32Array | null;
   };
   airs: (TargetAir | undefined)[];
+  /** The pitch of each of the station's lines, in Hz. */
+  tones: number[];
   replays: ArrayBuffer[];
   /** From and to, in seconds, or undefined for the whole of it. */
   spans: [number | undefined, number | undefined][];
   replaying: boolean;
-} = { gate: { band: null, level: 0, armed: false, delaySec: 0, duck: null }, airs: [], replays: [], spans: [], replaying: false };
+} = { gate: { band: null, level: 0, armed: false, delaySec: 0, duck: null }, airs: [], tones: [], replays: [], spans: [], replaying: false };
 
 /** The band gate, which only remembers. */
 const gate: BandGate = {
@@ -193,6 +195,7 @@ export function fakePlayer<T extends object>(real: T) {
         playTarget(timeline, options) {
           teardown();
           heard.airs.push(options.air);
+          if (options.voice) heard.tones.push(options.voice.toneHz);
           // Its clock runs over the padding on either side, as the real one.
           const start = now() + options.padSec;
           const end = timeline.duration + options.padSec;
@@ -250,6 +253,7 @@ export function resetKey(): void {
   keyedTo = 0;
   heard.gate = { band: null, level: 0, armed: false, delaySec: 0, duck: null };
   heard.airs = [];
+  heard.tones = [];
   heard.replays = [];
   heard.spans = [];
   heard.replaying = false;

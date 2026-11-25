@@ -10,6 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SettingsForm } from "./Controls";
 import { IconDownload, IconPlay, IconUpload } from "./Icons";
 import { useSettings, type SettingsTab } from "./SettingsDrawer";
+import { useSoundPanel } from "./soundPanel";
 
 /** The least room kept between a popover and the window's edge. */
 const EDGE_PX = 16;
@@ -110,7 +111,7 @@ function useNameColumn(open: boolean, pop: React.RefObject<HTMLElement | null>):
       ".group > .caption, .group > label:not(.check):not(.field), .group > label.field > .fieldname",
     );
     /* A slider's name sits on its own line above it, so it takes no column. */
-    const inColumn = [...names].filter((n) => !n.parentElement?.querySelector(':scope > input[type="range"]'));
+    const inColumn = [...names].filter((n) => !n.parentElement?.querySelector(':scope > input[type="range"], :scope > .pitchrange'));
     const widest = Math.max(0, ...inColumn.map((n) => Math.ceil(n.scrollWidth)));
     form.style.setProperty("--namecol", `${widest}px`);
     form.dataset.names = String(widest > 0);
@@ -166,6 +167,7 @@ export function QuickChip({
   const settings = useSettings();
   const close = useRef(() => setOpen(false)).current;
   usePopover(open, close, root);
+  useSoundPanel(open && tab === "sound");
   useNameColumn(open, pop);
   useInView(open, pop, true);
   useEffect(() => {

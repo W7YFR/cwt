@@ -80,6 +80,8 @@ import {
   QsbSlider,
   BandOnCheck,
   AgcChoice,
+  PitchSlider,
+  usePitchRange,
   KeyStyleGroup,
   KeyMark,
   paddleLabel,
@@ -96,6 +98,9 @@ import { DownloadItem, MenuHeading, QuickChip, Toolbar, WIDEST_SPEED } from "./T
 import { drawerOpen } from "./Drawer";
 import { CopyText } from "./CopyText";
 import { PageSwitch, type Page } from "./PageSwitch";
+import { useHeld, useSoundPanelOpen } from "./soundPanel";
+import { StationPitchDialog } from "./StationPitch";
+import { usePreview } from "./usePreview";
 import { isRecording, readRecording } from "./readRecording";
 import { SentText, Slots, SlotsAsText, SlotsLocked, SlotsPast } from "./Slots";
 import { onPhone, useHeadphones } from "./useHeadphones";
@@ -133,7 +138,7 @@ const INPUTS: ReadonlyArray<Option<CopyInput>> = [
 const INPUT_HELP =
   "How you copy each line: in one box, or in a slot for each character. Slots show how " +
   "many characters each word has, so they are the easier way to copy. A change during " +
-  "an attempt takes effect at Copy again.";
+  "an attempt takes effect at *Copy again*.";
 
 const LINES_SHOW: ReadonlyArray<Option<LinesShow>> = [
   { value: "copy", label: "Copy", note: "Type what you hear, graded when the line locks." },
@@ -147,7 +152,7 @@ const LINES_SHOW_HELP =
 const LOCK_HELP =
   "Your copy of a line can no longer change once the next line starts. The last line " +
   "locks 5 seconds after it ends. With this off, your copy stays open until you press " +
-  `Copy again. ${MOD}+Enter in a box locks a line too.`;
+  `*Copy again*. ${MOD}+Enter in a box locks a line too.`;
 
 const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
   { value: "nothing", label: "My copy", note: "Your copy as you typed it." },
@@ -156,11 +161,11 @@ const LOCKED_SHOWS: ReadonlyArray<Option<LockedShows>> = [
 ];
 const LOCKED_SHOWS_HELP =
   "What a locked line shows: your copy as typed, your copy with each character marked " +
-  "right or wrong, or your copy graded against what was sent. Show answers shows what " +
+  "right or wrong, or your copy graded against what was sent. *Show answers* shows what " +
   "was sent under every line.";
 
 const ALLOW_EDITS_HELP =
-  "An Edit button beside a locked copy opens it again, so you can fix a mistake. " +
+  "An *Edit* button beside a locked copy opens it again, so you can fix a mistake. " +
   `It locks again when it plays on, or on ${MOD}+Enter.`;
 
 const FOLLOW_HELP =
@@ -170,14 +175,14 @@ const FOLLOW_HELP =
 const GRADE_TYPING_HELP =
   "A dot under each slot you fill says if it is right: blue if right, red if not.";
 const SEEK_SLOT_HELP =
-  "While the recording is paused, it moves to the character of the slot you select. Play " +
+  "While the recording is paused, it moves to the character of the slot you select. *Play* " +
   "goes on from there.";
 
 const SHOW_SPEED_HELP =
   "Each line shows the speed it was sent at. For an opened recording, it is measured from the line.";
 
 const HIDE_CALLS_HELP =
-  "Each station shows as Station 1 or Station 2 until you copy its call in one of your " +
+  "Each station shows as *Station 1* or *Station 2* until you copy its call in one of your " +
   "lines. Hearing the call is part of copying.";
 
 const EARLIERS: ReadonlyArray<Option<Earlier>> = [
@@ -186,8 +191,8 @@ const EARLIERS: ReadonlyArray<Option<Earlier>> = [
   { value: "none", label: "None", note: "Each attempt starts clean, with nothing from before." },
 ];
 const EARLIER_HELP =
-  "What Copy again keeps in view. Last or All show your earlier copy of each line, marked " +
-  "right and wrong, and each box starts with your last copy. None starts each attempt " +
+  "What *Copy again* keeps in view. *Last* or *All* show your earlier copy of each line, marked " +
+  "right and wrong, and each box starts with your last copy. *None* starts each attempt " +
   "clean. Every attempt is kept either way.";
 
 const KINDS: ReadonlyArray<Option<Kind>> = [
@@ -198,7 +203,7 @@ const KINDS: ReadonlyArray<Option<Kind>> = [
   { value: "cwt", label: "CWT", note: "A fast CWops run: names and CWops numbers." },
 ];
 const KIND_HELP =
-  "The kind of QSO Generate QSO makes, as on the QSO page. CQ is a standard QSO between two " +
+  "The kind of QSO *Generate QSO* makes, as on the QSO page. *CQ* is a standard QSO between two " +
   "stations. The others are runs: one station calls CQ and works one station after another.";
 
 const RUN_QSOS: ReadonlyArray<Option<string>> = [
@@ -231,7 +236,7 @@ const GAP_HELP =
 const WAIT_HELP =
   "It stops after each line, in a recording too, until you type what you heard and press " +
   `${MOD}+Enter, which locks the line and goes on, as Enter does once every character is copied. ` +
-  "Play, or Enter before then, goes on without locking it.";
+  "*Play*, or Enter before then, goes on without locking it.";
 
 /** The silence between lines with Stop after each line, for when you play
  *  on. */
@@ -247,15 +252,15 @@ const SPEEDS: ReadonlyArray<Option<SpeedChoice>> = [
   { value: "mine", label: "Mine", note: "Every station at the speeds below." },
 ];
 const SPEED_HELP =
-  "How fast a generated QSO is sent. Format: each station at its own speed, as on the air: " +
+  "How fast a generated QSO is sent. *Format*: each station at its own speed, as on the air: " +
   `POTA ${FORMATS.pota.wpm.join(" to ")}, SST ${FORMATS.sst.wpm.join(" to ")}, ` +
   `MST ${FORMATS.mst.wpm.join(" to ")}, CWT ${FORMATS.cwt.wpm.join(" to ")}, and a standard QSO 15 to 25 wpm. ` +
-  "Mine: every station at the sliders. Your own text is always at the sliders. A change applies to " +
-  "the QSO on the page, and keeps your copy. Moving a slider chooses Mine.";
+  "*Mine*: every station at the sliders. Your own text is always at the sliders. A change applies to " +
+  "the QSO on the page, and keeps your copy. Moving a slider chooses *Mine*.";
 
 const AT_MINE_HELP =
   "An opened recording plays its lines sent again at the speed sliders, each station at its own pitch, " +
-  "with Between lines and the band settings as for a generated QSO. It sends what was read, so a " +
+  "with *Between lines* and the band settings as for a generated QSO. It sends what was read, so a " +
   "letter read wrong is sent wrong. Off: the recording as opened. A change keeps your copy.";
 
 /** Where the page is, as its heading says in a word. */
@@ -504,13 +509,14 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const [speedChoice, setSpeedChoice] = useChoice("copySpeed", "format");
   // The sliders' settings, and what plays: nothing added while the band is
   // switched off.
-  const [qsbSet, setQsbDb] = useChoice("qsbDb", 0);
-  const [noiseSet, setNoiseDb] = useChoice("noiseDb", NOISE_OFF_DB);
-  const [qrnSet, setQrn] = useChoice("qrn", 0);
-  const [qrmSet, setQrmDb] = useChoice("qrmDb", QRM_OFF_DB);
-  const [bandPlays, setBandPlaysRaw] = useOnOff("bandOn", true);
+  const [qsbShown, setQsbDb] = useChoice("qsbDb", 0);
+  const [noiseShown, setNoiseDb] = useChoice("noiseDb", NOISE_OFF_DB);
+  const [qrnShown, setQrn] = useChoice("qrn", 0);
+  const [qrmShown, setQrmDb] = useChoice("qrmDb", QRM_OFF_DB);
+  const [bandShown, setBandPlaysRaw] = useOnOff("bandOn", true);
   const keyStyle = useKeyStyle();
-  const [agc, setAgcRaw] = useChoice("agc", "fast");
+  const { pitch: pitchShown, setPitch } = usePitchRange();
+  const [agcShown, setAgcRaw] = useChoice("agc", "fast");
   /** A click changed how it is sent, the band's switch or the AGC, which
    *  has no slider to wait for. */
   const clicked = useRef(false);
@@ -522,11 +528,17 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
     clicked.current = true;
     setAgcRaw(next);
   };
-  const { qsbDb, noiseDb, qrn, qrmDb } = asPlayed(
-    { qsbDb: qsbSet, noiseDb: noiseSet, qrn: qrnSet, qrmDb: qrmSet },
-    bandPlays,
+  /** What the sound settings show, as `asPlayed` plays them. */
+  const soundShown = asPlayed({ qsbDb: qsbShown, noiseDb: noiseShown, qrn: qrnShown, qrmDb: qrmShown }, bandShown);
+  const hasBand = bandOn(soundShown);
+  /* What is sent: the sound settings as they were when the sound settings
+     last closed. Sending a QSO again takes a few hundred ms, so it waits for
+     them to close, and Preview plays the changes in the meantime. */
+  const soundOpen = useSoundPanelOpen();
+  const { qsbDb, noiseDb, qrn, qrmDb, bandPlays, agc, pitch } = useHeld(
+    { ...soundShown, bandPlays: bandShown, agc: agcShown, pitch: pitchShown },
+    soundOpen,
   );
-  const hasBand = bandOn({ noiseDb, qrn, qrmDb });
   const [mine, setMineRaw] = useState<Speed>(() => {
     const p = loadPrefs();
     const or = loadSpeed() ?? { charWpm: 20, farnsworthWpm: 20 };
@@ -562,6 +574,8 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
    *  generated QSO has its script too. An opened recording at your speeds
    *  has what it was as opened in `read`, and the bytes and lines it plays
    *  as sent again. */
+  /** The station whose pitch dialog is open, by its place in the script. */
+  const [pitchOf, setPitchOf] = useState<number | null>(null);
   const [file, setFile] = useState<{
     name: string;
     audio: ArrayBuffer;
@@ -643,6 +657,18 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
 
   /* How loud the recording plays: the listening level the other pages use. */
   const [gainDb, setGainDbRaw] = useState(() => loadPrefs().gainDb ?? 0);
+  const preview = usePreview({
+    sound: { ...soundShown, agc: agcShown, pitch: pitchShown },
+    speed: mine,
+    gainDb,
+    open: soundOpen,
+    onStart: () => player.stop(),
+  });
+  // Playing the QSO, or a line of it, stops Preview.
+  useEffect(() => {
+    if (playing !== null) preview.setMode(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
   const setGainDb = (next: number) => {
     setGainDbRaw(next);
     savePrefs({ ...loadPrefs(), gainDb: next });
@@ -758,7 +784,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
   const makeExchange = () => {
     player.stop();
     cancelLastLock();
-    const script = makeScript({ kind, length: qsoLength, qsos: runQsos, friends: loadFriends(), keys: keyStyle.keys });
+    const script = makeScript({ kind, length: qsoLength, qsos: runQsos, friends: loadFriends(), keys: keyStyle.keys, pitch });
     const sent = sendScript(script, sending);
     const audio = encodeWavBuffer(sent.samples, sent.rate);
     const name = nameOf(script);
@@ -773,20 +799,25 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
      and where you are in it kept. A slider moves in steps, so this waits
      for it to settle; the band's switch does not. */
   const sentWith = useRef(sendKey);
+  /** `f` sent again as `script` says, with your copy and where you are in
+   *  it kept. */
+  const sendAgain = (f: NonNullable<typeof file>, script: Script) => {
+    const was = f.rec;
+    const sent = sendScript(script, sendingOf(script));
+    const audio = encodeWavBuffer(sent.samples, sent.rate);
+    player.stop();
+    cancelLastLock();
+    setFile({ ...f, script, audio, rec: sent.rec });
+    setPos((p) => timeIn(was, sent.rec, p));
+    setKept((k) => (k ? { ...k, reached: timeIn(was, sent.rec, k.reached), at: timeIn(was, sent.rec, k.at) } : k));
+    void keepCopyFile({ name: f.name, audio: new Blob([audio]), recording: sent.rec, script });
+  };
   useEffect(() => {
     const now = clicked.current;
     if (!file?.script || sentWith.current === sendKey) return;
     const t = setTimeout(() => {
       sentWith.current = sendKey;
-      const was = file.rec;
-      const sent = sendScript(file.script!, sendingOf(file.script!));
-      const audio = encodeWavBuffer(sent.samples, sent.rate);
-      player.stop();
-      cancelLastLock();
-      setFile({ ...file, audio, rec: sent.rec });
-      setPos((p) => timeIn(was, sent.rec, p));
-      setKept((k) => (k ? { ...k, reached: timeIn(was, sent.rec, k.reached), at: timeIn(was, sent.rec, k.at) } : k));
-      void keepCopyFile({ name: file.name, audio: new Blob([audio]), recording: sent.rec, script: file.script });
+      sendAgain(file, file.script!);
     }, now ? 0 : 250);
     return () => clearTimeout(t);
     // Sent again on a change of how it is sent, not on each new file.
@@ -1768,17 +1799,18 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
     </Section>
   );
   const soundSection = (
-    <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
-      <QsbSlider qsbDb={qsbSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQsbDb} />
-      <NoiseSlider noiseDb={noiseSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setNoiseDb} />
-      <QrnSlider qrn={qrnSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrn} />
-      <QrmSlider qrmDb={qrmSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrmDb} />
-      <AgcChoice agc={agc} barred={!bandPlays ? NEEDS_BAND_ON : hasBand ? null : NEEDS_BAND} onChange={setAgc} />
-      <BandOnCheck on={bandPlays} onChange={setBandPlays} />
+    <SoundSection gainDb={gainDb} onGainDb={setGainDb} preview={preview}>
+      <PitchSlider pitch={pitchShown} onChange={setPitch} />
+      <NoiseSlider noiseDb={noiseShown} barred={bandShown ? null : NEEDS_BAND_ON} onChange={setNoiseDb} />
+      <QrnSlider qrn={qrnShown} barred={bandShown ? null : NEEDS_BAND_ON} onChange={setQrn} />
+      <QrmSlider qrmDb={qrmShown} barred={bandShown ? null : NEEDS_BAND_ON} onChange={setQrmDb} />
+      <QsbSlider qsbDb={qsbShown} barred={bandShown ? null : NEEDS_BAND_ON} onChange={setQsbDb} />
+      <AgcChoice agc={agcShown} barred={!bandShown ? NEEDS_BAND_ON : hasBand ? null : NEEDS_BAND} onChange={setAgc} />
+      <BandOnCheck on={bandShown} onChange={setBandPlays} />
     </SoundSection>
   );
   const kindLabel = KINDS.find((k) => k.value === kind)!.label;
-  const bandName = anyAdded({ qsbDb, noiseDb, qrn, qrmDb }) ? "On" : "Clean";
+  const bandName = anyAdded(soundShown) ? "On" : "Clean";
 
   return (
     <>
@@ -1898,6 +1930,16 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
               <button type="button" role="menuitem" data-testid="copy-open" disabled={reading} onClick={pickFile}>
                 <IconUpload /> Open a recording or a text file…
               </button>
+              {file?.script && (
+                <>
+                  <MenuHeading>Pitch</MenuHeading>
+                  {file.script.stations.map((st, i) => (
+                    <button key={i} type="button" role="menuitem" data-testid="copy-station-pitch" onClick={() => setPitchOf(i)}>
+                      Set {st.call || `station ${i + 1}`}'s pitch…
+                    </button>
+                  ))}
+                </>
+              )}
               <MenuHeading>Download</MenuHeading>
               <DownloadItem
                 label={added ? "Audio, clean" : "Audio"}
@@ -1911,7 +1953,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
                   label="Audio, as heard"
                   testId="copy-download-heard"
                   disabled={!rec}
-                  title="Save the QSO as a WAV file, with the QSB, noise, QRN and QRM you hear"
+                  title="Save the QSO as a WAV file, with the noise, QRN, QRM and QSB you hear"
                   onClick={downloadHeard}
                 />
               )}
@@ -2030,7 +2072,7 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           {
             id: "sound",
             label: "Sound",
-            scope: "Volume is the same on every page. QSB, Noise, QRN and QRM are the same on the Copy and QSO pages.",
+            scope: "Volume is the same on every page. Station pitch, Noise, QRN, QRM and QSB are the same on the Copy and QSO pages.",
             content: soundSection,
           },
           {
@@ -2189,6 +2231,19 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
         />
 
       </main>
+      {pitchOf !== null && file?.script?.stations[pitchOf] && (
+        <StationPitchDialog
+          call={file.script.stations[pitchOf]!.call || `Station ${pitchOf + 1}`}
+          hz={file.script.stations[pitchOf]!.toneHz}
+          note={`${file.script.stations[pitchOf]!.call || `Station ${pitchOf + 1}`} sends at this pitch in this QSO. The next QSO you generate picks its pitches from Station pitch.`}
+          onCancel={() => setPitchOf(null)}
+          onSet={(hz) => {
+            const script = file.script!;
+            sendAgain(file, { ...script, stations: script.stations.map((st, i) => (i === pitchOf ? { ...st, toneHz: hz } : st)) });
+            setPitchOf(null);
+          }}
+        />
+      )}
       {textDraft && (
         <CopyText
           text={textDraft.text}

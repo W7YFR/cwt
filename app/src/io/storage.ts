@@ -606,12 +606,15 @@ export interface Prefs {
   /** QRM on the Copy and QSO pages, in dB under the station's peak. Absent
    *  or at `QRM_OFF_DB`: none. */
   qrmDb?: number;
-  /** QSB, noise, QRN and QRM play on the Copy and QSO pages, at their
+  /** Noise, QRN, QRM and QSB play on the Copy and QSO pages, at their
    *  settings. False plays a clean signal and keeps the settings. Absent:
    *  they play. */
   bandOn?: boolean;
   /** The receiver's AGC on the Copy and QSO pages. Absent: fast. */
   agc?: "off" | "slow" | "fast";
+  /** The lowest and highest pitch of the stations on the Copy and QSO
+   *  pages, in Hz. Absent: 550 to 750. */
+  stationPitch?: { lowHz: number; highHz: number };
   /** How the stations on the Copy and QSO pages key: by default as on the
    *  air, or only on `styleKeys`. Absent: by default. */
   keyStyle?: "default" | "only";
@@ -886,6 +889,10 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   keyStyle: (v) => v === "default" || v === "only",
   styleKeys: (v) => Array.isArray(v) && v.length > 0 && v.every((k) => KEY_KINDS.includes(k as KeyKind)),
   agc: oneOf("off", "slow", "fast"),
+  stationPitch: (v) => {
+    const p = v as { lowHz?: unknown; highHz?: unknown } | null;
+    return typeof p === "object" && p !== null && isNum(p.lowHz) && isNum(p.highHz) && (p.lowHz as number) <= (p.highHz as number);
+  },
 };
 
 export function loadPrefs(): Prefs {

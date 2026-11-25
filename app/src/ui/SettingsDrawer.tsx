@@ -13,6 +13,7 @@ import { Drawer, DrawerTabs } from "./Drawer";
 import { createPortal } from "react-dom";
 import { IconCog } from "./Icons";
 import { SettingsForm } from "./Controls";
+import { useSoundPanel } from "./soundPanel";
 import type { InputDevice } from "@/capture/mic";
 import type { Profile } from "@/io/profiles";
 
@@ -90,6 +91,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     if ((prefs.settingsOpen ?? false) === open && (prefs.settingsTab ?? "page") === tab) return;
     savePrefs({ ...prefs, settingsOpen: open, settingsTab: tab });
   }, [open, tab]);
+  useSoundPanel(open && tab === "sound");
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [pageTabs, setPageTabsRaw] = useState<readonly PageTab[]>([]);
   const [locked, setLocked] = useState(false);

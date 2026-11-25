@@ -42,7 +42,7 @@ const KEEP_SECONDS = 30;
 const QSO_PAD_MS = 1000;
 /** What Pass thru does, and the one way it goes wrong. */
 const HEAR_HELP =
-  "Plays your input through your speakers or headphones while Live listens, at the Volume. " +
+  "Plays your input through your speakers or headphones while Live listens, at the *Playback volume*. " +
   "With a microphone as the input, use headphones: the microphone would hear the speakers.";
 /** A signal quiet this long is no longer counted in the status, seconds. */
 const QUIET_SHOWN_SEC = 20;

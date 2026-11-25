@@ -144,25 +144,25 @@ export const GAIN_HELP =
 
 export const QSB_HELP =
   "How deep the station's signal fades, as it does over the air. With noise on, a deep fade " +
-  "drops the signal into the noise. Off sends a steady signal.";
+  "drops the signal into the noise. *Off* sends a steady signal.";
 
 export const BAND_ON_HELP =
-  "Turn QSB, noise, QRN and QRM on and off together. Off sends a clean signal, and keeps " +
+  "Turn noise, QRN, QRM and QSB on and off together. Off sends a clean signal, and keeps " +
   "their settings for when you turn them on again.";
 
 export const KEY_STYLE_HELP =
-  "What the stations send with. Default: mostly a keyer, now and then a bug, as on the air. " +
-  "Only these: each station uses one of the ones you check. Friends use their own.";
+  "What the stations send with. *Default*: mostly a keyer, now and then a bug, as on the air. " +
+  "*Only these*: each station uses one of the ones you check. Friends use their own.";
 export const AGC_HELP =
   "How the receiver keeps what you hear at one level, as a radio's AGC does. Under a strong " +
   "signal the band goes quiet, and it comes back up between characters and words: fast at " +
-  "Fast, slowly at Slow. Off keeps the band at one level.";
+  "*Fast*, slowly at *Slow*. *Off* keeps the band at one level.";
 
 export const NOISE_HELP =
-  "How loud the band noise is, under the station's signal. Off sends a clean signal.";
+  "How loud the band noise is, under the station's signal. *Off* sends a clean signal.";
 
 export const BREAK_IN_HELP =
-  "How long the band stays cut after your last mark, as a radio's break-in delay. Full is " +
+  "How long the band stays cut after your last mark, as a radio's break-in delay. *Full* is " +
   "full break-in (QSK): you hear the band between your marks.";
 
 export const QRN_HELP =
@@ -171,6 +171,16 @@ export const QRN_HELP =
 export const QRM_HELP =
   "Another station near the frequency, sending a QSO of its own, and how loud it is under " +
   "the station you copy.";
+
+export const PITCH_HELP =
+  "Each station sends at its own pitch, picked at random between the two ends. " +
+  "Drag the ends together to hear every station at one pitch. The default is 550 to 750 Hz.";
+
+export const PREVIEW_HELP =
+  "*All* plays three stations again and again over the band: one at the lowest pitch, one in the middle and one at the highest.\n\n" +
+  "*Pitch* plays the same three stations with nothing added.\n\n" +
+  "*Band* plays the band alone.\n\n" +
+  "You hear each change as you make it. The QSO on the page gets the new sound when you close these settings.";
 
 export const OPEN_FILE_HELP = "Open a recording from disk";
 
@@ -182,7 +192,7 @@ export const OPEN_FILE_CLOSED =
 export const RUN_SORT_HELP =
   "What order the attempts are drawn in. A run keeps the number it was " +
   "recorded with wherever it lands, and nothing about the grading moves. " +
-  "\u201cBest\u201d means most consistent: you can send every character " +
+  "*Best* means most consistent: you can send every character " +
   "correctly and still be all over the place.";
 
 export const ZOOM_HELP = "Or scroll over the chart, which zooms about the pointer";
@@ -256,20 +266,21 @@ export const SHOW_CHART_CONTROLS_HELP =
    place, above what the setting does. A barred setting stays where it is, so
    the panel does not move under the pointer as other settings change. */
 
-export const NEEDS_LIVE_PROGRESS = "Needs Show where I am in the message.";
+export const NEEDS_LIVE_PROGRESS = "Needs *Show where I am in the message*.";
 export const NEEDS_RUNS = "Needs more than one run.";
 export const NEEDS_RUNS_SHOWN = "Needs more than one run on the chart.";
 export const ONE_INPUT = "This is the only input the browser offers.";
 export const CAL_FILE = "Not for a recording opened from disk. A file is read exactly as recorded.";
-export const CAL_NONE = "No calibration is saved for this input. Calibrate to make one.";
+export const CAL_NONE = "No calibration is saved for this input. *Calibrate* to make one.";
 export const CAL_REREADING = "Re-reading the session.";
-export const NEEDS_BAND = "Needs Noise, QRN or QRM on.";
-export const NEEDS_LINES_COPY = "Needs Each line shows = Copy.";
-export const NEEDS_THEIR_LINES_COPY = "Needs The station's lines show = Copy.";
-export const NEEDS_SLOTS = "Needs Copy in = Slots.";
-export const NOT_WITH_EXCHANGE = "Not with The station's lines show = Exchange.";
-export const NEEDS_BAND_BETWEEN = "Needs Play the band.";
-export const NEEDS_BAND_ON = "Needs Play QSB, noise, QRN and QRM.";
+export const NEEDS_BAND = "Needs *Noise*, *QRN* or *QRM* on.";
+export const NEEDS_LINES_COPY = "Needs *Each line shows* = *Copy*.";
+export const NEEDS_THEIR_LINES_COPY = "Needs *The station's lines show* = *Copy*.";
+export const NEEDS_SLOTS = "Needs *Copy in* = *Slots*.";
+export const NOT_WITH_EXCHANGE = "Not with *The station's lines show* = *Exchange*.";
+export const NEEDS_BAND_BETWEEN = "Needs *Play the band between the station's lines*.";
+export const NEEDS_BAND_ON = "Needs *Play noise, QRN, QRM and QSB*.";
+export const NEEDS_PAUSE = "Can't change this while recording. Press *Pause* first.";
 
 export const LOOP_HELP =
   "Replay what plays, the range or the whole track, each time it reaches " +

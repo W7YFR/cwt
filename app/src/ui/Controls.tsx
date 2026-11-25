@@ -16,13 +16,15 @@ import { createPortal } from "react-dom";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import type { RecordMode } from "./mode";
-import { IconBug, IconStraightKey } from "./Icons";
+import { IconBug, IconPlay, IconStop, IconStraightKey } from "./Icons";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import type { AgcMode } from "@/audio/agc";
 import { QRM_MAX_DB, QRM_OFF_DB, QRM_STEP_DB, qrmOn } from "@/copy/band";
 import { loadPrefs, loadUser, savePrefs } from "@/io/storage";
 import { STRAIGHT_MOST_WPM, type Fist, type KeyKind } from "@/timing/fist";
+import type { PreviewMode } from "./usePreview";
+import { DEFAULT_PITCH, PITCH_MAX_HZ, PITCH_MIN_HZ, PITCH_STEP_HZ, type PitchRange } from "@/qso/station";
 import { BREAK } from "@/morse";
 import {
   BREAK_MAX_SEC,
@@ -49,6 +51,8 @@ import {
   QRN_HELP,
   BREAK_IN_HELP,
   QRM_HELP,
+  PITCH_HELP,
+  PREVIEW_HELP,
   PACE_ABSOLUTE_HELP,
   TIMES_FILE_HELP,
   TIMES_HELP,
@@ -374,6 +378,24 @@ function fixedFrame(): { left: number; right: number; top: number } {
 /** A themed tooltip for `text`, drawn at the top of the page and placed by
  *  `anchor`: below it, or above where there is no room below, and inside the
  *  window either side. Spread `on` on the element that shows it. */
+/** A control or a choice named in a tip's text, between asterisks, as in
+ *  `*Fast*`: in italics in a tip, so it reads apart from the words around
+ *  it. */
+const TIP_NAME = /\*([^*\n]+)\*/g;
+
+/** `text` for a browser's own tooltip, which has no italics: the names
+ *  without their asterisks. */
+export function plainTip(text: string): string {
+  return text.replace(TIP_NAME, "$1");
+}
+
+/** `text` for a tip, its names in italics. */
+function tipText(text: string): React.ReactNode {
+  const parts = text.split(TIP_NAME);
+  // Split on a group: every odd part is a name.
+  return parts.map((part, i) => (i % 2 ? <em key={i}>{part}</em> : part));
+}
+
 function useTip<T extends HTMLElement>(
   text: string,
 ): {
@@ -420,7 +442,7 @@ function useTip<T extends HTMLElement>(
         hidden={!open}
         style={at ? { top: at.top, left: at.left } : { visibility: "hidden" }}
       >
-        {text}
+        {tipText(text)}
       </span>,
       document.body,
     ),
@@ -454,7 +476,7 @@ function HelpTip({ text }: { text: string }): React.ReactElement {
 function useHelp(text: string | undefined): { title?: string; tip: React.ReactNode } {
   const tips = useContext(HelpTips);
   if (!text) return { tip: null };
-  return tips ? { tip: <HelpTip text={text} /> } : { title: text, tip: null };
+  return tips ? { tip: <HelpTip text={text} /> } : { title: plainTip(text), tip: null };
 }
 
 function NumberField({
@@ -817,23 +839,69 @@ export function SettingsForm({ children }: { children: React.ReactNode }): React
   );
 }
 
-/** How loud playback is, with what else plays on the page's Sound tab. */
+/** How loud playback is, with what else plays on the page's Sound tab.
+ *  `preview` plays the settings as they are changed, on a page that makes
+ *  its sound from them. */
 export function SoundSection({
   gainDb,
   onGainDb,
+  preview,
   children,
 }: {
   gainDb: number;
   onGainDb(gainDb: number): void;
+  preview?: { mode: PreviewMode | null; setMode(mode: PreviewMode | null): void; barred?: string | null };
   children?: React.ReactNode;
 }): React.ReactElement {
   return (
     <Section name="audio" title="Sound">
       <div className="panelgroups">
+        {preview && <PreviewButtons {...preview} />}
         <ListeningLevel gainDb={gainDb} onChange={onGainDb} />
         {children}
       </div>
     </Section>
+  );
+}
+
+/** Preview: All, Pitch and Band, each playing the sound settings as they
+ *  are changed, until pressed again or the settings close. */
+function PreviewButtons({
+  mode,
+  setMode,
+  barred = null,
+}: {
+  mode: PreviewMode | null;
+  setMode(mode: PreviewMode | null): void;
+  barred?: string | null;
+}): React.ReactElement {
+  const about = useHelp(barredTitle(barred, PREVIEW_HELP));
+  const button = (of: PreviewMode, label: string) => (
+    <button
+      type="button"
+      data-testid={`sound-preview-${of}`}
+      aria-label={`Preview ${label.toLowerCase()}`}
+      aria-pressed={mode === of}
+      disabled={barred !== null}
+      title={about.title}
+      onClick={() => setMode(mode === of ? null : of)}
+    >
+      <i className="ico">{mode === of ? <IconStop /> : <IconPlay />}</i>
+      {label}
+    </button>
+  );
+  return (
+    <div className="group" data-disabled={barred !== null}>
+      <span className="caption" id="sound-preview-label">
+        Preview
+      </span>
+      <div className="previewrow" role="group" aria-labelledby="sound-preview-label">
+        {button("all", "All")}
+        {button("pitch", "Pitch")}
+        {button("band", "Band")}
+      </div>
+      {about.tip}
+    </div>
   );
 }
 
@@ -1141,17 +1209,25 @@ export function ListeningLevel({
   );
 }
 
-/** QSB, noise, QRN and QRM on or off together, their settings kept. The
+/** Noise, QRN, QRM and QSB on or off together, their settings kept. The
  *  Copy page and the QSO page both draw this. */
-export function BandOnCheck({ on, onChange }: { on: boolean; onChange(on: boolean): void }): React.ReactElement {
-  return <Check id="band-on" label="Play QSB, noise, QRN and QRM" help={BAND_ON_HELP} checked={on} onChange={onChange} />;
+export function BandOnCheck({
+  on,
+  barred = null,
+  onChange,
+}: {
+  on: boolean;
+  barred?: string | null;
+  onChange(on: boolean): void;
+}): React.ReactElement {
+  return <Check id="band-on" label="Play noise, QRN, QRM and QSB" help={BAND_ON_HELP} checked={on} barred={barred} onChange={onChange} />;
 }
 
 /** The AGC's settings, each with what it does. */
-const AGCS: ReadonlyArray<{ value: AgcMode; label: string; note: string }> = [
-  { value: "off", label: "Off", note: "The band stays at one level." },
-  { value: "slow", label: "Slow", note: "The band comes back up slowly after a signal." },
-  { value: "fast", label: "Fast", note: "The band comes back up between characters." },
+const AGCS: ReadonlyArray<{ value: AgcMode; label: string }> = [
+  { value: "off", label: "Off" },
+  { value: "slow", label: "Slow" },
+  { value: "fast", label: "Fast" },
 ];
 
 /** The receiver's AGC. The Copy page and the QSO page both draw this. */
@@ -1212,7 +1288,7 @@ export function KeyChecks({
           const on = keys.includes(k.key);
           const why = barred ?? (on && keys.length === 1 && !allowNone ? ONE_KEY : null);
           return (
-            <label key={k.key} className="check" title={why ?? k.help}>
+            <label key={k.key} className="check" title={plainTip(why ?? k.help)}>
               <input
                 type="checkbox"
                 id={`${idPrefix}key-${k.key}`}
@@ -1320,7 +1396,7 @@ export function KeyStyleGroup({ ks }: { ks: ReturnType<typeof useKeyStyle> }): R
       <KeyChecks
         idPrefix="style-"
         keys={ks.checked}
-        barred={ks.style === "only" ? null : "Pick Only these to choose."}
+        barred={ks.style === "only" ? null : "Pick *Only these* to choose."}
         onChange={ks.setChecked}
       />
     </>
@@ -1450,6 +1526,70 @@ export function QrmSlider({
         disabled={barred !== null}
         onChange={(e) => onChange(Number(e.target.value))}
       />
+      {about.tip}
+    </div>
+  );
+}
+
+/** Station pitch, kept as a preference the Copy and QSO pages share. */
+export function usePitchRange(): { pitch: PitchRange; setPitch(pitch: PitchRange): void } {
+  const [pitch, setPitchRaw] = useState<PitchRange>(() => loadPrefs().stationPitch ?? DEFAULT_PITCH);
+  return {
+    pitch,
+    setPitch: (next) => {
+      setPitchRaw(next);
+      savePrefs({ ...loadPrefs(), stationPitch: { lowHz: next.lowHz, highHz: next.highHz } });
+    },
+  };
+}
+
+/** Station pitch: the lowest and highest pitch a generated station sends
+ *  at, one slider with a handle at each end. The Copy page and the QSO page
+ *  both draw this. */
+export function PitchSlider({
+  pitch,
+  barred = null,
+  onChange,
+}: {
+  pitch: PitchRange;
+  barred?: string | null;
+  onChange(pitch: PitchRange): void;
+}): React.ReactElement {
+  const about = useHelp(barredTitle(barred, PITCH_HELP));
+  const { lowHz, highHz } = pitch;
+  const at = (hz: number) => (hz - PITCH_MIN_HZ) / (PITCH_MAX_HZ - PITCH_MIN_HZ);
+  // The low end's handle on top once it nears the top of the slider, so the
+  // two ends together can still be dragged down.
+  const lowOnTop = at(lowHz) > 0.5;
+  return (
+    <div className="group" data-disabled={barred !== null}>
+      <label htmlFor="pitch-low" title={about.title}>
+        Station pitch <output id="pitch-out">{lowHz === highHz ? `${lowHz} Hz` : `${lowHz}–${highHz} Hz`}</output>
+      </label>
+      <div className="pitchrange" data-low-on-top={lowOnTop} style={{ "--from": at(lowHz), "--to": at(highHz) } as React.CSSProperties}>
+        <input
+          type="range"
+          id="pitch-low"
+          aria-label="Lowest station pitch"
+          min={PITCH_MIN_HZ}
+          max={PITCH_MAX_HZ}
+          step={PITCH_STEP_HZ}
+          value={lowHz}
+          disabled={barred !== null}
+          onChange={(e) => onChange({ lowHz: Math.min(Number(e.target.value), highHz), highHz })}
+        />
+        <input
+          type="range"
+          id="pitch-high"
+          aria-label="Highest station pitch"
+          min={PITCH_MIN_HZ}
+          max={PITCH_MAX_HZ}
+          step={PITCH_STEP_HZ}
+          value={highHz}
+          disabled={barred !== null}
+          onChange={(e) => onChange({ lowHz, highHz: Math.max(Number(e.target.value), lowHz) })}
+        />
+      </div>
       {about.tip}
     </div>
   );

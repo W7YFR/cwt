@@ -24,7 +24,19 @@ import { FORMATS } from "@/qso/formats";
 import { hint, type Me } from "@/qso/hint";
 import { callIn, following, isRun, respond, wpmOf, type AnyQso, type RunQso } from "@/qso/run";
 import type { Speed } from "@/qso/speed";
-import { onKey, randomCaller, regionOf, STANDARD_KEYS, withKeys, type FriendInfo, type Rand, type Station } from "@/qso/station";
+import {
+  DEFAULT_PITCH,
+  onKey,
+  randomCaller,
+  randomPitch,
+  regionOf,
+  STANDARD_KEYS,
+  withKeys,
+  type FriendInfo,
+  type PitchRange,
+  type Rand,
+  type Station,
+} from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { targetTiming } from "@/timing";
 import { isFist, type Fist, type KeyKind } from "@/timing/fist";
@@ -81,6 +93,9 @@ export interface MakeOptions {
   /** The keys every station sends with, from Paddle. Absent or null: as on
    *  the air. Friends keep their own. */
   readonly keys?: readonly KeyKind[] | null;
+  /** The pitches the stations send at, from Station pitch. Absent: the
+   *  default. */
+  readonly pitch?: PitchRange;
 }
 
 /** The speeds a standard QSO is sent at, slowest and fastest. The station that
@@ -98,12 +113,13 @@ function wpmIn(rand: Rand, [lo, hi]: readonly [number, number]): Speed {
   return { charWpm: wpm, farnsworthWpm: wpm };
 }
 
-/** A pitch in the band the QSO page's stations use, at least
- *  `PITCH_APART_HZ` from `from` when given. */
-function pitchApart(rand: Rand, from?: number): number {
+/** A pitch in `range`, at least `PITCH_APART_HZ` from `from` when given and
+ *  `range` has room for that. */
+function pitchApart(rand: Rand, range: PitchRange, from?: number): number {
+  const room = from !== undefined && (range.highHz - from >= PITCH_APART_HZ || from - range.lowHz >= PITCH_APART_HZ);
   for (;;) {
-    const hz = 550 + Math.round(rand() * 20) * 10;
-    if (from === undefined || Math.abs(from - hz) >= PITCH_APART_HZ) return hz;
+    const hz = randomPitch(rand, range);
+    if (from === undefined || !room || Math.abs(from - hz) >= PITCH_APART_HZ) return hz;
   }
 }
 
@@ -119,14 +135,14 @@ function meOf(s: Station): Me {
 
 /** A generated QSO of `kind`, both sides, start to finish. */
 export function makeScript(options: MakeOptions): Script {
-  const { kind, rand = Math.random, length = "full", qsos = 3 } = options;
+  const { kind, rand = Math.random, length = "full", qsos = 3, pitch = DEFAULT_PITCH } = options;
   const hour = options.hour ?? Math.floor(rand() * 24);
   const start = kind === "cq" ? null : kind;
   const keys = options.keys ?? null;
   const caller = withKeys(onKey(randomCaller(rand), start ? FORMATS[start].keys : STANDARD_KEYS), keys);
   const me = meOf(caller);
   const mySpeed = wpmIn(rand, start ? wpmOf(start, caller) : STANDARD_QSO_WPM);
-  const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand), speed: mySpeed, ...fistOf(caller) }];
+  const stations: ScriptStation[] = [{ call: me.call, toneHz: pitchApart(rand, pitch), speed: mySpeed, ...fistOf(caller) }];
   const lines: ScriptLine[] = [];
   const voice = { rand, hour, pieces: length === "pieces" };
   const context = { rand, hour, length, region: me.region, speed: mySpeed };
@@ -137,7 +153,7 @@ export function makeScript(options: MakeOptions): Script {
     if (at >= 0) return at;
     // Apart from the station that runs: the two take turns. Callers in a
     // run never send at the same time, so they may share a pitch.
-    const toneHz = pitchApart(rand, stations[0]!.toneHz);
+    const toneHz = pitchApart(rand, pitch, stations[0]!.toneHz);
     return stations.push({ call: qso.them.call, toneHz, speed: qso.speed, ...fistOf(withKeys(qso.them, keys)) }) - 1;
   };
 
@@ -179,6 +195,11 @@ export interface SendOptions {
   readonly qrmDb?: number;
   /** The receiver's AGC. Absent: off. */
   readonly agc?: AgcMode;
+  /** When the QRM station first sends, in seconds. Absent: as on the air. */
+  readonly qrmFirstSec?: number;
+  /** The band alone: as long as the QSO, with the same band, and none of
+   *  its stations. */
+  readonly bandOnly?: boolean;
   readonly rate?: number;
 }
 
@@ -228,7 +249,7 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
   });
   const durationSec = t + LEAD_SEC;
   const samples = new Float32Array(Math.ceil(durationSec * rate));
-  for (const s of sounds) samples.set(s.samples.subarray(0, samples.length - s.at), s.at);
+  if (!options.bandOnly) for (const s of sounds) samples.set(s.samples.subarray(0, samples.length - s.at), s.at);
   // One band under every station, on the pitch between them.
   const tones = script.stations.map((s) => s.toneHz);
   addBand(samples, {
@@ -240,6 +261,7 @@ export function sendScript(script: Script, options: SendOptions): { samples: Flo
     seed: seedOf(script.stations[0]!.call || script.lines[0]!.text),
     qrmLines,
     agc: options.agc ?? "off",
+    ...(options.qrmFirstSec !== undefined ? { qrmFirstSec: options.qrmFirstSec } : {}),
   });
   return {
     samples,

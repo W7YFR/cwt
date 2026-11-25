@@ -130,6 +130,11 @@ async function settingsTab(tab: string): Promise<void> {
   if (button("panel-toggle").getAttribute("aria-pressed") !== "true") await click(button("panel-toggle"));
   await click($(`[data-testid="settings-tab"] [data-tab="${tab}"]`));
 }
+
+/** Close Settings: what changed in its Audio tab plays from then on. */
+async function closeSettings(): Promise<void> {
+  if (button("panel-toggle").getAttribute("aria-pressed") === "true") await click(button("panel-toggle"));
+}
 /** Where the page is, as its heading's `data-state` says. */
 const state = () => $('[data-testid="copy-state"]')?.dataset.state ?? "";
 const lines = () => $$('[data-testid="copy-line"]');
@@ -628,7 +633,8 @@ describe("a generated QSO", () => {
       await fill($<HTMLInputElement>(`#${id}`)!, value);
     }
     expect(loadPrefs()).toMatchObject({ qsbDb: 12, noiseDb: -20, qrn: 2, qrmDb: -20 });
-    // Sent again once the sliders settle: what plays next is not the clean QSO.
+    // Sent again once Settings closes: what plays next is not the clean QSO.
+    await closeSettings();
     await wait(400);
     expect(boxes()[0]!.value).toBe("CQ CWT");
     expect(length()).toBe(before);
@@ -657,16 +663,41 @@ describe("a generated QSO", () => {
     await click(on);
     expect(loadPrefs()).toMatchObject({ bandOn: false, ...band });
     for (const id of ["qsb", "noise", "qrn", "qrm"]) expect($<HTMLInputElement>(`#${id}`)!.disabled, id).toBe(true);
-    // Sent again at once: a click has no slider to wait for.
+    // Sent again once Settings closes.
+    await closeSettings();
     await wait(100);
     await playTo(2);
     expect(silence()).toBeGreaterThan(1000);
-    await click(on);
+    await settingsTab("sound");
+    await click($<HTMLInputElement>("#band-on")!);
     expect(loadPrefs().bandOn).toBe(true);
     for (const id of ["qsb", "noise", "qrn", "qrm"]) expect($<HTMLInputElement>(`#${id}`)!.disabled, id).toBe(false);
+    await closeSettings();
     await wait(100);
     await playTo(3);
     expect(silence()).toBeLessThan(100);
+  });
+
+  it("sends a station at the pitch set from ⋯, with your copy kept", async () => {
+    await makeUp({ copyKind: "cwt", copyRunQsos: 1, copySpeed: "mine", copyCharWpm: 40, copyFarnsworthWpm: 40 });
+    await playTo(1);
+    await fill(boxes()[0]!, "CQ CWT");
+    const pitchOf = async (station: number): Promise<HTMLInputElement> => {
+      await click(button("more"));
+      await click($$<HTMLButtonElement>('[data-testid="copy-station-pitch"]')[station]!);
+      return $<HTMLInputElement>("#station-pitch-hz")!;
+    };
+    const slider = await pitchOf(0);
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => {
+      set.call(slider, "420");
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("station-pitch-set"));
+    expect($('[data-testid="station-pitch"]')).toBeNull();
+    await wait(300);
+    expect(boxes()[0]!.value).toBe("CQ CWT");
+    expect((await pitchOf(0)).value).toBe("420");
   });
 
   it("shows the speed it is sent at, and follows the sliders", async () => {
