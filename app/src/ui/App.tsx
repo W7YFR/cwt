@@ -675,7 +675,9 @@ function Footer(): React.ReactElement {
       ·{" "}
       <a href="https://github.com/W7YFR/cwt" target="_blank" rel="noreferrer">
         v{APP_VERSION}
-      </a>
+      </a>{" "}
+      ·{" "}
+      <a href="terms.html">Terms</a>
     </footer>
   );
 }

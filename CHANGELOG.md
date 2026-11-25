@@ -9,7 +9,8 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- **Rag chew after the exchange**, in the QSO page's settings: after the exchange of a standard QSO, a model on your computer writes the station's lines until you send 73 or SK. The model is a one-time download of about 5 GB, and what you send stays on your computer.
+- **Enable LLM ragchew**, in the QSO page's settings: after the exchange of a plain QSO, a language model on your computer writes the station's lines until you send 73 or SK. It asks you to accept the terms first, then downloads the model, about 5 GB, once. What you send stays on your computer.
+- A **Terms** page, linked from the foot of every page.
 
 ### Changed
 
@@ -19,6 +20,8 @@ nothing to the site. The next release carries them.
 
 - With **Lenient** on, a name keyed with a stray gap, such as `NAME IS R OB ROB`, is read as ROB.
 - When the station asks for your name before it sends its exchange, your name sent alone, such as `ROB ROB`, now answers it. Before, the station asked again.
+- After a reload, the QSO, Copy and Live pages show at once, without a blank moment first.
+- **Settings**, left open over a reload, opens at the page's tab without showing **Microphone** first.
 
 ## v1.41.0 — 2026-11-25
 

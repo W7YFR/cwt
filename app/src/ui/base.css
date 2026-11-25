@@ -1359,6 +1359,20 @@ td.play[data-side="tgt"]:hover { box-shadow: inset 0 0 0 1px var(--tgt); }
   box-shadow: 0 18px 48px rgba(0, 0, 0, .45);
 }
 .dialog h2 { margin: 0; font-size: 18px; }
+/* A dialog opened from Settings: over the drawer. */
+.sheet.overdrawer { z-index: 60; }
+/* On a phone, a long confirm and Cancel one over the other, each as wide as
+   the dialog, the confirm on top. */
+@media (max-width: 560px) {
+  .confirm.stack { flex-direction: column-reverse; align-items: stretch; }
+}
+.dialog > p { margin: 0; font-size: 13px; line-height: 1.55; }
+/* A caution set apart: the panel's raised ground and a rule in the accent at
+   its left, in the dialog's own ink. */
+.dialog > .caution p { margin: 0; font-size: 13px; line-height: 1.55; }
+.dialog > .caution p + p { margin-top: 8px; }
+.dialog > .caution { padding: 8px 12px; border: 1px solid var(--line); border-left: 3px solid var(--you-quiet); border-radius: 8px; background: var(--panel-2); }
+.dialog > label.check { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink); }
 .dialog > .hint { margin: 0 0 4px; font-size: 12px; line-height: 1.5; }
 .dialog > label {
   font-size: 11px;

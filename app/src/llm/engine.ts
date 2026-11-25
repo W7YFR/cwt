@@ -20,6 +20,8 @@ export const MODELS = {
   "Llama-3.1-8B-Instruct-q4f16_1-MLC": {
     label: "Llama 3.1 8B",
     gb: 5,
+    /** The computer's memory it needs, in GB: the graphics card of a laptop shares it. */
+    memoryGb: 8,
     hf: "ac109a0e5f6dc3c2f4fbe02c20192f9f4665900d",
     lib: "Llama-3_1-8B-Instruct-q4f16_1_cs1k-webgpu.wasm",
     integrity: {
@@ -30,7 +32,8 @@ export const MODELS = {
   },
   "gemma-4-E2B-it-q4f16_1-MLC": {
     label: "Gemma 4 E2B",
-    gb: 3.4,
+    gb: 3,
+    memoryGb: 6,
     hf: "633df598b7a473759367855273c63912c9e2bc9a",
     lib: "gemma-4-E2B-it-q4f16_1_cs512-webgpu.wasm",
     integrity: {
@@ -55,7 +58,23 @@ export type ModelState =
   | { readonly kind: "downloaded" }
   | { readonly kind: "loading"; readonly progress: number; readonly text: string }
   | { readonly kind: "ready" }
-  | { readonly kind: "failed"; readonly error: string };
+  | { readonly kind: "failed"; readonly why: Failure; readonly error: string };
+
+/** Why the model did not download or load: no room on disk, a graphics card
+ *  without the memory for it, a download cut off, files that did not match
+ *  their hashes, or anything else. */
+export type Failure = "space" | "graphics" | "network" | "check" | "other";
+
+/** The failure an error from WebLLM, the browser or the GPU stands for. */
+export function failureOf(e: unknown): Failure {
+  const name = e instanceof Error || e instanceof DOMException ? e.name : "";
+  const text = `${name} ${e instanceof Error ? e.message : String(e)}`.toLowerCase();
+  if (name === "QuotaExceededError" || /quota|no space|disk.*full|storage.*full/.test(text)) return "space";
+  if (name === "IntegrityError" || /integrity/.test(text)) return "check";
+  if (/out of memory|oom|device (was )?lost|devicelost|maxbuffersize|maxstoragebufferbindingsize|allocat/.test(text)) return "graphics";
+  if (/failed to fetch|networkerror|network error|load failed|err_|aborted|timed? ?out/.test(text)) return "network";
+  return "other";
+}
 
 let model: ModelId = DEFAULT_MODEL;
 let state: ModelState = { kind: "checking" };
@@ -132,7 +151,7 @@ export function load(): Promise<void> {
       set({ kind: "ready" });
     } catch (e) {
       engine = null;
-      set({ kind: "failed", error: e instanceof Error ? e.message : String(e) });
+      set({ kind: "failed", why: failureOf(e), error: e instanceof Error ? e.message : String(e) });
     } finally {
       loading = null;
     }

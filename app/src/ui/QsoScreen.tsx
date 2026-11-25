@@ -48,6 +48,7 @@ import type { Speed } from "@/qso/speed";
 import { pitchIn, regionOf, withKeys, type Station } from "@/qso/station";
 import { borrows, detailsOf, opening, systemPrompt, toCw, toEnglish, type ChatTurn } from "@/qso/ragchew";
 import { chat, llmLog, modelState, wake } from "@/llm/engine";
+import { agreed } from "@/terms";
 import { RagChewGroup } from "./RagChew";
 import { CHAT_WORDS } from "@/qso/chatwords";
 import type { Length } from "@/qso/wording";
@@ -676,8 +677,9 @@ export function QsoScreen({
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
   const [ragChew, setRagChew] = useOnOff("qsoRagChew", false);
   // On: the model loads with the page, not only once Settings is open.
+  // Only once you accept the terms (see terms.ts).
   useEffect(() => {
-    if (ragChew) void wake();
+    if (ragChew && agreed()) void wake();
   }, [ragChew]);
   /** Each QSO's rag chew so far, in English, as the model had it. */
   const chats = useRef(
@@ -1515,6 +1517,7 @@ export function QsoScreen({
     const completes = !isRun(before) && !isScript(before) && before.stage !== "signing" && turn.qso.stage === "signing";
     const chatting =
       ragChew &&
+      agreed() &&
       modelState().kind === "ready" &&
       !isRun(before) &&
       !isScript(before) &&
@@ -3030,7 +3033,6 @@ export function QsoScreen({
                     checked={blurCall}
                     onChange={setBlurCall}
                   />
-                  <RagChewGroup on={ragChew} onChange={setRagChew} />
                   <Check
                     id="qso-show-their-speed"
                     label="Show the station's speed on each line"
@@ -3038,6 +3040,7 @@ export function QsoScreen({
                     checked={showTheirSpeed}
                     onChange={setShowTheirSpeed}
                   />
+                  <RagChewGroup on={ragChew} onChange={setRagChew} />
                 </div>
               </Section>
                 <Section name="you" title="You">

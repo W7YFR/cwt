@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { answer, chatsOn, newQso, Over, type Qso } from "@/qso/cq";
 import { toCw, toEnglish } from "@/qso/ragchew";
+import { failureOf } from "@/llm/engine";
 import { CHAT_WORDS } from "@/qso/chatwords";
 import { vocabulary } from "@/qso/vocabulary";
 import { readWords, type Spaced } from "@/timing/segment";
@@ -127,5 +128,17 @@ describe("the model's English as CW", () => {
     expect(toCw("Yes, Rob, I've used a few radios over the years. That was a long time ago, though.")).toBe(
       "YES ROB IVE USED A FEW RADIOS OVER THE YRS BT THAT WAS A LONG TIME AGO THOUGH BK",
     );
+  });
+});
+
+describe("why the model did not download or load", () => {
+  it("names each failure from what the browser, WebLLM or the GPU threw", () => {
+    const quota = Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" });
+    expect(failureOf(quota)).toBe("space");
+    expect(failureOf(Object.assign(new Error("Integrity verification failed for x.wasm"), { name: "IntegrityError" }))).toBe("check");
+    expect(failureOf(new Error("Device was lost. This can happen due to insufficient memory"))).toBe("graphics");
+    expect(failureOf(new Error("Cannot initialize runtime because of requested maxBufferSize exceeds limit"))).toBe("graphics");
+    expect(failureOf(new TypeError("Failed to fetch"))).toBe("network");
+    expect(failureOf(new Error("Something else"))).toBe("other");
   });
 });

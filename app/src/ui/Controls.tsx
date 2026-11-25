@@ -814,6 +814,19 @@ export function Check({
   );
 }
 
+/** A setting that is a button, with its help: as the rag chew's Enable. */
+export function ActionGroup({ help, children }: { help: string; children: React.ReactNode }): React.ReactElement {
+  const about = useHelp(help);
+  return (
+    <div className="group">
+      <div className="actionrow" title={about.title}>
+        {children}
+      </div>
+      {about.tip}
+    </div>
+  );
+}
+
 /** The input and its correction: what the Audio group sets. Absent where
  *  there is no recorder to set them for. */
 export interface AudioSetup {
