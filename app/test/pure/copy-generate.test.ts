@@ -6,6 +6,7 @@ import { decodeRecording, type Recording } from "@/copy/decode";
 import { PITCH_APART_HZ, makeScript, recordingScript, sendScript, type Kind } from "@/copy/generate";
 import { charsOf } from "@/copy/lines";
 import { GUIDE_IDS } from "@/qso/examples";
+import { previewClip } from "@/ui/usePreview";
 
 /** A fixed sequence, so each QSO is the same every run. */
 function seeded(seed: number): () => number {
@@ -118,5 +119,48 @@ describe("an opened recording, sent again at your speeds", () => {
     };
     const again = sendScript(recordingScript("qso.wav", read, speed), { gapSec: 1, speed });
     expect(chars(again.rec)).toEqual([["A", "B", "<UN>", "C"]]);
+  });
+});
+
+describe("Station pitch on a generated QSO", () => {
+  it("draws each station's pitch from the range", () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const script = makeScript({ kind: "cwt", rand: seeded(seed), qsos: 3, pitch: { lowHz: 800, highHz: 950 } });
+      for (const s of script.stations) {
+        expect(s.toneHz).toBeGreaterThanOrEqual(800);
+        expect(s.toneHz).toBeLessThanOrEqual(950);
+      }
+    }
+  });
+
+  it("sends every station at one pitch when the range is one pitch", () => {
+    const script = makeScript({ kind: "cwt", rand: seeded(4), qsos: 3, pitch: { lowHz: 700, highHz: 700 } });
+    expect(new Set(script.stations.map((s) => s.toneHz))).toEqual(new Set([700]));
+  });
+});
+
+describe("the preview clip", () => {
+  const calls = ["K7AB", "N0CD", "W1EF"];
+  const speed = { charWpm: 25, farnsworthWpm: 25 };
+  const sound = { pitch: { lowHz: 500, highHz: 800 }, qsbDb: 0, noiseDb: -20, qrn: 0, qrmDb: -100, agc: "off" as const };
+  const quiet = (x: Float32Array) => x.filter((v) => v === 0).length / x.length;
+
+  it("is as long in each mode, so a switch plays on from the same place", () => {
+    const lengths = (["all", "pitch", "band"] as const).map((m) => previewClip(m, calls, sound, speed).samples.length);
+    expect(new Set(lengths).size).toBe(1);
+  });
+
+  it("plays the stations with nothing added for Pitch, and the band alone for Band", () => {
+    const all = previewClip("all", calls, sound, speed).samples;
+    const pitch = previewClip("pitch", calls, sound, speed).samples;
+    const band = previewClip("band", calls, sound, speed).samples;
+    // The band fills the gaps of All. Pitch has silence between the calls.
+    expect(quiet(all)).toBeLessThan(0.01);
+    expect(quiet(pitch)).toBeGreaterThan(0.2);
+    expect(quiet(band)).toBeLessThan(0.01);
+    // Band is All with the stations taken out.
+    let louder = 0;
+    for (let i = 0; i < all.length; i += 97) if (Math.abs(all[i]!) > Math.abs(band[i]!) + 0.05) louder++;
+    expect(louder).toBeGreaterThan(0);
   });
 });

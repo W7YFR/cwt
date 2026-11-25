@@ -114,6 +114,13 @@ export async function settingsTab(tab: string): Promise<void> {
   await click($(`[data-testid="settings-tab"] [data-tab="${tab}"]`));
 }
 
+/** Close Settings: what changed in its Audio tab plays from then on. */
+export async function closeSettings(): Promise<void> {
+  if ($('[data-testid="panel-toggle"]')?.getAttribute("aria-pressed") === "true") {
+    await click($('[data-testid="panel-toggle"]'));
+  }
+}
+
 /** Choose what shows of the station's overs, in the settings: one of the
  *  buttons, by its label. */
 export async function showTheirs(label: string): Promise<void> {
@@ -148,6 +155,11 @@ export async function slide(id: string, value: number): Promise<void> {
 /** Mount the page with these choices and press Start. */
 export async function open(prefs: Prefs): Promise<void> {
   mount(prefs);
+  await start();
+}
+
+/** Press Start on the mounted page. */
+export async function start(): Promise<void> {
   await until("the Start button", () => {
     const b = $<HTMLButtonElement>('[data-testid="qso-start"]');
     return !!b && !b.disabled;

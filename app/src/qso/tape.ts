@@ -220,7 +220,7 @@ export const CLEAN: Pick<Added, "qsbDb" | "noiseDb" | "qrn" | "qrmDb"> = {
 };
 
 /** What is added to a QSO as it plays: `set` at its settings, or nothing
- *  when **Play QSB, noise, QRN and QRM** is off. */
+ *  when **Play noise, QRN, QRM and QSB** is off. */
 export function asPlayed(
   set: Pick<Added, "qsbDb" | "noiseDb" | "qrn" | "qrmDb">,
   on: boolean,

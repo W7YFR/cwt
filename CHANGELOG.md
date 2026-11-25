@@ -7,6 +7,26 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Station pitch** in the Copy and QSO pages' sound settings sets the lowest and highest pitch a station sends at. Each station picks its pitch at random in that range. The default is 550 to 750 Hz.
+- ⋯ can set one station's pitch by hand: on the station's lines in the QSO page's QSO under way, and in the Copy page's ⋯.
+- **Preview** in the Copy and QSO pages' sound settings plays three stations at the lowest, middle and highest pitch. **All** plays them over the band, **Pitch** plays them alone, and **Band** plays the band alone. You hear each change as you make it.
+
+### Changed
+
+- In the sound settings, **Noise**, **QRN** and **QRM** come before **QSB**. The checkbox is now **Play noise, QRN, QRM and QSB**.
+- In the QSO page's sound settings, **AGC** comes after **Break-in delay**.
+- **AGC** no longer shows a line under it. Its **?** says what each setting does.
+- A tip shows the name of a control or a choice in italics.
+- A change to the Copy and QSO pages' sound settings plays once you close the settings. The sliders no longer stutter as you drag them.
+- While the QSO page records, the band settings and the preview buttons are greyed out. **Playback volume** still works.
+
+### Fixed
+
+- In the Band popover, the checkboxes are no longer pushed in from the left edge.
+- Two tips named a setting wrongly. They now use the setting's name as the page shows it.
+
 ### Development
 
 - Two tests no longer fail now and then on `main`: the QSO tests when a station is on a straight key, and Pass thru on a slow machine.

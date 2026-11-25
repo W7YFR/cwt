@@ -8,7 +8,7 @@ import { NOISE_OFF_DB } from "@/audio/qsb";
 import { QRM_OFF_DB } from "@/copy/band";
 import { loadPrefs } from "@/io/storage";
 import { heard } from "../qso-fakes";
-import { $, EXCHANGE, click, ended, key, mount, open, send, settingsTab, slide, theirs, until, useQsoRig, yourTurn } from "../qso-rig";
+import { $, EXCHANGE, click, closeSettings, ended, key, mount, open, start, send, settingsTab, slide, theirs, until, useQsoRig, yourTurn } from "../qso-rig";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -91,26 +91,23 @@ describe("the AGC", () => {
 
 describe("the band switched off", () => {
   it("plays nothing added, keeps the sliders' settings, and plays them again when switched on", async () => {
-    await open({ qsbDb: 12, noiseDb: -26, qrn: 2, qrmDb: -20 });
-    await until("the band", () => heard.gate.band !== null);
-    const first = heard.gate.band!.samples;
+    mount({ qsbDb: 12, noiseDb: -26, qrn: 2, qrmDb: -20 });
     await settingsTab("sound");
     await click(input("band-on"));
     expect(loadPrefs()).toMatchObject({ bandOn: false, qsbDb: 12, noiseDb: -26, qrn: 2, qrmDb: -20 });
-    expect(heard.gate.band).toBeNull();
     for (const id of ["qsb", "noise", "qrn", "qrm", "break-in", "qso-band-noise"]) expect(input(id).disabled, id).toBe(true);
     expect(input("noise").value).toBe("-26");
-
+    await click(input("band-on"));
+    expect(loadPrefs().bandOn).toBe(true);
+    for (const id of ["qsb", "noise", "qrn", "qrm"]) expect(input(id).disabled, id).toBe(false);
+    await click(input("band-on"));
+    await closeSettings();
+    await start();
     await send("CQ CQ DE W7YFR W7YFR K");
+    expect(heard.gate.band).toBeNull();
     const air = heard.airs.at(-1);
     expect(air?.fade).toBeUndefined();
     expect(air?.band).toBeUndefined();
-
-    // At once, the same band: its parts were kept while it was off.
-    await click(input("band-on"));
-    expect(loadPrefs().bandOn).toBe(true);
-    expect(heard.gate.band!.samples).toEqual(first);
-    for (const id of ["qsb", "noise", "qrn", "qrm"]) expect(input(id).disabled, id).toBe(false);
   });
 
   it("starts off when it was left off", async () => {
@@ -131,18 +128,14 @@ describe("the band in a QSO", () => {
     expect(air?.band).toBeUndefined();
   });
 
-  it("follows a level slider at once, the same band at the new level", async () => {
-    // With the AGC off: on, it evens the level out.
-    await open({ noiseDb: -26, agc: "off" });
+  it("is set before Start: its settings are barred while the QSO records", async () => {
+    await open({ noiseDb: -26 });
     await until("the band", () => heard.gate.band !== null);
-    const first = heard.gate.band!.samples;
     await settingsTab("sound");
-    await slide("noise", -20);
-    const next = heard.gate.band!.samples;
-    expect(next).not.toBe(first);
-    expect(next.length).toBe(first.length);
-    const k = Math.pow(10, 6 / 20);
-    for (const i of [0, 1000, 500_000]) expect(next[i]).toBeCloseTo(first[i]! * k, 6);
+    for (const id of ["band-on", "qsb", "noise", "qrn", "qrm", "pitch-low", "pitch-high"]) expect(input(id).disabled, id).toBe(true);
+    expect($('[data-testid="agc"]')!.closest(".choicegroup")!.getAttribute("data-disabled")).toBe("true");
+    for (const id of ["break-in", "qso-band-noise"]) expect(input(id).disabled, id).toBe(false);
+    expect($<HTMLButtonElement>('[data-testid="sound-preview-all"]')!.disabled).toBe(true);
   });
 
   it("plays from the recorder all through, cut as you key for the break-in delay", async () => {

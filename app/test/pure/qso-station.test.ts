@@ -10,11 +10,14 @@ import { theirItems } from "@/qso/report";
 import { answerRun, following, newRun, RECENT_NAMES, respond, type RunQso } from "@/qso/run";
 import { newQso } from "@/qso/cq";
 import {
+  DEFAULT_PITCH,
   asFriend,
   digitOf,
   friendCalls,
   NAMES,
+  pitchIn,
   randomCaller,
+  randomPitch,
   randomStation,
   regionOf,
   STATION_NAMES,
@@ -344,5 +347,30 @@ describe("friends", () => {
     }
     expect(heard).toBeGreaterThan(5);
     expect(heard).toBeLessThan(150);
+  });
+});
+
+describe("a station's pitch", () => {
+  it("is drawn in steps of 10 Hz inside the range, both ends included", () => {
+    const rand = seeded(3);
+    const range = { lowHz: 400, highHz: 900 };
+    const seen = new Set<number>();
+    for (let i = 0; i < 2000; i++) {
+      const hz = randomPitch(rand, range);
+      expect(hz % 10).toBe(0);
+      expect(hz).toBeGreaterThanOrEqual(400);
+      expect(hz).toBeLessThanOrEqual(900);
+      seen.add(hz);
+    }
+    expect(seen.has(400) && seen.has(900)).toBe(true);
+    expect(randomPitch(rand, { lowHz: 620, highHz: 620 })).toBe(620);
+  });
+
+  it("is played as drawn with the default range, and at the same place in another range", () => {
+    for (let hz = DEFAULT_PITCH.lowHz; hz <= DEFAULT_PITCH.highHz; hz += 10) expect(pitchIn(hz, DEFAULT_PITCH)).toBe(hz);
+    const range = { lowHz: 300, highHz: 1000 };
+    expect(pitchIn(DEFAULT_PITCH.lowHz, range)).toBe(300);
+    expect(pitchIn(DEFAULT_PITCH.highHz, range)).toBe(1000);
+    expect(pitchIn(650, range)).toBe(650);
   });
 });

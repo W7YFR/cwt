@@ -45,7 +45,7 @@ import { exchangeReport, itemLabels } from "@/qso/report";
 import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
-import { regionOf, withKeys, type Station } from "@/qso/station";
+import { pitchIn, regionOf, withKeys, type Station } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import { anyAdded, asPlayed, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { patternOf } from "@/morse";
@@ -62,13 +62,16 @@ import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDE
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
 import { CopyText } from "./CopyText";
-import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_BAND_ON, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NOT_WITH_EXCHANGE } from "./copy";
+import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_BAND_ON, NEEDS_PAUSE, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NOT_WITH_EXCHANGE } from "./copy";
 import { Graded, RightOnly, type SentAttrs } from "./Graded";
 import { Slots, SlotsLocked } from "./Slots";
 import { keepDebugAudio, micLog } from "@/micdebug";
 import { ExampleLines, QsoGuide } from "./QsoHelp";
 import { PageHelp, type KeyGroup } from "./Help";
 import { PageSwitch, type Page } from "./PageSwitch";
+import { useHeld, useSoundPanelOpen } from "./soundPanel";
+import { StationPitchDialog } from "./StationPitch";
+import { usePreview } from "./usePreview";
 import { LevelMeter, RecDot } from "./Record";
 import {
   Check,
@@ -77,6 +80,8 @@ import {
   Section,
   SoundSection,
   BreakInSlider,
+  PitchSlider,
+  usePitchRange,
   DEFAULT_BREAK_IN_MS,
   NoiseSlider,
   QrmSlider,
@@ -125,9 +130,6 @@ const TYPING_QUIET_MS = 1200;
 /** The tone a station line plays at when the log kept none. */
 const DEFAULT_TONE_HZ = 600;
 
-/** The band noise's pitch when it plays on its own: the middle of the
- *  stations' tones. */
-const BAND_TONE_HZ = 645;
 
 /** The band's track: this long, then it loops, at this rate. Long enough
  *  that QRM does not repeat a QSO soon. */
@@ -219,8 +221,8 @@ const LENGTHS: ReadonlyArray<Option<LengthChoice>> = [
   { value: "mixed", label: "Mixed", note: "Any of these, changing from one station to the next." },
 ];
 const LENGTH_HELP =
-  "How much the station says in each line. Full sends each item twice, Short once, and " +
-  "Piece by piece sends its report, name and QTH one per line. Mixed changes from one " +
+  "How much the station says in each line. *Full* sends each item twice, *Short* once, and " +
+  "*Piece by piece* sends its report, name and QTH one per line. *Mixed* changes from one " +
   "station to the next, and from one line to the next.";
 
 /** With Mixed, how often a station goes piece by piece. The rest mix Full
@@ -232,8 +234,8 @@ const COPY_MODES: ReadonlyArray<Option<CopyMode>> = [
   { value: "strict", label: "Strict", note: "Wants your set speed and the exact call." },
 ];
 const COPY_HELP =
-  "How the station reads your sending. Lenient reads it at your own spacing and takes a " +
-  "call with one character wrong. Strict reads it at your speed and takes only calls sent exactly.";
+  "How the station reads your sending. *Lenient* reads it at your own spacing and takes a " +
+  "call with one character wrong. *Strict* reads it at your speed and takes only calls sent exactly.";
 
 const THEIR_TEXTS: ReadonlyArray<Option<TheirText>> = [
   { value: "before", label: "Whole", note: "Each line shows whole as soon as it starts." },
@@ -257,12 +259,12 @@ const COPY_INPUTS: ReadonlyArray<Option<CopyInput>> = [
   { value: "slots", label: "Slots", note: "A slot for each character." },
 ];
 const COPY_INPUT_HELP =
-  "How you copy the station's lines while they show as Copy: in one box, or in a slot for " +
+  "How you copy the station's lines while they show as *Copy*: in one box, or in a slot for " +
   "each character. Slots show how many characters each word has, so they are the easier " +
   "way to copy.";
 
 const REPLAY_HELP =
-  "When you press Continue, the station sends its last line again before your turn.";
+  "When you press *Continue*, the station sends its last line again before your turn.";
 
 const BLUR_CALL_HELP =
   "While the station's text is blurred, a copy box or off, its call is blurred in the log " +
@@ -277,8 +279,8 @@ const PLAYBACKS: ReadonlyArray<Option<Playback>> = [
 ];
 const PLAYBACK_HELP =
   "When the play buttons show: on each line, and under a QSO that is over. " +
-  "Always shows them on every line. During a QSO they play on your turn, before you start " +
-  "sending, and the microphone is not copied while they play. At end " +
+  "*Always* shows them on every line. During a QSO they play on your turn, before you start " +
+  "sending, and the microphone is not copied while they play. *At end* " +
   "shows them once the QSO is over. Where they show, a click on a word of the station's line " +
   "plays that word.";
 
@@ -287,10 +289,10 @@ const SCRIPT_REPORT_HELP =
   "lines it took with nothing wrong in them, your error signs, and what you asked the station for.";
 
 const DOWNLOAD_HEARD_HELP =
-  "Save the QSO with the QSB, noise, QRN and QRM set now. They are made again, so they are not " +
+  "Save the QSO with the noise, QRN, QRM and QSB set now. They are made again, so they are not " +
   "the same as you heard live.";
 const DOWNLOAD_LINE_HEARD_HELP =
-  "Save the line with the QSB, noise, QRN and QRM set now. They are made again, so they are not " +
+  "Save the line with the noise, QRN, QRM and QSB set now. They are made again, so they are not " +
   "the same as you heard live.";
 
 const YOUR_TEXTS: ReadonlyArray<Option<YourText>> = [
@@ -302,7 +304,7 @@ const YOUR_TEXT_HELP =
   "What shows of your own lines as you send them: each character, the same blurred, or nothing.";
 
 const ALLOW_EDITS_HELP =
-  "An Edit button beside a locked copy opens it again, so you can fix a mistake. " +
+  "An *Edit* button beside a locked copy opens it again, so you can fix a mistake. " +
   `It locks again when you next start sending, or on ${MOD}+Enter. Not once the QSO is over.`;
 const GRADE_TYPING_HELP =
   "A dot under each slot you fill says if it is right: blue if right, red if not.";
@@ -331,15 +333,15 @@ const NEXT_CALLERS: ReadonlyArray<Option<NextCaller>> = [
   { value: "uncertain", label: "Uncertain", note: "As Varied, and now and then nobody calls until you call CQ again." },
 ];
 const NEXT_CALLER_HELP =
-  "In a contest or POTA QSO, how soon the next station calls after your TU. Immediate waits a " +
-  "few seconds. Varied calls at once or after a longer wait, changing from one station to the " +
-  "next. Uncertain does the same, and now and then nobody calls until you call CQ again.";
+  "In a contest or POTA QSO, how soon the next station calls after your TU. *Immediate* waits a " +
+  "few seconds. *Varied* calls at once or after a longer wait, changing from one station to the " +
+  "next. *Uncertain* does the same, and now and then nobody calls until you call CQ again.";
 const KIND_HELP =
-  "The kind of QSO the suggested reply calls CQ for, and the one the guide's Examples show. " +
+  "The kind of QSO the suggested reply calls CQ for, and the one the guide's *Examples* show. " +
   "A CQ that starts another kind changes it.";
 const HINTS_HELP =
-  "A suggested reply under the log: one way to answer the station, with your details from User. " +
-  "Once copied waits until your copy of the station's line is all right. " +
+  "A suggested reply under the log: one way to answer the station, with your details from *User*. " +
+  "*Once copied* waits until your copy of the station's line is all right. " +
   "When its lines are not for copying, it shows once the line has played. " +
   "The station's call and name show as (THEIR CALL) and (THEIR NAME) until you copy them, unless the station's lines show.";
 
@@ -777,6 +779,8 @@ export function QsoScreen({
   /* Playing a line or a whole QSO again, once the microphone is off. A player
      of its own: the one above moves the QSO on when a line ends. */
   const [replaying, setReplaying] = useState<string | null>(null);
+  /** The station's pitch dialog is open: ⋯ on its line, in the QSO under way. */
+  const [pitchDialog, setPitchDialog] = useState(false);
   /** The slot selected last: its line and its place in the line. Kept
    *  without a render: the page's next one shows it. */
   const selected = useRef<{ line: number; slot: number } | null>(null);
@@ -830,7 +834,7 @@ export function QsoScreen({
   /* QSB on the station, and the band noise under it. The same preferences
      as the Copy page's. The sliders' settings, and what plays: nothing
      added while the band is switched off. */
-  const [qsbSet, setQsbDbRaw] = useState(() => loadPrefs().qsbDb ?? 0);
+  const [qsbShown, setQsbDbRaw] = useState(() => loadPrefs().qsbDb ?? 0);
   const setQsbDb = (next: number) => {
     setQsbDbRaw(next);
     savePrefs({ ...loadPrefs(), qsbDb: next });
@@ -844,31 +848,61 @@ export function QsoScreen({
     if (!fade) fades.current.set(key, (fade = fadeOf(qsbDb, seedOf(call))));
     return fade;
   };
-  const [noiseSet, setNoiseDbRaw] = useState(() => loadPrefs().noiseDb ?? NOISE_OFF_DB);
+  const [noiseShown, setNoiseDbRaw] = useState(() => loadPrefs().noiseDb ?? NOISE_OFF_DB);
   const setNoiseDb = (next: number) => {
     setNoiseDbRaw(next);
     savePrefs({ ...loadPrefs(), noiseDb: next });
   };
-  const [qrnSet, setQrnRaw] = useState(() => loadPrefs().qrn ?? 0);
+  const [qrnShown, setQrnRaw] = useState(() => loadPrefs().qrn ?? 0);
   const setQrn = (next: number) => {
     setQrnRaw(next);
     savePrefs({ ...loadPrefs(), qrn: next });
   };
-  const [qrmSet, setQrmDbRaw] = useState(() => loadPrefs().qrmDb ?? QRM_OFF_DB);
+  const [qrmShown, setQrmDbRaw] = useState(() => loadPrefs().qrmDb ?? QRM_OFF_DB);
   const setQrmDb = (next: number) => {
     setQrmDbRaw(next);
     savePrefs({ ...loadPrefs(), qrmDb: next });
   };
-  const [bandPlays, setBandPlays] = useOnOff("bandOn", true);
-  const [agc, setAgcRaw] = useState<AgcMode>(() => loadPrefs().agc ?? "fast");
+  const [bandShown, setBandPlays] = useOnOff("bandOn", true);
+  const [agcShown, setAgcRaw] = useState<AgcMode>(() => loadPrefs().agc ?? "fast");
   const setAgc = (next: AgcMode) => {
     setAgcRaw(next);
     savePrefs({ ...loadPrefs(), agc: next });
   };
+  const { pitch: pitchShown, setPitch } = usePitchRange();
+  /* What plays: the sound settings as they were when the sound settings
+     last closed. Making the band again takes a few hundred ms, so it waits
+     for them to close, and Preview plays the changes in the meantime. */
+  const soundOpen = useSoundPanelOpen();
+  /* While recording, the band settings are barred, and a change made before
+     waits too: it plays once you pause, not in the middle of your sending.
+     Set once the recorder is, below. */
+  const [recording, setRecording] = useState(false);
+  const { qsbSet, noiseSet, qrnSet, qrmSet, bandPlays, agc, pitch } = useHeld(
+    { qsbSet: qsbShown, noiseSet: noiseShown, qrnSet: qrnShown, qrmSet: qrmShown, bandPlays: bandShown, agc: agcShown, pitch: pitchShown },
+    soundOpen || recording,
+  );
   const { qsbDb, noiseDb, qrn, qrmDb } = asPlayed(
     { qsbDb: qsbSet, noiseDb: noiseSet, qrn: qrnSet, qrmDb: qrmSet },
     bandPlays,
   );
+  /** What the sound settings show, as `asPlayed` plays them. */
+  const soundShown = asPlayed({ qsbDb: qsbShown, noiseDb: noiseShown, qrn: qrnShown, qrmDb: qrmShown }, bandShown);
+  const preview = usePreview({
+    sound: { ...soundShown, agc: agcShown, pitch: pitchShown },
+    speed,
+    gainDb,
+    open: soundOpen,
+    onStart: () => {
+      player.stop();
+      listen.stop();
+    },
+  });
+  // A line played, or played again, stops Preview.
+  useEffect(() => {
+    if (playing !== null || replaying !== null) preview.setMode(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, replaying]);
   const [bandNoise, setBandNoise] = useOnOff("qsoBandNoise", true);
   const keyStyle = useKeyStyle();
   const [breakInMs, setBreakInMsRaw] = useState(() => loadPrefs().qsoBreakInMs ?? DEFAULT_BREAK_IN_MS);
@@ -877,15 +911,18 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoBreakInMs: next });
   };
   const hasBand = anyBand({ noiseDb, qrn, qrmDb });
+  const hasBandShown = anyBand(soundShown);
   /* The band's parts, each made again only when what it is made from
      changes. A level slider only mixes them again, which is quick, so it
      plays as it moves. They are made from the sliders' settings, and kept
      while the band is switched off, so switching it on is quick too. */
   const [bandSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
+  // The band noise's pitch: the middle of the stations' pitches.
+  const bandHz = (pitch.lowHz + pitch.highHz) / 2;
   const partOptions = (): PartOptions => ({
     n: BAND_SEC * BAND_RATE,
     rate: BAND_RATE,
-    toneHz: BAND_TONE_HZ,
+    toneHz: bandHz,
     peak: THEIR_PEAK,
     qrn: qrnSet,
     qsbDb: qsbSet,
@@ -895,11 +932,11 @@ export function QsoScreen({
   const noiseIsOn = noiseOn(noiseSet);
   const qrmIsOn = qrmOn(qrmSet);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const noise = useMemo(() => (noiseIsOn ? noisePart(partOptions()) : null), [noiseIsOn]);
+  const noise = useMemo(() => (noiseIsOn ? noisePart(partOptions()) : null), [noiseIsOn, bandHz]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const crashes = useMemo(() => qrnPart(partOptions()), [qrnSet]);
+  const crashes = useMemo(() => qrnPart(partOptions()), [qrnSet, bandHz]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const qrm = useMemo(() => (qrmIsOn ? qrmPart(partOptions()) : null), [qrmIsOn, qsbSet]);
+  const qrm = useMemo(() => (qrmIsOn ? qrmPart(partOptions()) : null), [qrmIsOn, qsbSet, bandHz]);
   /** The band as one track: its parts, mixed at the sliders' levels, and
    *  through the AGC on its own. How the AGC hears it goes with it: a
    *  station's line works out the AGC on the station and the band from it. */
@@ -953,6 +990,7 @@ export function QsoScreen({
     maxSeconds: MAX_OVER_SEC,
   });
   const { recorder } = rec;
+  useEffect(() => setRecording(recorder !== null), [recorder]);
 
   /* The band noise on its own, all through a session, when asked for. */
   /* Played by the recorder, which cuts it the moment you key: see BandGate. */
@@ -1229,6 +1267,9 @@ export function QsoScreen({
   const sendReply = (reply: string, station: Station, at: Speed, n: number, again: number | null) => {
     // Paddle sets the station's key, when it sets the keys.
     const them = withKeys(station, keyStyle.keys);
+    // Station pitch sets where in the band the station sends, unless its
+    // pitch was set by hand.
+    const toneHz = them.pitchHz ?? pitchIn(them.toneHz, pitch);
     setPhase("waiting");
     if (again === null) pending.current = { reply, them, at, n };
     const [lo, hi] = REPLY_DELAY_SEC;
@@ -1258,7 +1299,7 @@ export function QsoScreen({
               mode: theirMode.current,
               locked: false,
               sentWpm: sentSpeed(at, them.fist),
-              toneHz: them.toneHz,
+              toneHz,
               ...(them.fist ? { fist: them.fist } : {}),
             },
           ]);
@@ -1267,7 +1308,7 @@ export function QsoScreen({
         player.playTarget(timeline, {
           peak: THEIR_PEAK,
           padSec: 0.1,
-          voice: { toneHz: them.toneHz, filterQ: 3 },
+          voice: { toneHz, filterQ: 3 },
           air: {
             // On the page's clock, so the fading runs on between overs.
             ...(qsbDb > 0 ? { fade: { fade: fadeFor(them.call), atSec: performance.now() / 1000 } } : {}),
@@ -1609,8 +1650,9 @@ export function QsoScreen({
             items,
           },
     );
-    // The phase, for a reply that is due: it is kept as soon as it is.
-  }, [lines, closed, finished, theirSpeed, note, stopped, phase, ends, items]);
+    // The phase, for a reply that is due: it is kept as soon as it is. A
+    // station's pitch set by hand is kept when its dialog closes.
+  }, [lines, closed, finished, theirSpeed, note, stopped, phase, ends, items, pitchDialog]);
 
   /** Paused, or a reload came back to a session under way: Continue goes
    *  on with it, where Start would clear the log. */
@@ -1915,8 +1957,19 @@ export function QsoScreen({
     /** As heard: the station's fading and the band, made again. */
     const heard = (): Clip =>
       tape([part!], tapeRate(), { qsbDb, noiseDb, qrn, qrmDb, seed: Math.floor(Math.random() * 2 ** 31), qrmLines, agc });
+    // The station of the QSO under way, whose pitch can be set by hand.
+    const them = qso.current.them;
+    const tunable = !line.you && line.qso === qsoNo.current && !closed.includes(line.qso) && line.who === them.call;
     return (
       <MoreMenu label="More for this line" testId="qso-line-more" up>
+        {tunable && (
+          <>
+            <MenuHeading>Pitch</MenuHeading>
+            <button type="button" role="menuitem" data-testid="qso-station-pitch" onClick={() => setPitchDialog(true)}>
+              Set {them.call}'s pitch…
+            </button>
+          </>
+        )}
         <MenuHeading>Download</MenuHeading>
         <DownloadItem
           label={added ? "Audio, clean" : "Audio"}
@@ -2689,27 +2742,39 @@ export function QsoScreen({
       </div>
     </Section>
   );
+  /** Why the band settings are barred: changed while recording, the band
+   *  would be made again in the middle of your sending. */
+  const whileRecording = recorder !== null ? NEEDS_PAUSE : null;
   const soundSection = (
-    <SoundSection gainDb={gainDb} onGainDb={setGainDb}>
-    <QsbSlider qsbDb={qsbSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQsbDb} />
-    <NoiseSlider noiseDb={noiseSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setNoiseDb} />
-    <QrnSlider qrn={qrnSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrn} />
-    <QrmSlider qrmDb={qrmSet} barred={bandPlays ? null : NEEDS_BAND_ON} onChange={setQrmDb} />
-    <AgcChoice agc={agc} barred={!bandPlays ? NEEDS_BAND_ON : hasBand ? null : NEEDS_BAND} onChange={setAgc} />
+    <SoundSection
+      gainDb={gainDb}
+      onGainDb={setGainDb}
+      preview={{ ...preview, barred: whileRecording }}
+    >
+    <PitchSlider pitch={pitchShown} barred={whileRecording} onChange={setPitch} />
+    <NoiseSlider noiseDb={noiseShown} barred={whileRecording ?? (bandShown ? null : NEEDS_BAND_ON)} onChange={setNoiseDb} />
+    <QrnSlider qrn={qrnShown} barred={whileRecording ?? (bandShown ? null : NEEDS_BAND_ON)} onChange={setQrn} />
+    <QrmSlider qrmDb={qrmShown} barred={whileRecording ?? (bandShown ? null : NEEDS_BAND_ON)} onChange={setQrmDb} />
+    <QsbSlider qsbDb={qsbShown} barred={whileRecording ?? (bandShown ? null : NEEDS_BAND_ON)} onChange={setQsbDb} />
     <BreakInSlider
       ms={breakInMs}
-      barred={!bandPlays ? NEEDS_BAND_ON : !hasBand ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
+      barred={!bandShown ? NEEDS_BAND_ON : !hasBandShown ? NEEDS_BAND : !bandNoise ? NEEDS_BAND_BETWEEN : null}
       onChange={setBreakInMs}
+    />
+    <AgcChoice
+      agc={agcShown}
+      barred={whileRecording ?? (!bandShown ? NEEDS_BAND_ON : hasBandShown ? null : NEEDS_BAND)}
+      onChange={setAgc}
     />
     <Check
       id="qso-band-noise"
       label="Play the band between the station's lines"
       help={BAND_NOISE_HELP}
-      barred={!bandPlays ? NEEDS_BAND_ON : hasBand ? null : NEEDS_BAND}
+      barred={!bandShown ? NEEDS_BAND_ON : hasBandShown ? null : NEEDS_BAND}
       checked={bandNoise}
       onChange={setBandNoise}
     />
-    <BandOnCheck on={bandPlays} onChange={setBandPlays} />
+    <BandOnCheck on={bandShown} barred={whileRecording} onChange={setBandPlays} />
     </SoundSection>
   );
 
@@ -2826,7 +2891,7 @@ export function QsoScreen({
                   <div className="panelgroups">{hintsChoice}</div>
                 </Section>
               </QuickChip>
-              <QuickChip id="band" label="Band" value={anyAdded({ qsbDb, noiseDb, qrn, qrmDb }) ? "On" : "Clean"} widest="Clean" tab="sound">
+              <QuickChip id="band" label="Band" value={anyAdded(soundShown) ? "On" : "Clean"} widest="Clean" tab="sound">
                 {soundSection}
               </QuickChip>
             </>
@@ -2984,7 +3049,7 @@ export function QsoScreen({
           {
             id: "sound",
             label: "Sound",
-            scope: "Volume is the same on every page. QSB, Noise, QRN and QRM are the same on the Copy and QSO pages.",
+            scope: "Volume is the same on every page. Station pitch, Noise, QRN, QRM and QSB are the same on the Copy and QSO pages.",
             content: soundSection,
           },
           { id: "speed", label: "Speed", scope: "The same on the Send and QSO pages.", content: speedSection },
@@ -3179,6 +3244,21 @@ export function QsoScreen({
           </div>
         </div>
       </main>
+      {pitchDialog && (
+        <StationPitchDialog
+          call={qso.current.them.call}
+          hz={qso.current.them.pitchHz ?? pitchIn(qso.current.them.toneHz, pitch)}
+          note={`${qso.current.them.call} sends at this pitch for the rest of this QSO. The next station picks its pitch from Station pitch.`}
+          onCancel={() => setPitchDialog(false)}
+          onSet={(hz) => {
+            const call = qso.current.them.call;
+            qso.current = { ...qso.current, them: { ...qso.current.them, pitchHz: hz } };
+            const due = pending.current;
+            if (due && due.them.call === call) pending.current = { ...due, them: { ...due.them, pitchHz: hz } };
+            setPitchDialog(false);
+          }}
+        />
+      )}
       {scriptDraft && (
         <CopyText
           text={scriptDraft.text}
