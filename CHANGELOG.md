@@ -14,6 +14,7 @@ nothing to the site. The next release carries them.
 
 ### Changed
 
+- Every ⋯ button shows its name in the app's own tooltip, not the browser's.
 - On the QSO page, a QSO's lines take the whole width. Its report shows under them, with what each side sent and copied side by side, and its play and ⋯ buttons line up with the buttons of its lines.
 
 ### Fixed

@@ -4,8 +4,8 @@
  * so it runs only once you accept the terms. The terms have a version of
  * their own, apart from the app's. A change to `app/public/terms.html` raises
  * it, in the same change. A test holds the page's hash for each version, so
- * an edit without a raise fails it. Agreeing records the terms version and
- * the app version it was given on. An agreement to an older terms version is
+ * an edit without a raise fails it. Agreeing records the terms version, the
+ * app version it was given on, and when. An agreement to an older terms version is
  * no agreement: the rag chew asks again.
  */
 
@@ -14,10 +14,12 @@ export const TERMS_VERSION = 1;
 
 const KEY = "cwt:terms";
 
-/** What agreeing records: the terms version agreed to, and the app version it was given on. */
+/** What agreeing records: the terms version agreed to, the app version it
+ *  was given on, and when, as an ISO 8601 time. */
 export interface Agreement {
   readonly terms: number;
   readonly app: string;
+  readonly at: string;
 }
 
 /** Whether this browser agreed to the current terms. Storage that cannot be read holds no agreement. */
@@ -30,9 +32,9 @@ export function agreed(): boolean {
   }
 }
 
-/** Record agreement to the current terms, given on app version `app`. */
-export function agree(app: string): void {
-  const a: Agreement = { terms: TERMS_VERSION, app };
+/** Record agreement to the current terms, given on app version `app`, now. */
+export function agree(app: string, now: Date = new Date()): void {
+  const a: Agreement = { terms: TERMS_VERSION, app, at: now.toISOString() };
   try {
     localStorage.setItem(KEY, JSON.stringify(a));
   } catch {

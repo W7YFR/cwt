@@ -60,7 +60,15 @@ export type ModelState =
   | { readonly kind: "no-gpu" }
   | { readonly kind: "absent" }
   | { readonly kind: "downloaded" }
-  | { readonly kind: "loading"; readonly progress: number; readonly text: string }
+  | {
+      readonly kind: "loading";
+      /** Downloading from Hugging Face, or loading from this computer onto the GPU. */
+      readonly stage: "download" | "load";
+      readonly progress: number;
+      /** For a download: the MB fetched so far. */
+      readonly mb: number | null;
+      readonly text: string;
+    }
   | { readonly kind: "ready" }
   | { readonly kind: "failed"; readonly why: Failure; readonly error: string };
 
@@ -85,6 +93,10 @@ let model: ModelId = loadPrefs().qsoRagChewModel ?? DEFAULT_MODEL;
 let state: ModelState = { kind: "checking" };
 let engine: MLCEngine | null = null;
 let loading: Promise<void> | null = null;
+/** The engine while it loads, for `cancel`. */
+let starting: MLCEngine | null = null;
+/** `cancel` stopped the load under way: its failure is no failure. */
+let cancelled = false;
 const listeners = new Set<() => void>();
 
 function set(next: ModelState): void {
@@ -146,18 +158,27 @@ export async function check(): Promise<void> {
 export function load(): Promise<void> {
   if (engine) return Promise.resolve();
   loading ??= (async () => {
-    set({ kind: "loading", progress: 0, text: "Starting" });
+    // Not on this computer: it downloads first, until WebLLM says it loads.
+    const first = state.kind === "downloaded" ? "load" : "download";
+    set({ kind: "loading", stage: first, progress: 0, mb: null, text: "Starting" });
+    cancelled = false;
     try {
-      const { CreateMLCEngine } = await lib();
-      engine = await CreateMLCEngine(model, {
+      const { MLCEngine } = await lib();
+      // Made first and kept, so `cancel` can stop it while it loads.
+      starting = new MLCEngine({
         appConfig: await pinned(),
-        initProgressCallback: (p) => set({ kind: "loading", progress: p.progress, text: p.text }),
+        initProgressCallback: (p) => {
+          if (!cancelled) set(progressOf(p.progress, p.text, first));
+        },
       });
+      await starting.reload(model);
+      engine = starting;
       set({ kind: "ready" });
     } catch (e) {
       engine = null;
-      set({ kind: "failed", why: failureOf(e), error: e instanceof Error ? e.message : String(e) });
+      if (!cancelled) set({ kind: "failed", why: failureOf(e), error: e instanceof Error ? e.message : String(e) });
     } finally {
+      starting = null;
       loading = null;
     }
   })();
@@ -170,6 +191,35 @@ export async function wake(): Promise<void> {
   if (engine || loading) return;
   if (state.kind === "checking") await check();
   if (state.kind === "downloaded") await load();
+}
+
+/** Stop a download under way, and delete what came of it, so nothing is left
+ *  half on disk. */
+export async function cancel(): Promise<void> {
+  if (!starting) return;
+  cancelled = true;
+  await starting.unload().catch(() => {});
+  await loading?.catch(() => {});
+  const { deleteModelAllInfoInCache } = await lib();
+  await deleteModelAllInfoInCache(model, await pinned()).catch(() => {});
+  await sweep(model);
+  set({ kind: "absent" });
+}
+
+/** Every file of model `id` the browser holds, gone: WebLLM fetches several
+ *  parts at once, and one in flight when a download stops can land after
+ *  WebLLM's own delete. */
+async function sweep(id: ModelId): Promise<void> {
+  const prefix = `https://huggingface.co/mlc-ai/${id}/`;
+  try {
+    for (const name of await caches.keys()) {
+      if (!name.startsWith("webllm/")) continue;
+      const cache = await caches.open(name);
+      for (const req of await cache.keys()) if (req.url.startsWith(prefix)) await cache.delete(req);
+    }
+  } catch {
+    /* no Cache API here: WebLLM's delete is all there is */
+  }
 }
 
 /** Switch to `id`. The one in use leaves the GPU, and stays downloaded. */
@@ -193,6 +243,20 @@ export async function downloaded(): Promise<ModelId[]> {
   return ids.filter((_, i) => here[i]);
 }
 
+/** WebLLM's progress as a state: "Fetching param cache[3/108]: 150MB
+ *  fetched. 2% completed…" while it downloads, "Loading model from cache…" or
+ *  "Loading GPU shader modules…" while it loads. */
+export function progressOf(progress: number, text: string, first: "download" | "load"): ModelState {
+  const mb = text.match(/(\d+)MB fetched/);
+  return {
+    kind: "loading",
+    stage: text.startsWith("Fetching param cache") ? "download" : text.startsWith("Loading") ? "load" : first,
+    progress,
+    mb: mb ? Number(mb[1]) : null,
+    text,
+  };
+}
+
 /** Take a model out of the browser's storage, and off the GPU if it is the
  *  one in use. */
 export async function remove(id: ModelId = model): Promise<void> {
@@ -203,6 +267,7 @@ export async function remove(id: ModelId = model): Promise<void> {
   }
   const { deleteModelAllInfoInCache } = await lib();
   await deleteModelAllInfoInCache(id, await pinned()).catch(() => {});
+  await sweep(id);
   if (id === model) set({ kind: "absent" });
   else set(state);
 }

@@ -2966,19 +2966,40 @@ header .modeswitch button { white-space: nowrap; }
   column-gap: 14px;
 }
 /* Each control as wide as itself, but selects and sliders, which fill. */
-.viewpanel.formpanel .group > :not(select):not(input[type="range"]):not(.pitchrange):not(.sliderow):not(.helptip):not(.group):not(.checkaction) { justify-self: start; }
+.viewpanel.formpanel .group > :not(select):not(input[type="range"]):not(.pitchrange):not(.sliderow):not(.helptip):not(.group):not(.checkaction):not(.progressbox) { justify-self: start; }
 /* The question mark, at the right end of its row's first line, the same
    place in every row. */
 .viewpanel.formpanel .group > .helptip { grid-column: 3; grid-row: 1; justify-self: end; }
 /* A check's own button, as the rag chew's trash can: at the end of the
    check's line, just left of the question mark. */
 .viewpanel.formpanel .group > .checkaction { grid-column: 2; grid-row: 1; justify-self: end; }
-.viewpanel.formpanel .group:has(> .checkaction) > label.check { grid-row: 1; }
+.viewpanel.formpanel .group:has(> .checkaction) > label.check,
+.viewpanel.formpanel .group:has(> .checkaction) > .caption,
+.viewpanel.formpanel .group:has(> .checkaction) > .modeswitch { grid-row: 1; }
+.viewpanel.formpanel .group:has(> .checkaction) > .caption { grid-column: 1; }
+.viewpanel.formpanel .group:has(> .checkaction) > .modeswitch { grid-column: 2; }
 .viewpanel.formpanel .group > label.check,
 .viewpanel.formpanel .group > .previewrow { grid-column: 2; }
 .viewpanel.formpanel .group > label.check { min-height: 22px; }
 .viewpanel.formpanel .group > .keyrow { grid-column: 2; min-height: 22px; }
 /* A button that goes with the setting above it, as Remove the model. */
+/* A download or a load under way: a box with a bar, in the control column,
+   so it is seen. Its row has no ? to hold the help column open, so it keeps
+   that column's width, the ? and the gap, clear on its own. */
+.viewpanel.formpanel .group > .progressbox { grid-column: 2; margin-right: calc(15px + 14px); }
+.progressbox { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.progressbox .progresshead { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.progressbox .progresshead span { color: var(--ink-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.progressbox .progressfoot { display: flex; justify-content: flex-end; }
+.progressbox .progressbar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.progressbox .progressbar span { display: block; height: 100%; background: var(--you); transition: width .3s ease-out; }
+/* Before the first part has come: a short bar that moves, so it is seen to be
+   under way. */
+.progressbox .progressbar[data-waiting="true"] span { width: 30% !important; animation: progress-wait 1.2s ease-in-out infinite alternate; }
+@keyframes progress-wait { from { transform: translateX(-100%); } to { transform: translateX(333%); } }
+@media (prefers-reduced-motion: reduce) {
+  .progressbox .progressbar[data-waiting="true"] span { animation: none; transform: none; }
+}
 .viewpanel.formpanel .group > .actionrow { grid-column: 2; min-height: 0; margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
 /* What the choices do, under them, in view rather than in a tooltip. */
 .viewpanel.formpanel .group > .note {
@@ -3019,10 +3040,12 @@ header .modeswitch button { white-space: nowrap; }
   .viewpanel.formpanel .group { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
   .viewpanel.formpanel .group > .helptip { grid-column: 2; }
   .viewpanel.formpanel .group > .checkaction { grid-column: 1; }
+  .viewpanel.formpanel .group:has(> .checkaction) > .modeswitch { grid-row: 2; grid-column: 1; }
   .viewpanel.formpanel .group > label.check,
   .viewpanel.formpanel .group > .previewrow,
   .viewpanel.formpanel .group > .keyrow,
   .viewpanel.formpanel .group > .actionrow,
+  .viewpanel.formpanel .group > .progressbox,
   .viewpanel.formpanel .group > .note { grid-column: 1; }
 }
 /* Each section's settings on a panel of their own. Lines inside it only

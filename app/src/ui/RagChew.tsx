@@ -13,17 +13,15 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { APP_VERSION } from "@/build-info";
 import {
-  check, choose, downloaded, load, modelId, MODELS, modelState, remove, subscribe, type Failure, type ModelId, type ModelState,
+  cancel, check, choose, downloaded, load, modelId, MODELS, modelState, remove, subscribe, type Failure, type ModelId, type ModelState,
 } from "@/llm/engine";
 import { agree, agreed } from "@/terms";
-import { ActionGroup, Check, ChoiceGroup } from "./Controls";
+import { ActionGroup, ChoiceGroup, TipButton } from "./Controls";
 import { TrashIcon } from "./Scores";
 import { DeleteItem, MoreMenu } from "./Toolbar";
 
 const IDS = Object.keys(MODELS) as ModelId[];
 
-/** A model's size and the memory it needs, in a sentence. */
-const needs = (id: ModelId) => `About ${MODELS[id].gb} GB. Needs about ${MODELS[id].memoryGb} GB of memory.`;
 
 /** The model's state, as it changes. */
 export function useModel(): ModelState {
@@ -91,6 +89,18 @@ export function RagChewGroup({ on, onChange }: { on: boolean; onChange(on: boole
     if (on && accepted && s.kind === "downloaded") void load();
   }, [on, accepted, s.kind]);
   const inUse = s.kind === "downloaded" || s.kind === "loading" || s.kind === "ready";
+  /** The progress box, brought into view when the dialog closes on a yes,
+   *  so the download that starts is seen. */
+  const progress = useRef<HTMLDivElement | null>(null);
+  const [reveal, setReveal] = useState(false);
+  useEffect(() => {
+    if (!reveal || !progress.current) return;
+    const box = progress.current;
+    // After the frame that lays it out, so the whole box comes into view.
+    const frame = requestAnimationFrame(() => box.scrollIntoView({ block: "center" }));
+    setReveal(false);
+    return () => cancelAnimationFrame(frame);
+  }, [reveal, s.kind]);
   const failed = s.kind === "failed" && on;
 
   /** Delete models. Deleting the one in use moves to the other, if it is
@@ -104,21 +114,35 @@ export function RagChewGroup({ on, onChange }: { on: boolean; onChange(on: boole
       else onChange(false);
     }
   };
-  /** A choice of model: one here is switched to, one not here asks first. */
+  /** Cancel the download under way: back to the other model, if it is here,
+   *  or the rag chew off. */
+  const stop = async () => {
+    await cancel();
+    const left = await downloaded();
+    setHere(left);
+    if (left[0]) await choose(left[0]);
+    else onChange(false);
+  };
+  /** A choice of model: one here is switched to and turns the rag chew on;
+   *  one not here asks first, in a dialog for that model alone. */
   const pick = (next: ModelId) => {
-    if (here.includes(next)) void choose(next);
-    else setAsking(next);
+    if (!here.includes(next)) return setAsking(next);
+    onChange(true);
+    void choose(next);
   };
 
   const dialog = asking && (
     <TermsDialog
       initial={asking}
+      choosable={!(accepted && (inUse || failed))}
       here={here}
       onCancel={() => setAsking(null)}
       onAccept={(chosen) => {
-        agree(APP_VERSION);
+        // Only a first yes is recorded, so the time stays the time you accepted.
+        if (!agreed()) agree(APP_VERSION);
         setAccepted(true);
         setAsking(null);
+        setReveal(true);
         onChange(true);
         void choose(chosen).then(() => load());
       }}
@@ -147,58 +171,88 @@ export function RagChewGroup({ on, onChange }: { on: boolean; onChange(on: boole
       </MoreMenu>
     ) : (
       here.length === 1 && (
-        <button
-          type="button"
+        <TipButton
           className="iconbtn droprun"
-          data-testid="qso-rag-chew-remove"
-          aria-label={`Delete ${MODELS[here[0]!].label}`}
-          title={`Delete ${MODELS[here[0]!].label} from this computer. Rag chew turns off. Enabling it again downloads it again, about ${MODELS[here[0]!].gb} GB.`}
+          testId="qso-rag-chew-remove"
+          label={`Delete ${MODELS[here[0]!].label}`}
+          tip={`Delete ${MODELS[here[0]!].label} from this computer. Rag chew turns off. Enabling it again downloads it again, about ${MODELS[here[0]!].gb} GB.`}
           onClick={() => void drop(here)}
         >
           <TrashIcon />
-        </button>
+        </TipButton>
       )
     );
   return (
     <>
-      <Check id="qso-rag-chew-on" label="Rag chew after the exchange" help={help(s, label, gb)} checked={on} action={del} onChange={onChange} />
       <ChoiceGroup
-        id="qso-rag-chew-model"
-        label="Rag chew model"
-        help="The model that writes the station's lines. Each one downloads once and stays on this computer until you delete it."
-        value={id}
-        options={IDS.map((m) => ({
-          value: m,
-          label: MODELS[m].label,
-          note: `${MODELS[m].note} ${needs(m)}${here.includes(m) ? "" : " Choosing it asks before it downloads."}`,
-        }))}
-        onChange={(v) => pick(v as ModelId)}
+        id="qso-rag-chew-choice"
+        label="Rag chew"
+        help={help(s, label, gb)}
+        value={on ? id : "none"}
+        options={[{ value: "none", label: "None" }, ...IDS.map((m) => ({ value: m, label: MODELS[m].label }))]}
+        action={del}
+        onChange={(v) => (v === "none" ? onChange(false) : pick(v as ModelId))}
       />
-      {(s.kind === "loading" || failed) && (
-        <div className="group" data-testid="qso-rag-chew" data-model={s.kind}>
-          {s.kind === "failed" && (
+      {s.kind === "loading" ? (
+        <div className="group" data-testid="qso-rag-chew" data-model={s.kind} data-stage={s.stage} ref={progress}>
+          <Progress s={s} label={label} onCancel={() => void stop()} />
+        </div>
+      ) : (
+        failed && (
+          <div className="group" data-testid="qso-rag-chew" data-model={s.kind}>
             <p className="note" data-testid="qso-rag-chew-failed" data-why={s.why}>
               {failureText(s.why, label, gb)}
             </p>
-          )}
-          <div className="actionrow">
-            {s.kind === "loading" ? (
-              <button type="button" disabled>
-                Loading {label}: {Math.round(s.progress * 100)}%
-              </button>
-            ) : (
-              // A graphics card without the memory fails again: no retry.
-              s.why !== "graphics" && (
+            {/* A graphics card without the memory fails again: no retry. */}
+            {s.why !== "graphics" && (
+              <div className="actionrow">
                 <button type="button" data-testid="qso-rag-chew-download" onClick={() => void load()}>
                   Try {label} again
                 </button>
-              )
+              </div>
             )}
           </div>
-        </div>
+        )
       )}
       {dialog}
     </>
+  );
+}
+
+/** A size in MB, as MB or, from 1 GB, as GB. */
+const size = (mb: number) => (mb < 1000 ? `${Math.round(mb)} MB` : `${(mb / 1024).toFixed(1)} GB`);
+
+/** The download or the load, as a bar, with what it is and how far along. */
+function Progress({
+  s,
+  label,
+  onCancel,
+}: {
+  s: Extract<ModelState, { kind: "loading" }>;
+  label: string;
+  onCancel(): void;
+}): React.ReactElement {
+  const pct = Math.floor(s.progress * 100);
+  // WebLLM tells progress as each part of the model comes, about 200 MB.
+  const waiting = s.progress === 0;
+  const sofar = s.stage === "download" && s.mb && s.progress > 0.005 ? ` · ${size(s.mb)} of ${size(s.mb / s.progress)}` : "";
+  return (
+    <div className="progressbox" role="status" aria-live="polite">
+      <div className="progresshead">
+        <b>{s.stage === "download" ? `Downloading ${label}` : `Loading ${label}`}</b>
+        <span>{waiting ? "Starting" : `${pct}%${sofar}`}</span>
+      </div>
+      <div className="progressbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={label} data-waiting={waiting}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      {s.stage === "download" && (
+        <div className="progressfoot">
+          <button type="button" data-testid="qso-rag-chew-cancel" onClick={onCancel}>
+            Cancel download
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -226,12 +280,13 @@ function Stack({ chosen, part }: { chosen: ModelId; part(id: ModelId): React.Rea
   );
 }
 
-/** What a model is good for, what downloads, and what it needs. */
-function ModelText({ id, here }: { id: ModelId; here: boolean }): React.ReactElement {
+/** What a model is good for (with the switch, `note`), what downloads, and
+ *  what it needs. */
+function ModelText({ id, here, note: withNote }: { id: ModelId; here: boolean; note: boolean }): React.ReactElement {
   const { label, gb, note, memoryGb } = MODELS[id];
   return (
     <>
-      <p className="note">{note}</p>
+      {withNote && <p className="note">{note}</p>}
       <p>
         {here ? (
           <>
@@ -277,19 +332,24 @@ function License({ id }: { id: ModelId }): React.ReactElement {
  *  this computer. */
 function TermsDialog({
   initial,
+  choosable,
   here,
   onCancel,
   onAccept,
 }: {
   initial: ModelId;
+  /** Opened from Enable: a switch between the models. Opened by choosing a
+   *  model: that model alone. */
+  choosable: boolean;
   here: readonly ModelId[];
   onCancel(): void;
   onAccept(chosen: ModelId): void;
 }): React.ReactElement {
   const [chosen, setChosen] = useState(initial);
   const download = !here.includes(chosen);
-  // Accepted before, for another model: the box starts checked.
-  const [yes, setYes] = useState(agreed);
+  // Accepted before, for the other model: no terms to accept again.
+  const [accepted] = useState(agreed);
+  const [yes, setYes] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     box.current?.focus();
@@ -324,16 +384,18 @@ function TermsDialog({
           To do that, the rag chew uses a language model. That is a program that reads what you send, as text, and
           writes the station&rsquo;s reply. The page then sends the reply back to you as CW.
         </p>
-        <div className="pick" data-testid="qso-rag-chew-pick">
-          <div className="modeswitch" role="group" aria-label="Model">
-            {IDS.map((m) => (
-              <button key={m} type="button" aria-pressed={chosen === m} onClick={() => setChosen(m)}>
-                {MODELS[m].label}
-              </button>
-            ))}
+        {choosable && (
+          <div className="pick" data-testid="qso-rag-chew-pick">
+            <div className="modeswitch" role="group" aria-label="Model">
+              {IDS.map((m) => (
+                <button key={m} type="button" aria-pressed={chosen === m} onClick={() => setChosen(m)}>
+                  {MODELS[m].label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        <Stack chosen={chosen} part={(m) => <ModelText id={m} here={here.includes(m)} />} />
+        )}
+        <Stack chosen={chosen} part={(m) => <ModelText id={m} here={here.includes(m)} note={choosable} />} />
         <div className="caution">
           <p>
             <b>A language model writes the station&rsquo;s lines, not a person.</b> They can be wrong, made up or
@@ -342,25 +404,25 @@ function TermsDialog({
           <p>The author of CWT is not liable for anything the model says.</p>
         </div>
         <Stack chosen={chosen} part={(m) => <License id={m} />} />
-        <label className="check">
-          <input
-            type="checkbox"
-            data-testid="qso-rag-chew-accept"
-            checked={yes}
-            onChange={(e) => setYes(e.target.checked)}
-          />
-          <span>
-            I accept the{" "}
-            <a href="terms.html">Terms</a>
-            .
-          </span>
-        </label>
+        {!accepted && (
+          <label className="check">
+            <input
+              type="checkbox"
+              data-testid="qso-rag-chew-accept"
+              checked={yes}
+              onChange={(e) => setYes(e.target.checked)}
+            />
+            <span>
+              I accept the <a href="terms.html">Terms</a>.
+            </span>
+          </label>
+        )}
         <div className="confirm stack">
           <button type="button" onClick={onCancel}>
             Cancel
           </button>
-          <button type="button" className="primary" data-testid="qso-rag-chew-yes" disabled={!yes} onClick={() => onAccept(chosen)}>
-            {download ? "Accept Terms and Download Model" : "Accept Terms and Turn On"}
+          <button type="button" className="primary" data-testid="qso-rag-chew-yes" disabled={!accepted && !yes} onClick={() => onAccept(chosen)}>
+            {accepted ? (download ? "Download Model" : "Turn On") : download ? "Accept Terms and Download Model" : "Accept Terms and Turn On"}
           </button>
         </div>
       </div>

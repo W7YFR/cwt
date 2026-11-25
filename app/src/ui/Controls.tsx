@@ -396,7 +396,7 @@ function tipText(text: string): React.ReactNode {
   return parts.map((part, i) => (i % 2 ? <em key={i}>{part}</em> : part));
 }
 
-function useTip<T extends HTMLElement>(
+export function useTip<T extends HTMLElement>(
   text: string,
 ): {
   id: string;
@@ -612,6 +612,7 @@ export function ChoiceGroup({
   value,
   options,
   barred = null,
+  action,
   onChange,
 }: {
   id: string;
@@ -620,6 +621,8 @@ export function ChoiceGroup({
   value: string;
   /** Why it does nothing now, when another setting rules it out. */
   barred?: string | null;
+  /** A button for the setting, at the end of its row, left of the ?. */
+  action?: React.ReactNode;
   /** Each choice, with a sentence on what it does. The chosen one's shows
    *  under the buttons. */
   options: ReadonlyArray<{ value: string; label: string; note?: string }>;
@@ -663,6 +666,7 @@ export function ChoiceGroup({
           ))}
         </span>
       )}
+      {action && <span className="checkaction">{action}</span>}
       {about.tip}
     </div>
   );
@@ -811,6 +815,44 @@ export function Check({
       {action && <span className="checkaction">{action}</span>}
       {about.tip}
     </div>
+  );
+}
+
+/** A button with the app's tooltip, never the browser's: as a trash can
+ *  that says what it deletes. */
+export function TipButton({
+  tip,
+  label,
+  className,
+  testId,
+  onClick,
+  children,
+}: {
+  tip: string;
+  /** Its name, for a screen reader. */
+  label: string;
+  className?: string;
+  testId?: string;
+  onClick(): void;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const t = useTip<HTMLButtonElement>(tip);
+  return (
+    <>
+      <button
+        ref={t.anchor}
+        type="button"
+        className={className}
+        data-testid={testId}
+        aria-label={label}
+        aria-describedby={t.id}
+        onClick={onClick}
+        {...t.on}
+      >
+        {children}
+      </button>
+      {t.box}
+    </>
   );
 }
 
