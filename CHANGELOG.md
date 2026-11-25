@@ -9,7 +9,7 @@ nothing to the site. The next release carries them.
 
 ### Added
 
-- **Enable LLM rag chew**, in the QSO page's settings: after the exchange of a plain QSO, a language model on your computer writes the station's lines until you send 73 or SK, with your choice of **Llama 3.1 8B** (about 5 GB) or **Gemma 4 E2B** (about 3 GB). Each asks you to accept the terms, downloads once and stays until you delete it.
+- **Enable LLM rag chew**, in the QSO page's settings: after the exchange of a plain QSO, a language model on your computer writes the station's lines until you send 73 or SK. **Rag chew** then picks **None**, **Llama 3.1 8B** (about 5 GB) or **Gemma 4 E2B** (about 3 GB), each a one-time download.
 - A **Terms** page, linked from the foot of every page.
 
 ### Changed
