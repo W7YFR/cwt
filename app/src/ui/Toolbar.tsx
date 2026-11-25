@@ -75,9 +75,14 @@ function useInView(open: boolean, pop: React.RefObject<HTMLElement | null>, pin 
       if (over > 0) el.style.left = `${-over}px`;
     };
     place();
-    /* A change made in the popover can change the chip's width and wrap the
-       chip to another line. The popover moves with the chip and can then run
-       off an edge, so it is placed again. Only the sides count: the root
+    /* A change made in the popover can change the chip's width. The chip
+       then moves, or wraps to another line, and the popover moves with it.
+       So the popover is placed again when the chip changes size. The window
+       keeps a scrollbar gutter that counts as in view, so the edge watch
+       alone misses a popover that moves into it. */
+    const chip = new ResizeObserver(place);
+    if (el.parentElement) chip.observe(el.parentElement);
+    /* Other chips can move this one too. Only the sides count: the root
        reaches far above and below the window. */
     const watch = new IntersectionObserver(
       (entries) => {
@@ -86,7 +91,10 @@ function useInView(open: boolean, pop: React.RefObject<HTMLElement | null>, pin 
       { rootMargin: "100000px 0px", threshold: 1 },
     );
     watch.observe(el);
-    return () => watch.disconnect();
+    return () => {
+      chip.disconnect();
+      watch.disconnect();
+    };
   }, [open, pop]);
 }
 

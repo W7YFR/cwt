@@ -5,6 +5,10 @@
  * back up. The popover moves with the chip. Placed only when it opened, it
  * kept its old offset and ran off the left or the right edge.
  *
+ * At the right end of a line, a chip that gets narrower moves right in
+ * place. The popover moves into the window's scrollbar gutter, which the
+ * window counts as in view.
+ *
  * Geometry, so a real browser: jsdom has no layout and no intersections.
  */
 
@@ -42,7 +46,7 @@ afterEach(() => {
 
 /** A filler as wide as `filler()` says, then the chip under test, whose
  *  popover has one button to switch its value. */
-function Bar({ start, filler }: { start: string; filler: () => number }): React.ReactElement {
+function Bar({ start, filler, to }: { start: string; filler: () => number; to?: string }): React.ReactElement {
   const [value, setValue] = useState(start);
   return createElement(Toolbar, {
     actions: null,
@@ -56,7 +60,7 @@ function Bar({ start, filler }: { start: string; filler: () => number }): React.
         tab: "page",
         children: createElement(
           "button",
-          { type: "button", "data-testid": "switch", onClick: () => setValue((v) => (v === SHORT ? LONG : SHORT)) },
+          { type: "button", "data-testid": "switch", onClick: () => setValue((v) => to ?? (v === SHORT ? LONG : SHORT)) },
           "Switch",
         ),
       }),
@@ -105,5 +109,18 @@ describe("a quick setting's popover", () => {
     expect(r.moved, "the chip moved up").toBe(true);
     expect(r.left).toBeGreaterThanOrEqual(0);
     expect(r.right).toBeLessThanOrEqual(r.window);
+  });
+
+  it("stays in from the edge when its chip gets narrower at the right end of a line", async () => {
+    line.remove();
+    await act(async () => root.render(createElement(Bar, { start: "Paced", to: "Zen", filler: () => 0 })));
+    const chip = $<HTMLElement>("[data-testid='chip-test']");
+    await act(async () => chip.click());
+    const left = chip.getBoundingClientRect().left;
+    await act(async () => $<HTMLElement>("[data-testid='switch']").click());
+    await frames();
+    const pop = $<HTMLElement>("[data-testid='pop-test']").getBoundingClientRect();
+    expect(chip.getBoundingClientRect().left, "the chip moved right").toBeGreaterThan(left);
+    expect(pop.right).toBeLessThanOrEqual(document.documentElement.clientWidth - 16);
   });
 });
