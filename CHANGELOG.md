@@ -10,7 +10,7 @@ nothing to the site. The next release carries them.
 ### Added
 
 - **Station pitch** in the Copy and QSO pages' sound settings sets the lowest and highest pitch a station sends at. Each station picks its pitch at random in that range. The default is 550 to 750 Hz.
-- ⋯ can set one station's pitch by hand: on the station's lines in the QSO page's QSO under way, and in the Copy page's ⋯.
+- **Set K7AB's pitch…** in ⋯ sets one station's pitch by hand. It is on the station's lines in the QSO page's current QSO, and in the Copy page's ⋯.
 - **Preview** in the Copy and QSO pages' sound settings plays three stations at the lowest, middle and highest pitch. **All** plays them over the band, **Pitch** plays them alone, and **Band** plays the band alone. You hear each change as you make it.
 
 ### Changed
@@ -20,7 +20,7 @@ nothing to the site. The next release carries them.
 - **AGC** no longer shows a line under it. Its **?** says what each setting does.
 - A tip shows the name of a control or a choice in italics.
 - A change to the Copy and QSO pages' sound settings plays once you close the settings. The sliders no longer stutter as you drag them.
-- While the QSO page records, the band settings and the preview buttons are greyed out. **Playback volume** still works.
+- While the QSO page records, **Station pitch**, the band settings, **AGC** and **Preview** are greyed out.
 
 ### Fixed
 
