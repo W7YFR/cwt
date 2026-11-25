@@ -156,9 +156,11 @@ export async function open(prefs: Prefs): Promise<void> {
   await until("the session to start", () => yourTurn());
 }
 
-/** Mount the page with these choices. */
+/** Mount the page with these choices. Every station keys on a keyer unless
+ *  `prefs` says otherwise: a station on a straight key sends no faster than
+ *  20 WPM, and the stations are picked at random. */
 export function mount(prefs: Prefs): void {
-  savePrefs({ charWpm: WPM, farnsworthWpm: WPM, qsoLength: "short", ...prefs });
+  savePrefs({ charWpm: WPM, farnsworthWpm: WPM, qsoLength: "short", keyStyle: "only", styleKeys: ["keyer"], ...prefs });
   act(() =>
     root.render(
       withSettings(

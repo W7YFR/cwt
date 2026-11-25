@@ -7,6 +7,10 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Development
+
+- Two tests no longer fail now and then on `main`: the QSO tests when a station is on a straight key, and Pass thru on a slow machine.
+
 ## v1.40.2 — 2026-11-25
 
 ### Fixed
