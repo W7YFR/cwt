@@ -7,6 +7,12 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.40.2 — 2026-11-25
+
+### Fixed
+
+- A quick setting's popover no longer runs off the right edge of the window when a change in it makes its chip narrower.
+
 ## v1.40.1 — 2026-11-23
 
 ### Fixed

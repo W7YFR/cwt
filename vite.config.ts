@@ -223,6 +223,10 @@ export default defineConfig({
                purpose. */
             provider: playwright({
               contextOptions: { permissions: ["microphone"] },
+              /* Headless Chromium hides scrollbars. The app keeps a gutter
+                 for one, and a popover can run into that gutter, so the
+                 tests see the scrollbar the app is used with. */
+              launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] },
             }),
             headless: true,
             instances: [{ browser: "chromium" }],
