@@ -33,7 +33,7 @@ import {
   savePrefs,
   saveSpeed,
 } from "@/io/storage";
-import { DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
+import { chatsOn, DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
 import { REPLIES_EVENT, suggestedRepliesOn } from "@/devtools";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
@@ -46,6 +46,10 @@ import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import { pitchIn, regionOf, withKeys, type Station } from "@/qso/station";
+import { borrows, detailsOf, opening, systemPrompt, toCw, toEnglish, type ChatTurn } from "@/qso/ragchew";
+import { chat, llmLog, modelState, wake } from "@/llm/engine";
+import { RagChewGroup } from "./RagChew";
+import { CHAT_WORDS } from "@/qso/chatwords";
 import type { Length } from "@/qso/wording";
 import { anyAdded, asPlayed, LINE_PAD_SEC, lineAudio, tape, trimmed, type Added, type Clip, type TapeLine } from "@/qso/tape";
 import { patternOf } from "@/morse";
@@ -91,6 +95,7 @@ import {
   AgcChoice,
   KeyStyleGroup,
   KeyMark,
+  ModelMark,
   keyName,
   paddleLabel,
   STRAIGHT_SPEED_HELP,
@@ -372,6 +377,8 @@ interface Line {
   /** The station's fist on a key worked by hand, for the station's lines.
    *  Absent: a keyer, and in a log kept before there were bugs. */
   readonly fist?: Fist;
+  /** Written by the rag chew model. */
+  readonly model?: true;
   /** Your lines: the suggested reply when you began it, shown or not, for
    *  the debug save. Absent when there was none. */
   readonly hint?: string;
@@ -399,6 +406,8 @@ interface Kept {
   /** Your copy of each QSO's items, typed with the station's lines as
    *  Exchange, by QSO and label. Absent in a log kept before there was. */
   readonly items?: Readonly<Record<number, Readonly<Record<string, string>>>>;
+  /** The rag chew of the QSO under way, as the model had it. */
+  readonly chat?: readonly ChatTurn[];
 }
 
 /** The console's switch for the suggested replies in the log, followed. */
@@ -413,6 +422,8 @@ interface Pending {
   readonly them: Station;
   readonly at: Speed;
   readonly n: number;
+  /** Written by the rag chew model. */
+  readonly model?: boolean;
 }
 
 /** The session as last remembered, or null if there is none or it does not
@@ -501,6 +512,7 @@ function useOnOff(
     | "qsoShowSpeed"
     | "qsoShowTheirSpeed"
     | "qsoBlurCall"
+    | "qsoRagChew"
     | "qsoReplay"
     | "qsoShowDownload"
     | "qsoScriptReport"
@@ -662,6 +674,18 @@ export function QsoScreen({
   const settingsOpen = settings.open;
   const showSettings = () => settings.show("page");
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
+  const [ragChew, setRagChew] = useOnOff("qsoRagChew", false);
+  // On: the model loads with the page, not only once Settings is open.
+  useEffect(() => {
+    if (ragChew) void wake();
+  }, [ragChew]);
+  /** Each QSO's rag chew so far, in English, as the model had it. */
+  const chats = useRef(
+    new Map<number, ChatTurn[]>(kept && Array.isArray(kept.chat) ? [[kept.qsoNo, [...kept.chat]]] : []),
+  );
+  /** Counts each stop and pause, so a reply the model was still writing
+   *  is dropped. */
+  const hush = useRef(0);
   const [replayOnContinue, setReplayOnContinue] = useOnOff("qsoReplay", true);
   const [scriptReportOn, setScriptReportOn] = useOnOff("qsoScriptReport", false);
   const [playback, setPlaybackRaw] = useState<Playback>(() => loadPrefs().qsoPlayback ?? "always");
@@ -956,6 +980,7 @@ export function QsoScreen({
    *  calls at its end. Drawn once for each wait. */
   const nextWait = useRef<NextCall | null>(null);
   const quiet = useCallback(() => {
+    hush.current++;
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
     if (nextCall.current !== null) clearTimeout(nextCall.current);
@@ -1070,9 +1095,21 @@ export function QsoScreen({
      User, and the station's call and name. */
   const user = loadUser();
   const them = qso.current.them;
+  // With rag chew on, the words of a chat too, and every word the station
+  // has sent in this QSO: an answer to its question uses its words.
+  const theirWords = ragChew
+    ? lines
+        .filter((l) => !l.you && l.qso === qsoNo.current)
+        .map((l) => l.text.replace(/[?.,]/g, " "))
+        .join(" ")
+    : "";
   const words = useMemo(
-    () => vocabulary([user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name]),
-    [user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name],
+    () =>
+      vocabulary([
+        user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name,
+        ...(ragChew ? CHAT_WORDS : []), theirWords,
+      ]),
+    [user.callsign, user.name, user.qthCity, user.qthRegionShort, user.cwopsNumber, them.call, them.name, ragChew, theirWords],
   );
   const copy = useLiveCopy(source, phase === "listening", lenient, calibration, words);
   /* You are typing in a copy box. Nothing is dropped and nothing starts over:
@@ -1264,14 +1301,14 @@ export function QsoScreen({
   /** The station's over: after a short wait, it goes in the log and plays.
    *  `again` is a line already in the log to play once more, rather than a
    *  new one. */
-  const sendReply = (reply: string, station: Station, at: Speed, n: number, again: number | null) => {
+  const sendReply = (reply: string, station: Station, at: Speed, n: number, again: number | null, model = false) => {
     // Paddle sets the station's key, when it sets the keys.
     const them = withKeys(station, keyStyle.keys);
     // Station pitch sets where in the band the station sends, unless its
     // pitch was set by hand.
     const toneHz = them.pitchHz ?? pitchIn(them.toneHz, pitch);
     setPhase("waiting");
-    if (again === null) pending.current = { reply, them, at, n };
+    if (again === null) pending.current = { reply, them, at, n, ...(model ? { model } : {}) };
     const [lo, hi] = REPLY_DELAY_SEC;
     timer.current = setTimeout(
       () => {
@@ -1301,6 +1338,7 @@ export function QsoScreen({
               sentWpm: sentSpeed(at, them.fist),
               toneHz,
               ...(them.fist ? { fist: them.fist } : {}),
+              ...(model ? { model: true as const } : {}),
             },
           ]);
         }
@@ -1337,7 +1375,7 @@ export function QsoScreen({
   replay.current = () => {
     const due = pending.current;
     if (due) {
-      sendReply(due.reply, due.them, due.at, due.n, null);
+      sendReply(due.reply, due.them, due.at, due.n, null, due.model);
       return;
     }
     const n = qsoNo.current;
@@ -1469,6 +1507,20 @@ export function QsoScreen({
     });
     const them = turn.qso.them;
     const n = qsoNo.current;
+    // After the exchange, where the station would begin to sign, the model
+    // writes its line, and the QSO stays where it was. Your 73 or SK still
+    // ends it as before. The line that completes the exchange gets the
+    // model's line too, in place of the station's sign-off.
+    const before = qso.current;
+    const completes = !isRun(before) && !isScript(before) && before.stage !== "signing" && turn.qso.stage === "signing";
+    const chatting =
+      ragChew &&
+      modelState().kind === "ready" &&
+      !isRun(before) &&
+      !isScript(before) &&
+      !turn.ended &&
+      (completes || chatsOn(before, heard, { lenient, saved: user.callsign }));
+    const chatFrom = completes ? ({ ...turn.qso, stage: "exchanged", last: (before as Qso).last } as Qso) : before;
     const sent: Line = {
       // Your own call: what the station copied of it shows in the report.
       who: user.callsign.trim().toUpperCase() || turn.qso.you || "You",
@@ -1482,7 +1534,7 @@ export function QsoScreen({
       ...(replyRef.current ? { hint: replyRef.current } : {}),
     };
 
-    qso.current = turn.ended ? following(turn.qso, Math.random, speed) : turn.qso;
+    qso.current = turn.ended ? following(turn.qso, Math.random, speed) : chatting ? chatFrom : turn.qso;
     // A CQ that started another kind of QSO makes it the preferred mode.
     const started = kindOf(turn.qso);
     if (started && started !== guideKind) setGuideKind(started);
@@ -1515,8 +1567,47 @@ export function QsoScreen({
     if (turn.ended) closing.current = n;
 
     setNote("");
+    if (chatting) {
+      void chatReply(chatFrom as Qso, heard, copy.sentWpm, n, () => {
+        // No line from the model: the station answers as the scripts have it.
+        qso.current = turn.qso;
+        if (turn.reply === null) {
+          recorder.restart();
+          return;
+        }
+        sendReply(turn.reply, them, at, n, null);
+      });
+      return;
+    }
     sendReply(turn.reply, them, at, n, null);
-  }, [copy.over, copy.text, copy.turn, phase, recorder, player, speed, lenient, length]);
+  }, [copy.over, copy.text, copy.turn, phase, recorder, player, speed, lenient, length, ragChew]);
+
+  /** The station's rag chew line to `heard`, from the model. A line that
+   *  takes your details as its own, or opens as its last one did, is written
+   *  again once. `fallback` sends the scripts' line instead. */
+  const chatReply = async (q: Qso, heard: string, yourWpm: SentWpm | null, n: number, fallback: () => void) => {
+    setPhase("waiting");
+    const hushed = hush.current;
+    const user = loadUser();
+    const them = q.them;
+    const d = detailsOf(them);
+    const said = toEnglish(heard, [them.call, q.you, user.callsign.trim().toUpperCase()].filter(Boolean));
+    const turns: ChatTurn[] = [...(chats.current.get(n) ?? []), { role: "user", content: said }];
+    const system = systemPrompt(them, d, user, { wpm: q.speed.farnsworthWpm, yourWpm: yourWpm?.farnsworthWpm ?? null });
+    let english: string | null = null;
+    let line = "";
+    for (let tries = 0; tries < 2 && !line; tries++) {
+      english = await chat(system, turns);
+      const cw = english ? toCw(english) : "";
+      if (cw && !borrows(cw, heard, d) && opening(cw) !== opening(q.last)) line = cw;
+      llmLog("qso: rag chew", { system: tries === 0 && turns.length === 1 ? system : undefined, said, english, cw, kept: !!line });
+    }
+    if (hush.current !== hushed || qsoNo.current !== n) return;
+    if (!line) return fallback();
+    chats.current.set(n, [...turns, { role: "assistant", content: english! }]);
+    qso.current = { ...q, last: line };
+    sendReply(line, them, q.speed, n, null, true);
+  };
 
   useEffect(
     () => () => {
@@ -1648,6 +1739,7 @@ export function QsoScreen({
             pending: pending.current,
             ends,
             items,
+            ...(chats.current.has(qsoNo.current) ? { chat: chats.current.get(qsoNo.current) } : {}),
           },
     );
     // The phase, for a reply that is due: it is kept as soon as it is. A
@@ -2088,24 +2180,24 @@ export function QsoScreen({
           ))}
       </>
     );
+    // The two halves side by side: what the station sent and you copied,
+    // then what you sent and it copied.
     return (
       <div className="qsoreport" data-testid="qso-report">
         <table>
-          <tbody>
-            {group("them", `${call} sent`, "You copied")}
-            {group("you", "You sent", `${call} copied`)}
-          </tbody>
+          <tbody>{group("them", `${call} sent`, "You copied")}</tbody>
+        </table>
+        <table>
+          <tbody>{group("you", "You sent", `${call} copied`)}</tbody>
         </table>
       </div>
     );
   };
-  /** Under a QSO that is over: ▶, which plays it as heard, and ⋯, with the
-   *  clean and the heard versions to play or save, then its name. First on
-   *  the row, under the start of its lines, where they are seen. */
-  /** No report will come for the QSO under way: a script, with its report
-   *  off. */
-  const noReportDue = isScript(qso.current) && !scriptReportOn;
-  const qsoTapeRow = (n: number, at: number, bare = false): React.ReactElement | null => {
+  /** Under a QSO that is over: its report, under the start of its lines, and
+   *  at the end of the row its name, then ▶, which plays it as heard, and ⋯,
+   *  with the clean and the heard versions to play or save, in line with
+   *  the lines' own buttons. */
+  const qsoTapeRow = (n: number, at: number, bare = false, report: React.ReactNode = null): React.ReactElement | null => {
     if (!closed.includes(n)) return null;
     const play = playback !== "never";
     // The row shows while your overs come back after a reload, so the log
@@ -2173,8 +2265,11 @@ export function QsoScreen({
     if (bare) return end;
     return (
       <li className="qsotape" data-testid="qso-tape">
-        {end}
-        <span className="tapename">{name}</span>
+        {report}
+        <span className="tapeside">
+          <span className="tapename">{name}</span>
+          {end}
+        </span>
       </li>
     );
   };
@@ -2539,11 +2634,16 @@ export function QsoScreen({
           {!line.you && <span className="focusstop" tabIndex={-1} data-testid="qso-focus-stop" />}
           {textOf(line, i)}
           <span className="lend">
-            {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm && (
+            {(line.you ? showSpeed : showTheirSpeed) && line.sentWpm ? (
               <span className="lwpm" data-testid="qso-line-wpm">
+                {!line.you && line.model && <ModelMark />}
                 {!line.you && <KeyMark fist={line.fist} />}
                 {wpmOf(line.sentWpm)}
               </span>
+            ) : (
+              // The speed's room on a line without one, so every line's text
+              // ends in the same place.
+              (showSpeed || showTheirSpeed) && <span className="lwpm" aria-hidden="true" />
             )}
             {lineEdit(line, i)}
             {linePlay(i)}
@@ -2930,6 +3030,7 @@ export function QsoScreen({
                     checked={blurCall}
                     onChange={setBlurCall}
                   />
+                  <RagChewGroup on={ragChew} onChange={setRagChew} />
                   <Check
                     id="qso-show-their-speed"
                     label="Show the station's speed on each line"
@@ -3166,18 +3267,13 @@ export function QsoScreen({
               {book && bookHead(bookLabels(qsoGroups(lines)[0]?.qso ?? qsoNo.current), "first")}
               {qsoGroups(lines).map((group, g, all) => {
                 if (book && !isScript(ends[group.qso] ?? qso.current)) return bookRow(group, g, all);
-                const report = qsoReport(group.qso);
                 return (
                 <Fragment key={group.at[0]}>
-                  {/* The report's column only where a report is or will be:
-                      a QSO under way keeps it, so its lines do not move when
-                      the report comes. */}
-                  <li className={report || (!closed.includes(group.qso) && !noReportDue) ? "qsogroup" : "qsogroup noreport"}>
+                  <li className="qsogroup">
                     <ol className="qsolines">
                       {group.at.map(lineItem)}
-                      {qsoTapeRow(group.qso, g)}
+                      {qsoTapeRow(group.qso, g, false, qsoReport(group.qso))}
                     </ol>
-                    {report}
                   </li>
                   {g < all.length - 1 && <li className="qsodivider" role="separator" data-testid="qso-divider" />}
                 </Fragment>
@@ -3192,7 +3288,7 @@ export function QsoScreen({
                 yourText !== "none" &&
                 !headless(qsoNo.current) &&
                 (copy.text || copy.keying) && (
-                <li className={noReportDue ? "you live noreport" : "you live"}>
+                <li className="you live">
                   <span className="who">{qso.current.you || "You"}</span>
                   <span
                     className={yourText === "hidden" ? "text blurred" : "text"}
@@ -3205,7 +3301,7 @@ export function QsoScreen({
                       empty while you send, so the text wraps where it will
                       stay: the speed at your set speed until it is read. */}
                   <span className="lend reserve" aria-hidden="true">
-                    {showSpeed && <span className="lwpm">{wpmOf(copy.sentWpm ?? speed)}</span>}
+                    {(showSpeed || showTheirSpeed) && <span className="lwpm">{showSpeed && wpmOf(copy.sentWpm ?? speed)}</span>}
                     {allowEdits && <span className="lspace" />}
                     {playback === "always" && <span className="lspace" />}
                     <span className="lspace" />

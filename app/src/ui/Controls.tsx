@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import type { RecordMode } from "./mode";
-import { IconBug, IconPlay, IconStop, IconStraightKey } from "./Icons";
+import { IconBug, IconPlay, IconRobot, IconStop, IconStraightKey } from "./Icons";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import type { AgcMode } from "@/audio/agc";
@@ -783,6 +783,7 @@ export function Check({
   help,
   checked,
   barred = null,
+  action,
   onChange,
 }: {
   id: string;
@@ -790,6 +791,8 @@ export function Check({
   help: string;
   checked: boolean;
   barred?: string | null;
+  /** A button for the setting, at the end of its row, left of the ?. */
+  action?: React.ReactNode;
   onChange(checked: boolean): void;
 }): React.ReactElement {
   const about = useHelp(barredTitle(barred, help));
@@ -805,6 +808,7 @@ export function Check({
         />{" "}
         {label}
       </label>
+      {action && <span className="checkaction">{action}</span>}
       {about.tip}
     </div>
   );
@@ -1333,6 +1337,18 @@ function KeyIcon({ kind }: { kind: Exclude<KeyKind, "keyer"> }): React.ReactElem
   return (
     <span ref={tip.anchor} className="lkey" data-key={kind} role="img" aria-label={says} {...tip.on}>
       {kind === "bug" ? <IconBug /> : <IconStraightKey />}
+      {tip.box}
+    </span>
+  );
+}
+
+/** A robot on a line the rag chew model wrote, with its themed tooltip. */
+export function ModelMark(): React.ReactElement {
+  const says = "The model on this computer wrote this line.";
+  const tip = useTip<HTMLSpanElement>(says);
+  return (
+    <span ref={tip.anchor} className="lkey" data-key="model" role="img" aria-label={says} {...tip.on}>
+      <IconRobot />
       {tip.box}
     </span>
   );

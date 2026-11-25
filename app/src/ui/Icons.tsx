@@ -218,6 +218,22 @@ export function IconStraightKey(): React.ReactElement {
   );
 }
 
+/** A robot's head: an antenna, a square face and two eyes. A line the rag
+ *  chew model wrote. */
+export function IconRobot(): React.ReactElement {
+  return (
+    <Icon name="robot" stroke>
+      <path d="M8 2.2v2.3" />
+      <circle cx="8" cy="1.8" r=".8" fill="currentColor" stroke="none" />
+      <rect x="2.8" y="4.5" width="10.4" height="8.6" rx="2" />
+      <circle cx="6" cy="8.4" r="1" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="8.4" r="1" fill="currentColor" stroke="none" />
+      <path d="M6.2 11h3.6" />
+      <path d="M1.3 7.6v2.6M14.7 7.6v2.6" />
+    </Icon>
+  );
+}
+
 /** A bug from the side: the paddle, and the long arm with its weight at the
  *  end. */
 export function IconBug(): React.ReactElement {

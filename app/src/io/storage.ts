@@ -493,6 +493,9 @@ export interface Prefs {
   /** Blurred station text blurs the station's call in the log too. Absent
    *  is off. */
   qsoBlurCall?: boolean;
+  /** After the exchange of a standard QSO, a model in the browser writes the
+   *  station's lines until you sign off. Absent is off. */
+  qsoRagChew?: boolean;
   /** Continue on the QSO page plays the station's last over again. Absent
    *  is on. */
   qsoReplay?: boolean;
@@ -840,6 +843,7 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoGuide: oneOf("cq", "cwt", "sst", "mst", "pota"),
   qsoSideGuide: isBool,
   qsoBlurCall: isBool,
+  qsoRagChew: isBool,
   qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
   qsoHints: oneOf("off", "always", "copied"),

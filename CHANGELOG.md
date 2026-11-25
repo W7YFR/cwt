@@ -7,6 +7,19 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **Rag chew after the exchange**, in the QSO page's settings: after the exchange of a standard QSO, a model on your computer writes the station's lines until you send 73 or SK. The model is a one-time download of about 5 GB, and what you send stays on your computer.
+
+### Changed
+
+- On the QSO page, a QSO's lines take the whole width. Its report shows under them, with what each side sent and copied side by side, and its play and ⋯ buttons line up with the buttons of its lines.
+
+### Fixed
+
+- With **Lenient** on, a name keyed with a stray gap, such as `NAME IS R OB ROB`, is read as ROB.
+- When the station asks for your name before it sends its exchange, your name sent alone, such as `ROB ROB`, now answers it. Before, the station asked again.
+
 ## v1.41.0 — 2026-11-25
 
 ### Added

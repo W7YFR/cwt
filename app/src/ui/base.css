@@ -2623,7 +2623,14 @@ header .modeswitch button { white-space: nowrap; }
   height: 1.5em;
   padding-left: 12px;
 }
-.qsolog .lend .lwpm { margin-left: 0; padding-left: 0; }
+/* As wide on every line, with or without a speed in it, so the text of every
+   line ends in the same place. */
+.qsolog .lend .lwpm { margin-left: 0; padding-left: 0; min-width: 6.5em; text-align: right; }
+/* On a phone the text needs the room more: the speed is as wide as itself. */
+@media (max-width: 560px) {
+  .qsolog .lend .lwpm { min-width: 0; }
+  .qsolog .lend .lwpm:empty { display: none; }
+}
 /* The end of the line you are sending: there, so the text wraps short of it,
    and not seen. */
 .qsolog .lend.reserve { visibility: hidden; }
@@ -2632,22 +2639,16 @@ header .modeswitch button { white-space: nowrap; }
 .qsolog .lspace { flex: 0 0 24px; width: 24px; height: 24px; }
 /* Play QSO and Download, under the last line of a QSO that is over, lined up
    with the text. */
-.qsolog .qsotape { padding-left: calc(8ch + 12px); gap: 8px; }
+/* Set off from the lines by a dashed rule from the text on, so it reads
+   as the QSO's summary. A solid rule is where one QSO ends. */
+.qsolog .qsotape { margin-left: calc(8ch + 12px); gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--line); }
 /* Where one QSO ends and the next begins. */
 .qsolog .qsodivider { height: 0; margin: 6px 0; border-top: 1px solid var(--line); }
-/* A QSO in the log: its lines, and its report to their right. With room, every
-   QSO keeps the report's column, so the lines end in one place whether or not
-   a QSO has its report yet. Without room, the report goes under. */
-.qsolog { container-type: inline-size; }
+/* A QSO in the log: its lines across the whole width. Under them, its
+   report's two halves side by side, lined up with the text. */
 .qsolog > li.qsogroup { display: flex; flex-direction: column; gap: 12px; }
-.qsolog .qsoreport { padding-left: calc(8ch + 12px); min-width: 0; }
-@container (min-width: 42rem) {
-  .qsolog > li.qsogroup { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; column-gap: 32px; align-items: start; }
-  .qsolog > li.live { margin-right: calc(20rem + 32px); }
-  .qsolog > li.qsogroup.noreport { grid-template-columns: minmax(0, 1fr); }
-  .qsolog > li.live.noreport { margin-right: 0; }
-  .qsolog .qsoreport { padding-left: 24px; border-left: 1px solid var(--line); }
-}
+.qsolog .qsoreport { display: flex; flex-wrap: wrap; gap: 12px 24px; min-width: 0; margin-top: 4px; }
+.qsolog .qsoreport table + table { padding-left: 24px; border-left: 1px solid var(--line); }
 .qsolines {
   min-width: 0;
   list-style: none;
@@ -2941,14 +2942,20 @@ header .modeswitch button { white-space: nowrap; }
   column-gap: 14px;
 }
 /* Each control as wide as itself, but selects and sliders, which fill. */
-.viewpanel.formpanel .group > :not(select):not(input[type="range"]):not(.pitchrange):not(.sliderow):not(.helptip):not(.group) { justify-self: start; }
+.viewpanel.formpanel .group > :not(select):not(input[type="range"]):not(.pitchrange):not(.sliderow):not(.helptip):not(.group):not(.checkaction) { justify-self: start; }
 /* The question mark, at the right end of its row's first line, the same
    place in every row. */
 .viewpanel.formpanel .group > .helptip { grid-column: 3; grid-row: 1; justify-self: end; }
+/* A check's own button, as the rag chew's trash can: at the end of the
+   check's line, just left of the question mark. */
+.viewpanel.formpanel .group > .checkaction { grid-column: 2; grid-row: 1; justify-self: end; }
+.viewpanel.formpanel .group:has(> .checkaction) > label.check { grid-row: 1; }
 .viewpanel.formpanel .group > label.check,
 .viewpanel.formpanel .group > .previewrow { grid-column: 2; }
 .viewpanel.formpanel .group > label.check { min-height: 22px; }
 .viewpanel.formpanel .group > .keyrow { grid-column: 2; min-height: 22px; }
+/* A button that goes with the setting above it, as Remove the model. */
+.viewpanel.formpanel .group > .actionrow { grid-column: 2; min-height: 0; margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
 /* What the choices do, under them, in view rather than in a tooltip. */
 .viewpanel.formpanel .group > .note {
   grid-column: 2;
@@ -2987,9 +2994,11 @@ header .modeswitch button { white-space: nowrap; }
   .viewpanel.formpanel, .viewpanel.formpanel .pagerow { grid-template-columns: 1fr; }
   .viewpanel.formpanel .group { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
   .viewpanel.formpanel .group > .helptip { grid-column: 2; }
+  .viewpanel.formpanel .group > .checkaction { grid-column: 1; }
   .viewpanel.formpanel .group > label.check,
   .viewpanel.formpanel .group > .previewrow,
   .viewpanel.formpanel .group > .keyrow,
+  .viewpanel.formpanel .group > .actionrow,
   .viewpanel.formpanel .group > .note { grid-column: 1; }
 }
 /* Each section's settings on a panel of their own. Lines inside it only
@@ -3407,10 +3416,19 @@ header .modeswitch button { white-space: nowrap; }
   .keylist .keyrow { grid-template-columns: 120px minmax(0, 1fr); }
 }
 
-/* Under a QSO that is over: ▶ and ⋯ first, then its name. */
-.qsolog .qsotape { align-items: center; justify-content: flex-start; }
+/* Under a QSO that is over: its report, then at the end of the row its name,
+   ▶ and ⋯, in line with the buttons of its lines. */
+.qsolog .qsotape { align-items: flex-start; justify-content: flex-start; }
+.qsolog .qsotape .tapeside { margin-left: auto; display: flex; align-items: center; gap: 12px; height: 1.5em; margin-top: 4px; }
 .qsolog .qsotape .tapename { font: 12.5px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-faint); }
-.qsolog .qsotape .tapeend { display: flex; align-items: center; gap: 6px; }
+.qsolog .qsotape .tapeend { display: flex; align-items: center; gap: 8px; }
+/* On a phone: the name and buttons on a row of their own, at its end, and
+   the report's halves one under the other. */
+@media (max-width: 560px) {
+  .qsolog .qsotape { flex-wrap: wrap; }
+  .qsolog .qsotape .tapeside { order: -1; width: 100%; justify-content: flex-end; }
+  .qsolog .qsoreport table + table { padding-left: 0; border-left: 0; }
+}
 .qsolog .qsotape .more .iconbtn { width: 24px; height: 24px; font-size: 13px; }
 /* ⋯ at the end of a line, beside its play button. */
 .qsolog .lend .quick.more { margin-left: 0; }

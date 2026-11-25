@@ -1074,6 +1074,24 @@ describe("bare answers and split reports", () => {
     expect(named[3]).not.toMatch(/NAME\?|PSE AGN/);
   });
 
+  it("reads a name with a stray gap, with lenient copy", () => {
+    const lenient = { lenient: true, saved: "" };
+    expect(new Over("UR 5NN NAME IS R OB ROB QTH IS SEATTLE", lenient).yourName()).toBe("ROB");
+    expect(new Over("NAME IS ED ED", lenient).yourName()).toBe("ED");
+    expect(new Over("NAME IS R OB ROB", STRICT).yourName()).toBe("");
+  });
+
+  it("takes a bare name while the station waits on your exchange", () => {
+    const lenient = { ...ctx, ear: { lenient: true, saved: "" } };
+    let q: Qso = answer(newQso(() => 0.3), "CQ CQ DE W7YFR K", lenient).qso;
+    q = answer(q, `${q.them.call} DE W7YFR UR 5NN NAME IS T QTH IS SEATTLE BK`, lenient).qso;
+    expect(q.stage).toBe("called");
+    expect(q.got).not.toContain("name");
+    q = answer(q, "ROB ROB K", lenient).qso;
+    expect(q.got).toContain("name");
+    expect(q.yourName).toBe("ROB");
+  });
+
   it("reads a report run into a word, with lenient copy", () => {
     let q: Qso = newQso(() => 0.3);
     q = answer(q, "CQ CQ DE W7YFR K", ctx).qso;

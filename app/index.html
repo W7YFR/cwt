@@ -4,12 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<!-- A strict policy, and a cheap one: this app makes no network requests of
-     any kind, so `connect-src 'none'` is a description of it rather than a
-     restriction. Whatever you record never had a way off the machine, and now
-     that is enforced rather than merely true.
+<!-- A strict policy, and a cheap one: this app sends nothing anywhere. The
+     only requests it may make are downloads of the rag chew model, and only
+     once you ask for it: the weights from Hugging Face and the model's
+     library from GitHub. `connect-src` names those and no others, down to
+     the path where it can: MLC's models on Hugging Face, and MLC's library
+     repo on GitHub, not the rest of either site.
+     Whatever you record or key never had a way off the machine, and that is
+     enforced rather than merely true.
 
-     Three entries are load-bearing and none of them are guessable:
+     These entries are load-bearing and none of them are guessable:
+
+       connect-src ...       the rag chew model's download (llm/engine.ts).
+                             Hugging Face sends its files from its own CDN,
+                             *.hf.co, which a path cannot narrow: a redirect
+                             is matched on its host alone.
+       script-src ... 'wasm-unsafe-eval'
+                             the model runs as WebAssembly, and a policy
+                             with script-src refuses to compile any without it.
 
        script-src ... blob:  the microphone's AudioWorklet is compiled from a
                              source string and loaded through a blob URL (see
@@ -24,7 +36,7 @@
      has to arrive as a real header, which GitHub Pages cannot send. Same for
      Permissions-Policy and X-Content-Type-Options — putting them here would
      look like protection without being any. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src https://huggingface.co/mlc-ai/ https://*.huggingface.co https://*.hf.co https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'">
 <!-- The one outbound link is the author's QRZ page; it carries rel="noreferrer"
      itself, and this makes that the default for anything added later. -->
 <meta name="referrer" content="no-referrer">
