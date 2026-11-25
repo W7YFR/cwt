@@ -7,8 +7,8 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { SettingsForm } from "./Controls";
-import { IconDownload, IconPlay, IconUpload } from "./Icons";
+import { SettingsForm, useTip } from "./Controls";
+import { IconDownload, IconPlay, IconTrash, IconUpload } from "./Icons";
 import { useSettings, type SettingsTab } from "./SettingsDrawer";
 import { useSoundPanel } from "./soundPanel";
 
@@ -237,6 +237,7 @@ export function MoreMenu({
   const root = useRef<HTMLDivElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   const close = useRef(() => setOpen(false)).current;
+  const tip = useTip<HTMLButtonElement>(label);
   usePopover(open, close, root);
   useInView(open && !up, pop);
   /* Above the button, placed against the window: a menu inside a scrolling
@@ -262,17 +263,20 @@ export function MoreMenu({
   return (
     <div className="quick more" ref={root}>
       <button
+        ref={tip.anchor}
         type="button"
         className="iconbtn"
         data-testid={testId}
         aria-label={label}
-        title={label}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
+        {...tip.on}
       >
         ⋯
       </button>
+      {/* Not over its own menu. */}
+      {!open && tip.box}
       {open && (
         <div
           className={up ? "quickpop menu up" : "quickpop menu"}
@@ -334,6 +338,11 @@ export function OpenFileItem({
 /** An item in ⋯ that saves a file. */
 export function DownloadItem(props: Omit<MenuItemProps, "icon">): React.ReactElement {
   return <MenuItem {...props} icon={<IconDownload />} />;
+}
+
+/** An item in ⋯ that deletes something. */
+export function DeleteItem(props: Omit<MenuItemProps, "icon">): React.ReactElement {
+  return <MenuItem {...props} icon={<IconTrash />} />;
 }
 
 /** An item in ⋯ that plays something. */

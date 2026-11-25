@@ -247,19 +247,19 @@ function AppBody(): React.ReactElement {
    * said to have been arrived at. */
   const screen = opening
     ? "opening"
-    : booting && !take.loaded
-      ? "booting"
-      : calibrating
-          ? "calibrate"
-          : page === "qso"
-            ? "qso"
-            : page === "live"
-            ? "live"
-            : page === "copy"
+    : calibrating
+      ? "calibrate"
+      : page === "qso"
+        ? "qso"
+        : page === "live"
+          ? "live"
+          : page === "copy"
             ? "copy"
-            : take.loaded && take.review
-            ? "review"
-            : "landing";
+            : booting && !take.loaded
+              ? "booting"
+              : take.loaded && take.review
+                ? "review"
+                : "landing";
 
   /* Arriving at a screen means arriving at the top of it.
    *
@@ -478,12 +478,6 @@ function AppBody(): React.ReactElement {
         <div className="busy" role="status">
           measuring your sending…
         </div>
-      ) : booting && !take.loaded ? (
-        /* Holds the page's height either way, so the landing screen does not
-           jump up the moment it appears. */
-        <div className="busy" role="status" aria-live="polite">
-          {slowBoot ? "looking for your last session…" : ""}
-        </div>
       ) : calibrating ? (
         <Calibrate
           current={profile}
@@ -536,6 +530,14 @@ function AppBody(): React.ReactElement {
           onPage={setPage}
           onHome={goHome}
         />
+      ) : booting && !take.loaded ? (
+        /* The last session is the Send page's, so only it waits for the
+           session to come back: Copy, Live and QSO draw at once. Holds the
+           page's height either way, so the landing screen does not jump up
+           the moment it appears. */
+        <div className="busy" role="status" aria-live="polite">
+          {slowBoot ? "looking for your last session…" : ""}
+        </div>
       ) : take.loaded && take.review ? (
         <ReviewScreen
           onPage={setPage}
@@ -673,7 +675,9 @@ function Footer(): React.ReactElement {
       ·{" "}
       <a href="https://github.com/W7YFR/cwt" target="_blank" rel="noreferrer">
         v{APP_VERSION}
-      </a>
+      </a>{" "}
+      ·{" "}
+      <a href="terms.html">Terms</a>
     </footer>
   );
 }

@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import { ZOOM_MAX, ZOOM_MIN } from "@/render/geometry";
 import type { LetterSize, ReviewSettings, Timing, ViewMode } from "@/types";
 import type { RecordMode } from "./mode";
-import { IconBug, IconPlay, IconStop, IconStraightKey } from "./Icons";
+import { IconBug, IconPlay, IconRobot, IconStop, IconStraightKey } from "./Icons";
 import { TIMES_MAX, TIMES_MIN } from "@/timing";
 import { NOISE_MAX_DB, NOISE_OFF_DB, NOISE_STEP_DB, noiseOn, QRN_LEVELS, QSB_MAX_DB, QSB_STEP_DB } from "@/audio/qsb";
 import type { AgcMode } from "@/audio/agc";
@@ -396,7 +396,7 @@ function tipText(text: string): React.ReactNode {
   return parts.map((part, i) => (i % 2 ? <em key={i}>{part}</em> : part));
 }
 
-function useTip<T extends HTMLElement>(
+export function useTip<T extends HTMLElement>(
   text: string,
 ): {
   id: string;
@@ -612,6 +612,7 @@ export function ChoiceGroup({
   value,
   options,
   barred = null,
+  action,
   onChange,
 }: {
   id: string;
@@ -620,6 +621,8 @@ export function ChoiceGroup({
   value: string;
   /** Why it does nothing now, when another setting rules it out. */
   barred?: string | null;
+  /** A button for the setting, at the end of its row, left of the ?. */
+  action?: React.ReactNode;
   /** Each choice, with a sentence on what it does. The chosen one's shows
    *  under the buttons. */
   options: ReadonlyArray<{ value: string; label: string; note?: string }>;
@@ -663,6 +666,7 @@ export function ChoiceGroup({
           ))}
         </span>
       )}
+      {action && <span className="checkaction">{action}</span>}
       {about.tip}
     </div>
   );
@@ -783,6 +787,7 @@ export function Check({
   help,
   checked,
   barred = null,
+  action,
   onChange,
 }: {
   id: string;
@@ -790,6 +795,8 @@ export function Check({
   help: string;
   checked: boolean;
   barred?: string | null;
+  /** A button for the setting, at the end of its row, left of the ?. */
+  action?: React.ReactNode;
   onChange(checked: boolean): void;
 }): React.ReactElement {
   const about = useHelp(barredTitle(barred, help));
@@ -805,6 +812,58 @@ export function Check({
         />{" "}
         {label}
       </label>
+      {action && <span className="checkaction">{action}</span>}
+      {about.tip}
+    </div>
+  );
+}
+
+/** A button with the app's tooltip, never the browser's: as a trash can
+ *  that says what it deletes. */
+export function TipButton({
+  tip,
+  label,
+  className,
+  testId,
+  onClick,
+  children,
+}: {
+  tip: string;
+  /** Its name, for a screen reader. */
+  label: string;
+  className?: string;
+  testId?: string;
+  onClick(): void;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const t = useTip<HTMLButtonElement>(tip);
+  return (
+    <>
+      <button
+        ref={t.anchor}
+        type="button"
+        className={className}
+        data-testid={testId}
+        aria-label={label}
+        aria-describedby={t.id}
+        onClick={onClick}
+        {...t.on}
+      >
+        {children}
+      </button>
+      {t.box}
+    </>
+  );
+}
+
+/** A setting that is a button, with its help: as the rag chew's Enable. */
+export function ActionGroup({ help, children }: { help: string; children: React.ReactNode }): React.ReactElement {
+  const about = useHelp(help);
+  return (
+    <div className="group">
+      <div className="actionrow" title={about.title}>
+        {children}
+      </div>
       {about.tip}
     </div>
   );
@@ -1333,6 +1392,18 @@ function KeyIcon({ kind }: { kind: Exclude<KeyKind, "keyer"> }): React.ReactElem
   return (
     <span ref={tip.anchor} className="lkey" data-key={kind} role="img" aria-label={says} {...tip.on}>
       {kind === "bug" ? <IconBug /> : <IconStraightKey />}
+      {tip.box}
+    </span>
+  );
+}
+
+/** A robot on a line the rag chew model wrote, with its themed tooltip. */
+export function ModelMark(): React.ReactElement {
+  const says = "The model on this computer wrote this line.";
+  const tip = useTip<HTMLSpanElement>(says);
+  return (
+    <span ref={tip.anchor} className="lkey" data-key="model" role="img" aria-label={says} {...tip.on}>
+      <IconRobot />
       {tip.box}
     </span>
   );

@@ -294,6 +294,13 @@ const DE_STOP = new Set([
  *  else. */
 export const TURN_WORDS = new Set(["DE", "K", "KN", "BK", "AR", "<KN>", "<BK>", "<AR>", "<BT>", "PSE"]);
 
+/** Words that ask for the last over again on their own. */
+const AGAIN_WORDS = new Set(["AGN?", "QRZ?"]);
+
+/** Words that can come before a request to send again: R ?, SRI AGN?,
+ *  PSE AGN. */
+const AGAIN_BEFORE = new Set(["R", "RR", "RRR", "SRI", "PSE"]);
+
 /** Questions that are part of an exchange, not about what was sent. */
 const NOT_QUESTIONS = new Set(["HW?", "CPY?"]);
 
@@ -646,9 +653,30 @@ export class Over {
   }
 
   /** Whether it asks something the station cannot place: a word with a ?
-   *  that is none of AGN?, HW? or the questions it answers. */
+   *  that is none of AGN?, HW? or the questions it answers, or a ? keyed
+   *  apart after a word of its own, as in WHAT RIG ?. */
   puzzles(): boolean {
-    return this.words.some((w) => w.endsWith("?") && w !== "?" && !NOT_QUESTIONS.has(w));
+    return this.words.some(
+      (w, i) => (w === "?" ? !this.bareMark(i) : w.endsWith("?") && !AGAIN_WORDS.has(w) && !NOT_QUESTIONS.has(w)),
+    );
+  }
+
+  /** Whether it asks for the last over again. ?, AGN? or QRZ? with nothing
+   *  said before it but calls, R, SRI and the like: ? alone, R ?. AGN or
+   *  PSE AGN with nothing else said. The ? after a word is a question, as
+   *  in WHAT RIG ?, and AGN among other words is not a request, as in GUD
+   *  TO WORK U AGN. */
+  asksAgain(): boolean {
+    const { words } = this;
+    if (words.some((w, i) => (w === "?" || AGAIN_WORDS.has(w)) && this.bareMark(i))) return true;
+    const said = words.filter((w) => !isCall(w) && !TURN_WORDS.has(w) && !AGAIN_BEFORE.has(w));
+    return said.length > 0 && said.every((w) => w === "AGN" || w === "?" || AGAIN_WORDS.has(w));
+  }
+
+  /** Whether the word at `i` has nothing before it but calls, turn words
+   *  and acknowledgements: a ? there asks for the over again. */
+  private bareMark(i: number): boolean {
+    return this.words.slice(0, i).every((w) => isCall(w) || TURN_WORDS.has(w) || AGAIN_BEFORE.has(w) || w === "?");
   }
 
   /** Whether the station can read it: most of its words are words it knows.
@@ -715,7 +743,27 @@ export class Over {
 
   yourName(): string {
     const name = this.after(["NAME", "NM", "OP"]);
-    return name && /^[A-Z]{2,}$/.test(name) ? name : "";
+    if (name && /^[A-Z]{2,}$/.test(name)) return name;
+    return this.ear.lenient ? this.splitName() : "";
+  }
+
+  /** Lenient: a name with a stray gap or letter before it, as the R OB ROB in
+   *  NAME IS R OB ROB. The words after the label, up to the next label or
+   *  known word: a word that joins the ones before it, or else the first of
+   *  two letters or more. */
+  private splitName(): string {
+    const { words } = this;
+    const i = words.findIndex((w) => ["NAME", "NM", "OP"].includes(w));
+    if (i < 0) return "";
+    const run: string[] = [];
+    for (let j = i + 1; j < words.length && run.length < NAME_REACH; j++) {
+      const w = words[j]!;
+      if (FILLER.has(w) && run.length === 0) continue;
+      if (!/^[A-Z]+$/.test(w) || PIECE_LABELS.has(w) || TURN_WORDS.has(w) || (KNOWN.has(w) && w.length > 1)) break;
+      run.push(w);
+    }
+    const joins = run.find((w, at) => w.length >= 2 && run.some((_, a) => a < at && run.slice(a, at).join("") === w));
+    return joins ?? run.find((w) => w.length >= 2) ?? "";
   }
 
 }
@@ -751,6 +799,19 @@ export interface Paced {
   readonly last: string;
 }
 
+/** Whether your over is one for the rag chew (Step 3), once the station
+ *  has begun its exchange: never your sign-off, a request to send again, or
+ *  QRS or QRQ. With the exchange done and none of it owed, any other over.
+ *  Before then, an over the scripts cannot place: a question, or one the
+ *  station cannot read. The station need not know its words. */
+export function chatsOn(qso: Qso, heard: string, ear: Ear = STRICT): boolean {
+  if (qso.stage !== "pieces" && qso.stage !== "exchanged") return false;
+  const over = new Over(asAnswer(qso, heard), ear);
+  if (over.closing() || over.speedAsk() || over.asksAgain()) return false;
+  if (qso.stage === "exchanged" && sentPieces(qso).every((p) => qso.got.includes(p))) return true;
+  return over.puzzles() || !over.readable(qso.them);
+}
+
 /** QRS or QRQ in `over`, once the station has sent something: `qso` at the
  *  new speed, and its reply when the request settles the over. QRS, or a
  *  request with nothing else in it, gets the last over again at the new
@@ -780,6 +841,9 @@ export function pace<Q extends Paced>(
 
 /** Labels of your own exchange: an over with one of these says which piece
  *  it sends. */
+/** How many words after NAME a lenient ear looks through for your name. */
+const NAME_REACH = 3;
+
 const PIECE_LABELS = new Set(["UR", "RST", "RPT", "NAME", "OP", "NM", "QTH"]);
 
 /** The most words, past the turn words, of an over that is only an answer:
@@ -792,8 +856,9 @@ const ANSWER_WORDS = 3;
  *  word the station does not know: TNX ROB is TNX NAME ROB. A report needs
  *  no label. */
 function asAnswer(qso: Qso, heard: string): string {
-  if (qso.stage !== "pieces" && qso.stage !== "exchanged") return heard;
-  const owed = sentPieces(qso).filter((p) => !qso.got.includes(p));
+  if (qso.stage !== "called" && qso.stage !== "pieces" && qso.stage !== "exchanged") return heard;
+  // Called: it waits for your exchange, all of it.
+  const owed = (qso.stage === "called" ? wording.PIECES : sentPieces(qso)).filter((p) => !qso.got.includes(p));
   if (owed.length !== 1 || owed[0] === "report") return heard;
   // An over it cannot read is not an answer: it gets PSE AGN.
   if (heard.includes(UNKNOWN)) return heard;
@@ -892,7 +957,8 @@ function reply(qso: Qso, over: Over, context: Context): Turn {
   const { them } = qso;
   const mirror = over.opensWithCalls(them.call);
   // HW? asks how you copied, so it is not a request to send again.
-  const again = over.has("AGN") || over.words.some((w) => ["?", "AGN?", "QRZ?"].includes(w));
+  // AGN among other words still asks again here, as in PSE NAME AGN.
+  const again = over.has("AGN") || over.asksAgain();
   const voice = (q: Qso): wording.Say => ({
     them,
     you: q.you,

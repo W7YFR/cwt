@@ -7,6 +7,25 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.42.0 — 2026-11-25
+
+### Added
+
+- **Enable LLM rag chew**, in the QSO page's settings: after the exchange of a plain QSO, a language model on your computer writes the station's lines until you send 73 or SK. **Rag chew** then picks **None**, **Llama 3.1 8B** (about 5 GB) or **Gemma 4 E2B** (about 3 GB), each a one-time download.
+- A **Terms** page, linked from the foot of every page.
+
+### Changed
+
+- Every ⋯ button shows its name in the app's own tooltip, not the browser's.
+- On the QSO page, a QSO's lines take the whole width. Its report shows under them, with what each side sent and copied side by side, and its play and ⋯ buttons line up with the buttons of its lines.
+
+### Fixed
+
+- With **Lenient** on, a name keyed with a stray gap, such as `NAME IS R OB ROB`, is read as ROB.
+- When the station asks for your name before it sends its exchange, your name sent alone, such as `ROB ROB`, now answers it. Before, the station asked again.
+- After a reload, the QSO, Copy and Live pages show at once, without a blank moment first.
+- **Settings**, left open over a reload, opens at the page's tab without showing **Microphone** first.
+
 ## v1.41.0 — 2026-11-25
 
 ### Added

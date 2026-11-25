@@ -116,3 +116,18 @@ simplified technical English:
 - Active voice, present tense.
 - No filler, no hedging, no preamble.
 - One term per concept. Reuse the same word for the same thing.
+
+## The app's own controls
+
+Every tooltip, alert, modal, prompt, confirm and menu in the app uses the
+app's own component. Never use the browser's.
+
+- A tooltip: the `help` of a settings control, `TipButton` or `useTip`
+  (`app/src/ui/Controls.tsx`). Never a `title` attribute.
+- A modal, prompt or confirm: a dialog in the app's `.sheet` and `.dialog`,
+  with `overdrawer` when it opens over Settings. `TermsDialog` in
+  `app/src/ui/RagChew.tsx` shows the pattern. Never `alert`, `confirm`,
+  `prompt` or a bare `<dialog>`.
+- A message that stays on the page: a `.banner`, as in `app/src/ui/App.tsx`.
+- A menu: `MoreMenu` (`app/src/ui/Toolbar.tsx`).
+- Before you write a new one, find how another page does it, and reuse that.

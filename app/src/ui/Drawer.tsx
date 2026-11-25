@@ -54,6 +54,9 @@ export function Drawer({
     drawer.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // A dialog over the drawer, as the rag chew's terms, takes its own
+      // Escape: it closes, and the drawer stays.
+      if (e.target instanceof Element && e.target.closest("[data-own-escape]")) return;
       e.preventDefault();
       e.stopPropagation();
       close.current();

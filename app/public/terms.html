@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Terms · CWT</title>
+<meta name="description" content="The terms of use for CWT: what it does, how it reads your sending, the optional rag chew feature, and what stays on your machine.">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#12151a">
+<meta name="robots" content="noindex">
+<style>
+/* The app's palette and header, so this page reads as part of it. */
+:root{
+  --bg:#12151a;--panel:#1a1f27;--line:#2e3644;--text:#e6eaf0;--muted:#97a3b6;--faint:#66708a;--accent:#6aa9ff;--warn:#f2cc60;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scrollbar-gutter:stable;scrollbar-color:color-mix(in srgb, var(--faint) 45%, transparent) transparent}
+*{scrollbar-width:thin}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.callsign{display:block;color:var(--faint);text-decoration:none;flex:none}
+.callsign:hover,.callsign:focus-visible{color:var(--accent)}
+.callsign .art{display:block;white-space:pre;font-family:var(--mono);font-size:calc(26px / 6);line-height:1;font-weight:400;letter-spacing:0}
+header .div{width:1px;align-self:stretch;background:var(--line)}
+header h1{margin:0;color:var(--accent)}
+header h1 a{color:inherit;text-decoration:none}
+header h1 .art{display:block;white-space:pre;font-family:var(--mono);font-size:calc(26px / 6);line-height:1;font-weight:400;letter-spacing:0}
+main{max-width:680px;margin:0 auto;padding:28px 16px 8px}
+main h2{font-size:22px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+.dated{color:var(--faint);font-size:12px;margin:0 0 24px}
+main h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:26px 0 8px;font-weight:600}
+main p{margin:0 0 10px}
+main a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+/* The app's question mark and its tip, for a line the terms carry because a
+   license asks for it. */
+.helptip{position:relative;top:-1px;display:inline-block;vertical-align:middle}
+.helpdot{display:block;width:13px;height:13px;padding:0;border:1px solid var(--accent);border-radius:50%;background:none;color:var(--accent);font:600 9px/11px system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;cursor:help}
+.helpdot:hover,.helpdot:focus-visible{border-color:var(--accent);color:var(--accent)}
+.tip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);z-index:1;width:max-content;max-width:min(300px,calc(100vw - 24px));padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:0 6px 18px rgb(0 0 0 / .35);color:var(--text);font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;font-style:normal;pointer-events:none}
+.helpdot:hover+.tip,.helpdot:focus-visible+.tip{display:block}
+.colophon{padding:16px 20px 24px;text-align:center;font-size:11px;color:var(--faint)}
+.colophon a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.colophon a:hover,.colophon a:focus-visible{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <a class="callsign" href="https://www.w7yfr.com" aria-label="W7YFR — back to w7yfr.com"><span class="art" aria-hidden="true">██╗    ██╗███████╗██╗   ██╗███████╗██████╗
+██║    ██║╚════██║╚██╗ ██╔╝██╔════╝██╔══██╗
+██║ █╗ ██║    ██╔╝ ╚████╔╝ █████╗  ██████╔╝
+██║███╗██║   ██╔╝   ╚██╔╝  ██╔══╝  ██╔══██╗
+╚███╔███╔╝   ██║     ██║   ██║     ██║  ██║
+ ╚══╝╚══╝    ╚═╝     ╚═╝   ╚═╝     ╚═╝  ╚═╝</span></a>
+  <span class="div"></span>
+  <h1><a href="./" aria-label="CWT — back to the app"><span class="art" role="img" aria-label="CWT"> ██████╗██╗    ██╗████████╗
+██╔════╝██║    ██║╚══██╔══╝
+██║     ██║ █╗ ██║   ██║
+██║     ██║███╗██║   ██║
+╚██████╗╚███╔███╔╝   ██║
+ ╚═════╝ ╚══╝╚══╝    ╚═╝</span></a></h1>
+</header>
+
+<main>
+  <h2>Terms of use</h2>
+  <p class="dated">Last updated November 25, 2026</p>
+
+  <p>CWT is a free tool for practicing Morse code (CW). By using it you agree to these terms. They are short. Please read them.</p>
+
+  <h3>1. What CWT does</h3>
+  <p>CWT listens to you send Morse code through your microphone or another audio input. It times every dit, dah and gap, reads what you sent, and compares it with what you meant to send. It also plays generated QSOs for you to copy by ear. On the QSO page you work stations that CWT makes up, and they answer what you send.</p>
+
+  <h3>2. How it reads your sending</h3>
+  <p>CWT reads your sending from sound. Your microphone, your room, your key and your calibration all change what it hears. Every reading is an estimate: the letters it copies, your speed, your timing and your grades. They are a guide to your practice, not a measure of your skill.</p>
+
+  <h3>3. The rag chew feature</h3>
+  <p>The rag chew feature on the QSO page is optional. It is off until you enable it and explicitly accept these terms. Enabling it downloads the language model you choose: <a href="https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct">Llama 3.1 8B Instruct</a> by Meta, about 5 GB, or <a href="https://huggingface.co/google/gemma-4-E2B-it">Gemma 4 E2B</a> by Google, about 3 GB. Each comes in a form prepared by the MLC project (<a href="https://huggingface.co/mlc-ai/Llama-3.1-8B-Instruct-q4f16_1-MLC">Llama</a>, <a href="https://huggingface.co/mlc-ai/gemma-4-E2B-it-q4f16_1-MLC">Gemma</a>), from <a href="https://huggingface.co">Hugging Face</a>. The program that runs a model, about 7 to 12 MB, comes from the <a href="https://github.com/mlc-ai/binary-mlc-llm-libs">MLC project on GitHub</a>. CWT checks the program before it runs it. The browser keeps each model you download, and its program, on your computer until you remove them. The model runs on your computer's graphics card.</p>
+  <p>Once your exchange with a station is done, the model writes the station's lines. <b>A language model writes them, not the author of CWT and not a real person.</b> They can be wrong, made up, repeated, strange or offensive. The station, its operator and everything it says about itself are made up. Do not rely on anything it says, about radio, the rules or anything else.</p>
+  <p>Llama 3.1 is Meta's, under the <a href="https://www.llama.com/llama3_1/license/">Llama 3.1 Community License</a> and its <a href="https://www.llama.com/llama3_1/use-policy/">Acceptable Use Policy</a>. When you download it, you agree to them. <em>Built with Llama.</em> <span class="helptip"><button type="button" class="helpdot" aria-label="Why this is here" aria-describedby="llama-tip">?</button><span class="tip" role="tooltip" id="llama-tip">Meta's Llama 3.1 license requires a product that uses Llama to say this.</span></span> Gemma 4 is Google's, under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0 license</a>.</p>
+  <p>Each download uses your data and your storage: about 5 GB for Llama, about 3 GB for Gemma. Running the model works your graphics card, which can warm your computer and use up a laptop's battery faster. You can remove either model at any time from the QSO page's settings.</p>
+
+  <h3>4. No warranty</h3>
+  <p>CWT and the rag chew models are provided as is and as available, with no warranty of any kind, express or implied, including any warranty of accuracy, fitness for a particular purpose, or that they will work without error.</p>
+
+  <h3>5. Limitation of liability</h3>
+  <p>To the fullest extent the law allows, the author of CWT is not liable for any loss or damage that comes from using it or relying on it. That includes anything a rag chew model says or writes, a model's download, and any effect on your computer, its storage, its battery or your data plan. You use CWT and the models at your own risk.</p>
+
+  <h3>6. Privacy</h3>
+  <p>Everything runs in your browser. There is no account, no upload and no server. Your recordings, what you key and your settings never leave your machine. They stay in the browser's own storage until you clear them. There are no analytics and no cookies.</p>
+  <p>CWT makes no network requests of its own, with one exception. When you enable the rag chew feature and explicitly accept these terms, it downloads the model and its program from the addresses in section 3. What you send to the model never leaves your computer. The page is blocked from sending anything anywhere else.</p>
+
+  <h3>7. Source and license</h3>
+  <p>The source is on <a href="https://github.com/W7YFR/cwt">GitHub</a> under the MIT license, which carries its own no-warranty terms for the code. The license does not cover the rag chew models, which have their own licenses (section 3). Bugs and ideas are welcome on GitHub.</p>
+
+  <h3>8. Changes</h3>
+  <p>These terms may change. The date at the top says when they last did. Using CWT after a change means you accept the new terms. The rag chew feature asks you to accept them again before it runs.</p>
+</main>
+
+<footer class="colophon">
+  © <span id="year"></span> <a href="https://www.qrz.com/db/W7YFR">W7YFR</a> · <a href="./">CWT</a>
+</footer>
+<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

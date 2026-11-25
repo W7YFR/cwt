@@ -31,9 +31,9 @@ import { playwright } from "@vitest/browser-playwright";
    chromium` once. */
 /* The dev server's own socket, through the app's CSP.
  *
- * index.html declares `connect-src 'none'` — the app talks to nothing, ever,
- * and the policy says so rather than leaving it to be inferred. That is true
- * of the app and false of the dev server, whose hot-update channel is a
+ * index.html lets the page connect only to the rag chew model's download
+ * hosts, and the policy says so rather than leaving it to be inferred. That
+ * is true of the app and false of the dev server, whose hot-update channel is a
  * WebSocket to localhost: the browser blocks it, the client logs "connecting"
  * forever, and every edit sits on the server until the page is reloaded by
  * hand. It reads exactly like hot reloading having been turned off.
@@ -42,6 +42,7 @@ import { playwright } from "@vitest/browser-playwright";
  * is the whole point of it: the built page keeps the policy it was written
  * with, and no shipped byte knows this plugin exists. */
 function devCsp(): Plugin {
+  // The dev server's own origin and socket, before the model's hosts.
   const OPEN = "connect-src 'self' ws: wss:";
   /* The tag first, the directive inside it second. The prose above the tag
      quotes the directive it is explaining, so a pattern loose enough to find
@@ -66,7 +67,10 @@ function devCsp(): Plugin {
         console.warn("[dev-csp] no connect-src in the page policy — HMR may be blocked");
         return html;
       }
-      return html.replace(tag, tag.replace(/connect-src[^;"]*/, OPEN));
+      return html.replace(
+        tag,
+        tag.replace(/connect-src([^;"]*)/, (_, hosts: string) => `${OPEN}${hosts.replace(/\s*'none'/, "")}`),
+      );
     },
   };
 }

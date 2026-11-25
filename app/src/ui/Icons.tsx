@@ -218,6 +218,31 @@ export function IconStraightKey(): React.ReactElement {
   );
 }
 
+/** A trash can: delete. */
+export function IconTrash(): React.ReactElement {
+  return (
+    <Icon name="trash" stroke>
+      <path d="M2.5 4.5h11M6.5 4.5V3a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8v1.5M4 4.5l.7 8.3a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4.5M6.6 7v4M9.4 7v4" />
+    </Icon>
+  );
+}
+
+/** A robot's head: an antenna, a square face and two eyes. A line the rag
+ *  chew model wrote. */
+export function IconRobot(): React.ReactElement {
+  return (
+    <Icon name="robot" stroke>
+      <path d="M8 2.2v2.3" />
+      <circle cx="8" cy="1.8" r=".8" fill="currentColor" stroke="none" />
+      <rect x="2.8" y="4.5" width="10.4" height="8.6" rx="2" />
+      <circle cx="6" cy="8.4" r="1" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="8.4" r="1" fill="currentColor" stroke="none" />
+      <path d="M6.2 11h3.6" />
+      <path d="M1.3 7.6v2.6M14.7 7.6v2.6" />
+    </Icon>
+  );
+}
+
 /** A bug from the side: the paddle, and the long arm with its weight at the
  *  end. */
 export function IconBug(): React.ReactElement {

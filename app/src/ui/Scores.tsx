@@ -220,8 +220,8 @@ export function Scores({
 }
 
 /** A trash can with a small mark at its top right. The mark says how much it
- *  throws away: 1 for one run, A for all of them. */
-function TrashIcon({ mark }: { mark: string }): React.ReactElement {
+ *  throws away: 1 for one run, A for all of them. None: a plain trash can. */
+export function TrashIcon({ mark }: { mark?: string }): React.ReactElement {
   return (
     <>
       {/* Drawn rather than typed: no system font carries a trash can that can
@@ -239,9 +239,11 @@ function TrashIcon({ mark }: { mark: string }): React.ReactElement {
           strokeLinejoin="round"
         />
       </svg>
-      <span className="trashmark" aria-hidden="true">
-        {mark}
-      </span>
+      {mark && (
+        <span className="trashmark" aria-hidden="true">
+          {mark}
+        </span>
+      )}
     </>
   );
 }

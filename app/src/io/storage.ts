@@ -493,6 +493,11 @@ export interface Prefs {
   /** Blurred station text blurs the station's call in the log too. Absent
    *  is off. */
   qsoBlurCall?: boolean;
+  /** After the exchange of a standard QSO, a model in the browser writes the
+   *  station's lines until you sign off. Absent is off. */
+  qsoRagChew?: boolean;
+  /** The rag chew's model, as WebLLM names it. */
+  qsoRagChewModel?: "Llama-3.1-8B-Instruct-q4f16_1-MLC" | "gemma-4-E2B-it-q4f16_1-MLC";
   /** Continue on the QSO page plays the station's last over again. Absent
    *  is on. */
   qsoReplay?: boolean;
@@ -840,6 +845,8 @@ const PREF_SHAPE: Readonly<Record<keyof Prefs, Check>> = {
   qsoGuide: oneOf("cq", "cwt", "sst", "mst", "pota"),
   qsoSideGuide: isBool,
   qsoBlurCall: isBool,
+  qsoRagChew: isBool,
+  qsoRagChewModel: oneOf("Llama-3.1-8B-Instruct-q4f16_1-MLC", "gemma-4-E2B-it-q4f16_1-MLC"),
   qsoReplay: isBool,
   qsoYourText: oneOf("sent", "hidden", "none"),
   qsoHints: oneOf("off", "always", "copied"),

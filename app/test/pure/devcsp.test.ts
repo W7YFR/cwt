@@ -1,7 +1,7 @@
 /* The dev server has to be able to reach its own socket.
  *
- * index.html says `connect-src 'none'`, which is the truth about the app and a
- * lie about the dev server: hot updates arrive over a WebSocket to localhost,
+ * index.html lets the page connect only to the rag chew model's hosts, which
+ * is the truth about the app and a lie about the dev server: hot updates arrive over a WebSocket to localhost,
  * and a browser enforcing that policy blocks it. The symptom is not an error
  * anyone goes looking for — the page loads, the app works, and edits simply do
  * not appear until you reload by hand, which reads as hot reloading having
@@ -18,6 +18,10 @@ import config from "../../../vite.config";
 import { DATA_DIR } from "../oracle-fs";
 
 const INDEX = readFileSync(`${DATA_DIR}/../../index.html`, "utf8");
+
+/** Where the rag chew model downloads from, and nowhere else. */
+const MODEL_HOSTS =
+  "connect-src https://huggingface.co/mlc-ai/ https://*.huggingface.co https://*.hf.co https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/";
 
 /** The policy the browser would enforce.
  *
@@ -48,18 +52,19 @@ function devCsp() {
 }
 
 describe("the app's own content policy", () => {
-  it("shuts every outbound connection in the page that ships", () => {
+  it("opens no outbound connection in the page that ships, but the model's download", () => {
     // The premise, and worth asserting on its own: the loosening below is only
     // safe because this is what the file says.
-    expect(policy(INDEX)).toContain("connect-src 'none'");
+    expect(policy(INDEX).find((d) => d.startsWith("connect-src"))).toBe(MODEL_HOSTS);
   });
 
   it("is loosened for the dev server, and only there", () => {
     const p = devCsp();
     expect(p.apply).toBe("serve");
     const served = policy(p.transformIndexHtml(INDEX));
-    expect(served).not.toContain("connect-src 'none'");
-    expect(served.find((d) => d.startsWith("connect-src"))).toMatch(/\bws:/);
+    const connect = served.find((d) => d.startsWith("connect-src"))!;
+    expect(connect).toMatch(/\bws:/);
+    expect(connect).toContain("https://huggingface.co");
   });
 
   it("loosens that one directive and nothing else", () => {
@@ -70,7 +75,7 @@ describe("the app's own content policy", () => {
     const before = policy(INDEX);
     const after = policy(devCsp().transformIndexHtml(INDEX));
     expect(after.length).toBe(before.length);
-    expect(before.filter((d, i) => d !== after[i])).toEqual(["connect-src 'none'"]);
+    expect(before.filter((d, i) => d !== after[i])).toEqual([MODEL_HOSTS]);
   });
 
   it("passes a page with no policy through untouched", () => {
@@ -88,7 +93,7 @@ describe("the app's own content policy", () => {
        lost a paragraph. */
     const served = devCsp().transformIndexHtml(INDEX);
     const grew = served.length - INDEX.length;
-    expect(grew).toBe("connect-src 'self' ws: wss:".length - "connect-src 'none'".length);
+    expect(grew).toBe(" 'self' ws: wss:".length);
     expect(served.match(/<meta/g)!.length).toBe(INDEX.match(/<meta/g)!.length);
   });
 });
