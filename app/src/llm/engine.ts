@@ -282,20 +282,12 @@ export async function chat(system: string, turns: readonly ChatTurn[]): Promise<
       temperature: 0.7,
       top_p: 0.9,
       max_tokens: 100,
-      ...(model.startsWith("Qwen3") ? { extra_body: { enable_thinking: false } } : {}),
     });
     return out.choices[0]?.message.content ?? null;
   } catch {
     return null;
   }
 }
-
-addHelper("ragChewModel", "ragChewModel(id?): the rag chew model, or switch to another (Llama 3.1 8B or Gemma 4 E2B).", (id?: string) => {
-  if (id === undefined) return { model, models: Object.keys(MODELS), state };
-  if (!(id in MODELS)) return `Not a model: ${id}`;
-  void choose(id as ModelId);
-  return `Rag chew model: ${id}.`;
-});
 
 /** Where `__cwt.debugLLM(true)` is kept, so it lasts across reloads. */
 const DEBUG_KEY = "cwt:debugLLM";
