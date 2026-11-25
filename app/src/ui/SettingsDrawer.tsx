@@ -29,6 +29,8 @@ const APP_TABS: readonly PageTab[] = [
   { id: "drills", label: "Drills", scope: EVERY_PAGE },
 ];
 const isApp = (id: SettingsTab) => APP_TABS.some((a) => a.id === id);
+/** How long the drawer, open over a reload, waits for the page's tabs. */
+const PAGE_TABS_WAIT_MS = 500;
 const isTab = (v: unknown): v is SettingsTab => ORDER.includes(v as SettingsTab);
 
 interface PageTab {
@@ -194,9 +196,21 @@ export function SettingsDrawer({
   const scope = tabs.find((t) => t.id === tab)?.scope;
   const pageOwns = host.pageTabs.some((t) => t.id === tab);
   const appPart = app(tab);
+  // A reload that left the drawer open at a page's tab: the page mounts a
+  // moment after the drawer, and until it gives its tabs the drawer would
+  // show the first of the app's, then jump. So it waits for them, for up to
+  // half a second, as a screen with no tabs of its own never gives any.
+  // Only for the drawer the reload brought back: one you open is wanted now.
+  const [reopened] = useState(() => host.open);
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setWaited(true), PAGE_TABS_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const ready = !reopened || waited || isApp(host.tab) || host.pageTabs.length > 0;
   return (
     <Drawer
-      open={host.open}
+      open={host.open && ready}
       onClose={host.close}
       title="Settings"
       id="settings-drawer"
