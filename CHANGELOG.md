@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.41.0 — 2026-11-25
+
 ### Added
 
 - **Station pitch** in the Copy and QSO pages' sound settings sets the lowest and highest pitch a station sends at. Each station picks its pitch at random in that range. The default is 550 to 750 Hz.
