@@ -42,7 +42,11 @@ afterEach(() => {
 describe("Pass thru", () => {
   it("plays the input only while it is ticked, at the Volume", async () => {
     render(<App />);
-    fireEvent.click(await screen.findByTestId("live-start"));
+    /* Listen is shown before the input is found, and a click on it does
+       nothing until then. */
+    const listen = await screen.findByTestId("live-start");
+    await waitFor(() => expect(listen).toBeEnabled());
+    fireEvent.click(listen);
     // Listening, and off: nothing reaches the speakers.
     await waitFor(() => expect(monitor).toHaveBeenCalled());
     expect(monitor.mock.lastCall![0]).toBe(0);
