@@ -107,6 +107,49 @@ export function systemPrompt(them: Station, d: Details, user: UserInfo, pace: Pa
   ].join("\n");
 }
 
+/** The model's instructions for your suggested reply in a rag chew with
+ *  `them`: the model writes as you, from what User holds. */
+export function replyPrompt(them: Station, user: UserInfo): string {
+  const yourName = title(user.name.trim() || "OM");
+  const yourQth = [user.qthCity.trim(), user.qthRegionShort.trim()].filter(Boolean).join(" ");
+  const rig = [user.rigManufacturer.trim(), user.rigModel.trim()].filter(Boolean).join(" ");
+  const facts = [
+    rig && `- Radio: ${rig}${user.rigPower.trim() ? ` at ${user.rigPower.trim().replace(/\s*w(atts?)?$/i, "")}W` : ""}.`,
+    user.antenna.trim() && `- Antenna: ${user.antenna.trim()}.`,
+    user.age.trim() && `- Age ${user.age.trim()}.`,
+    user.yearLicensed.trim() && `- Licensed in ${user.yearLicensed.trim()}.`,
+  ].filter(Boolean);
+  return [
+    `You are ${yourName}, a ham radio operator${yourQth ? ` in ${yourQth}` : ""}. You are chatting with ${title(them.name)}, another ham in ${them.qth}, by Morse code.`,
+    `You already traded signal reports, names and locations. Now it is a casual chat.`,
+    ``,
+    ...(facts.length ? [`Facts about you (only these are about you):`, ...facts, ``] : []),
+    `How to reply:`,
+    `- Morse is slow, so keep it short: 1 or 2 short sentences, at most 20 words.`,
+    `- React to one thing ${title(them.name)} just told you, or answer their question.`,
+    `- Then you may ask ${title(them.name)} one simple question.`,
+    `- Never make up a fact about yourself. Use only the facts above. If you have none to share, ask a question instead.`,
+    `- Never claim ${title(them.name)}'s radio, antenna, weather or town as yours.`,
+    `- Do not sign off. Do not say goodbye or 73.`,
+    `- Plain words only. Write numbers as digits. No emoji, no lists, no quotes.`,
+  ].join("\n");
+}
+
+/** The rag chew so far, as one message that asks for your next line. One
+ *  message, not the turns with their roles swapped: a chat that opened
+ *  with the model's turn is one some models refuse. */
+export function yourTurn(them: Station, user: UserInfo, turns: readonly ChatTurn[]): ChatTurn[] {
+  const you = title(user.name.trim() || "OM");
+  const lines = turns.map((t) => `${t.role === "user" ? you : title(them.name)}: ${t.content}`);
+  return [{ role: "user", content: `The chat so far:\n${lines.join("\n")}\n\nWrite ${you}'s next line, and only that line.` }];
+}
+
+/** The model's line for you, without the "Rob:" it may write before it, as
+ *  the chat it read has. */
+export function unlabeled(english: string): string {
+  return english.replace(/^\s*[A-Za-z]+:\s*/, "");
+}
+
 /** CW words to English, longest phrases first. */
 const TO_ENGLISH: ReadonlyArray<readonly [string, string]> = [
   ["HW CPY ?", "how do you copy me?"], ["HW CPY?", "how do you copy me?"], ["HW CPY", "how do you copy me?"],

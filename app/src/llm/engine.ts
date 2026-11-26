@@ -272,21 +272,52 @@ export async function remove(id: ModelId = model): Promise<void> {
   else set(state);
 }
 
-/** The station's reply in English, or null with no model loaded or on an
- *  error. */
-export async function chat(system: string, turns: readonly ChatTurn[]): Promise<string | null> {
+/** The model's call under way: the model writes one reply at a time, so the
+ *  next call waits for it. */
+let busy: Promise<unknown> = Promise.resolve();
+/** A suggested reply is being written. The station's line comes first. */
+let suggesting = false;
+
+/** The model's reply in English, or null with no model loaded, on an error,
+ *  or when stopped. */
+async function ask(system: string, turns: readonly ChatTurn[], maxTokens: number): Promise<string | null> {
   if (!engine) return null;
   try {
     const out = await engine.chat.completions.create({
       messages: [{ role: "system", content: system }, ...turns],
       temperature: 0.7,
       top_p: 0.9,
-      max_tokens: 100,
+      max_tokens: maxTokens,
     });
-    return out.choices[0]?.message.content ?? null;
+    const choice = out.choices[0];
+    return choice && choice.finish_reason !== "abort" ? choice.message.content : null;
   } catch {
     return null;
   }
+}
+
+/** The station's reply in English, or null. A suggested reply still being
+ *  written is stopped, so the station's line is not held up. */
+export function chat(system: string, turns: readonly ChatTurn[]): Promise<string | null> {
+  if (suggesting) void engine?.interruptGenerate();
+  const run = busy.then(() => ask(system, turns, 100));
+  busy = run;
+  return run;
+}
+
+/** Your suggested reply in English, or null, also when the station's next
+ *  line stopped it. */
+export function suggest(system: string, turns: readonly ChatTurn[]): Promise<string | null> {
+  const run = busy.then(async () => {
+    suggesting = true;
+    try {
+      return await ask(system, turns, 60);
+    } finally {
+      suggesting = false;
+    }
+  });
+  busy = run;
+  return run;
 }
 
 /** Where `__cwt.debugLLM(true)` is kept, so it lasts across reloads. */

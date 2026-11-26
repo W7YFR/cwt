@@ -200,7 +200,11 @@ const CLOSING_PAIRS = ["FER QSO", "FB QSO", "TNX QSO", "FOR QSO"];
 
 /** What signs off inside words run together. Short ones such as SK or GL
  *  turn up inside other words, so only these count. */
-const CLOSING_RUN = ["73", "CUAGN", "FERQSO", "FBQSO", "TNXQSO"];
+const CLOSING_RUN = ["CUAGN", "FERQSO", "FBQSO", "TNXQSO"];
+
+/** 73 inside a word, as in R73 or 73SK, but not inside a number, as in
+ *  IC7300 or 1973. */
+const RUN_73 = /(?<!\d)73(?!\d)/;
 
 /** A signal report: 599, 579, 5NN. */
 export const REPORT_RE = /^[1-5][1-9N][1-9N]$/;
@@ -398,7 +402,11 @@ export class Over {
     if (words.some((w) => CLOSING.includes(w))) return true;
     const pairs = words.slice(1).map((w, i) => `${words[i]} ${w}`);
     if (pairs.some((p) => CLOSING_PAIRS.includes(p))) return true;
-    return this.ear.lenient && CLOSING_RUN.some((w) => this.joined.includes(w));
+    if (!this.ear.lenient) return false;
+    if (CLOSING_RUN.some((w) => this.joined.includes(w))) return true;
+    // 73 in a word, or keyed apart as 7 3. Each word on its own: run
+    // together, a number before it, as in 599 R73, would hide it.
+    return words.some((w) => RUN_73.test(w)) || pairs.some((p) => /(?<!\d)7 3(?!\d)/.test(p));
   }
 
   /** The word after the first of `labels`, past any filler. */

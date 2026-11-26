@@ -111,11 +111,16 @@ const wait = (ms: number) =>
     await new Promise((r) => setTimeout(r, ms));
   });
 
-async function until(what: string, ok: () => boolean, ms = 20_000): Promise<void> {
-  for (let t = 0; t < ms; t += 50) {
+/** Wait until `ok` holds, or fail saying `what`. `ms` is real time, and ends
+ *  before the test's own 15 s limit: a test stopped at its limit would leave
+ *  this loop running, and its act() calls would fail the tests after it. */
+async function until(what: string, ok: () => boolean, ms = 12_000): Promise<void> {
+  const end = performance.now() + ms;
+  while (performance.now() < end) {
     if (ok()) return;
     await wait(50);
   }
+  if (ok()) return;
   throw new Error(`timed out waiting for ${what}`);
 }
 

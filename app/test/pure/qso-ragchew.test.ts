@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { answer, chatsOn, newQso, Over, type Qso } from "@/qso/cq";
-import { toCw, toEnglish } from "@/qso/ragchew";
+import { replyPrompt, toCw, toEnglish, unlabeled, yourTurn } from "@/qso/ragchew";
+import { EMPTY_USER } from "@/io/storage";
 import { failureOf } from "@/llm/engine";
 import { CHAT_WORDS } from "@/qso/chatwords";
 import { vocabulary } from "@/qso/vocabulary";
@@ -140,5 +141,44 @@ describe("why the model did not download or load", () => {
     expect(failureOf(new Error("Cannot initialize runtime because of requested maxBufferSize exceeds limit"))).toBe("graphics");
     expect(failureOf(new TypeError("Failed to fetch"))).toBe("network");
     expect(failureOf(new Error("Something else"))).toBe("other");
+  });
+});
+
+describe("a sign-off, with Lenient on", () => {
+  it("is a 73 in a word or keyed apart, but not one inside a number", () => {
+    for (const h of ["TNX 73", "R73", "73SK", "UR 599 R73", "7 3 SK", "TNX FERQSO"]) expect(new Over(h, ear).closing(), h).toBe(true);
+    for (const h of ["FB RIG HR IS IC7300", "LIC IN 1973", "RIG IC 7300"]) expect(new Over(h, ear).closing(), h).toBe(false);
+  });
+
+  it("leaves a rag chew about an IC7300 going", () => {
+    expect(chatsOn(stages().done, "FB RIG HR IS IC7300 BK", ear)).toBe(true);
+  });
+});
+
+describe("your suggested reply in a rag chew", () => {
+  const them = stages().done.them;
+  const user = { ...EMPTY_USER, name: "ROB", qthCity: "SEATTLE", qthRegionShort: "WA", rigManufacturer: "ICOM", rigModel: "IC7300", rigPower: "100" };
+
+  it("gives the model only the facts User holds", () => {
+    const p = replyPrompt(them, user);
+    expect(p).toContain("ICOM IC7300 at 100W");
+    expect(p).not.toContain("Antenna:");
+    expect(replyPrompt(them, EMPTY_USER)).not.toContain("Facts about you");
+  });
+
+  it("sends the chat as one message from you, with each line under its speaker", () => {
+    const turns = yourTurn(them, user, [
+      { role: "user", content: "great rig here is ic7300" },
+      { role: "assistant", content: "Nice radio. What antenna?" },
+    ]);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]!.role).toBe("user");
+    expect(turns[0]!.content).toContain("Rob: great rig here is ic7300");
+    expect(turns[0]!.content).toContain(`${them.name.charAt(0)}${them.name.slice(1).toLowerCase()}: Nice radio. What antenna?`);
+  });
+
+  it("drops a speaker's name the model writes before the line", () => {
+    expect(unlabeled("Rob: My antenna is a dipole.")).toBe("My antenna is a dipole.");
+    expect(unlabeled("My antenna is a dipole.")).toBe("My antenna is a dipole.");
   });
 });

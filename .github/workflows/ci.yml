@@ -150,6 +150,15 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
 
+      # A failed browser test saves a screenshot of the page as it stopped.
+      # Kept, as the log alone does not show where a test was stuck.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failures
+          path: app/.vitest/attachments/failure-screenshots/
+          if-no-files-found: ignore
+
   # Does this push change a build input? A push that touches only CI, docs,
   # tests or the Makefile builds the same site, so it skips build and deploy.
   # A manual run always deploys. When the commit the push started from is not
