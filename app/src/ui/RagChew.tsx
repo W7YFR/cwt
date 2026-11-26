@@ -7,7 +7,8 @@
  * download and turns the rag chew on. After that the setting is a check, to
  * turn the rag chew on and off, and a choice of model. Each model downloads
  * once and stays until you delete it: a trash can with one on this computer,
- * ⋯ with both, to delete either or both. */
+ * ⋯ with both, to delete either or both. Once a model is here, a second check
+ * has the model write your suggested reply too. */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -16,7 +17,7 @@ import {
   cancel, check, choose, downloaded, load, modelId, MODELS, modelState, remove, subscribe, type Failure, type ModelId, type ModelState,
 } from "@/llm/engine";
 import { agree, agreed } from "@/terms";
-import { ActionGroup, ChoiceGroup, TipButton } from "./Controls";
+import { ActionGroup, Check, ChoiceGroup, TipButton } from "./Controls";
 import { TrashIcon } from "./Scores";
 import { DeleteItem, MoreMenu } from "./Toolbar";
 
@@ -32,6 +33,11 @@ const ABOUT =
   "After you and the station trade reports, names and QTHs, a model on this computer writes " +
   "the station's lines. The station chats about its rig, antenna and weather, and answers what " +
   "you send, until you send 73 or SK. What you send stays on this computer.";
+
+const HINTS_HELP =
+  "In a rag chew, the model writes your suggested reply to the station's last line. It uses your details in *User*. " +
+  "The suggested reply shows once the model has written it. " +
+  "When this is off, the suggested reply in a rag chew is a sign-off. Needs *Suggest my reply* on.";
 
 /** The setting's help: what rag chew does, and where the model is. */
 function help(s: ModelState, label: string, gb: number): string {
@@ -69,7 +75,18 @@ function failureText(why: Failure, label: string, gb: number): string {
   }
 }
 
-export function RagChewGroup({ on, onChange }: { on: boolean; onChange(on: boolean): void }): React.ReactElement {
+export function RagChewGroup({
+  on,
+  onChange,
+  hints,
+  onHints,
+}: {
+  on: boolean;
+  onChange(on: boolean): void;
+  /** The model writes your suggested reply. */
+  hints: boolean;
+  onHints(on: boolean): void;
+}): React.ReactElement {
   const s = useModel();
   const id = modelId();
   const { label, gb } = MODELS[id];
@@ -192,6 +209,14 @@ export function RagChewGroup({ on, onChange }: { on: boolean; onChange(on: boole
         options={[{ value: "none", label: "None" }, ...IDS.map((m) => ({ value: m, label: MODELS[m].label }))]}
         action={del}
         onChange={(v) => (v === "none" ? onChange(false) : pick(v as ModelId))}
+      />
+      <Check
+        id="qso-rag-chew-hints"
+        label="The model suggests my reply"
+        help={HINTS_HELP}
+        checked={hints}
+        barred={on ? null : "Needs a *Rag chew* model."}
+        onChange={onHints}
       />
       {s.kind === "loading" ? (
         <div className="group" data-testid="qso-rag-chew" data-model={s.kind} data-stage={s.stage} ref={progress}>

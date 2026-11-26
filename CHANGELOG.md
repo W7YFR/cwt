@@ -7,6 +7,19 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+### Added
+
+- **The model suggests my reply**, under **Rag chew** once a model is downloaded, has the model write your suggested reply to the station's last line. It is off at first.
+
+### Fixed
+
+- With **Lenient** on, a line with a number that holds 73, such as IC7300 or 1973, no longer ends the QSO.
+
+### Development
+
+- A browser test that gets stuck fails alone, naming what it waited for. The tests after it no longer fail with it.
+- CI keeps a screenshot of each failed browser test.
+
 ## v1.42.0 — 2026-11-25
 
 ### Added

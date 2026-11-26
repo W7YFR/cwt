@@ -56,12 +56,15 @@ const { SettingsForm } = await import("@/ui/Controls");
 const { agreed } = await import("@/terms");
 
 let on = false;
+let hints = false;
 function Harness({ initial }: { initial: boolean }) {
   const [value, setValue] = useState(initial);
+  const [suggests, setSuggests] = useState(false);
   on = value;
+  hints = suggests;
   return (
     <SettingsForm>
-      <RagChewGroup on={value} onChange={setValue} />
+      <RagChewGroup on={value} onChange={setValue} hints={suggests} onHints={setSuggests} />
     </SettingsForm>
   );
 }
@@ -127,6 +130,21 @@ describe("the rag chew setting", () => {
     await click(choices()[1]!);
     expect(on).toBe(true);
     expect(byId("qso-rag-chew-remove"), "one model here: a trash can").not.toBeNull();
+  });
+
+  it("offers the model's suggested reply only once a model is here, and only with the model on", async () => {
+    await mount();
+    expect(document.getElementById("qso-rag-chew-hints"), "no model here").toBeNull();
+    cleanup();
+    localStorage.setItem("cwt:terms", JSON.stringify({ terms: 1, app: "1.0.0", at: "2026-11-25T00:00:00.000Z" }));
+    fake.here.add(LLAMA);
+    await mount(true);
+    const check = () => document.getElementById("qso-rag-chew-hints") as HTMLInputElement;
+    expect(check().checked, "off at first").toBe(false);
+    await click(check());
+    expect(hints).toBe(true);
+    await click(choices()[0]!);
+    expect(check().disabled, "rag chew None").toBe(true);
   });
 
   it("asks for a model not here without the terms again, for that model alone", async () => {

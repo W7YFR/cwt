@@ -46,8 +46,8 @@ import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import { pitchIn, regionOf, withKeys, type Station } from "@/qso/station";
-import { borrows, detailsOf, opening, systemPrompt, toCw, toEnglish, type ChatTurn } from "@/qso/ragchew";
-import { chat, llmLog, modelState, wake } from "@/llm/engine";
+import { borrows, detailsOf, opening, replyPrompt, systemPrompt, toCw, toEnglish, unlabeled, yourTurn, type ChatTurn } from "@/qso/ragchew";
+import { chat, llmLog, modelState, suggest, wake } from "@/llm/engine";
 import { agreed } from "@/terms";
 import { RagChewGroup } from "./RagChew";
 import { CHAT_WORDS } from "@/qso/chatwords";
@@ -514,6 +514,7 @@ function useOnOff(
     | "qsoShowTheirSpeed"
     | "qsoBlurCall"
     | "qsoRagChew"
+    | "qsoRagChewHints"
     | "qsoReplay"
     | "qsoShowDownload"
     | "qsoScriptReport"
@@ -657,6 +658,8 @@ export function QsoScreen({
     savePrefs({ ...loadPrefs(), qsoGuide: next });
   };
   const [hints, setHintsRaw] = useState<Hints>(() => loadPrefs().qsoHints ?? "off");
+  const hintsRef = useRef(hints);
+  hintsRef.current = hints;
   const setHints = (next: Hints) => {
     setHintsRaw(next);
     savePrefs({ ...loadPrefs(), qsoHints: next });
@@ -676,6 +679,10 @@ export function QsoScreen({
   const showSettings = () => settings.show("page");
   const [blurCall, setBlurCall] = useOnOff("qsoBlurCall", false);
   const [ragChew, setRagChew] = useOnOff("qsoRagChew", false);
+  /** In a rag chew, the model writes your suggested reply. */
+  const [modelHints, setModelHints] = useOnOff("qsoRagChewHints", false);
+  const modelHintsRef = useRef(modelHints);
+  modelHintsRef.current = modelHints;
   // On: the model loads with the page, not only once Settings is open.
   // Only once you accept the terms (see terms.ts).
   useEffect(() => {
@@ -685,6 +692,9 @@ export function QsoScreen({
   const chats = useRef(
     new Map<number, ChatTurn[]>(kept && Array.isArray(kept.chat) ? [[kept.qsoNo, [...kept.chat]]] : []),
   );
+  /** Your suggested reply in a rag chew, from the model: `after` is the
+   *  station's line it answers. */
+  const [chatHint, setChatHint] = useState<{ n: number; after: string; reply: string } | null>(null);
   /** Counts each stop and pause, so a reply the model was still writing
    *  is dropped. */
   const hush = useRef(0);
@@ -1607,9 +1617,24 @@ export function QsoScreen({
     }
     if (hush.current !== hushed || qsoNo.current !== n) return;
     if (!line) return fallback();
-    chats.current.set(n, [...turns, { role: "assistant", content: english! }]);
+    const chatted: ChatTurn[] = [...turns, { role: "assistant", content: english! }];
+    chats.current.set(n, chatted);
     qso.current = { ...q, last: line };
     sendReply(line, them, q.speed, n, null, true);
+    // While the line plays, the model writes your reply to it.
+    if (hintsRef.current !== "off" && modelHintsRef.current) void suggestReply(q, chatted, line, n);
+  };
+
+  /** Your suggested reply to the station's rag chew line `after`, from the
+   *  model. */
+  const suggestReply = async (q: Qso, turns: readonly ChatTurn[], after: string, n: number) => {
+    const hushed = hush.current;
+    const user = loadUser();
+    const english = await suggest(replyPrompt(q.them, user), yourTurn(q.them, user, turns));
+    const cw = english ? toCw(unlabeled(english)) : "";
+    llmLog("qso: suggested reply", { english, cw });
+    if (!cw || hush.current !== hushed || qsoNo.current !== n) return;
+    setChatHint({ n, after, reply: cw });
   };
 
   useEffect(
@@ -2541,21 +2566,30 @@ export function QsoScreen({
         name: nameShown ? them.name : THEIR_NAME,
         region: theirsShown || heard(qsoNo.current, theirRegion) ? theirRegion : "",
       };
+  /** The station's last line, when the rag chew model wrote it and writes
+   *  your replies too: none shows until the model has one. */
+  const lastLine = lines.at(-1);
+  const chatLine =
+    modelHints && lastLine && !lastLine.you && lastLine.model && lastLine.qso === qsoNo.current ? lastLine : null;
   /** The suggested reply for your turn, shown or not: the debug save keeps
    *  it with your line. */
   const reply =
     recorder && (phase === "listening" || phase === "replaying")
-      ? hint(
-          qso.current,
-          meOf(loadUser()),
-          guideKind === "cq" ? null : guideKind,
-          {
-            ...seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
-            // A station that goes piece by piece: your exchange goes so too.
-            pieces: length === "pieces" || (length === "mixed" && piecesStation.current),
-          },
-          theirsIn,
-        )
+      ? chatLine
+        ? chatHint && chatHint.n === chatLine.qso && chatHint.after === chatLine.text
+          ? chatHint.reply
+          : null
+        : hint(
+            qso.current,
+            meOf(loadUser()),
+            guideKind === "cq" ? null : guideKind,
+            {
+              ...seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+              // A station that goes piece by piece: your exchange goes so too.
+              pieces: length === "pieces" || (length === "mixed" && piecesStation.current),
+            },
+            theirsIn,
+          )
       : null;
   replyRef.current = reply;
   const suggestion =
@@ -3040,7 +3074,7 @@ export function QsoScreen({
                     checked={showTheirSpeed}
                     onChange={setShowTheirSpeed}
                   />
-                  <RagChewGroup on={ragChew} onChange={setRagChew} />
+                  <RagChewGroup on={ragChew} onChange={setRagChew} hints={modelHints} onHints={setModelHints} />
                 </div>
               </Section>
                 <Section name="you" title="You">
