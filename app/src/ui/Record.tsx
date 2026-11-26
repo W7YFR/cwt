@@ -14,7 +14,8 @@ import type { Profile } from "@/io/profiles";
 import { DrillPicker } from "./DrillPicker";
 import { fmtElapsed } from "./format";
 import { IconRecord } from "./Icons";
-import { MicDebug } from "./MicDebug";
+import { DebugTools } from "./DebugPanel";
+import { MicDebug, MicReadout } from "./MicDebug";
 import type { RecorderHandle } from "./useRecorder";
 import { RECORD_MODES, type RecordMode } from "./mode";
 import { MODE_HELP } from "./copy";
@@ -284,6 +285,9 @@ export function RecordBar({
 
       {/* Nothing at all without `?micdebug` in the URL. */}
       <MicDebug rec={rec} />
+      <DebugTools>
+        <MicReadout rec={rec} />
+      </DebugTools>
 
       {/* Outside the bar, not in it.
 

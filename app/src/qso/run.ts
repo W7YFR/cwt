@@ -42,6 +42,7 @@ import {
   nearly,
   newQso,
   pace,
+  reportAt,
   type Context,
   type Qso,
 } from "./cq";
@@ -336,13 +337,13 @@ function regionIn(words: readonly string[], mine: string, lenient: boolean): str
   return "";
 }
 
-/** A report: 5NN, or one keyed apart, as 5 NN. */
+/** A report: 5NN, or one keyed apart, as 5 NN or 5 N N. */
 function reportIn(words: readonly string[]): string {
   const whole = words.find((w) => REPORT_RE.test(w));
   if (whole) return whole;
-  for (let i = 0; i + 1 < words.length; i++) {
-    const two = words[i]! + words[i + 1]!;
-    if (REPORT_RE.test(two)) return two;
+  for (let i = 0; i < words.length; i++) {
+    const apart = reportAt(words, i);
+    if (apart) return apart;
   }
   return "";
 }

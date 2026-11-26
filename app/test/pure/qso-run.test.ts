@@ -184,6 +184,8 @@ describe("the station asks again", () => {
   it("keeps what you sent before, and does not ask for it again", () => {
     // The report keyed apart, then sent alone after RST?.
     expect(work(called("pota"), ["K4ABC UR 5 NN WA WA BK"]).replies).toEqual(["BK TU UR 5NN GA BK"]);
+    expect(work(called("pota"), ["K4ABC UR 5 N N WA WA BK"]).replies).toEqual(["BK TU UR 5NN GA BK"]);
+    expect(work(called("pota"), ["K4ABC UR 4 9 9 WA WA BK"]).replies).toEqual(["BK TU UR 5NN GA BK"]);
     expect(work(called("pota"), ["K4ABC WA WA BK", "5NN 5NN K"]).replies).toEqual([
       "RST?",
       "BK TU UR 5NN GA BK",

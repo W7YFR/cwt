@@ -1397,12 +1397,27 @@ function KeyIcon({ kind }: { kind: Exclude<KeyKind, "keyer"> }): React.ReactElem
   );
 }
 
-/** A robot on a line the rag chew model wrote, with its themed tooltip. */
-export function ModelMark(): React.ReactElement {
-  const says = "The model on this computer wrote this line.";
+/** What the robot says while the rag chew model writes a line. */
+const WRITING = {
+  reply: "The model is writing the station's reply to your last line.",
+  hint: "The model is writing a suggested reply for you.",
+} as const;
+
+/** A robot on a line the rag chew model wrote, with its themed tooltip.
+ *  With `writing`, it pulses while the model writes that line. */
+export function ModelMark({ writing }: { writing?: keyof typeof WRITING }): React.ReactElement {
+  const says = writing ? WRITING[writing] : "The model on this computer wrote this line.";
   const tip = useTip<HTMLSpanElement>(says);
   return (
-    <span ref={tip.anchor} className="lkey" data-key="model" role="img" aria-label={says} {...tip.on}>
+    <span
+      ref={tip.anchor}
+      className={writing ? "lkey busy" : "lkey"}
+      data-key="model"
+      data-busy={writing}
+      role="img"
+      aria-label={says}
+      {...tip.on}
+    >
       <IconRobot />
       {tip.box}
     </span>

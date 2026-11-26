@@ -9,20 +9,9 @@
 
 import { APP_VERSION } from "@/build-info";
 import { encodeWav, encodeWavBuffer } from "@/audio/wav";
-import { useSyncExternalStore } from "react";
-import {
-  MIC_DEBUG_EVENT,
-  debugAudio,
-  micDebugOn,
-  micTranscript,
-  type DebugAudio,
-} from "@/micdebug";
-
-/** The switch, followed: `__cwt.micDebug()` shows the buttons at once. */
-function subscribe(changed: () => void): () => void {
-  window.addEventListener(MIC_DEBUG_EVENT, changed);
-  return () => window.removeEventListener(MIC_DEBUG_EVENT, changed);
-}
+import { useContext, useSyncExternalStore } from "react";
+import { debugAudio, micDebugOn, micTranscript, onMicDebug, type DebugAudio } from "@/micdebug";
+import { InDebugPanel } from "./DebugPanel";
 
 /** Silence between the overs in the saved audio, in seconds. */
 const BETWEEN_SEC = 0.5;
@@ -119,8 +108,11 @@ export function DebugDownload({
   current(): DebugAudio | null;
   session?: () => { data: unknown; audio: { samples: Float32Array; rate: number } | null };
 }): React.ReactElement | null {
-  const on = useSyncExternalStore(subscribe, micDebugOn);
-  if (!on) return null;
+  // The switch, followed: `__cwt.micDebug()` shows the buttons at once. The
+  // debug panel shows them with or without it.
+  const on = useSyncExternalStore(onMicDebug, micDebugOn);
+  const inPanel = useContext(InDebugPanel);
+  if (!on && !inPanel) return null;
   return (
     <>
       {session && (

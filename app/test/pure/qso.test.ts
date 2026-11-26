@@ -1105,4 +1105,28 @@ describe("bare answers and split reports", () => {
     expect(replies[1]).toMatch(/TNX FER RPT/);
     expect(replies[2]).not.toMatch(/RST\?/);
   });
+
+  it("reads a report keyed a character at a time", () => {
+    for (const ear of [STRICT, { lenient: true, saved: "" }]) {
+      expect(new Over("UR 4 9 9 4 9 9 K", ear).reportSent()).toBe("499");
+      expect(new Over("UR 4 9 9 4 9 9 K", ear).hasReport()).toBe(true);
+      expect(new Over("UR 5 N N K", ear).reportSent()).toBe("5NN");
+    }
+    // A word of more than one character is not joined in.
+    expect(new Over("UR 4 99X K", STRICT).hasReport()).toBe(false);
+    let q: Qso = newQso(() => 0.3);
+    q = answer(q, "CQ CQ DE W7YFR K", ctx).qso;
+    const t = answer(q, `${q.them.call} DE W7YFR UR 4 9 9 4 9 9 K`, ctx);
+    expect(t.qso.got).toContain("report");
+    expect(t.qso.yourReport).toBe("499");
+    expect(t.reply).not.toMatch(/RST\?/);
+    expect(answer(t.qso, "BK", ctx).reply).not.toMatch(/RST\?/);
+  });
+
+  it("takes the station's report keyed apart with a ? as a check of it", () => {
+    let q: Qso = newQso(() => 0.3);
+    q = answer(q, "CQ CQ DE W7YFR K", ctx).qso;
+    const rst = q.them.rst === "599" ? "5 N N" : q.them.rst.split("").join(" ");
+    expect(new Over(`${rst} ?`, STRICT).asks(q.them).checked).toEqual(["report"]);
+  });
 });

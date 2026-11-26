@@ -59,6 +59,29 @@ describe("the suggested reply in a rag chew", () => {
     expect(hint()).toBeNull();
   });
 
+  it("is none, not a sign-off, when the model's reply is Morse code", async () => {
+    model.yours = ".-.. --- ..- / -.-. --- -.. .-.. -.-. .-.. -..-";
+    const asked = model.asked;
+    await chatting();
+    await until("the model asked", () => model.asked > asked);
+    expect(hint()).toBeNull();
+  });
+
+  it("is the scripts' line when the model has no reply mid-exchange", async () => {
+    model.yours = null;
+    localStorage.setItem("cwt:terms", JSON.stringify({ terms: 1, app: "1.0.0", at: "2026-11-25T00:00:00.000Z" }));
+    await open({ qsoTheirText: "before", qsoHints: "always", qsoRagChew: true, qsoRagChewHints: true, qsoLength: "pieces", user: USER });
+    const call = callIn(await send("CQ CQ DE W7YFR W7YFR K"));
+    const asked = model.asked;
+    await send(`${call} DE W7YFR UR 599 599 BK`);
+    // A question mid-exchange goes to the model, which answers it.
+    expect((await send("WHAT RIG ?")).querySelector(".text")?.textContent).toContain("TS590");
+    await until("the model asked", () => model.asked > asked);
+    // The scripts' next piece of your exchange: your name.
+    await until("a suggested reply", () => hint() !== null);
+    expect(hint()).toContain(USER.name);
+  });
+
   it("is not asked of the model when the setting is off", async () => {
     model.yours = "Rob: Nice rig. What antenna do you use?";
     const asked = model.asked;

@@ -2452,6 +2452,41 @@ button.cal { font-size: 11px; padding: 3px 8px; }
   box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
 }
 
+/* The debug panel, behind `__cwt.debug(true)` or `?debug`: the microphone
+   readout's box and tab, with more in the box. Open, the box sits where the
+   page's card sits: the same inset from the window, the same padding and the
+   same corner, so its edges and text line up with the card's. Folded, its tab
+   sits in the left corner at the card's edge, clear of the readout's own tab,
+   and on a phone above the bar of actions at the foot of the screen. The tab
+   is big enough to tap. */
+.micdebug.debugpanel {
+  left: 20px;
+  right: 20px;
+  bottom: 12px;
+  max-height: 60vh;
+  padding: 28px 32px;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+}
+.debugpanel section { border-top: 1px solid var(--line); padding-top: 12px; }
+.debugpanel .debugbar { display: flex; gap: 6px; }
+.debugpanel label.check { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
+.debugevent { padding: 4px 0; overflow-wrap: anywhere; }
+.debugevent + .debugevent { border-top: 1px dashed var(--line); }
+.debugtools { display: flex; flex-wrap: wrap; gap: 6px; }
+.debugtools > div { flex-basis: 100%; }
+.debugsave:has(.debugtools:empty) { display: none; }
+.micdebug-tab.debugtab { left: 20px; right: auto; bottom: 12px; min-height: 40px; padding: 10px 14px; font-size: 13px; }
+@media (max-width: 700px) {
+  .micdebug.debugpanel { left: 16px; right: 16px; bottom: 16px; padding: 20px 16px; }
+  .micdebug-tab.debugtab { left: 16px; bottom: 16px; }
+}
+@media (max-width: 560px) {
+  .micdebug-tab.debugtab { bottom: calc(128px + env(safe-area-inset-bottom)); }
+  .debugpanel { max-height: 70vh; }
+}
+
 /* ---- recording mode ------------------------------------------------------ */
 
 /* Plain, Paced, Zen: three buttons joined into one control, the one in force
@@ -2636,6 +2671,15 @@ header .modeswitch button { white-space: nowrap; }
 /* The key a line was sent on, before its speed: the speed's own ink, a size
    up so the drawing reads. */
 .qsolog .lwpm .lkey { display: inline-flex; vertical-align: -2px; margin-right: 5px; font-size: 14px; }
+/* The robot while the model writes a line: it pulses as the record light
+   does, and with less motion it stays dim instead. */
+.lkey.busy { animation: pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .lkey.busy { animation: none; opacity: .5; }
+}
+/* In the suggested reply, the robot sits before the reply, in the label's
+   ink. */
+.qsohint .lkey { display: inline-flex; vertical-align: -2px; margin-left: 1ch; font-size: 14px; color: var(--ink-faint); }
 /* The end of a row: the speed and the play button, centered together on the
    row's first line of text, whatever the text below it wraps to. */
 .qsolog .lend {

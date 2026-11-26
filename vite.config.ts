@@ -230,7 +230,9 @@ export default defineConfig({
               /* Headless Chromium hides scrollbars. The app keeps a gutter
                  for one, and a popover can run into that gutter, so the
                  tests see the scrollbar the app is used with. */
-              launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] },
+              /* Muted: the pages still play, but not through the speakers of
+                 the computer that runs the tests. */
+              launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"], args: ["--mute-audio"] },
             }),
             headless: true,
             instances: [{ browser: "chromium" }],
