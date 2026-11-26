@@ -6,7 +6,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadPrefs } from "@/io/storage";
 import { heard } from "../qso-fakes";
-import { $, $$, EXCHANGE, click, closeSettings, mount, open, send, settingsTab, slide, start, until, useQsoRig } from "../qso-rig";
+import {
+  $,
+  $$,
+  EXCHANGE,
+  click,
+  closeSettings,
+  mount,
+  open,
+  send,
+  settingsTab,
+  slide,
+  start,
+  until,
+  useQsoRig,
+  yourTurn,
+} from "../qso-rig";
 
 vi.mock("@/capture/mic", async (real) => (await import("../qso-fakes")).fakeMic(await real()));
 vi.mock("@/audio/player", async (real) => (await import("../qso-fakes")).fakePlayer(await real()));
@@ -66,6 +81,30 @@ describe("one station's pitch, set by hand", () => {
     expect(heard.tones.at(-1)).toBe(420);
   });
 
+  it("plays the station's lines already sent at the new pitch", async () => {
+    /** How strong `hz` is in a 16-bit WAV: Goertzel over the whole of it. */
+    const power = (wav: ArrayBuffer, hz: number): number => {
+      const rate = new DataView(wav).getUint32(24, true);
+      const pcm = new Int16Array(wav.slice(44));
+      const k = 2 * Math.cos((2 * Math.PI * hz) / rate);
+      let s1 = 0;
+      let s2 = 0;
+      for (const v of pcm) [s1, s2] = [v + k * s1 - s2, s1];
+      return s1 * s1 + s2 * s2 - k * s1 * s2;
+    };
+    await open({ qsoPlayback: "always" });
+    await send("CQ CQ DE W7YFR W7YFR K");
+    const was = heard.tones.at(-1)!;
+    await click(lineMores()[1]!);
+    await click($('[data-testid="qso-station-pitch"]'));
+    await slide("station-pitch-hz", 420);
+    await click($('[data-testid="station-pitch-set"]'));
+    await click($$('[data-testid="qso-line-play"]')[1]!);
+    const played = heard.replays.at(-1)!;
+    expect(power(played, 420)).toBeGreaterThan(10 * power(played, was));
+    await until("the line to end", () => yourTurn());
+  });
+
   it("is left as it was on Cancel", async () => {
     await open({});
     await send("CQ CQ DE W7YFR W7YFR K");
@@ -87,7 +126,11 @@ describe("Preview", () => {
   class FakeContext {
     currentTime = 0;
     destination = {};
-    createGain = () => ({ gain: { value: 1 }, connect() {} });
+    createGain = () => ({
+      context: this,
+      gain: { value: 1, setValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} },
+      connect() {},
+    });
     createBuffer = (_channels: number, length: number, sampleRate: number) => {
       const data = new Float32Array(length);
       return { duration: length / sampleRate, getChannelData: () => data };
@@ -125,5 +168,22 @@ describe("Preview", () => {
     await settingsTab("sound");
     expect(pressed()).toHaveLength(0);
     expect(stopped).toBeGreaterThanOrEqual(started);
+  });
+
+  it("plays the station's CQ from its pitch dialog, made again as the slider moves, until the dialog closes", async () => {
+    await open({});
+    await send("CQ CQ DE W7YFR W7YFR K");
+    await click(lineMores()[1]!);
+    await click($('[data-testid="qso-station-pitch"]'));
+    const preview = $('[data-testid="station-pitch-preview"]')!;
+    expect(preview.getAttribute("aria-pressed")).toBe("false");
+    await click(preview);
+    expect(preview.getAttribute("aria-pressed")).toBe("true");
+    await until("the CQ to play", () => started > 0);
+    const was = started;
+    await slide("station-pitch-hz", 420);
+    await until("the CQ to play at the new pitch", () => started > was);
+    await click($('[data-testid="station-pitch-set"]'));
+    expect(stopped).toBe(started);
   });
 });

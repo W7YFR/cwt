@@ -7,6 +7,17 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.44.0 — 2026-11-26
+
+### Added
+
+- **Preview**, in a station's pitch dialog on the QSO and Copy pages, plays the station's CQ again and again. The CQ changes pitch as you drag the slider.
+
+### Fixed
+
+- On the QSO page, a station's lines sent before you set its pitch now play again at the new pitch.
+- **Preview** in the sound settings no longer pops when you drag a slider while it plays.
+
 ## v1.43.0 — 2026-11-26
 
 ### Added
