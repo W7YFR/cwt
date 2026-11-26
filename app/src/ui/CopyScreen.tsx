@@ -67,6 +67,7 @@ import { anyAdded, asPlayed } from "@/qso/tape";
 import { fmtSpeed } from "./format";
 import type { LockedShows } from "@/qso/show";
 import type { Speed } from "@/qso/speed";
+import { randomStation } from "@/qso/station";
 import type { Length } from "@/qso/wording";
 import {
   Check,
@@ -2236,6 +2237,9 @@ export function CopyScreen({ onError, onPage, onHome, fileTarget }: CopyScreenPr
           call={file.script.stations[pitchOf]!.call || `Station ${pitchOf + 1}`}
           hz={file.script.stations[pitchOf]!.toneHz}
           note={`${file.script.stations[pitchOf]!.call || `Station ${pitchOf + 1}`} sends at this pitch in this QSO. The next QSO you generate picks its pitches from Station pitch.`}
+          station={{ ...file.script.stations[pitchOf]!, call: file.script.stations[pitchOf]!.call || randomStation(Math.random).call }}
+          gainDb={gainDb}
+          onPreview={() => player.stop()}
           onCancel={() => setPitchOf(null)}
           onSet={(hz) => {
             const script = file.script!;

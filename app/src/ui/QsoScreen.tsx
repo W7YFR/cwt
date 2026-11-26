@@ -3382,12 +3382,21 @@ export function QsoScreen({
           call={qso.current.them.call}
           hz={qso.current.them.pitchHz ?? pitchIn(qso.current.them.toneHz, pitch)}
           note={`${qso.current.them.call} sends at this pitch for the rest of this QSO. The next station picks its pitch from Station pitch.`}
+          station={{ call: qso.current.them.call, speed: theirSpeed, fist: withKeys(qso.current.them, keyStyle.keys).fist }}
+          gainDb={gainDb}
+          onPreview={() => {
+            player.stop();
+            listen.stop();
+          }}
           onCancel={() => setPitchDialog(false)}
           onSet={(hz) => {
             const call = qso.current.them.call;
             qso.current = { ...qso.current, them: { ...qso.current.them, pitchHz: hz } };
             const due = pending.current;
             if (due && due.them.call === call) pending.current = { ...due, them: { ...due.them, pitchHz: hz } };
+            // The station's lines already sent in this QSO play again at the new pitch.
+            const n = qsoNo.current;
+            setLines((l) => l.map((line) => (line.qso === n && !line.you && line.who === call ? { ...line, toneHz: hz } : line)));
             setPitchDialog(false);
           }}
         />

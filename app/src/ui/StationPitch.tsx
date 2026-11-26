@@ -4,12 +4,20 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { sendScript } from "@/copy/generate";
+import type { Fist } from "@/timing/fist";
+import type { Speed } from "@/qso/speed";
 import { PITCH_MAX_HZ, PITCH_MIN_HZ, PITCH_STEP_HZ } from "@/qso/station";
+import { IconPlay, IconStop } from "./Icons";
+import { useLoop } from "./usePreview";
 
 export function StationPitchDialog({
   call,
   hz,
   note,
+  station,
+  gainDb,
+  onPreview,
   onSet,
   onCancel,
 }: {
@@ -18,10 +26,35 @@ export function StationPitchDialog({
   hz: number;
   /** What the pitch applies to, in a sentence. */
   note: string;
+  /** What Preview sends a CQ as: the station's call, speed and fist. */
+  station: { call: string; speed: Speed; fist?: Fist | undefined };
+  gainDb: number;
+  /** Stops what the page plays: the two never play at once. */
+  onPreview(): void;
   onSet(hz: number): void;
   onCancel(): void;
 }): React.ReactElement {
   const [value, setValue] = useState(hz);
+  const [preview, setPreview] = useState(false);
+  // As the dialog opened: a call made up for a station with none stays the same.
+  const [sender] = useState(station);
+  // The station's CQ at the pitch on the slider, again and again.
+  const loop = useLoop(
+    preview
+      ? () =>
+          sendScript(
+            {
+              kind: "text",
+              stations: [{ call: sender.call, speed: sender.speed, toneHz: value, ...(sender.fist ? { fist: sender.fist } : {}) }],
+              lines: [{ station: 0, text: `CQ CQ DE ${sender.call} ${sender.call} K` }],
+            },
+            // One line: the quiet at each end of the clip parts one CQ from the next.
+            { gapSec: 0 },
+          )
+      : null,
+    String(value),
+    gainDb,
+  );
   const slider = useRef<HTMLInputElement>(null);
   // Straight onto the slider: the arrow keys move it a step at a time.
   useEffect(() => slider.current?.focus(), []);
@@ -59,6 +92,24 @@ export function StationPitchDialog({
             value={value}
             onChange={(e) => setValue(Number(e.target.value))}
           />
+        </div>
+        <div className="previewrow">
+          <button
+            type="button"
+            data-testid="station-pitch-preview"
+            aria-pressed={preview}
+            onClick={() => {
+              // From the click itself: a browser starts audio only from one.
+              if (!preview) {
+                onPreview();
+                loop.wake();
+              }
+              setPreview(!preview);
+            }}
+          >
+            <i className="ico">{preview ? <IconStop /> : <IconPlay />}</i>
+            Preview
+          </button>
         </div>
         <div className="confirm">
           <button onClick={onCancel}>Cancel</button>
