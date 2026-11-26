@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.43.0 — 2026-11-26
+
 ### Added
 
 - **The model suggests my reply**, under **Rag chew** once a model is downloaded, has the model write your suggested reply to the station's last line. It is off at first.
