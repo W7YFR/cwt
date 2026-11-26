@@ -13,7 +13,7 @@ nothing to the site. The next release carries them.
 
 ### Fixed
 
-- With **Lenient** on, a line with a number that holds 73, such as IC7300 or 1973, no longer ends the QSO.
+- With **Lenient** on, a number in your line that holds 73, such as IC7300 or 1973, no longer ends the QSO.
 
 ### Development
 
