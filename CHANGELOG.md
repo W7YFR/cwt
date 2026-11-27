@@ -7,6 +7,28 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.44.1 — 2026-11-27
+
+### Added
+
+- In a rag chew, a robot pulses in the log while the model writes the station's line, and in **Suggested reply** while it writes yours. Its tip says what the model is writing.
+
+### Fixed
+
+- In a rag chew, a station line the model wrote in dots and dashes is no longer keyed as slashes and BT. The station sends another line instead.
+- A signal report keyed one character at a time, such as `4 9 9` or `5 N N`, is now read. The station no longer asks for your report again.
+- With **The model suggests my reply** on, a suggested reply that is not words no longer shows. Partway through the exchange, the usual suggested reply shows in its place.
+- In a rag chew, a station that sends with a paddle or a straight key no longer says it uses a bug.
+- In a rag chew, the station no longer reads your line back to you before it answers.
+- In a rag chew, a word keyed in pieces, such as `CR OP S`, no longer has a piece read as an abbreviation.
+- The rag chew station no longer says it sends on a keyer when **Paddle** has it on a bug or a straight key.
+
+### Development
+
+- `__cwt.debug(true)`, or `?debug` in the address, shows a debug panel on every page: the debug switches, the last rag chew lines, the Save buttons and the build.
+- The rag chew log says why a line from the model was not sent, and logs the model's errors.
+- The browser tests run with the browser's sound muted.
+
 ## v1.44.0 — 2026-11-26
 
 ### Added

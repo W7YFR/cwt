@@ -33,8 +33,8 @@ import {
   savePrefs,
   saveSpeed,
 } from "@/io/storage";
-import { chatsOn, DEFAULT_SPEED, newQso, type Qso } from "@/qso/cq";
-import { REPLIES_EVENT, suggestedRepliesOn } from "@/devtools";
+import { chatsOn, DEFAULT_SPEED, newQso, Over as CqOver, STRICT, type Qso } from "@/qso/cq";
+import { onSuggestedReplies, suggestedRepliesOn } from "@/devtools";
 import { FORMATS } from "@/qso/formats";
 import { fmtSpeed } from "./format";
 import { callIn, following, isRun, respond, type AnyQso } from "@/qso/run";
@@ -46,7 +46,7 @@ import { vocabulary } from "@/qso/vocabulary";
 import type { GuideId } from "@/qso/examples";
 import type { Speed } from "@/qso/speed";
 import { pitchIn, regionOf, withKeys, type Station } from "@/qso/station";
-import { borrows, detailsOf, opening, replyPrompt, systemPrompt, toCw, toEnglish, unlabeled, yourTurn, type ChatTurn } from "@/qso/ragchew";
+import { detailsOf, notWords, rejected, replyPrompt, systemPrompt, toCw, toEnglish, unlabeled, yourTurn, type ChatTurn } from "@/qso/ragchew";
 import { chat, llmLog, modelState, suggest, wake } from "@/llm/engine";
 import { agreed } from "@/terms";
 import { RagChewGroup } from "./RagChew";
@@ -66,6 +66,8 @@ import { drawerOpen } from "./Drawer";
 import { DownloadItem, MenuHeading, MoreMenu, PlayItem, QuickChip, Toolbar, WIDEST_SPEED } from "./Toolbar";
 import { ALT, altOf, MOD } from "./modKey";
 import { DebugDownload } from "./DebugDownload";
+import { DebugTools } from "./DebugPanel";
+import { MicReadout } from "./MicDebug";
 import { CopyText } from "./CopyText";
 import { NEEDS_BAND, NEEDS_BAND_BETWEEN, NEEDS_BAND_ON, NEEDS_PAUSE, NEEDS_SLOTS, NEEDS_THEIR_LINES_COPY, NOT_WITH_EXCHANGE } from "./copy";
 import { Graded, RightOnly, type SentAttrs } from "./Graded";
@@ -411,12 +413,6 @@ interface Kept {
   readonly chat?: readonly ChatTurn[];
 }
 
-/** The console's switch for the suggested replies in the log, followed. */
-function onReplies(changed: () => void): () => void {
-  window.addEventListener(REPLIES_EVENT, changed);
-  return () => window.removeEventListener(REPLIES_EVENT, changed);
-}
-
 /** A reply the station is about to send, before it goes in the log. */
 interface Pending {
   readonly reply: string;
@@ -693,8 +689,17 @@ export function QsoScreen({
     new Map<number, ChatTurn[]>(kept && Array.isArray(kept.chat) ? [[kept.qsoNo, [...kept.chat]]] : []),
   );
   /** Your suggested reply in a rag chew, from the model: `after` is the
-   *  station's line it answers. */
-  const [chatHint, setChatHint] = useState<{ n: number; after: string; reply: string } | null>(null);
+   *  station's line it answers. Null when the model gave none it could use. */
+  const [chatHint, setChatHint] = useState<{ n: number; after: string; reply: string | null } | null>(null);
+  /** The station's rag chew line the model is writing, in QSO `n`: a row in
+   *  the log shows it. `id` is the call that set it, so a call dropped by a
+   *  stop never clears the next one's. */
+  const [writing, setWriting] = useState<{ id: number; n: number } | null>(null);
+  /** Your suggested reply the model is writing, to the station's line
+   *  `after` in QSO `n`. */
+  const [suggesting, setSuggesting] = useState<{ id: number; n: number; after: string } | null>(null);
+  /** Counts the model's calls, for `writing` and `suggesting`. */
+  const modelCalls = useRef(0);
   /** Counts each stop and pause, so a reply the model was still writing
    *  is dropped. */
   const hush = useRef(0);
@@ -708,7 +713,7 @@ export function QsoScreen({
   const [lockCopy, setLockCopy] = useOnOff("qsoLockCopy", true);
   const [gradeTyping, setGradeTyping] = useOnOff("qsoGradeTyping", false);
   // Set from the console: __cwt.suggestedReplies().
-  const pastHints = useSyncExternalStore(onReplies, suggestedRepliesOn);
+  const pastHints = useSyncExternalStore(onSuggestedReplies, suggestedRepliesOn);
   const [allowEdits, setAllowEdits] = useOnOff("qsoAllowEdits", false);
   const [lockedShows, setLockedShowsRaw] = useState<LockedShows>(
     () => loadPrefs().qsoLockedShows ?? "nothing",
@@ -999,6 +1004,9 @@ export function QsoScreen({
     nextCall.current = null;
     player.stop();
     setPhase("listening");
+    // What the model is still writing is dropped: its robot goes.
+    setWriting(null);
+    setSuggesting(null);
   }, [player]);
 
   /** Pause, for the Enter key: bound below, once the recorder is. */
@@ -1333,6 +1341,8 @@ export function QsoScreen({
           setPlaying({ line: again, shown: 0 });
         } else {
           pending.current = null;
+          // The model's line takes the place of its robot in the log.
+          if (model) setWriting(null);
           // Your over went in the log at least one render ago.
           setPlaying({ line: lineCount.current, shown: 0 });
           setLines((l) => [
@@ -1595,14 +1605,21 @@ export function QsoScreen({
     sendReply(turn.reply, them, at, n, null);
   }, [copy.over, copy.text, copy.turn, phase, recorder, player, speed, lenient, length, ragChew]);
 
-  /** The station's rag chew line to `heard`, from the model. A line that
-   *  takes your details as its own, or opens as its last one did, is written
-   *  again once. `fallback` sends the scripts' line instead. */
+  /** The station's rag chew line to `heard`, from the model. A line that is
+   *  not words, reads yours back, takes your details as its own, or opens as
+   *  its last one did, is written again once. `fallback` sends the scripts'
+   *  line instead. The log shows the robot from the start until the line is
+   *  in the log, or until `fallback`. */
   const chatReply = async (q: Qso, heard: string, yourWpm: SentWpm | null, n: number, fallback: () => void) => {
     setPhase("waiting");
+    const id = ++modelCalls.current;
+    setWriting({ id, n });
+    const done = () => setWriting((w) => (w?.id === id ? null : w));
     const hushed = hush.current;
     const user = loadUser();
-    const them = q.them;
+    // On the key Paddle gives it, as `sendReply` sends the line: the same
+    // call and habit pick the same key there.
+    const them = withKeys(q.them, keyStyle.keys);
     const d = detailsOf(them);
     const said = toEnglish(heard, [them.call, q.you, user.callsign.trim().toUpperCase()].filter(Boolean));
     const turns: ChatTurn[] = [...(chats.current.get(n) ?? []), { role: "user", content: said }];
@@ -1611,13 +1628,18 @@ export function QsoScreen({
     let line = "";
     for (let tries = 0; tries < 2 && !line; tries++) {
       english = await chat(system, turns);
-      const cw = english ? toCw(english) : "";
-      if (cw && !borrows(cw, heard, d) && opening(cw) !== opening(q.last)) line = cw;
-      llmLog("qso: rag chew", { system: tries === 0 && turns.length === 1 ? system : undefined, said, english, cw, kept: !!line });
+      const cw = english ? toCw(unlabeled(english)) : "";
+      const why = rejected(english, cw, heard, d, q.last);
+      if (!why) line = cw;
+      llmLog("qso: rag chew", { system: tries === 0 && turns.length === 1 ? system : undefined, said, english, cw, kept: !!line, why });
     }
-    if (hush.current !== hushed || qsoNo.current !== n) return;
-    if (!line) return fallback();
-    const chatted: ChatTurn[] = [...turns, { role: "assistant", content: english! }];
+    if (hush.current !== hushed || qsoNo.current !== n) return done();
+    if (!line) {
+      done();
+      return fallback();
+    }
+    // The line as toCw had it: a "Lynn:" the model wrote before it stays out of the history.
+    const chatted: ChatTurn[] = [...turns, { role: "assistant", content: unlabeled(english!) }];
     chats.current.set(n, chatted);
     qso.current = { ...q, last: line };
     sendReply(line, them, q.speed, n, null, true);
@@ -1629,12 +1651,16 @@ export function QsoScreen({
    *  model. */
   const suggestReply = async (q: Qso, turns: readonly ChatTurn[], after: string, n: number) => {
     const hushed = hush.current;
+    const id = ++modelCalls.current;
+    setSuggesting({ id, n, after });
     const user = loadUser();
     const english = await suggest(replyPrompt(q.them, user), yourTurn(q.them, user, turns));
     const cw = english ? toCw(unlabeled(english)) : "";
-    llmLog("qso: suggested reply", { english, cw });
-    if (!cw || hush.current !== hushed || qsoNo.current !== n) return;
-    setChatHint({ n, after, reply: cw });
+    const why = english === null ? "error" : cw ? null : notWords(english) ? "morse" : "empty";
+    llmLog("qso: suggested reply", { english, cw, why });
+    setSuggesting((w) => (w?.id === id ? null : w));
+    if (hush.current !== hushed || qsoNo.current !== n) return;
+    setChatHint({ n, after, reply: cw || null });
   };
 
   useEffect(
@@ -1669,6 +1695,8 @@ export function QsoScreen({
     setItems({});
     setOpened(new Set());
     setPlaying(null);
+    setWriting(null);
+    setSuggesting(null);
     qsoNo.current = 0;
     closing.current = null;
     setFinished(null);
@@ -2567,37 +2595,50 @@ export function QsoScreen({
         region: theirsShown || heard(qsoNo.current, theirRegion) ? theirRegion : "",
       };
   /** The station's last line, when the rag chew model wrote it and writes
-   *  your replies too: none shows until the model has one. */
+   *  your replies too: none shows until the model is writing one. */
   const lastLine = lines.at(-1);
   const chatLine =
     modelHints && lastLine && !lastLine.you && lastLine.model && lastLine.qso === qsoNo.current ? lastLine : null;
+  const scripted = () =>
+    hint(
+      qso.current,
+      meOf(loadUser()),
+      guideKind === "cq" ? null : guideKind,
+      {
+        ...seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
+        // A station that goes piece by piece: your exchange goes so too.
+        pieces: length === "pieces" || (length === "mixed" && piecesStation.current),
+      },
+      theirsIn,
+    );
+  /** The scripts' reply when the model gave none it could use, but never
+   *  their sign-off in the middle of a chat. */
+  const unlessSignOff = (line: string) => (new CqOver(line, STRICT).closing() ? null : line);
   /** The suggested reply for your turn, shown or not: the debug save keeps
    *  it with your line. */
-  const reply =
-    recorder && (phase === "listening" || phase === "replaying")
-      ? chatLine
-        ? chatHint && chatHint.n === chatLine.qso && chatHint.after === chatLine.text
-          ? chatHint.reply
+  /** Whether the model's reply `h` answers the station's last line. */
+  const forChatLine = (h: { n: number; after: string } | null): boolean =>
+    !!h && !!chatLine && h.n === chatLine.qso && h.after === chatLine.text;
+  const yourTurnNow = !!recorder && (phase === "listening" || phase === "replaying");
+  /* While the model writes it, the scripts' reply shows in its place, as
+     when the model gives none. */
+  const reply = yourTurnNow
+    ? chatLine
+      ? forChatLine(chatHint)
+        ? (chatHint!.reply ?? unlessSignOff(scripted()))
+        : forChatLine(suggesting)
+          ? unlessSignOff(scripted())
           : null
-        : hint(
-            qso.current,
-            meOf(loadUser()),
-            guideKind === "cq" ? null : guideKind,
-            {
-              ...seededVoice(qsoNo.current * 1000 + lines.length, new Date().getHours()),
-              // A station that goes piece by piece: your exchange goes so too.
-              pieces: length === "pieces" || (length === "mixed" && piecesStation.current),
-            },
-            theirsIn,
-          )
-      : null;
+      : scripted()
+    : null;
   replyRef.current = reply;
-  const suggestion =
-    // A script always shows what is to be sent next: that is the exercise.
-    // It stays while a line plays again, so the page does not jump.
-    reply !== null && (isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight()))
-      ? reply
-      : null;
+  // A script always shows what is to be sent next: that is the exercise.
+  // It stays while a line plays again, so the page does not jump.
+  const hintsShow = () => isScript(qso.current) || hints === "always" || (hints === "copied" && copiedRight());
+  const suggestion = reply !== null && hintsShow() ? reply : null;
+  /** The model is still writing your suggested reply: its robot pulses in
+   *  the suggested reply's line, with the scripts' reply or nothing. */
+  const hintWriting = yourTurnNow && forChatLine(suggesting) && hintsShow();
 
   /* A new line, or more of one, keeps the end of the log in view: unless you
      scrolled up, in which case the log stays where you are reading. The
@@ -2606,7 +2647,35 @@ export function QsoScreen({
   useLayoutEffect(() => {
     const box = logBox.current;
     if (box && atEnd.current) box.scrollTop = box.scrollHeight;
-  }, [lines, playing, copy.text, copy.keying, note, finished, suggestion]);
+  }, [lines, playing, copy.text, copy.keying, note, finished, suggestion, writing, hintWriting]);
+
+  /** The session in one file, for Save session: every line, the QSOs as the
+   *  station had them, your copy in Exchange's boxes, your settings, and the
+   *  session's clean audio. */
+  const debugSession = () => {
+    const parts = lines.map((_, i) => tapeLineOf(i)).filter((p): p is TapeLine => p !== null);
+    return {
+      data: {
+        prefs: loadPrefs(),
+        user: loadUser(),
+        lines,
+        ends,
+        current: qso.current,
+        items,
+        closed,
+      },
+      audio: parts.length ? tape(parts, tapeRate()) : null,
+    };
+  };
+  /** Your line still being sent, for Save log and Save audio. */
+  const debugCurrent = () =>
+    recorder
+      ? {
+          label: `in progress: ${copy.text || "(nothing)"}${copy.keying ? ` [${copy.keying}]` : ""}`,
+          samples: recorder.since(0),
+          rate: recorder.rate,
+        }
+      : null;
 
   const status = !recorder
     ? open
@@ -2650,6 +2719,28 @@ export function QsoScreen({
       : phase === "waiting"
         ? "waiting"
         : "receiving";
+
+  /** The station's line the model is writing, after your line in QSO
+   *  group `at`: the station's label as its last line has it, no text, and
+   *  the robot pulsing where the speed goes. Not a line in `lines`, so no
+   *  line's index moves. */
+  const modelWait = (at: readonly number[]): React.ReactElement => {
+    const theirs = at.map((i) => lines[i]!).reverse().find((l) => !l.you);
+    return (
+      <li className="modelwait" data-testid="qso-model-wait">
+        {theirs ? labelOf(theirs) : <span className="who">Station</span>}
+        <span className="text" />
+        <span className="lend">
+          <span className="lwpm">
+            <ModelMark writing="reply" />
+          </span>
+          {allowEdits && <span className="lspace" aria-hidden="true" />}
+          {playback === "always" && <span className="lspace" aria-hidden="true" />}
+          <span className="lspace" aria-hidden="true" />
+        </span>
+      </li>
+    );
+  };
 
   /** One line of the log: who sent it, its text, and its end. */
   const lineItem = (i: number): React.ReactElement => {
@@ -3232,34 +3323,11 @@ export function QsoScreen({
           </div>
 
           <div className="qsocontrols">
-            <DebugDownload
-              session={() => {
-                // Every line, the QSOs as the station had them, your copy in
-                // Exchange's boxes, your settings, and the session's clean audio.
-                const parts = lines.map((_, i) => tapeLineOf(i)).filter((p): p is TapeLine => p !== null);
-                return {
-                  data: {
-                    prefs: loadPrefs(),
-                    user: loadUser(),
-                    lines,
-                    ends,
-                    current: qso.current,
-                    items,
-                    closed,
-                  },
-                  audio: parts.length ? tape(parts, tapeRate()) : null,
-                };
-              }}
-              current={() =>
-                recorder
-                  ? {
-                      label: `in progress: ${copy.text || "(nothing)"}${copy.keying ? ` [${copy.keying}]` : ""}`,
-                      samples: recorder.since(0),
-                      rate: recorder.rate,
-                    }
-                  : null
-              }
-            />
+            <DebugDownload session={debugSession} current={debugCurrent} />
+            <DebugTools>
+              <DebugDownload session={debugSession} current={debugCurrent} />
+              <MicReadout rec={rec} />
+            </DebugTools>
             {/* Your speed does two jobs: your sending is copied at it, and each
                 new station answers at it. QRS and QRQ change the station's speed
                 alone. */}
@@ -3309,6 +3377,7 @@ export function QsoScreen({
                   <li className="qsogroup">
                     <ol className="qsolines">
                       {group.at.map(lineItem)}
+                      {writing?.n === group.qso && modelWait(group.at)}
                       {qsoTapeRow(group.qso, g, false, qsoReport(group.qso))}
                     </ol>
                   </li>
@@ -3347,9 +3416,11 @@ export function QsoScreen({
               )}
             </ol>
 
-            {suggestion && (
+            {(suggestion || hintWriting) && (
               <p className="qsohint" data-testid="qso-hint">
-                Suggested reply:<code>{suggestion}</code>
+                Suggested reply:
+                {hintWriting && <ModelMark writing="hint" />}
+                {suggestion && <code>{suggestion}</code>}
               </p>
             )}
 

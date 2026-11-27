@@ -45,6 +45,12 @@ export function micDebugOn(): boolean {
   }
 }
 
+/** Call `changed` when the switch changes, for `useSyncExternalStore`. */
+export function onMicDebug(changed: () => void): () => void {
+  window.addEventListener(MIC_DEBUG_EVENT, changed);
+  return () => window.removeEventListener(MIC_DEBUG_EVENT, changed);
+}
+
 /** Turn the transcript on or off for this tab. On, what is kept so far is
  *  printed at once. */
 export function setMicDebug(on: boolean): void {

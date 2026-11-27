@@ -3,7 +3,9 @@
 
 import { describe, expect, it } from "vitest";
 import { answer, chatsOn, newQso, Over, type Qso } from "@/qso/cq";
-import { replyPrompt, toCw, toEnglish, unlabeled, yourTurn } from "@/qso/ragchew";
+import { detailsOf, rejected, replyPrompt, systemPrompt, toCw, toEnglish, unlabeled, yourTurn } from "@/qso/ragchew";
+import { randomStation } from "@/qso/station";
+import { fistFor } from "@/timing/fist";
 import { EMPTY_USER } from "@/io/storage";
 import { failureOf } from "@/llm/engine";
 import { CHAT_WORDS } from "@/qso/chatwords";
@@ -11,6 +13,15 @@ import { vocabulary } from "@/qso/vocabulary";
 import { readWords, type Spaced } from "@/timing/segment";
 
 const ear = { lenient: true, saved: "W7YFR" };
+
+/** A fixed sequence, so the stations are the same every run. */
+function seeded(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
 
 /** A standard QSO with the station partway through its exchange, piece by
  *  piece, and the same QSO with the exchange done. */
@@ -78,6 +89,13 @@ describe("your over in English for the model", () => {
     expect(toEnglish("R OB ROB K", [])).toBe("r ob rob");
   });
 
+  it("keeps a short CW word beside a piece of a word keyed apart", () => {
+    expect(toEnglish("IS THAT HARD ON UR CR OP S", [])).toBe("is that hard on ur cr op s");
+    expect(toEnglish("GUD OP", [])).toBe("good operator");
+    expect(toEnglish("OP HR IS BOB", [])).toBe("operator here is bob");
+    expect(toEnglish("UR SIG IS 599", [])).toBe("your signal is 599");
+  });
+
   it("drops the word an error sign takes back", () => {
     expect(toEnglish("MY ANT IS DIPLE EEEEEE DIPOLE BK", [])).toBe("my antenna is dipole");
   });
@@ -132,6 +150,106 @@ describe("the model's English as CW", () => {
   });
 });
 
+describe("a reply that is not words", () => {
+  /** Replies the model wrote in Morse code on the live site. */
+  const MORSE = [
+    "..-.-. ..- .. --- .-.. / -.-. --- -.. .-.. -.-. .-.. -..- / ..- -.-. -..- -..- / ..-.. --- / ..-.-. --- -.. .-.. -.-. .-.. -..-",
+    ".-.. --- ..- / -.-. --- -.. .-.. -.-. .-.. -..-",
+    "...-.. --- / ..-.. --- / ..-.-. --- -..- / ..- -..- -.-. .-.. -..-",
+  ];
+
+  it("keys nothing for Morse code, or for a reply with no letter in it", () => {
+    for (const m of [...MORSE, "/ . / . /", "599 599", "   "]) expect(toCw(m), m).toBe("");
+  });
+
+  it("still keys a sentence, and one with a stray dash or slash", () => {
+    expect(toCw("Snow here today. How is the weather there?")).toBe("SNOW HR TODAY BT HOW IS THE WX THERE? BK");
+    expect(toCw("My antenna is a 40/80 dipole - it works well.")).toBe("MY ANT IS A 40/80 DIPOLE IT WORKS WELL BK");
+    expect(toCw("I run 5 W - just a KX2 / and a wire.")).not.toBe("");
+  });
+
+  it("says why the station does not send a line", () => {
+    const them = stages().done.them;
+    const d = detailsOf(them);
+    expect(rejected(null, "", "", d, "")).toBe("error");
+    expect(rejected("  ", "", "", d, "")).toBe("empty");
+    expect(rejected(MORSE[0]!, toCw(MORSE[0]!), "", d, "")).toBe("morse");
+    expect(rejected("Nice rig.", "NICE RIG BK", "RIG HR IS FT9999", d, "")).toBe(null);
+    expect(rejected("My FT9999 is great.", "MY FT9999 IS FB BK", "RIG HR IS FT9999", d, "")).toBe("borrows");
+    expect(rejected("Nice rig here.", "NICE RIG HR BK", "", d, "NICE RIG HR BT WX SUNNY BK")).toBe("opening");
+  });
+
+  it("does not send a line that reads yours back to you", () => {
+    const d = detailsOf(stages().done.them);
+    const heard = "IS THAT HARD ON UR CR OP S OR IS THAT THE C OR R E CT CL IM AT I FOR THE W";
+    const back =
+      'You\'re asking if the dry weather is hard on my crops, or if that\'s the correct claim for the word "operator". ' +
+      "The dry weather can be tough on my crops, but I've learned to manage it.";
+    expect(rejected(back, toCw(back), heard, d, "")).toBe("restates");
+    for (const e of ["Lynn: you said it was hard?", "If I understand you, yes.", "It sounds like you have rain."]) {
+      expect(rejected(e, toCw(unlabeled(e)), heard, d, ""), e).toBe("restates");
+    }
+    const kept = "Yes, the dry weather is hard on the crops some years.";
+    expect(rejected(kept, toCw(kept), heard, d, "")).toBe(null);
+  });
+});
+
+describe("the station's prompt", () => {
+  const user = { ...EMPTY_USER, name: "ROB", qthCity: "SEATTLE", qthRegionShort: "WA" };
+  const stations = Array.from({ length: 200 }, (_, i) => randomStation(seeded(i + 1)));
+
+  it("says plain English and no Morse code before the facts", () => {
+    const them = stations[0]!;
+    const p = systemPrompt(them, detailsOf(them), user, { wpm: 15, yourWpm: null });
+    const rule = p.indexOf("Never write dots, dashes or Morse code");
+    expect(rule).toBeGreaterThan(0);
+    expect(rule).toBeLessThan(p.indexOf("Facts about you"));
+    expect(p).not.toContain("by Morse code");
+  });
+
+  it("gives a bug as an interest only to a station that sends with one", () => {
+    let bugs = 0;
+    for (const them of stations) {
+      const { fist: _, ...rest } = them;
+      const keyer = detailsOf(rest);
+      const bug = detailsOf({ ...rest, fist: fistFor("bug", 1)! });
+      const straight = detailsOf({ ...rest, fist: fistFor("straight", 1)! });
+      expect(keyer.interest).not.toBe("USE A BUG");
+      expect(keyer.interest).not.toBe("ARE IN THE SKCC");
+      expect(straight.interest).not.toBe("USE A BUG");
+      // The other details stay as they were.
+      expect({ ...keyer, interest: "" }).toEqual({ ...bug, interest: "" });
+      if (bug.interest === "USE A BUG") {
+        bugs++;
+        // In its place: contests on a keyer, the Straight Key Century Club on a straight key.
+        expect(keyer.interest).toBe("LIKE CONTESTS");
+        expect(straight.interest).toBe("ARE IN THE SKCC");
+      }
+    }
+    expect(bugs).toBeGreaterThan(0);
+  });
+
+  it("gives the SKCC to a straight key or a bug, and contests to a keyer in its place", () => {
+    let skcc = 0;
+    for (const them of stations) {
+      const { fist: _, ...rest } = them;
+      const straight = detailsOf({ ...rest, fist: fistFor("straight", 1)! });
+      const bug = detailsOf({ ...rest, fist: fistFor("bug", 1)! });
+      if (straight.interest !== "ARE IN THE SKCC" || bug.interest !== "ARE IN THE SKCC") continue;
+      skcc++;
+      expect(detailsOf(rest).interest).toBe("LIKE CONTESTS");
+    }
+    expect(skcc).toBeGreaterThan(0);
+  });
+
+  it("says each interest as the station's own, in the second person", () => {
+    for (const them of stations) {
+      const p = systemPrompt(them, detailsOf(them), user, { wpm: 15, yourWpm: null });
+      expect(p).not.toMatch(/\bYou (uses|builds|is|chases|restores|likes|also likes)\b/);
+    }
+  });
+});
+
 describe("why the model did not download or load", () => {
   it("names each failure from what the browser, WebLLM or the GPU threw", () => {
     const quota = Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" });
@@ -166,15 +284,22 @@ describe("your suggested reply in a rag chew", () => {
     expect(replyPrompt(them, EMPTY_USER)).not.toContain("Facts about you");
   });
 
-  it("sends the chat as one message from you, with each line under its speaker", () => {
+  it("sends the chat as one message from you, with the station's last line set apart at the end", () => {
+    const name = `${them.name.charAt(0)}${them.name.slice(1).toLowerCase()}`;
     const turns = yourTurn(them, user, [
       { role: "user", content: "great rig here is ic7300" },
       { role: "assistant", content: "Nice radio. What antenna?" },
+      { role: "user", content: "a dipole" },
+      { role: "assistant", content: "Dipoles work well. How high is it?" },
     ]);
     expect(turns).toHaveLength(1);
     expect(turns[0]!.role).toBe("user");
-    expect(turns[0]!.content).toContain("Rob: great rig here is ic7300");
-    expect(turns[0]!.content).toContain(`${them.name.charAt(0)}${them.name.slice(1).toLowerCase()}: Nice radio. What antenna?`);
+    const text = turns[0]!.content;
+    expect(text).toContain("Rob: great rig here is ic7300");
+    expect(text).toContain(`${name}: Nice radio. What antenna?`);
+    expect(text).not.toContain(`${name}: Dipoles work well`);
+    expect(text).toContain(`${name} just said: Dipoles work well. How high is it?`);
+    expect(text.indexOf("just said")).toBeGreaterThan(text.indexOf("Rob: a dipole"));
   });
 
   it("drops a speaker's name the model writes before the line", () => {

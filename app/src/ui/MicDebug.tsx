@@ -18,8 +18,9 @@
  * thing anyone trips over.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { APP_VERSION } from "@/build-info";
+import { debugPanelOn, onDebugPanel } from "@/devtools";
 import { micDebugOn } from "@/micdebug";
 import { IconChevron } from "./Icons";
 import type { RecorderHandle } from "./useRecorder";
@@ -91,31 +92,94 @@ function Row({ k, v }: { k: string; v: React.ReactNode }): React.ReactElement {
   );
 }
 
-export function MicDebug({ rec }: { rec: RecorderHandle }): React.ReactElement | null {
-  const access = useMicAccess();
+/** The readings, taken when the readout mounts with `on`, and again on
+ *  re-read. */
+function useProbe(on: boolean): { p: Probe | null; n: number; reread(): void } {
   const [p, setP] = useState<Probe | null>(null);
   const [n, setN] = useState(0);
-  const [hidden, setHidden] = useState(folded);
-
-  const fold = (next: boolean): void => {
-    folded = next;
-    setHidden(next);
-  };
-
   const take = useCallback(() => {
     void probe().then(setP);
   }, []);
   /* Nothing at all when the flag is absent — not even the reading. A panel
      that is not on screen enumerating devices is a side effect nobody asked
      for, and in the tests it is an async state update landing after the test
-     that mounted it has finished. The early return below cannot prevent it:
-     the hooks above it run either way, which is the rule. */
+     that mounted it has finished. The early return in `MicDebug` cannot
+     prevent it: the hooks above it run either way, which is the rule. */
   useEffect(() => {
-    if (!micDebugOn()) return;
+    if (!on) return;
     take();
   }, [take]);
+  return {
+    p,
+    n,
+    reread: () => {
+      setN((x) => x + 1);
+      take();
+    },
+  };
+}
 
-  if (!micDebugOn()) return null;
+/** The readout's lines, and the button that takes the readings again. */
+function Readout({ rec, access, probed }: { rec: RecorderHandle; access: string; probed: ReturnType<typeof useProbe> }) {
+  const { p, n } = probed;
+  return (
+    <>
+      <Row k="build" v={`v${APP_VERSION}`} />
+      <Row k="secure ctx" v={String(p?.secure)} />
+      <Row k="getUserMedia" v={String(p?.hasGetUserMedia)} />
+      <Row k="permissions" v={p?.permissions ?? "…"} />
+      <Row k="useMicAccess" v={access} />
+      <Row
+        k="recorder"
+        v={`probing=${rec.probing} needAccess=${rec.needAccess} blocked=${rec.blocked} recording=${Boolean(
+          rec.recorder,
+        )}`}
+      />
+      <Row
+        k="devices"
+        v={`${rec.devices.length} — ${rec.devices.map((d) => d.label).join(" | ") || "none"}`}
+      />
+      <div className="k">raw audioinput (re-read {n}×):</div>
+      {(p?.raw ?? []).map((d, i) => (
+        <div key={i}>
+          {"  "}
+          {d.id} {d.label}
+        </div>
+      ))}
+      {p?.raw.length === 0 && <div>{"  (list is empty)"}</div>}
+      <button className="reread" data-testid="mic-debug-reread" onClick={probed.reread}>
+        re-read
+      </button>
+    </>
+  );
+}
+
+/** The readout alone, for the debug panel, which mounts it only while it
+ *  shows. */
+export function MicReadout({ rec }: { rec: RecorderHandle }): React.ReactElement {
+  const access = useMicAccess();
+  const probed = useProbe(true);
+  return (
+    <div data-testid="mic-readout">
+      <Readout rec={rec} access={access} probed={probed} />
+    </div>
+  );
+}
+
+export function MicDebug({ rec }: { rec: RecorderHandle }): React.ReactElement | null {
+  const access = useMicAccess();
+  const probed = useProbe(micDebugOn());
+  const [hidden, setHidden] = useState(folded);
+  // The debug panel holds the readout while it shows: one panel at the foot
+  // of the screen, not two.
+  const panel = useSyncExternalStore(onDebugPanel, debugPanelOn);
+
+  const fold = (next: boolean): void => {
+    folded = next;
+    setHidden(next);
+  };
+
+  if (!micDebugOn() || panel) return null;
 
   if (hidden) {
     return (
@@ -145,39 +209,7 @@ export function MicDebug({ rec }: { rec: RecorderHandle }): React.ReactElement |
           hide <IconChevron />
         </button>
       </div>
-      <Row k="build" v={`v${APP_VERSION}`} />
-      <Row k="secure ctx" v={String(p?.secure)} />
-      <Row k="getUserMedia" v={String(p?.hasGetUserMedia)} />
-      <Row k="permissions" v={p?.permissions ?? "…"} />
-      <Row k="useMicAccess" v={access} />
-      <Row
-        k="recorder"
-        v={`probing=${rec.probing} needAccess=${rec.needAccess} blocked=${rec.blocked} recording=${Boolean(
-          rec.recorder,
-        )}`}
-      />
-      <Row
-        k="devices"
-        v={`${rec.devices.length} — ${rec.devices.map((d) => d.label).join(" | ") || "none"}`}
-      />
-      <div className="k">raw audioinput (re-read {n}×):</div>
-      {(p?.raw ?? []).map((d, i) => (
-        <div key={i}>
-          {"  "}
-          {d.id} {d.label}
-        </div>
-      ))}
-      {p?.raw.length === 0 && <div>{"  (list is empty)"}</div>}
-      <button
-        className="reread"
-        data-testid="mic-debug-reread"
-        onClick={() => {
-          setN((x) => x + 1);
-          take();
-        }}
-      >
-        re-read
-      </button>
+      <Readout rec={rec} access={access} probed={probed} />
     </div>
   );
 }

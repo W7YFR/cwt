@@ -36,6 +36,7 @@ import { UnsetNotesText, type UnsetNotes } from "./SlotMenu";
 import { ReviewScreen } from "./ReviewScreen";
 import { CopyScreen } from "./CopyScreen";
 import { QsoScreen } from "./QsoScreen";
+import { DebugPanel } from "./DebugPanel";
 import { LiveScreen } from "./LiveScreen";
 import type { Page } from "./PageSwitch";
 import { useFileDrop } from "./useFileDrop";
@@ -646,6 +647,7 @@ function AppBody(): React.ReactElement {
       />
 
       <Footer />
+      <DebugPanel />
     </div>
   );
 }

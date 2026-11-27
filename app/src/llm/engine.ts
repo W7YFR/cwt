@@ -290,8 +290,11 @@ async function ask(system: string, turns: readonly ChatTurn[], maxTokens: number
       max_tokens: maxTokens,
     });
     const choice = out.choices[0];
+    // Cut off at max_tokens: the line ends mid-sentence.
+    if (choice?.finish_reason === "length") llmLog("llm: cut off", { maxTokens, reply: choice.message.content });
     return choice && choice.finish_reason !== "abort" ? choice.message.content : null;
-  } catch {
+  } catch (e) {
+    llmLog("llm: error", { name: e instanceof Error ? e.name : typeof e, message: e instanceof Error ? e.message : String(e) });
     return null;
   }
 }
@@ -323,9 +326,12 @@ export function suggest(system: string, turns: readonly ChatTurn[]): Promise<str
 /** Where `__cwt.debugLLM(true)` is kept, so it lasts across reloads. */
 const DEBUG_KEY = "cwt:debugLLM";
 
+/** Fired on `window` when the switch changes. */
+export const LLM_DEBUG_EVENT = "cwt-debugllm";
+
 /** Whether rag chew lines go to the console. `?micdebug` is too busy to
  *  read them in. */
-function debugOn(): boolean {
+export function llmDebugOn(): boolean {
   try {
     return localStorage.getItem(DEBUG_KEY) === "1";
   } catch {
@@ -333,11 +339,64 @@ function debugOn(): boolean {
   }
 }
 
-/** One rag chew event: into the mic transcript, and to the console with
- *  `__cwt.debugLLM(true)`. */
+/** Send rag chew lines to the console, or stop. */
+export function setLlmDebug(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(DEBUG_KEY, "1");
+    else localStorage.removeItem(DEBUG_KEY);
+  } catch {
+    /* no local storage: nothing changes */
+  }
+  window.dispatchEvent(new Event(LLM_DEBUG_EVENT));
+}
+
+/** Call `changed` when the switch changes, for `useSyncExternalStore`. */
+export function onLlmDebug(changed: () => void): () => void {
+  window.addEventListener(LLM_DEBUG_EVENT, changed);
+  return () => window.removeEventListener(LLM_DEBUG_EVENT, changed);
+}
+
+/** One rag chew event, as the debug panel shows it. */
+export interface LlmEvent {
+  /** Seconds since the page loaded. */
+  readonly at: number;
+  readonly event: string;
+  readonly detail: unknown;
+}
+
+/** Events kept for the debug panel. Older events go first. */
+const EVENTS_MAX = 20;
+let events: readonly LlmEvent[] = [];
+const eventListeners = new Set<() => void>();
+
+function setEvents(next: readonly LlmEvent[]): void {
+  events = next;
+  for (const l of eventListeners) l();
+}
+
+/** The last rag chew events, oldest first. The same array until one is
+ *  added or they are cleared. */
+export function llmEvents(): readonly LlmEvent[] {
+  return events;
+}
+
+/** Call `changed` when an event is added or they are cleared. */
+export function onLlmEvents(changed: () => void): () => void {
+  eventListeners.add(changed);
+  return () => eventListeners.delete(changed);
+}
+
+export function clearLlmEvents(): void {
+  setEvents([]);
+}
+
+/** One rag chew event: into the mic transcript, into the debug panel, and
+ *  to the console with `__cwt.debugLLM(true)`. */
 export function llmLog(event: string, detail: unknown): void {
   micLog(event, detail);
-  if (debugOn()) console.info(`[llm] ${event}`, detail);
+  const at = typeof performance === "undefined" ? 0 : performance.now() / 1000;
+  setEvents([...events, { at, event, detail }].slice(-EVENTS_MAX));
+  if (llmDebugOn()) console.info(`[llm] ${event}`, detail);
 }
 
 addHelper(
@@ -345,12 +404,7 @@ addHelper(
   "debugLLM(true) prints each rag chew line to the console, kept across reloads: what you sent, the model's reply and " +
     "the CW sent. debugLLM(false) turns it off.",
   (on = true) => {
-    try {
-      if (on) localStorage.setItem(DEBUG_KEY, "1");
-      else localStorage.removeItem(DEBUG_KEY);
-    } catch {
-      /* no local storage: nothing changes */
-    }
+    setLlmDebug(on);
     return on ? "LLM debug on, across reloads." : "LLM debug off.";
   },
 );

@@ -213,6 +213,18 @@ export const REPORT_RE = /^[1-5][1-9N][1-9N]$/;
  *  5NNWA, never part of 1234. */
 export const REPORT_IN = /(?<![0-9])[1-5][1-9N][1-9N](?![0-9])/;
 
+/** The report that starts at word `i` of `words`: 599 whole, one keyed in
+ *  two pieces, as 5 NN, or one keyed a character at a time, as 4 9 9 or
+ *  5 N N. Empty when none. */
+export function reportAt(words: readonly string[], i: number): string {
+  const w = words[i] ?? "";
+  if (REPORT_RE.test(w)) return w;
+  const two = w + (words[i + 1] ?? "");
+  if (REPORT_RE.test(two)) return two;
+  const three = words.slice(i, i + 3);
+  return three.length === 3 && three.every((c) => c.length === 1) && REPORT_RE.test(three.join("")) ? three.join("") : "";
+}
+
 /** UR run into a report, as UR5NN: the shape of a call, but in a QSO it is
  *  UR 5NN. */
 const UR_REPORT_RE = /^UR([1-5][1-9N][1-9N])$/;
@@ -550,8 +562,13 @@ export class Over {
         // Part of its call keyed apart, as N 8 V ?: up to four words before
         // the ? read as one.
         const apart = [2, 3, 4].find((n) => n <= kept.length && partOfCall(kept.slice(-n).join("")));
+        // Its report keyed apart, as 5 7 9 ?: read whole.
+        const report = [2, 3].find((n) => n <= kept.length && reportAt(kept.slice(-n), 0) === kept.slice(-n).join(""));
         if (item) check(item);
-        else if (partOfCall(prev)) add(asked, "call");
+        else if (report && theirs(kept.slice(-report).join("")) === "report") {
+          kept.splice(-report);
+          check("report");
+        } else if (partOfCall(prev)) add(asked, "call");
         else if (apart) {
           kept.splice(-apart);
           add(asked, "call");
@@ -596,9 +613,8 @@ export class Over {
     const { words } = this;
     for (let i = 0; i < words.length; i++) {
       const w = words[i]!;
-      if (REPORT_RE.test(w)) return w;
-      const two = w + (words[i + 1] ?? "");
-      if (REPORT_RE.test(two)) return two;
+      const report = reportAt(words, i);
+      if (report) return report;
       if (this.ear.lenient && !isCall(w)) {
         const m = REPORT_IN.exec(w);
         if (m) return m[0];
@@ -728,11 +744,11 @@ export class Over {
     return ok[word.length]!;
   }
 
-  /** Whether it holds a report: 599, or one keyed apart, as 5 NN. When
-   *  lenient, one run into other words too, as UR5NN. */
+  /** Whether it holds a report: 599, or one keyed apart, as 5 NN or 4 9 9.
+   *  When lenient, one run into other words too, as UR5NN. */
   hasReport(): boolean {
     const { words } = this;
-    if (words.some((w, i) => REPORT_RE.test(w) || REPORT_RE.test(w + (words[i + 1] ?? "")))) return true;
+    if (words.some((_, i) => reportAt(words, i))) return true;
     return this.ear.lenient && words.some((w) => !isCall(w) && REPORT_IN.test(w));
   }
 

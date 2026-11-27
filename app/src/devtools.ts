@@ -45,18 +45,29 @@ export function suggestedRepliesOn(): boolean {
   }
 }
 
+/** Show or hide the suggested replies in the QSO log, for this tab. */
+export function setSuggestedReplies(on: boolean): void {
+  try {
+    if (on) sessionStorage.setItem(REPLIES_KEY, "1");
+    else sessionStorage.removeItem(REPLIES_KEY);
+  } catch {
+    /* no session storage: nothing changes */
+  }
+  window.dispatchEvent(new Event(REPLIES_EVENT));
+}
+
+/** Call `changed` when the switch changes, for `useSyncExternalStore`. */
+export function onSuggestedReplies(changed: () => void): () => void {
+  window.addEventListener(REPLIES_EVENT, changed);
+  return () => window.removeEventListener(REPLIES_EVENT, changed);
+}
+
 addHelper(
   "suggestedReplies",
   "suggestedReplies() shows, above each line you sent on the QSO page, the reply suggested before it, " +
     "for this tab. suggestedReplies(false) hides them.",
   (on = true) => {
-    try {
-      if (on) sessionStorage.setItem(REPLIES_KEY, "1");
-      else sessionStorage.removeItem(REPLIES_KEY);
-    } catch {
-      /* no session storage: nothing changes */
-    }
-    window.dispatchEvent(new Event(REPLIES_EVENT));
+    setSuggestedReplies(on);
     return on ? "Suggested replies show in the QSO log." : "Suggested replies hidden.";
   },
 );
@@ -84,17 +95,68 @@ export function onLivePage(changed: () => void): () => void {
   return () => window.removeEventListener(LIVE_EVENT, changed);
 }
 
+/** Add the Live page to the page switch, or take it away. */
+export function setLivePage(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(LIVE_KEY, "1");
+    else localStorage.removeItem(LIVE_KEY);
+  } catch {
+    /* no local storage: nothing changes */
+  }
+  window.dispatchEvent(new Event(LIVE_EVENT));
+}
+
 addHelper(
   "enableLive",
   "enableLive() adds the Live page to the page switch, kept across reloads. enableLive(false) takes it away.",
   (on = true) => {
-    try {
-      if (on) localStorage.setItem(LIVE_KEY, "1");
-      else localStorage.removeItem(LIVE_KEY);
-    } catch {
-      /* no local storage: nothing changes */
-    }
-    window.dispatchEvent(new Event(LIVE_EVENT));
+    setLivePage(on);
     return on ? "The Live page is in the page switch." : "The Live page is gone from the page switch.";
+  },
+);
+
+/* ---- the debug panel ------------------------------------------------------ */
+
+/** The switch, kept across reloads and tabs until it is turned off. */
+const DEBUG_KEY = "cwt:debug";
+
+/** Fired on `window` when the switch changes. */
+export const DEBUG_EVENT = "cwt-debug";
+
+/** Whether the debug panel shows: `?debug` in the address, or the switch. */
+export function debugPanelOn(): boolean {
+  if (typeof location === "undefined") return false;
+  if (new URLSearchParams(location.search).has("debug")) return true;
+  try {
+    return localStorage.getItem(DEBUG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Show or hide the debug panel. */
+export function setDebugPanel(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(DEBUG_KEY, "1");
+    else localStorage.removeItem(DEBUG_KEY);
+  } catch {
+    /* no local storage: nothing changes */
+  }
+  window.dispatchEvent(new Event(DEBUG_EVENT));
+}
+
+/** Call `changed` when the switch changes, for `useSyncExternalStore`. */
+export function onDebugPanel(changed: () => void): () => void {
+  window.addEventListener(DEBUG_EVENT, changed);
+  return () => window.removeEventListener(DEBUG_EVENT, changed);
+}
+
+addHelper(
+  "debug",
+  "debug(true) shows the debug panel on every page, kept across reloads, as ?debug does: the debug switches, " +
+    "the last rag chew lines, the Save buttons and the build. debug(false) or the panel's close hides it.",
+  (on = true) => {
+    setDebugPanel(on);
+    return on ? "The debug panel shows." : "The debug panel is hidden.";
   },
 );
