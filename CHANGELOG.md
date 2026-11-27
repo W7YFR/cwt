@@ -7,6 +7,8 @@ nothing to the site. The next release carries them.
 
 ## Unreleased
 
+## v1.44.1 — 2026-11-27
+
 ### Added
 
 - In a rag chew, a robot pulses in the log while the model writes the station's line, and in **Suggested reply** while it writes yours. Its tip says what the model is writing.
